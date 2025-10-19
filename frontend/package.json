@@ -13,6 +13,7 @@
     "@noble/ed25519": "^3.0.0",
     "@telegram-apps/sdk": "^3.11.8",
     "@telegram-apps/sdk-react": "^3.3.9",
+    "@telegram-apps/telegram-ui": "^2.1.13",
     "next": "15.5.6",
     "qs": "^6.14.0",
     "react": "19.1.0",
