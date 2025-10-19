@@ -1,6 +1,7 @@
 import { etc, verify } from "@noble/ed25519";
-import { TELEGRAM_PUBLIC_KEYS } from "./constants";
 import qs from "qs";
+
+import { TELEGRAM_PUBLIC_KEYS } from "./constants";
 
 export const cleanInitData = (initData: string) => {
   const cleanInitData = qs.parse(initData);

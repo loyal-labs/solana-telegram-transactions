@@ -1,6 +1,7 @@
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import { FlatCompat } from "@eslint/eslintrc";
+import simpleImportSort from "eslint-plugin-simple-import-sort";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -19,17 +20,12 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
     ],
+    plugins: {
+      "simple-import-sort": simpleImportSort,
+    },
     rules: {
-      "sort-imports": [
-        "error",
-        {
-          allowSeparatedGroups: true,
-          ignoreCase: false,
-          ignoreDeclarationSort: false,
-          ignoreMemberSort: false,
-          memberSyntaxSortOrder: ["none", "all", "multiple", "single"],
-        },
-      ],
+      "simple-import-sort/imports": "error",
+      "simple-import-sort/exports": "error",
     },
   },
 ];

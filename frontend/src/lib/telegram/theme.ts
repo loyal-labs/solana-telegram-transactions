@@ -1,5 +1,5 @@
-import type { RGB } from "@telegram-apps/types";
 import { themeParams } from "@telegram-apps/sdk";
+import type { RGB } from "@telegram-apps/types";
 
 const isClient = typeof window !== "undefined";
 

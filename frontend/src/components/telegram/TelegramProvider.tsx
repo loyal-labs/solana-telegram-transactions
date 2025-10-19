@@ -1,8 +1,7 @@
 'use client';
 
-import { type PropsWithChildren, useEffect } from 'react';
-
 import { init } from '@telegram-apps/sdk';
+import { type PropsWithChildren, useEffect } from 'react';
 
 import { useDidMount } from '@/hooks/useDidMount';
 

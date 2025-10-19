@@ -1,6 +1,6 @@
+import type { SecondaryButtonPosition } from "@telegram-apps/bridge";
 import { mainButton, secondaryButton } from "@telegram-apps/sdk-react";
 import type { RGB } from "@telegram-apps/types";
-import type { SecondaryButtonPosition } from "@telegram-apps/bridge";
 
 import { isInMiniApp } from "./index";
 
