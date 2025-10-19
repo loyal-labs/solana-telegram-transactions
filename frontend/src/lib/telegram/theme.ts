@@ -1,31 +1,8 @@
 import { themeParams } from "@telegram-apps/sdk";
 import type { RGB } from "@telegram-apps/types";
 
+import { themeColorSignals, ThemeSignalKey } from "@/types/telegram";
 const isClient = typeof window !== "undefined";
-
-const themeColorSignals = {
-  accentTextColor: themeParams.accentTextColor,
-  backgroundColor: themeParams.backgroundColor,
-  buttonColor: themeParams.buttonColor,
-  buttonTextColor: themeParams.buttonTextColor,
-  destructiveTextColor: themeParams.destructiveTextColor,
-  headerBackgroundColor: themeParams.headerBackgroundColor,
-  hintColor: themeParams.hintColor,
-  linkColor: themeParams.linkColor,
-  secondaryBackgroundColor: themeParams.secondaryBackgroundColor,
-  sectionBackgroundColor: themeParams.sectionBackgroundColor,
-  sectionHeaderTextColor: themeParams.sectionHeaderTextColor,
-  sectionSeparatorColor: themeParams.sectionSeparatorColor,
-  subtitleTextColor: themeParams.subtitleTextColor,
-  textColor: themeParams.textColor,
-  bottomBarBgColor: themeParams.bottomBarBgColor,
-  state: themeParams.state,
-  isDark: themeParams.isDark,
-} as const;
-
-type ThemeSignals = typeof themeColorSignals;
-
-export type ThemeSignalKey = Exclude<keyof ThemeSignals, "state" | "isDark">;
 
 let asyncMountPromise: Promise<boolean> | null = null;
 

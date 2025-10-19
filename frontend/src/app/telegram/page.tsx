@@ -9,14 +9,15 @@ import {
   useSignal
 } from '@telegram-apps/sdk-react';
 import { List } from '@telegram-apps/telegram-ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import ReceiveSheet from '@/components/wallet/ReceiveSheet';
 import SendSheet from '@/components/wallet/SendSheet';
 import WalletBalance from '@/components/wallet/WalletBalance';
+import { TELEGRAM_BOT_ID } from '@/lib/constants';
+import { ensureWalletKeypair } from '@/lib/solana/wallet-keypair-logic';
 import { initTelegram } from '@/lib/telegram';
 import { hideMainButton, hideSecondaryButton, showMainButton, showSecondaryButton } from '@/lib/telegram/buttons';
-import { TELEGRAM_BOT_ID } from '@/lib/telegram/constants';
 import { cleanInitData, createValidationString, validateInitData } from '@/lib/telegram/init-data-transform';
 import { ensureTelegramTheme, themeSignals } from '@/lib/telegram/theme';
 
@@ -37,6 +38,7 @@ export default function Home() {
   const buttonColor = useSignal(themeSignals.buttonColor);
   const buttonTextColor = useSignal(themeSignals.buttonTextColor);
   const sectionSeparatorColor = useSignal(themeSignals.sectionSeparatorColor);
+  const ensuredWalletRef = useRef(false);
 
   useEffect(() => {
     if (rawInitData) {
@@ -52,6 +54,24 @@ export default function Home() {
   useEffect(() => {
     initTelegram();
     void ensureTelegramTheme();
+  }, []);
+
+  useEffect(() => {
+    if (ensuredWalletRef.current) return;
+
+    ensuredWalletRef.current = true;
+
+    void (async () => {
+      try {
+        const { keypair, isNew } = await ensureWalletKeypair();
+        console.log("Wallet keypair ready", {
+          isNew,
+          publicKey: keypair.publicKey.toBase58(),
+        });
+      } catch (error) {
+        console.error("Failed to ensure wallet keypair", error);
+      }
+    })();
   }, []);
 
   useEffect(() => {

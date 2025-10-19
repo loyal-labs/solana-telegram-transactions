@@ -1,17 +1,9 @@
 import type { SecondaryButtonPosition } from "@telegram-apps/bridge";
 import { mainButton, secondaryButton } from "@telegram-apps/sdk-react";
-import type { RGB } from "@telegram-apps/types";
+
+import { BaseButtonOptions } from "@/types/telegram";
 
 import { isInMiniApp } from "./index";
-
-type BaseButtonOptions = {
-  text: string;
-  isEnabled?: boolean;
-  hasShineEffect?: boolean;
-  backgroundColor?: RGB;
-  textColor?: RGB;
-  showLoader?: boolean;
-};
 
 export type MainButtonOptions = BaseButtonOptions & {
   onClick?: () => void;

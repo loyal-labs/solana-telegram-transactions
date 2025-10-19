@@ -1,31 +1,92 @@
 "use client";
 
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Badge, Cell, Info } from "@telegram-apps/telegram-ui";
-import { type ReactNode } from "react";
+import { useEffect, useState } from "react";
 
-export type WalletBalanceProps = {
-  /**
-   * The primary balance amount shown in the cell's trailing info block.
-   * Defaults to the mocked SOL balance.
-   */
-  amount?: ReactNode;
-  /**
-   * Fiat representation rendered as the subtitle of the trailing info block.
-   * Defaults to the mocked USD equivalent.
-   */
-  fiatAmount?: string;
+import {
+  getWalletBalance,
+  getWalletPublicKey,
+} from "@/lib/solana/wallet-details";
+
+type WalletBalanceData = {
+  lamports: number | null;
+  publicKey: string | null;
 };
 
-export default function WalletBalance({
-  amount = "1 SOL",
-  fiatAmount = "$300.00",
-}: WalletBalanceProps) {
+const INITIAL_DATA: WalletBalanceData = {
+  lamports: null,
+  publicKey: null,
+};
+
+const SOL_PRICE_USD = 180; // TODO: Replace with live SOL price feed.
+
+const formatBalance = (lamports: number | null): string => {
+  if (lamports === null) return "—";
+
+  const sol = lamports / LAMPORTS_PER_SOL;
+  return `${sol.toFixed(4)} SOL`;
+};
+
+const formatUsdValue = (lamports: number | null): string => {
+  if (lamports === null) return "—";
+
+  const sol = lamports / LAMPORTS_PER_SOL;
+  const usd = sol * SOL_PRICE_USD;
+
+  return `$${usd.toFixed(2)}`;
+};
+
+export default function WalletBalance() {
+  const [data, setData] = useState<WalletBalanceData>(INITIAL_DATA);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const load = async () => {
+      try {
+        const [publicKey, lamports] = await Promise.all([
+          getWalletPublicKey(),
+          getWalletBalance(),
+        ]);
+
+        if (!isMounted) return;
+        setData({
+          lamports,
+          publicKey: publicKey.toBase58(),
+        });
+      } catch (error) {
+        console.error("Failed to load wallet balance", error);
+        if (!isMounted) return;
+        setData(INITIAL_DATA);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void load();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const balanceDisplay = formatBalance(data.lamports);
+  const usdDisplay = formatUsdValue(data.lamports);
+  const subtitle = isLoading ? "Loading…" : usdDisplay;
+
   return (
     <Cell
       after={
-        <Info subtitle={fiatAmount} type="text">
-          {amount}
+        <Info subtitle={subtitle} type="text">
+          {isLoading ? "…" : balanceDisplay}
         </Info>
+      }
+      description={
+        data.publicKey ? `${data.publicKey.slice(0, 4)}…${data.publicKey.slice(-4)}` : undefined
       }
       interactiveAnimation="opacity"
       titleBadge={<Badge type="dot" />}

@@ -10,8 +10,16 @@ import {
 } from "@telegram-apps/telegram-ui";
 import { Icon28Close } from "@telegram-apps/telegram-ui/dist/icons/28/close";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
+import { getWalletPublicKey } from "@/lib/solana/wallet-details";
 import { themeSignals } from "@/lib/telegram/theme";
 
 export type ReceiveSheetProps = {
@@ -29,7 +37,6 @@ const FALLBACKS = {
   text: "var(--tg-theme-text-color, #1f2937)",
 } as const;
 
-const PLACEHOLDER_ADDRESS = "6R1uV5rZpW2xYK9sMxXAyXsVDn1oHJf1fTFfU3zKQtjQ";
 const COPIED_RESET_TIMEOUT = 2000;
 
 const formatWalletAddress = (address: string) => {
@@ -46,6 +53,8 @@ export default function ReceiveSheet({
   onOpenChange,
 }: ReceiveSheetProps) {
   const [copied, setCopied] = useState(false);
+  const [address, setAddress] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const surfaceColor = useSignal(themeSignals.backgroundColor) ?? FALLBACKS.surface;
   const borderColor = useSignal(themeSignals.sectionSeparatorColor) ?? FALLBACKS.border;
@@ -73,18 +82,52 @@ export default function ReceiveSheet({
     };
   }, [copied]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadAddress = async () => {
+      setIsLoading(true);
+
+      try {
+        const publicKey = await getWalletPublicKey();
+
+        if (isMounted) {
+          setAddress(publicKey.toBase58());
+        }
+      } catch (error) {
+        console.error("Failed to fetch wallet address", error);
+
+        if (isMounted) {
+          setAddress(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadAddress();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const copyAddress = useCallback(async () => {
+    if (!address) return;
+
     try {
       if (!navigator?.clipboard?.writeText) {
         throw new Error("Clipboard API is not available");
       }
 
-      await navigator.clipboard.writeText(PLACEHOLDER_ADDRESS);
+      await navigator.clipboard.writeText(address);
       setCopied(true);
     } catch (error) {
       console.error("Failed to copy wallet address", error);
     }
-  }, []);
+  }, [address]);
 
   const copyButton = useMemo(
     () => (
@@ -93,6 +136,7 @@ export default function ReceiveSheet({
         size="s"
         onClick={copyAddress}
         aria-label="Copy wallet address"
+        disabled={!address || isLoading}
         style={
           {
             ...(buttonColor
@@ -111,13 +155,15 @@ export default function ReceiveSheet({
         {copied ? "Copied" : "Copy"}
       </Button>
     ),
-    [copied, copyAddress, buttonColor, buttonTextColor],
+    [copied, copyAddress, buttonColor, buttonTextColor, address, isLoading],
   );
 
-  const displayAddress = useMemo(
-    () => formatWalletAddress(PLACEHOLDER_ADDRESS),
-    [],
-  );
+  const displayAddress = useMemo(() => {
+    if (isLoading) return "Loading…";
+    if (!address) return "—";
+
+    return formatWalletAddress(address);
+  }, [address, isLoading]);
 
   return (
     <Modal

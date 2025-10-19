@@ -1,8 +1,8 @@
 import { cloudStorage } from "@telegram-apps/sdk";
 
-import { isInMiniApp } from "./index";
+import { CloudKeyInput } from "@/types/telegram";
 
-type CloudKeyInput = string | string[];
+import { isInMiniApp } from "./index";
 
 const normalizeKeys = (input: CloudKeyInput): string[] =>
   Array.isArray(input) ? input : [input];

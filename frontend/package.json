@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@noble/ed25519": "^3.0.0",
+    "@solana/web3.js": "1",
     "@telegram-apps/sdk": "^3.11.8",
     "@telegram-apps/sdk-react": "^3.3.9",
     "@telegram-apps/telegram-ui": "^2.1.13",
