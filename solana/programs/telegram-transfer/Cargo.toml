@@ -17,8 +17,7 @@ no-log-ix-name = []
 idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
-anchor-lang = { version = "^0", features = ["init-if-needed"] }
-ephemeral-rollups-sdk = { version = "^0", features = ["anchor"] }
-anchor-spl = { version = "^0" }
-solana-system-interface = { version = "2", default-features = false, features = ["bincode"] }
-
+anchor-lang = { version = "0.32", features = ["init-if-needed"] }
+borsh = { version = "0.10.4", default-features = false }
+borsh-derive  = "0.10.4"  
+sha2 = "0.10"
