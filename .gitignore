@@ -38,8 +38,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files 
 .env*
+/frontend/.env*
 
 # vercel
 /frontend/.vercel
@@ -47,3 +48,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/solana/.anchor
+/solana/.DS_Store
+/solana/target
+/solana/**/*.rs.bk
+/solana/node_modules
+/solana/test-ledger
+/solana/.yarn
