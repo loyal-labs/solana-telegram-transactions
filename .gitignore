@@ -57,3 +57,16 @@ next-env.d.ts
 /solana/test-ledger
 /solana/.yarn
 /solana/my-ledger-1/
+
+## Arcium
+/arcium/.anchor
+/arcium/.DS_Store
+/arcium/target
+/arcium/**/*.rs.bk
+/arcium/node_modules
+/arcium/test-ledger
+/arcium/.yarn
+/arcium/encrypted-ixs/arcis_temp_target
+/arcium/build
+/arcium/encrypted-ixs/src/main.rs
+/arcium/artifacts/
