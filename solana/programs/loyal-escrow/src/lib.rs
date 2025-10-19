@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 declare_id!("3PqMNJhv6R5m88rb3pW3RjASMbNzW1XW3nPdB6XWNb1w");
 
 #[program]
-pub mod solana {
+pub mod loyal_escrow {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {

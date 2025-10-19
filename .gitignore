@@ -56,3 +56,4 @@ next-env.d.ts
 /solana/node_modules
 /solana/test-ledger
 /solana/.yarn
+/solana/my-ledger-1/

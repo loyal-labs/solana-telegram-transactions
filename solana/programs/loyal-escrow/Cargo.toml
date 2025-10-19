@@ -1,12 +1,12 @@
 [package]
-name = "solana"
+name = "loyal_escrow"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "solana"
+name = "loyal_escrow"
 
 [features]
 default = []
@@ -18,5 +18,5 @@ idl-build = ["anchor-lang/idl-build"]
 
 
 [dependencies]
-anchor-lang = "0.31.1"
-
+anchor-lang = { version = "^0", features = ["init-if-needed"] }
+ephemeral-rollups-sdk = { version = "^0", features = ["anchor"] }
