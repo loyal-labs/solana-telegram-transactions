@@ -1,12 +1,12 @@
-import { isTMA } from "@telegram-apps/bridge";
 import {
+  RequestedContact,
   init,
   miniApp,
-  sendData,
-  requestContact,
-  RequestedContact,
   openTelegramLink,
+  requestContact,
+  sendData,
 } from "@telegram-apps/sdk-react";
+import { isTMA } from "@telegram-apps/bridge";
 
 // Initialize once
 let initialized = false;

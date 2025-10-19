@@ -1,5 +1,9 @@
- 'use client';
+'use client';
 
+import { hashes } from '@noble/ed25519';
+import { sha512 } from '@noble/hashes/sha512';
+
+import { cleanInitData, createValidationString, validateInitData } from '@/lib/telegram/init-data-transform';
 import {
   initData,
   useLaunchParams,
@@ -7,10 +11,26 @@ import {
   useSignal
 } from '@telegram-apps/sdk-react';
 
+import { TELEGRAM_BOT_ID } from '@/lib/telegram/constants';
+import { useEffect } from 'react';
+
+hashes.sha512 = sha512;
+
 export default function Home() {
   const lp = useLaunchParams();
   const rawInitData = useRawInitData();
   const initDataUser = useSignal(initData.user);
+
+  useEffect(() => {
+    if (rawInitData) {
+      const cleanInitDataResult = cleanInitData(rawInitData);
+      const validationString = createValidationString(TELEGRAM_BOT_ID, cleanInitDataResult);
+
+      const signature = cleanInitDataResult.signature as string;
+      const isValid = validateInitData(validationString, signature);
+      console.log("Signature is valid: ", isValid);
+    }
+  }, [rawInitData]);
 
 
     return (
