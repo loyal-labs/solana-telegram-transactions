@@ -1,12 +1,12 @@
 [package]
-name = "loyal_escrow"
+name = "telegram-transfer"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "loyal_escrow"
+name = "telegram_transfer"
 
 [features]
 default = []
@@ -16,7 +16,7 @@ no-idl = []
 no-log-ix-name = []
 idl-build = ["anchor-lang/idl-build"]
 
-
 [dependencies]
 anchor-lang = { version = "^0", features = ["init-if-needed"] }
 ephemeral-rollups-sdk = { version = "^0", features = ["anchor"] }
+anchor-spl = { version = "^0" }

@@ -1,5 +1,5 @@
 [workspace]
-members = ["programs/loyal-escrow"]
+members = ["programs/telegram-transfer"]
 resolver = "2"
 
 [profile.release]

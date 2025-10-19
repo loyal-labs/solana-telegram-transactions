@@ -8,10 +8,10 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-loyal-escrow = "3PqMNJhv6R5m88rb3pW3RjASMbNzW1XW3nPdB6XWNb1w"
+telegram-transfer = "Gfxxzt3Dxpjpz8sh8XP6yL7UijniKXw7Yk8YZnDKikiN"
 
 [programs.localnet]
-loyal-escrow = "3PqMNJhv6R5m88rb3pW3RjASMbNzW1XW3nPdB6XWNb1w"
+telegram-transfer = "Gfxxzt3Dxpjpz8sh8XP6yL7UijniKXw7Yk8YZnDKikiN"
 
 [registry]
 url = "https://api.apr.dev"
@@ -22,3 +22,13 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "bun run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[test]
+startup_wait = 5000
+shutdown_wait = 2000
+upgradeable = false
+
+[[test.genesis]]
+address = "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+program = "tests/fixtures/dlp.so"
+upgradeable = false
