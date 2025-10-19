@@ -153,3 +153,54 @@ export const hideSecondaryButton = (): boolean => {
 
   return true;
 };
+
+type ButtonStyleOptions = Pick<BaseButtonOptions, "backgroundColor" | "textColor">;
+
+type WalletButtonsBaseOptions = {
+  mainStyle?: ButtonStyleOptions;
+  secondaryStyle?: ButtonStyleOptions;
+};
+
+type WalletHomeButtonsOptions = WalletButtonsBaseOptions & {
+  onSend: () => void;
+  onReceive: () => void;
+};
+
+type WalletReceiveButtonsOptions = WalletButtonsBaseOptions & {
+  onShare: () => void;
+};
+
+export const showWalletHomeButtons = ({
+  onSend,
+  onReceive,
+  mainStyle,
+  secondaryStyle,
+}: WalletHomeButtonsOptions): boolean => {
+  const mainShown = showMainButton({
+    text: "Send",
+    onClick: onSend,
+    ...(mainStyle ?? {}),
+  });
+
+  const secondaryShown = showSecondaryButton({
+    text: "Receive",
+    position: "left",
+    onClick: onReceive,
+    ...(secondaryStyle ?? {}),
+  });
+
+  return mainShown && secondaryShown;
+};
+
+export const showReceiveShareButton = ({
+  onShare,
+  mainStyle,
+}: WalletReceiveButtonsOptions): boolean => {
+  const mainShown = showMainButton({
+    text: "Share",
+    onClick: onShare,
+    ...(mainStyle ?? {}),
+  });
+
+  return mainShown;
+};

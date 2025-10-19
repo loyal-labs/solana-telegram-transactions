@@ -9,15 +9,21 @@ import {
   useSignal
 } from '@telegram-apps/sdk-react';
 import { List } from '@telegram-apps/telegram-ui';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import ReceiveSheet from '@/components/wallet/ReceiveSheet';
 import SendSheet from '@/components/wallet/SendSheet';
 import WalletBalance from '@/components/wallet/WalletBalance';
 import { TELEGRAM_BOT_ID } from '@/lib/constants';
+import { getWalletPublicKey } from '@/lib/solana/wallet-details';
 import { ensureWalletKeypair } from '@/lib/solana/wallet-keypair-logic';
-import { initTelegram } from '@/lib/telegram';
-import { hideMainButton, hideSecondaryButton, showMainButton, showSecondaryButton } from '@/lib/telegram/buttons';
+import { initTelegram, sendString } from '@/lib/telegram';
+import {
+  hideMainButton,
+  hideSecondaryButton,
+  showReceiveShareButton,
+  showWalletHomeButtons,
+} from '@/lib/telegram/buttons';
 import { cleanInitData, createValidationString, validateInitData } from '@/lib/telegram/init-data-transform';
 import { ensureTelegramTheme, themeSignals } from '@/lib/telegram/theme';
 
@@ -29,16 +35,86 @@ export default function Home() {
   const rawInitData = useRawInitData();
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
   const [isReceiveSheetOpen, setReceiveSheetOpen] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(secondaryButton.setParams.isAvailable);
   const backgroundColor = useSignal(themeSignals.backgroundColor);
   const secondaryBackgroundColor = useSignal(themeSignals.secondaryBackgroundColor);
   const textColor = useSignal(themeSignals.textColor);
-  const buttonColor = useSignal(themeSignals.buttonColor);
-  const buttonTextColor = useSignal(themeSignals.buttonTextColor);
   const sectionSeparatorColor = useSignal(themeSignals.sectionSeparatorColor);
   const ensuredWalletRef = useRef(false);
+
+  const handleOpenSendSheet = useCallback(() => {
+    setSendSheetOpen(true);
+  }, []);
+
+  const handleOpenReceiveSheet = useCallback(() => {
+    setReceiveSheetOpen(true);
+  }, []);
+
+  const handleShareAddress = useCallback(async () => {
+    try {
+      const address =
+        walletAddress ??
+        (await getWalletPublicKey().then((publicKey) => {
+          const base58 = publicKey.toBase58();
+          setWalletAddress((prev) => prev ?? base58);
+          return base58;
+        }));
+
+      if (!address) {
+        console.warn("Wallet address unavailable");
+        return;
+      }
+
+      const canUseShare =
+        typeof navigator !== "undefined" &&
+        typeof navigator.share === "function" &&
+        (typeof window === "undefined" || window.isSecureContext);
+
+      if (canUseShare) {
+        try {
+          await navigator.share({
+            title: "My Solana address",
+            text: address,
+          });
+          return;
+        } catch (shareError) {
+          if (
+            shareError instanceof DOMException &&
+            (shareError.name === "AbortError" ||
+              shareError.name === "NotAllowedError")
+          ) {
+            // User cancelled or platform disallowed; fall back.
+          } else {
+            console.warn("Web Share failed, falling back to copy", shareError);
+          }
+        }
+      } else {
+        console.warn("Web Share API unavailable, attempting copy fallback");
+      }
+
+      if (navigator?.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(address);
+          console.log("Copied wallet address to clipboard");
+          return;
+        } catch (copyError) {
+          console.warn("Clipboard copy failed, attempting Telegram share", copyError);
+        }
+      }
+
+      if (sendString(address)) {
+        console.log("Shared wallet address via Telegram bridge");
+        return;
+      }
+
+      console.warn("No available method to share wallet address");
+    } catch (error) {
+      console.error("Failed to share wallet address", error);
+    }
+  }, [walletAddress]);
 
   useEffect(() => {
     if (rawInitData) {
@@ -61,61 +137,63 @@ export default function Home() {
 
     ensuredWalletRef.current = true;
 
-    void (async () => {
-      try {
-        const { keypair, isNew } = await ensureWalletKeypair();
-        console.log("Wallet keypair ready", {
-          isNew,
-          publicKey: keypair.publicKey.toBase58(),
-        });
-      } catch (error) {
-        console.error("Failed to ensure wallet keypair", error);
-      }
-    })();
-  }, []);
+	    void (async () => {
+	      try {
+	        const { keypair, isNew } = await ensureWalletKeypair();
+	        const publicKeyBase58 = keypair.publicKey.toBase58();
+	        console.log("Wallet keypair ready", {
+	          isNew,
+	          publicKey: publicKeyBase58,
+	        });
+	        setWalletAddress(publicKeyBase58);
+	      } catch (error) {
+	        console.error("Failed to ensure wallet keypair", error);
+	      }
+	    })();
+	  }, []);
 
   useEffect(() => {
     if (!mainButtonAvailable) {
       mainButton.mount.ifAvailable?.();
       hideMainButton();
-      return;
     }
 
-    showMainButton({
-      text: "Send",
-      ...(buttonColor ? { backgroundColor: buttonColor } : {}),
-      ...(buttonTextColor ? { textColor: buttonTextColor } : {}),
-      onClick: () => {
-        setSendSheetOpen(true);
-      },
-    });
-
-    return () => {
-      hideMainButton();
-    };
-  }, [mainButtonAvailable, buttonColor, buttonTextColor]);
-
-  useEffect(() => {
     if (!secondaryButtonAvailable) {
       secondaryButton.mount.ifAvailable?.();
       hideSecondaryButton();
-      return;
     }
 
-    showSecondaryButton({
-      text: "Receive",
-      position: "left",
-      ...(buttonColor ? { backgroundColor: buttonColor } : {}),
-      ...(buttonTextColor ? { textColor: buttonTextColor } : {}),
-      onClick: () => {
-        setReceiveSheetOpen(true);
-      },
-    });
+    if (!mainButtonAvailable) {
+      return () => {
+        hideMainButton();
+        hideSecondaryButton();
+      };
+    }
+
+    if (isReceiveSheetOpen) {
+      hideSecondaryButton();
+      showReceiveShareButton({
+        onShare: handleShareAddress,
+      });
+    } else {
+      showWalletHomeButtons({
+        onSend: handleOpenSendSheet,
+        onReceive: handleOpenReceiveSheet,
+      });
+    }
 
     return () => {
+      hideMainButton();
       hideSecondaryButton();
     };
-  }, [secondaryButtonAvailable, buttonColor, buttonTextColor]);
+  }, [
+    isReceiveSheetOpen,
+    mainButtonAvailable,
+    secondaryButtonAvailable,
+    handleOpenSendSheet,
+    handleOpenReceiveSheet,
+    handleShareAddress,
+  ]);
 
   const resolvedBackgroundColor =
     secondaryBackgroundColor ?? 'var(--tg-theme-bg-color, #ffffff)';
