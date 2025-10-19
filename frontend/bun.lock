@@ -5,6 +5,7 @@
       "name": "frontend",
       "dependencies": {
         "@telegram-apps/sdk": "^3.11.8",
+        "@telegram-apps/sdk-react": "^3.3.9",
         "next": "15.5.6",
         "react": "19.1.0",
         "react-dom": "19.1.0",
@@ -186,6 +187,8 @@
     "@telegram-apps/navigation": ["@telegram-apps/navigation@1.0.14", "", {}, "sha512-bqNgF/J8Po7ZtsELm3E1a6aPr7awwxO3sIqD8J6u12urOlGoW5+1KxKKbkPa58mgXuQdsltd8apI+OVy0IYiUA=="],
 
     "@telegram-apps/sdk": ["@telegram-apps/sdk@3.11.8", "", { "dependencies": { "@telegram-apps/bridge": "^2.11.0", "@telegram-apps/navigation": "^1.0.14", "@telegram-apps/signals": "^1.1.2", "@telegram-apps/toolkit": "^2.1.3", "@telegram-apps/transformers": "^2.2.6", "@telegram-apps/types": "^2.0.3", "better-promises": "^0.4.1", "error-kid": "^0.0.7", "valibot": "1.0.0" } }, "sha512-vlpkYzMJCV9Cadsn9Q+/hbHNR39j5o96N9z4CjZ6AFHkkxOeOqVRrq9zRBw0gmffROkF2bU0WQxhRj8KZ/bPhw=="],
+
+    "@telegram-apps/sdk-react": ["@telegram-apps/sdk-react@3.3.9", "", { "dependencies": { "@telegram-apps/sdk": "^3.11.8" }, "peerDependencies": { "@types/react": "^17.0.0 || ^18.0.0 || ^19.0.0", "react": "^17.0.0 || ^18.0.0 || ^19.0.0" }, "optionalPeers": ["@types/react"] }, "sha512-85jF1ICT8sYCNzXu19SqJrfrS8XslsvV14KUcToiyL7H5ZMXHt0JQKM+QJgULjnLjEswweQ4/7Bd7mNULf/BIg=="],
 
     "@telegram-apps/signals": ["@telegram-apps/signals@1.1.2", "", {}, "sha512-1P1kdCLX7MfETGPxH7f3UZKIsdE7Tz5S7QmN4Km1sbYQMakD5Bi1NecSMR7/wnHp50gWMI1JzENcMtCEmouhSg=="],
 

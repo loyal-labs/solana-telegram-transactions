@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@telegram-apps/sdk": "^3.11.8",
+    "@telegram-apps/sdk-react": "^3.3.9",
     "next": "15.5.6",
     "react": "19.1.0",
     "react-dom": "19.1.0"
