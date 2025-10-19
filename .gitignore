@@ -57,6 +57,7 @@ next-env.d.ts
 /solana/test-ledger
 /solana/.yarn
 /solana/my-ledger-1/
+/solana/test-ledger-magicblock/
 
 ## Arcium
 /arcium/.anchor
