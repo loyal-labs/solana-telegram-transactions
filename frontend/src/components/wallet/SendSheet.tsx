@@ -1,42 +1,44 @@
 "use client";
-import { useSignal } from "@telegram-apps/sdk-react";
-import { Button, Input, List, Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
+import { Button, Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Icon28Close } from "@telegram-apps/telegram-ui/dist/icons/28/close";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
-import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
-
-import { themeSignals } from "@/lib/telegram/theme";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 
 export type SendSheetProps = {
   trigger?: ReactNode | null;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  initialRecipient?: string;
 };
 
 const DEFAULT_TRIGGER = <Button size="m">Open modal</Button>;
 
-const FALLBACKS = {
-  surface: "var(--tg-theme-bg-color, #ffffff)",
-  background: "var(--tg-theme-secondary-bg-color, rgba(15, 23, 42, 0.04))",
-  border: "var(--tg-theme-section-separator-color, rgba(15, 23, 42, 0.08))",
-  text: "var(--tg-theme-text-color, #1f2937)",
-} as const;
-
-export default function SendSheet({ trigger, open, onOpenChange }: SendSheetProps) {
+export default function SendSheet({ trigger, open, onOpenChange, initialRecipient }: SendSheetProps) {
   const [sum, setSum] = useState("");
   const [recipient, setRecipient] = useState("");
 
-  const surfaceColor = useSignal(themeSignals.backgroundColor) ?? FALLBACKS.surface;
-  const borderColor = useSignal(themeSignals.sectionSeparatorColor) ?? FALLBACKS.border;
-  const textColor = useSignal(themeSignals.textColor) ?? FALLBACKS.text;
+  // Update recipient when initialRecipient changes or when sheet opens
+  useEffect(() => {
+    if (open) {
+      setRecipient(initialRecipient || "");
+    }
+  }, [initialRecipient, open]);
+
+  // Clear fields when sheet closes
+  useEffect(() => {
+    if (!open) {
+      setSum("");
+      setRecipient("");
+    }
+  }, [open]);
 
   const modalStyle = useMemo(
     () =>
       ({
-        "--tgui--bg_color": surfaceColor,
-        "--tgui--divider": surfaceColor,
+        "--tgui--bg_color": "#0a0a0a",
+        "--tgui--divider": "rgba(255, 255, 255, 0.04)",
       }) as CSSProperties,
-    [surfaceColor],
+    [],
   );
 
   return (
@@ -50,9 +52,14 @@ export default function SendSheet({ trigger, open, onOpenChange }: SendSheetProp
         <Modal.Header
           after={
             <Modal.Close aria-label="Close send sheet">
-              <Icon28Close style={{ color: textColor }} />
+              <Icon28Close style={{ color: "rgba(255, 255, 255, 0.6)" }} />
             </Modal.Close>
           }
+          style={{
+            background: "#0a0a0a",
+            color: "rgba(255, 255, 255, 0.9)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.04)"
+          }}
         >
           Send
         </Modal.Header>
@@ -60,42 +67,101 @@ export default function SendSheet({ trigger, open, onOpenChange }: SendSheetProp
     >
       <div
         style={{
-          backgroundColor: surfaceColor,
-          padding: "16px 0",
+          backgroundColor: "#0a0a0a",
+          padding: "20px 16px",
         }}
       >
         <Drawer.Title asChild>
           <VisuallyHidden>Send assets</VisuallyHidden>
         </Drawer.Title>
-        <List
+        <div
           style={{
             width: "100%",
             margin: "0 auto",
             maxWidth: 420,
-            background: surfaceColor,
-            color: textColor,
-            borderRadius: "var(--tgui--border_radius_m)",
-            border: `1px solid ${borderColor}`,
-            padding: 16,
-            boxSizing: "border-box",
             display: "flex",
             flexDirection: "column",
-            gap: 16,
+            gap: 20,
           }}
         >
-          <Input
-            header="Sum"
-            placeholder="Enter amount"
-            value={sum}
-            onChange={(event) => setSum(event.target.value)}
-          />
-          <Input
-            header="Recipient"
-            placeholder="Username, phone, or wallet"
-            value={recipient}
-            onChange={(event) => setRecipient(event.target.value)}
-          />
-        </List>
+          <div>
+            <label style={{
+              display: "block",
+              color: "rgba(255, 255, 255, 0.4)",
+              fontSize: "11px",
+              textTransform: "uppercase",
+              letterSpacing: "0.15em",
+              marginBottom: "8px",
+              fontWeight: 500
+            }}>
+              Amount
+            </label>
+            <input
+              type="text"
+              placeholder="0.00"
+              value={sum}
+              onChange={(event) => setSum(event.target.value)}
+              style={{
+                width: "100%",
+                padding: "14px 16px",
+                background: "rgba(255, 255, 255, 0.04)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: "12px",
+                color: "rgba(255, 255, 255, 0.9)",
+                fontSize: "16px",
+                fontFamily: "'JetBrains Mono', monospace",
+                outline: "none",
+                transition: "all 0.2s",
+              }}
+              onFocus={(e) => {
+                e.target.style.background = "rgba(255, 255, 255, 0.06)";
+                e.target.style.borderColor = "rgba(99, 102, 241, 0.3)";
+              }}
+              onBlur={(e) => {
+                e.target.style.background = "rgba(255, 255, 255, 0.04)";
+                e.target.style.borderColor = "rgba(255, 255, 255, 0.08)";
+              }}
+            />
+          </div>
+          <div>
+            <label style={{
+              display: "block",
+              color: "rgba(255, 255, 255, 0.4)",
+              fontSize: "11px",
+              textTransform: "uppercase",
+              letterSpacing: "0.15em",
+              marginBottom: "8px",
+              fontWeight: 500
+            }}>
+              Recipient
+            </label>
+            <input
+              type="text"
+              placeholder="Username, phone, or wallet"
+              value={recipient}
+              onChange={(event) => setRecipient(event.target.value)}
+              style={{
+                width: "100%",
+                padding: "14px 16px",
+                background: "rgba(255, 255, 255, 0.04)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: "12px",
+                color: "rgba(255, 255, 255, 0.9)",
+                fontSize: "14px",
+                outline: "none",
+                transition: "all 0.2s",
+              }}
+              onFocus={(e) => {
+                e.target.style.background = "rgba(255, 255, 255, 0.06)";
+                e.target.style.borderColor = "rgba(99, 102, 241, 0.3)";
+              }}
+              onBlur={(e) => {
+                e.target.style.background = "rgba(255, 255, 255, 0.04)";
+                e.target.style.borderColor = "rgba(255, 255, 255, 0.08)";
+              }}
+            />
+          </div>
+        </div>
       </div>
     </Modal>
   );

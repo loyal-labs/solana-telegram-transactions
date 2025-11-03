@@ -1,10 +1,7 @@
 "use client";
 
-import { useSignal } from "@telegram-apps/sdk-react";
 import {
   Button,
-  Cell,
-  List,
   Modal,
   VisuallyHidden,
 } from "@telegram-apps/telegram-ui";
@@ -20,7 +17,6 @@ import {
 } from "react";
 
 import { getWalletPublicKey } from "@/lib/solana/wallet-details";
-import { themeSignals } from "@/lib/telegram/theme";
 
 export type ReceiveSheetProps = {
   trigger?: ReactNode | null;
@@ -30,22 +26,7 @@ export type ReceiveSheetProps = {
 
 const DEFAULT_TRIGGER = <Button size="m">Receive</Button>;
 
-const FALLBACKS = {
-  surface: "var(--tg-theme-bg-color, #ffffff)",
-  background: "var(--tg-theme-secondary-bg-color, rgba(15, 23, 42, 0.04))",
-  border: "var(--tg-theme-section-separator-color, rgba(15, 23, 42, 0.08))",
-  text: "var(--tg-theme-text-color, #1f2937)",
-} as const;
-
 const COPIED_RESET_TIMEOUT = 2000;
-
-const formatWalletAddress = (address: string) => {
-  if (address.length <= 10) {
-    return address;
-  }
-
-  return `${address.slice(0, 5)}...${address.slice(-5)}`;
-};
 
 export default function ReceiveSheet({
   trigger,
@@ -55,21 +36,6 @@ export default function ReceiveSheet({
   const [copied, setCopied] = useState(false);
   const [address, setAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  const surfaceColor = useSignal(themeSignals.backgroundColor) ?? FALLBACKS.surface;
-  const borderColor = useSignal(themeSignals.sectionSeparatorColor) ?? FALLBACKS.border;
-  const textColor = useSignal(themeSignals.textColor) ?? FALLBACKS.text;
-  const buttonColor = useSignal(themeSignals.buttonColor);
-  const buttonTextColor = useSignal(themeSignals.buttonTextColor);
-
-  const modalStyle = useMemo(
-    () =>
-      ({
-        "--tgui--bg_color": surfaceColor,
-        "--tgui--divider": surfaceColor,
-      }) as CSSProperties,
-    [surfaceColor],
-  );
 
   useEffect(() => {
     if (!copied) {
@@ -129,41 +95,21 @@ export default function ReceiveSheet({
     }
   }, [address]);
 
-  const copyButton = useMemo(
-    () => (
-      <Button
-        mode="filled"
-        size="s"
-        onClick={copyAddress}
-        aria-label="Copy wallet address"
-        disabled={!address || isLoading}
-        style={
-          {
-            ...(buttonColor
-              ? {
-                  "--tgui--button_color": buttonColor,
-                }
-              : {}),
-            ...(buttonTextColor
-              ? {
-                  "--tgui--button_text_color": buttonTextColor,
-                }
-              : {}),
-          } as CSSProperties
-        }
-      >
-        {copied ? "Copied" : "Copy"}
-      </Button>
-    ),
-    [copied, copyAddress, buttonColor, buttonTextColor, address, isLoading],
-  );
-
   const displayAddress = useMemo(() => {
     if (isLoading) return "Loading…";
     if (!address) return "—";
 
-    return formatWalletAddress(address);
+    return address;
   }, [address, isLoading]);
+
+  const modalStyle = useMemo(
+    () =>
+      ({
+        "--tgui--bg_color": "#0a0a0a",
+        "--tgui--divider": "rgba(255, 255, 255, 0.04)",
+      }) as CSSProperties,
+    [],
+  );
 
   return (
     <Modal
@@ -176,9 +122,14 @@ export default function ReceiveSheet({
         <Modal.Header
           after={
             <Modal.Close aria-label="Close receive sheet">
-              <Icon28Close style={{ color: textColor }} />
+              <Icon28Close style={{ color: "rgba(255, 255, 255, 0.6)" }} />
             </Modal.Close>
           }
+          style={{
+            background: "#0a0a0a",
+            color: "rgba(255, 255, 255, 0.9)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.04)"
+          }}
         >
           Receive
         </Modal.Header>
@@ -186,37 +137,84 @@ export default function ReceiveSheet({
     >
       <div
         style={{
-          backgroundColor: surfaceColor,
-          padding: "16px 0",
+          backgroundColor: "#0a0a0a",
+          padding: "20px 16px",
         }}
       >
         <Drawer.Title asChild>
           <VisuallyHidden>Receive assets</VisuallyHidden>
         </Drawer.Title>
-        <List
+        <div
           style={{
             width: "100%",
             margin: "0 auto",
             maxWidth: 420,
-            background: surfaceColor,
-            color: textColor,
-            borderRadius: "var(--tgui--border_radius_m)",
-            border: `1px solid ${borderColor}`,
-            padding: 16,
-            boxSizing: "border-box",
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
           }}
         >
-          <Cell
-            subtitle={displayAddress}
-            after={copyButton}
-            interactiveAnimation="opacity"
-          >
-            Address
-          </Cell>
-        </List>
+          <div>
+            <label style={{
+              display: "block",
+              color: "rgba(255, 255, 255, 0.4)",
+              fontSize: "11px",
+              textTransform: "uppercase",
+              letterSpacing: "0.15em",
+              marginBottom: "8px",
+              fontWeight: 500
+            }}>
+              Wallet Address
+            </label>
+            <div style={{
+              padding: "16px",
+              background: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px"
+            }}>
+              <p style={{
+                color: "rgba(255, 255, 255, 0.8)",
+                fontSize: "13px",
+                fontFamily: "'JetBrains Mono', monospace",
+                wordBreak: "break-all",
+                flex: 1,
+                margin: 0
+              }}>
+                {displayAddress}
+              </p>
+              <button
+                onClick={copyAddress}
+                disabled={!address || isLoading}
+                style={{
+                  padding: "8px 16px",
+                  background: copied ? "rgba(16, 185, 129, 0.15)" : "rgba(99, 102, 241, 0.15)",
+                  border: copied ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(99, 102, 241, 0.3)",
+                  borderRadius: "8px",
+                  color: copied ? "rgba(16, 185, 129, 0.9)" : "rgba(99, 102, 241, 0.9)",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: address && !isLoading ? "pointer" : "not-allowed",
+                  opacity: address && !isLoading ? 1 : 0.5,
+                  transition: "all 0.2s",
+                  whiteSpace: "nowrap"
+                }}
+                onMouseEnter={(e) => {
+                  if (address && !isLoading && !copied) {
+                    e.currentTarget.style.background = "rgba(99, 102, 241, 0.25)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!copied) {
+                    e.currentTarget.style.background = "rgba(99, 102, 241, 0.15)";
+                  }
+                }}
+              >
+                {copied ? "✓ Copied" : "Copy"}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </Modal>
   );

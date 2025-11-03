@@ -6,20 +6,37 @@ import {
   requestContact,
   RequestedContact,
   sendData,
+  viewport,
 } from "@telegram-apps/sdk-react";
 
 // Initialize once
 let initialized = false;
 
 export const initTelegram = () => {
-  if (!initialized && isTMA()) {
-    try {
+  if (initialized) return;
+
+  try {
+    if (isTMA()) {
       init();
       miniApp.ready();
-      initialized = true;
-    } catch (e) {
-      console.error(e);
+
+      // Safely mount viewport to prevent null errors
+      if (viewport.mount.isAvailable()) {
+        try {
+          viewport.mount();
+        } catch (e) {
+          // Suppress viewport mounting errors in dev environment
+          console.debug("Viewport mount skipped:", (e as Error).message);
+        }
+      }
+    } else {
+      // Running outside Telegram - features will be unavailable
+      console.debug("Running in non-Telegram environment");
     }
+  } catch (e) {
+    console.warn("Telegram SDK initialization skipped:", (e as Error).message);
+  } finally {
+    initialized = true;
   }
 };
 
