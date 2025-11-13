@@ -3,14 +3,14 @@ use arcium_anchor::prelude::*;
 
 const COMP_DEF_OFFSET_ADD_TOGETHER: u32 = comp_def_offset("add_together");
 
-declare_id!("9LiN2R1XUV51qGs9cN9uSwP4vPb1bB4tk45hmzpU8uBv");
+declare_id!("H3E9PeKn9ZGZvF1PStcsBSjkanQkrcGEq6hBw6i5v5M");
 
 #[arcium_program]
 pub mod arcium {
     use super::*;
 
     pub fn init_add_together_comp_def(ctx: Context<InitAddTogetherCompDef>) -> Result<()> {
-        init_comp_def(ctx.accounts, true, 0, None, None)?;
+        init_comp_def(ctx.accounts, 0, None, None)?;
         Ok(())
     }
 
@@ -29,15 +29,7 @@ pub mod arcium {
             Argument::EncryptedU8(ciphertext_0),
             Argument::EncryptedU8(ciphertext_1),
         ];
-
-        queue_computation(
-            ctx.accounts,
-            computation_offset,
-            args,
-            None,
-            vec![AddTogetherCallback::callback_ix(&[])],
-        )?;
-
+        queue_computation(ctx.accounts, computation_offset, args, None, vec![AddTogetherCallback::callback_ix(&[])], 1)?;
         Ok(())
     }
 
@@ -102,7 +94,7 @@ pub struct AddTogether<'info> {
     pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
     #[account(
         mut,
-        address = derive_cluster_pda!(mxe_account)
+        address = derive_cluster_pda!(mxe_account, ErrorCode::ClusterNotSet)
     )]
     pub cluster_account: Account<'info, Cluster>,
     #[account(

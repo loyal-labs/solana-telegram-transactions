@@ -1,4 +1,5 @@
 [toolchain]
+solana_version = "2.3.0"
 package_manager = "yarn"
 
 [features]
@@ -6,7 +7,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-arcium = "9LiN2R1XUV51qGs9cN9uSwP4vPb1bB4tk45hmzpU8uBv"
+arcium = "H3E9PeKn9ZGZvF1PStcsBSjkanQkrcGEq6hBw6i5v5M"
 
 [registry]
 url = "https://api.apr.dev"

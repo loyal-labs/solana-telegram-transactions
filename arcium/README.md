@@ -41,7 +41,7 @@ pub mod my_program {
     use super::*;
 
     pub fn init_add_together_comp_def(ctx: Context<InitAddTogetherCompDef>) -> Result<()> {
-        init_comp_def(ctx.accounts, true, 0, None, None)?;
+        init_comp_def(ctx.accounts, 0, None, None)?;
         Ok(())
     }
 
@@ -59,14 +59,7 @@ pub mod my_program {
             Argument::EncryptedU8(ciphertext_0),
             Argument::EncryptedU8(ciphertext_1),
         ];
-        ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
-        queue_computation(
-            ctx.accounts,
-            computation_offset,
-            args,
-            None,
-            vec![AddTogetherCallback::callback_ix(&[])],
-        )?;
+        queue_computation(ctx.accounts, computation_offset, args, None, vec![AddTogetherCallback::callback_ix(&[])], 1)?;
         Ok(())
     }
 

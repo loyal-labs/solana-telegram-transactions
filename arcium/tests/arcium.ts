@@ -19,11 +19,30 @@ import {
   getCompDefAccAddress,
   getExecutingPoolAccAddress,
   getComputationAccAddress,
+  getClusterAccAddress,
   x25519,
 } from "@arcium-hq/client";
 import * as fs from "fs";
 import * as os from "os";
 import { expect } from "chai";
+
+// Cluster configuration
+// For localnet testing: null (uses ARCIUM_CLUSTER_PUBKEY from env)
+// For devnet/testnet: specific cluster offset
+const CLUSTER_OFFSET: number | null = null;
+
+/**
+ * Gets the cluster account address based on configuration.
+ * - If CLUSTER_OFFSET is set: Uses getClusterAccAddress (devnet/testnet)
+ * - If null: Uses getArciumEnv().arciumClusterPubkey (localnet)
+ */
+function getClusterAccount(): PublicKey {
+  if (CLUSTER_OFFSET !== null) {
+    return getClusterAccAddress(CLUSTER_OFFSET);
+  } else {
+    return getArciumEnv().arciumClusterPubkey;
+  }
+}
 
 describe("Arcium", () => {
   // Configure the client to use the local cluster.
@@ -47,7 +66,7 @@ describe("Arcium", () => {
     return event;
   };
 
-  const arciumEnv = getArciumEnv();
+  const clusterAccount = getClusterAccount();
 
   it("Is initialized!", async () => {
     const owner = readKpJson(`${os.homedir()}/.config/solana/id.json`);
@@ -100,7 +119,7 @@ describe("Arcium", () => {
           program.programId,
           computationOffset
         ),
-        clusterAccount: arciumEnv.arciumClusterPubkey,
+        clusterAccount,
         mxeAccount: getMXEAccAddress(program.programId),
         mempoolAccount: getMempoolAccAddress(program.programId),
         executingPool: getExecutingPoolAccAddress(program.programId),
@@ -188,7 +207,7 @@ describe("Arcium", () => {
 async function getMXEPublicKeyWithRetry(
   provider: anchor.AnchorProvider,
   programId: PublicKey,
-  maxRetries: number = 10,
+  maxRetries: number = 20,
   retryDelayMs: number = 500
 ): Promise<Uint8Array> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
