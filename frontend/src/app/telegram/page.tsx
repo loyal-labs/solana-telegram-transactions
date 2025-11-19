@@ -35,19 +35,21 @@ hashes.sha512 = sha512;
 
 const SOL_PRICE_USD = 180;
 
-const QUICK_SEND_CONTACTS = [
-  { id: '1', name: 'Alice', initials: 'AL' },
-  { id: '2', name: 'Bob', initials: 'BO' },
-  { id: '3', name: 'Carol', initials: 'CA' },
-  { id: '4', name: 'Dave', initials: 'DA' },
-  { id: '5', name: 'Eve', initials: 'EV' },
-];
+// Commented out - Quick Send feature not yet complete
+// const QUICK_SEND_CONTACTS = [
+//   { id: '1', name: 'Alice', initials: 'AL' },
+//   { id: '2', name: 'Bob', initials: 'BO' },
+//   { id: '3', name: 'Carol', initials: 'CA' },
+//   { id: '4', name: 'Dave', initials: 'DA' },
+//   { id: '5', name: 'Eve', initials: 'EV' },
+// ];
 
-const MOCK_TRANSACTIONS = [
-  { id: '1', name: 'Received from Alice', date: 'Today', amount: 0.5, type: 'receive' },
-  { id: '2', name: 'Sent to Bob', date: 'Yesterday', amount: -0.25, type: 'send' },
-  { id: '3', name: 'Received from Carol', date: 'Jan 15, 2025', amount: 1.0, type: 'receive' },
-];
+// Commented out - Placeholder transactions
+// const MOCK_TRANSACTIONS = [
+//   { id: '1', name: 'Received from Alice', date: 'Today', amount: 0.5, type: 'receive' },
+//   { id: '2', name: 'Sent to Bob', date: 'Yesterday', amount: -0.25, type: 'send' },
+//   { id: '3', name: 'Received from Carol', date: 'Jan 15, 2025', amount: 1.0, type: 'receive' },
+// ];
 
 export default function Home() {
   const rawInitData = useRawInitData();
@@ -354,14 +356,14 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Quick Send - with dotted accent line */}
-          <div className="relative mb-8">
+          {/* Quick Send - Commented out until feature is complete */}
+          {/* <div className="relative mb-8"> */}
             {/* Decorative dotted line */}
-            <div className="absolute left-0 top-0 w-8 h-px" style={{
+            {/* <div className="absolute left-0 top-0 w-8 h-px" style={{
               backgroundImage: 'repeating-linear-gradient(90deg, rgba(255,255,255,0.2) 0px, rgba(255,255,255,0.2) 2px, transparent 2px, transparent 6px)',
-            }} />
+            }} /> */}
 
-            <div className="flex items-center justify-between mb-4">
+            {/* <div className="flex items-center justify-between mb-4">
               <h2 className="text-white/90 text-sm font-medium tracking-wide">Quick Send</h2>
               <button
                 onClick={() => handleOpenSendSheet()}
@@ -372,9 +374,9 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                 </svg>
               </button>
-            </div>
+            </div> */}
 
-            <div className="flex space-x-3 overflow-x-auto pb-1 scrollbar-hide">
+            {/* <div className="flex space-x-3 overflow-x-auto pb-1 scrollbar-hide">
               {QUICK_SEND_CONTACTS.map((contact, idx) => (
                 <button
                   key={contact.id}
@@ -389,9 +391,9 @@ export default function Home() {
                       animationDelay: `${idx * 0.1}s`,
                     }}
                   >
-                    {contact.initials}
+                    {contact.initials} */}
                     {/* Corner accent */}
-                    <div className="absolute top-0 right-0 w-2 h-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* <div className="absolute top-0 right-0 w-2 h-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <div className="w-1 h-1 rounded-full bg-indigo-400" style={{
                         boxShadow: '0 0 6px rgba(99, 102, 241, 0.6)',
                       }} />
@@ -401,7 +403,7 @@ export default function Home() {
                 </button>
               ))}
             </div>
-          </div>
+          </div> */}
 
           {/* Wallet Card - THE focal card with stacking */}
           <div className="relative mb-8" style={{ perspective: '1000px' }}>
@@ -482,10 +484,12 @@ export default function Home() {
                   backgroundImage: 'repeating-linear-gradient(90deg, rgba(255,255,255,0.15) 0px, rgba(255,255,255,0.15) 2px, transparent 2px, transparent 6px)',
                 }} />
               </div>
-              <button className="text-white/40 text-xs hover:text-white/60 transition-colors">See all →</button>
+              {/* Commented out - Transaction history page not yet designed */}
+              {/* <button className="text-white/40 text-xs hover:text-white/60 transition-colors">See all →</button> */}
             </div>
 
-            <div className="space-y-0">
+            {/* Commented out - Placeholder transactions */}
+            {/* <div className="space-y-0">
               {MOCK_TRANSACTIONS.map((tx, idx) => (
                 <div key={tx.id}>
                   <div className="flex items-center justify-between py-3.5 group hover:bg-white/[0.02] -mx-2 px-2 rounded-lg transition-all">
@@ -547,7 +551,7 @@ export default function Home() {
                   )}
                 </div>
               ))}
-            </div>
+            </div> */}
           </div>
         </div>
       </main>
