@@ -8,10 +8,12 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-telegram-transfer = "Gfxxzt3Dxpjpz8sh8XP6yL7UijniKXw7Yk8YZnDKikiN"
+telegram-transfer = "4ewpzEPF5xrVAHeRkoe7XS1yKFGQBekD7PgFwEz9SaxY"
+telegram-verification = "9yiphKYd4b69tR1ZPP8rNwtMeUwWgjYXaXdEzyNziNhz"
 
 [programs.localnet]
-telegram-transfer = "Gfxxzt3Dxpjpz8sh8XP6yL7UijniKXw7Yk8YZnDKikiN"
+telegram-transfer = "4ewpzEPF5xrVAHeRkoe7XS1yKFGQBekD7PgFwEz9SaxY"
+telegram-verification = "9yiphKYd4b69tR1ZPP8rNwtMeUwWgjYXaXdEzyNziNhz"
 
 [registry]
 url = "https://api.apr.dev"
