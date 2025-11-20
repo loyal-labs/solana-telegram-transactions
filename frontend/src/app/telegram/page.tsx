@@ -488,70 +488,31 @@ export default function Home() {
               {/* <button className="text-white/40 text-xs hover:text-white/60 transition-colors">See all →</button> */}
             </div>
 
-            {/* Commented out - Placeholder transactions */}
-            {/* <div className="space-y-0">
-              {MOCK_TRANSACTIONS.map((tx, idx) => (
-                <div key={tx.id}>
-                  <div className="flex items-center justify-between py-3.5 group hover:bg-white/[0.02] -mx-2 px-2 rounded-lg transition-all">
-                    <div className="flex items-center space-x-3">
-                      <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110"
-                        style={{
-                          background: tx.type === 'receive'
-                            ? 'rgba(16, 185, 129, 0.12)'
-                            : 'rgba(239, 68, 68, 0.12)',
-                          border: `1px solid ${tx.type === 'receive' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-                        }}
-                      >
-                        <svg
-                          className={`w-3.5 h-3.5 ${
-                            tx.type === 'receive' ? 'text-emerald-400' : 'text-red-400'
-                          }`}
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          {tx.type === 'receive' ? (
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2.5}
-                              d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                            />
-                          ) : (
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2.5}
-                              d="M5 10l7-7m0 0l7 7m-7-7v18"
-                            />
-                          )}
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-white/90 text-sm font-medium">{tx.name}</p>
-                        <p className="text-white/30 text-xs mt-0.5">{tx.date}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p
-                        className={`text-sm font-semibold mono ${
-                          tx.amount > 0 ? 'text-emerald-400' : 'text-red-400'
-                        }`}
-                      >
-                        {tx.amount > 0 ? '+' : ''}{tx.amount.toFixed(2)} SOL
-                      </p>
-                      <p className="text-white/30 text-xs mt-0.5 mono">
-                        ${(Math.abs(tx.amount) * SOL_PRICE_USD).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                  {idx < MOCK_TRANSACTIONS.length - 1 && (
-                    <div className="h-px" style={{ background: 'rgba(255, 255, 255, 0.04)' }} />
-                  )}
-                </div>
-              ))}
-            </div> */}
+            {/* Empty state */}
+            <div className="flex flex-col items-center justify-center pt-6 pb-12 px-4">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                }}
+              >
+                <svg
+                  className="w-6 h-6 text-white/30"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+              <p className="text-white/30 text-sm tracking-wide">Your transactions will appear here</p>
+            </div>
           </div>
         </div>
       </main>
