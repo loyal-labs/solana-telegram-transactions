@@ -10,6 +10,11 @@ declare_id!("9yiphKYd4b69tR1ZPP8rNwtMeUwWgjYXaXdEzyNziNhz");
 
 // ---- Constants ----
 const MAX_VALIDATION_LEN: usize = 768;
+const MIN_USERNAME_LEN: usize = 5;
+const MAX_USERNAME_LEN: usize = 32;
+const USERNAME_PATTERN: &str = "\"username\":\"";
+const AUTH_DATE_PREFIX: &str = "\nauth_date=";
+
 const ED25519_HEADER_LEN: usize = 2;   // [sig_count: u8, padding: u8]
 const ED25519_OFFSETS_LEN: usize = 14; // 7 * u16 (LE)
 const SIG_LEN: usize = 64;
@@ -22,17 +27,25 @@ const TELEGRAM_PUBKEY_PROD: [u8; 32] =
 pub mod telegram_verification {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        msg!("Greetings from: {:?}", ctx.program_id);
-        Ok(())
-    }
-
     pub fn store(ctx: Context<StoreTelegramInitData>, validation_bytes: Vec<u8>) -> Result<()> {
         require!(validation_bytes.len() <= MAX_VALIDATION_LEN, ErrorCode::InvalidValidationBytesLength);
 
         let session = &mut ctx.accounts.session;
+
+        let username = extract_username(&validation_bytes)?;
+        require!(username.len() > MIN_USERNAME_LEN, ErrorCode::InvalidTelegramUsername);
+        require!(username.len() < MAX_USERNAME_LEN, ErrorCode::InvalidTelegramUsername);
+
+        let auth_at = extract_auth_date(&validation_bytes)?;
+        require!(auth_at > 0, ErrorCode::InvalidTelegramAuthDate);
+
         session.user_wallet = ctx.accounts.user.key();
+        session.username = username;
+        session.auth_at = auth_at;
         session.validation_bytes = validation_bytes;
+        session.verified = false;
+        session.verified_at = None;
+        
         Ok(())
     }
 
@@ -43,16 +56,14 @@ pub mod telegram_verification {
             &ctx.accounts.instructions,
             expected,
         )?;
-        // Optionally mark the session as verified with a flag
+        let session = &mut ctx.accounts.session;
+        session.verified = true;
+        session.verified_at = Some(Clock::get()?.unix_timestamp as u64);
         Ok(())
     }
 }
 
 // ---- Accounts ----
-
-#[derive(Accounts)]
-pub struct Initialize {}
-
 #[derive(Accounts)]
 pub struct StoreTelegramInitData<'info> {
     #[account(mut)]
@@ -88,8 +99,15 @@ pub struct VerifyTelegramInitData<'info> {
 pub struct TelegramSession {
     pub user_wallet: Pubkey,
 
+    #[max_len(MAX_USERNAME_LEN)]
+    pub username: String,
+
     #[max_len(MAX_VALIDATION_LEN)]
     pub validation_bytes: Vec<u8>,
+
+    pub verified: bool,
+    pub auth_at: u64,
+    pub verified_at: Option<u64>,
 }
 
 // ---- Helpers ----
@@ -170,6 +188,72 @@ fn verify_previous_ed25519_ix(
     Ok(())
 }
 
+fn extract_username(bytes: &[u8]) -> Result<String> {
+    // We expect ASCII only.
+    let s = core::str::from_utf8(bytes)
+        .map_err(|_| error!(ErrorCode::InvalidTelegramMessage))?;
+
+    // Look for `"username":"`
+    let start = s
+        .find(USERNAME_PATTERN)
+        .ok_or_else(|| error!(ErrorCode::InvalidTelegramMessage))?
+        + USERNAME_PATTERN.len();
+
+    // Read until the next `"`
+    let rest = &s[start..];
+    let end_rel = rest
+        .find('"')
+        .ok_or_else(|| error!(ErrorCode::InvalidTelegramMessage))?;
+
+    let username = &rest[..end_rel];
+
+    require!(
+        (MIN_USERNAME_LEN..=MAX_USERNAME_LEN).contains(&username.len()),
+        ErrorCode::InvalidTelegramUsername
+    );
+    require!(
+        username
+            .bytes()
+            .all(|b| (b'A'..=b'Z').contains(&b)
+                || (b'a'..=b'z').contains(&b)
+                || (b'0'..=b'9').contains(&b)
+                || b == b'_'),
+        ErrorCode::InvalidTelegramUsername
+    );
+
+    Ok(username.to_string())
+}
+
+fn extract_auth_date(bytes: &[u8]) -> Result<u64> {
+    let s = core::str::from_utf8(bytes)
+        .map_err(|_| error!(ErrorCode::InvalidTelegramMessage))?;
+
+    let start = if let Some(idx) = s.find(AUTH_DATE_PREFIX) {
+        idx + AUTH_DATE_PREFIX.len()
+    } else if s.starts_with(AUTH_DATE_PREFIX) {
+        AUTH_DATE_PREFIX.len()
+    } else {
+        return Err(error!(ErrorCode::InvalidTelegramMessage));
+    };
+
+    let rest = &s[start..];
+    let end_rel = rest.find('\n').unwrap_or(rest.len());
+    let num_str = &rest[..end_rel];
+
+    require!(
+        num_str.chars().all(|c| c.is_ascii_digit()),
+        ErrorCode::InvalidTelegramMessage
+    );
+
+    let ts: u64 = num_str
+        .parse()
+        .map_err(|_| error!(ErrorCode::InvalidTelegramMessage))?;
+
+    require!(ts > 0, ErrorCode::InvalidTelegramMessage);
+
+    Ok(ts as u64)
+}
+
 // ---- Error Codes ----
 #[error_code]
 pub enum ErrorCode {
@@ -187,4 +271,8 @@ pub enum ErrorCode {
     InvalidTelegramSignature,
     #[msg("Invalid Telegram public key")]
     InvalidTelegramPublicKey,
+    #[msg("Invalid Telegram username")]
+    InvalidTelegramUsername,
+    #[msg("Invalid Telegram auth date")]
+    InvalidTelegramAuthDate,
 }

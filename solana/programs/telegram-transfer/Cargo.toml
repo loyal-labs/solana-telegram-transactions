@@ -22,3 +22,4 @@ borsh = { version = "0.10.4", default-features = false }
 borsh-derive  = "0.10.4"  
 hex-literal = "0.4.1"
 sha2 = "0.10"
+telegram-verification = { path = "../telegram-verification", features = ["cpi"] }

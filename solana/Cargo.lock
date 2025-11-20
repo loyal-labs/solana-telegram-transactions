@@ -1347,6 +1347,7 @@ dependencies = [
  "borsh-derive 0.10.4",
  "hex-literal",
  "sha2",
+ "telegram-verification",
 ]
 
 [[package]]

@@ -46,6 +46,9 @@ const VALIDATION_SIGNATURE_BYTES: Uint8Array = new Uint8Array([
   178, 153, 248, 2, 121, 161, 49, 224, 103, 190, 108, 234, 4,
 ]);
 
+const VALIDATION_AUTH_DATE = 1763598375;
+const VALIDATION_USERNAME = "dig133713337";
+
 const TELEGRAM_PUBKEY_PROD_HEX =
   "e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d";
 const TELEGRAM_PUBKEY_PROD_BYTES = Buffer.from(TELEGRAM_PUBKEY_PROD_HEX, "hex");
@@ -58,6 +61,12 @@ describe.only("telegram-verification test suite", () => {
   const user = userKp.publicKey;
   const wallet = new anchor.Wallet(userKp);
 
+  const otherUserKp = web3.Keypair.generate();
+  const otherUser = otherUserKp.publicKey;
+  const otherWallet = new anchor.Wallet(otherUserKp);
+
+  const initialAmount = LAMPORTS_PER_SOL * 6;
+
   const provider = new anchor.AnchorProvider(
     baseProvider.connection,
     wallet,
@@ -65,21 +74,25 @@ describe.only("telegram-verification test suite", () => {
   );
   anchor.setProvider(provider);
 
-  const program = anchor.workspace
+  const verificationProgram = anchor.workspace
     .TelegramVerification as Program<TelegramVerification>;
-
-  const validationString = new TextDecoder().decode(VALIDATION_BYTES);
-  console.log("Validation string:", validationString);
-  console.log("Validation string length:", validationString.length);
+  const transferProgram = anchor.workspace
+    .TelegramTransfer as Program<TelegramTransfer>;
 
   let sessionPda: PublicKey;
+  let vaultPda: PublicKey;
+  let depositPda: PublicKey;
 
   before(async () => {
     const { blockhash, lastValidBlockHeight } =
       await provider.connection.getLatestBlockhash();
     const signature = await provider.connection.requestAirdrop(
-      provider.wallet.publicKey,
-      LAMPORTS_PER_SOL * 2
+      user,
+      initialAmount
+    );
+    const signature2 = await provider.connection.requestAirdrop(
+      otherUser,
+      initialAmount
     );
 
     await provider.connection.confirmTransaction(
@@ -90,37 +103,126 @@ describe.only("telegram-verification test suite", () => {
       },
       "confirmed"
     );
-  });
 
-  it("Initialize program", async () => {
-    await program.methods.initialize().rpc({ commitment: "confirmed" });
-  });
-
-  it("stores validation bytes in TelegramSession PDA", async () => {
-    [sessionPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("tg_session"), user.toBuffer()],
-      program.programId
+    await provider.connection.confirmTransaction(
+      {
+        signature: signature2,
+        blockhash,
+        lastValidBlockHeight,
+      },
+      "confirmed"
     );
+  });
 
-    await program.methods
-      .store(Buffer.from(VALIDATION_BYTES))
+  it("Create deposit for user A", async () => {
+    await transferProgram.methods
+      .depositForUsername(VALIDATION_USERNAME, new BN(initialAmount / 2))
       .accounts({
         payer: user,
-        user,
+        depositor: user,
+      })
+      .rpc({ commitment: "confirmed" });
+
+    [depositPda] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("deposit"),
+        user.toBuffer(),
+        Buffer.from(VALIDATION_USERNAME),
+      ],
+      transferProgram.programId
+    );
+
+    const deposit = await transferProgram.account.deposit.fetch(depositPda);
+    expect(deposit.amount.toNumber()).to.equal(initialAmount / 2);
+    expect(deposit.user.toBase58()).to.equal(user.toBase58());
+    expect(deposit.username).to.equal(VALIDATION_USERNAME);
+  });
+
+  it("Top up existing deposit for user A", async () => {
+    await transferProgram.methods
+      .depositForUsername(VALIDATION_USERNAME, new BN(initialAmount / 4))
+      .accounts({
+        payer: user,
+        depositor: user,
+      })
+      .rpc({ commitment: "confirmed" });
+
+    const deposit = await transferProgram.account.deposit.fetch(depositPda);
+    expect(deposit.amount.toNumber()).to.equal((initialAmount * 3) / 4);
+    expect(deposit.user.toBase58()).to.equal(user.toBase58());
+    expect(deposit.username).to.equal(VALIDATION_USERNAME);
+  });
+
+  it("Refund deposit for user A", async () => {
+    [vaultPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), Buffer.from(VALIDATION_USERNAME)],
+      transferProgram.programId
+    );
+
+    await transferProgram.methods
+      .refundDeposit(new BN(initialAmount / 4))
+      .accounts({
+        depositor: user,
+        // @ts-ignore
+        vault: vaultPda,
+        deposit: depositPda,
+      })
+      .rpc({ commitment: "confirmed" });
+
+    const deposit = await transferProgram.account.deposit.fetch(depositPda);
+    expect(deposit.amount.toNumber()).to.equal(initialAmount / 2);
+    expect(deposit.user.toBase58()).to.equal(user.toBase58());
+    expect(deposit.username).to.equal(VALIDATION_USERNAME);
+  });
+
+  it("Refund deposit for user B (checks for thrown error)", async () => {
+    let threw = false;
+    try {
+      await transferProgram.methods
+        .refundDeposit(new BN(initialAmount / 4))
+        .accounts({
+          depositor: otherUser,
+          // @ts-ignore
+          vault: vaultPda,
+          deposit: depositPda,
+        })
+        .rpc({ commitment: "confirmed" });
+    } catch (e) {
+      threw = true;
+    }
+    expect(threw).to.be.true;
+  });
+
+  it("User B stores initData in TelegramSession PDA", async () => {
+    [sessionPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("tg_session"), otherUser.toBuffer()],
+      verificationProgram.programId
+    );
+
+    await verificationProgram.methods
+      .store(Buffer.from(VALIDATION_BYTES))
+      .accounts({
+        payer: otherUser,
+        user: otherUser,
         // @ts-ignore
         session: sessionPda,
         systemProgram: SystemProgram.programId,
       })
-      .signers([userKp])
+      .signers([otherUserKp])
       .rpc({ commitment: "confirmed" });
 
-    const session = await program.account.telegramSession.fetch(sessionPda);
+    const session = await verificationProgram.account.telegramSession.fetch(
+      sessionPda
+    );
 
-    console.log("Session:", session);
-    expect(session.userWallet.toBase58()).to.eq(user.toBase58());
+    expect(session.userWallet.toBase58()).to.eq(otherUser.toBase58());
+    expect(session.username).to.eq(VALIDATION_USERNAME);
+    expect(session.verified).to.eq(false);
+    expect(session.verifiedAt).to.eq(null);
+    expect(session.authAt).to.not.be.null;
   });
 
-  it("verifies Telegram initData with native sysvar instructions", async () => {
+  it("User B verifies Telegram initData with native sysvar instructions", async () => {
     // this ix verifies ed25519 signature
     const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
       publicKey: TELEGRAM_PUBKEY_UINT8ARRAY,
@@ -128,7 +230,7 @@ describe.only("telegram-verification test suite", () => {
       signature: VALIDATION_SIGNATURE_BYTES,
     });
 
-    const verifyIx = await program.methods
+    const verifyIx = await verificationProgram.methods
       .verifyTelegramInitData()
       .accounts({
         session: sessionPda,
@@ -138,10 +240,10 @@ describe.only("telegram-verification test suite", () => {
       .instruction();
 
     const tx = new Transaction().add(ed25519Ix, verifyIx);
-    tx.feePayer = user;
+    tx.feePayer = otherUser;
     const { blockhash } = await provider.connection.getLatestBlockhash();
     tx.recentBlockhash = blockhash;
-    tx.sign(userKp);
+    tx.sign(otherUserKp);
 
     let threw = false;
     try {
@@ -154,5 +256,33 @@ describe.only("telegram-verification test suite", () => {
       console.error("Error:", e);
     }
     expect(threw).to.eq(false);
+
+    let session = await verificationProgram.account.telegramSession.fetch(
+      sessionPda
+    );
+    expect(session.username).to.eq(VALIDATION_USERNAME);
+    expect(session.verified).to.be.true;
+    expect(session.verifiedAt).to.not.be.null;
+  });
+
+  it("User B claims deposit from user A with verified initData", async () => {
+    await transferProgram.methods
+      .claimDeposit(new BN(initialAmount / 4))
+      .accounts({
+        recipient: otherUser,
+        // @ts-ignore
+        vault: vaultPda,
+        deposit: depositPda,
+        session: sessionPda,
+      })
+      .rpc({ commitment: "confirmed" });
+
+    const deposit = await transferProgram.account.deposit.fetch(depositPda);
+    expect(deposit.amount.toNumber()).to.equal(initialAmount / 4);
+    expect(deposit.user.toBase58()).to.equal(user.toBase58());
+    expect(deposit.username).to.equal(VALIDATION_USERNAME);
+
+    const otherUserBalance = await provider.connection.getBalance(otherUser);
+    expect(otherUserBalance).to.greaterThan(initialAmount);
   });
 });
