@@ -144,13 +144,14 @@ fn verify_previous_ed25519_ix(
         ErrorCode::InvalidEd25519
     );
 
-    // Payload region starts immediately after offsets
-    let data_start = ED25519_HEADER_LEN + need;
-
     // Compute absolute slices and bounds-check
-    let sig_abs = data_start + signature_offset;
-    let pk_abs  = data_start + public_key_offset;
-    let msg_abs = data_start + message_data_offset;
+    let sig_abs = signature_offset;
+    let pk_abs  = public_key_offset;
+    let msg_abs = message_data_offset;
+
+    require!(sig_abs >= ED25519_HEADER_LEN + ED25519_OFFSETS_LEN, ErrorCode::InvalidEd25519);
+    require!(pk_abs  >= ED25519_HEADER_LEN + ED25519_OFFSETS_LEN, ErrorCode::InvalidEd25519);
+    require!(msg_abs >= ED25519_HEADER_LEN + ED25519_OFFSETS_LEN, ErrorCode::InvalidEd25519);
 
     require!(sig_abs + SIG_LEN      <= data.len(), ErrorCode::InvalidEd25519);
     require!(pk_abs  + PUBKEY_LEN   <= data.len(), ErrorCode::InvalidEd25519);

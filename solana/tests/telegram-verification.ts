@@ -11,34 +11,45 @@ import {
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import { TelegramVerification } from "../target/types/telegram_verification";
+import { Ed25519Program } from "@solana/web3.js";
+import { publicKey } from "@coral-xyz/anchor/dist/cjs/utils";
+import { SYSVAR_INSTRUCTIONS_PUBKEY } from "@solana/web3.js";
 
+// --- Testing fixtures ---
 const VALIDATION_BYTES: Uint8Array = new Uint8Array([
-  56, 48, 54, 53, 49, 52, 48, 52, 57, 57, 58, 87, 101, 97, 116, 97, 97, 116, 97,
-  10, 97, 117, 116, 104, 95, 100, 97, 116, 101, 61, 49, 55, 54, 51, 53, 50, 50,
-  52, 54, 55, 10, 99, 104, 97, 116, 95, 105, 110, 115, 116, 97, 110, 99, 101,
-  61, 45, 52, 53, 57, 55, 56, 48, 55, 53, 56, 53, 54, 55, 51, 56, 52, 53, 53,
-  55, 49, 10, 99, 104, 97, 116, 95, 116, 121, 112, 101, 61, 115, 117, 115, 101,
-  114, 61, 123, 34, 105, 58, 56, 55, 57, 55, 55, 54, 55, 44, 34, 102, 105, 114,
-  115, 116, 95, 110, 97, 109, 101, 34, 58, 34, 84, 114, 97, 118, 105, 115, 116,
-  95, 110, 97, 109, 101, 34, 58, 34, 34, 44, 34, 117, 115, 101, 114, 110, 97,
-  109, 101, 34, 58, 34, 49, 51, 51, 55, 49, 51, 51, 51, 55, 34, 44, 34, 108, 97,
-  110, 103, 117, 97, 103, 101, 95, 99, 111, 100, 101, 34, 58, 34, 101, 110, 34,
-  44, 34, 97, 108, 108, 111, 119, 115, 95, 119, 114, 105, 116, 101, 95, 116,
-  111, 95, 112, 109, 34, 58, 116, 114, 117, 101, 44, 34, 112, 104, 111, 116,
-  111, 95, 117, 114, 108, 34, 58, 34, 116, 116, 112, 115, 58, 92, 47, 92, 47,
-  116, 46, 109, 101, 101, 114, 112, 105, 99, 92, 47, 51, 50, 48, 92, 47, 120,
-  99, 90, 85, 85, 85, 87, 51, 117, 74, 50, 99, 79, 80, 86, 73, 81, 85, 111, 99,
-  104, 105, 119, 72, 99, 56, 113, 118, 114, 56, 106, 114, 108, 66, 56, 74, 45,
-  72, 88, 120, 105, 112, 98, 83, 74, 76, 122, 122, 118, 120, 73, 99, 79, 106,
-  55, 103, 55, 70, 49, 69, 78, 116, 72, 71, 46, 115, 118, 103,
+  56, 48, 54, 53, 49, 52, 48, 52, 57, 57, 58, 87, 101, 98, 65, 112, 112, 68, 97,
+  116, 97, 10, 97, 117, 116, 104, 95, 100, 97, 116, 101, 61, 49, 55, 54, 51, 53,
+  57, 56, 51, 55, 53, 10, 99, 104, 97, 116, 95, 105, 110, 115, 116, 97, 110, 99,
+  101, 61, 45, 52, 53, 57, 55, 56, 48, 55, 53, 56, 53, 54, 55, 51, 56, 52, 53,
+  53, 55, 49, 10, 99, 104, 97, 116, 95, 116, 121, 112, 101, 61, 115, 101, 110,
+  100, 101, 114, 10, 117, 115, 101, 114, 61, 123, 34, 105, 100, 34, 58, 56, 49,
+  51, 56, 55, 57, 55, 55, 54, 55, 44, 34, 102, 105, 114, 115, 116, 95, 110, 97,
+  109, 101, 34, 58, 34, 84, 114, 97, 118, 105, 115, 34, 44, 34, 108, 97, 115,
+  116, 95, 110, 97, 109, 101, 34, 58, 34, 34, 44, 34, 117, 115, 101, 114, 110,
+  97, 109, 101, 34, 58, 34, 100, 105, 103, 49, 51, 51, 55, 49, 51, 51, 51, 55,
+  34, 44, 34, 108, 97, 110, 103, 117, 97, 103, 101, 95, 99, 111, 100, 101, 34,
+  58, 34, 101, 110, 34, 44, 34, 97, 108, 108, 111, 119, 115, 95, 119, 114, 105,
+  116, 101, 95, 116, 111, 95, 112, 109, 34, 58, 116, 114, 117, 101, 44, 34, 112,
+  104, 111, 116, 111, 95, 117, 114, 108, 34, 58, 34, 104, 116, 116, 112, 115,
+  58, 92, 47, 92, 47, 116, 46, 109, 101, 92, 47, 105, 92, 47, 117, 115, 101,
+  114, 112, 105, 99, 92, 47, 51, 50, 48, 92, 47, 120, 99, 90, 85, 85, 85, 87,
+  51, 117, 74, 50, 99, 79, 80, 86, 73, 81, 85, 111, 99, 104, 105, 119, 72, 99,
+  56, 113, 118, 114, 56, 106, 114, 108, 66, 56, 74, 45, 72, 88, 120, 105, 112,
+  98, 83, 74, 76, 122, 122, 118, 120, 73, 99, 79, 106, 55, 103, 55, 70, 49, 69,
+  78, 116, 72, 71, 46, 115, 118, 103, 34, 125,
 ]);
 
 const VALIDATION_SIGNATURE_BYTES: Uint8Array = new Uint8Array([
-  181, 119, 170, 178, 72, 35, 92, 228, 70, 10, 178, 38, 59, 13, 126, 110, 115,
-  46, 238, 87, 14, 177, 232, 229, 237, 166, 209, 137, 210, 236, 229, 14, 215,
-  201, 215, 158, 12, 112, 23, 56, 220, 97, 7, 188, 15, 113, 210, 31, 10, 14,
-  138, 45, 172, 55, 212, 63, 165, 121, 205, 230, 74, 38, 174, 13,
+  139, 171, 57, 233, 145, 1, 218, 227, 29, 106, 55, 30, 237, 207, 28, 229, 22,
+  234, 202, 160, 221, 31, 219, 251, 151, 181, 118, 207, 216, 254, 57, 79, 209,
+  9, 176, 4, 81, 224, 69, 253, 250, 110, 16, 143, 73, 60, 35, 61, 66, 177, 139,
+  178, 153, 248, 2, 121, 161, 49, 224, 103, 190, 108, 234, 4,
 ]);
+
+const TELEGRAM_PUBKEY_PROD_HEX =
+  "e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d";
+const TELEGRAM_PUBKEY_PROD_BYTES = Buffer.from(TELEGRAM_PUBKEY_PROD_HEX, "hex");
+const TELEGRAM_PUBKEY_UINT8ARRAY = new Uint8Array(TELEGRAM_PUBKEY_PROD_BYTES);
 
 describe.only("telegram-verification test suite", () => {
   const baseProvider = anchor.AnchorProvider.env();
@@ -59,6 +70,9 @@ describe.only("telegram-verification test suite", () => {
 
   const validationString = new TextDecoder().decode(VALIDATION_BYTES);
   console.log("Validation string:", validationString);
+  console.log("Validation string length:", validationString.length);
+
+  let sessionPda: PublicKey;
 
   before(async () => {
     const { blockhash, lastValidBlockHeight } =
@@ -79,11 +93,66 @@ describe.only("telegram-verification test suite", () => {
   });
 
   it("Initialize program", async () => {
+    await program.methods.initialize().rpc({ commitment: "confirmed" });
+  });
+
+  it("stores validation bytes in TelegramSession PDA", async () => {
+    [sessionPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("tg_session"), user.toBuffer()],
+      program.programId
+    );
+
     await program.methods
-      .initialize()
+      .store(Buffer.from(VALIDATION_BYTES))
       .accounts({
         payer: user,
+        user,
+        // @ts-ignore
+        session: sessionPda,
+        systemProgram: SystemProgram.programId,
       })
+      .signers([userKp])
       .rpc({ commitment: "confirmed" });
+
+    const session = await program.account.telegramSession.fetch(sessionPda);
+
+    console.log("Session:", session);
+    expect(session.userWallet.toBase58()).to.eq(user.toBase58());
+  });
+
+  it("verifies Telegram initData with native sysvar instructions", async () => {
+    // this ix verifies ed25519 signature
+    const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
+      publicKey: TELEGRAM_PUBKEY_UINT8ARRAY,
+      message: VALIDATION_BYTES,
+      signature: VALIDATION_SIGNATURE_BYTES,
+    });
+
+    const verifyIx = await program.methods
+      .verifyTelegramInitData()
+      .accounts({
+        session: sessionPda,
+        // @ts-ignore
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
+      })
+      .instruction();
+
+    const tx = new Transaction().add(ed25519Ix, verifyIx);
+    tx.feePayer = user;
+    const { blockhash } = await provider.connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    tx.sign(userKp);
+
+    let threw = false;
+    try {
+      const sig = await provider.connection.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false,
+      });
+      await provider.connection.confirmTransaction(sig, "confirmed");
+    } catch (e) {
+      threw = true;
+      console.error("Error:", e);
+    }
+    expect(threw).to.eq(false);
   });
 });
