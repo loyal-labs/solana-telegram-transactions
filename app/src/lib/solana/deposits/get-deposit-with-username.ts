@@ -1,8 +1,8 @@
 import { Program } from "@coral-xyz/anchor";
 
 import { TelegramTransfer } from "../../../../../target/types/telegram_transfer";
+import { TelegramDeposit } from "../../../types/deposits";
 import { encodeAnchorStringFilter } from "../solana-helpers";
-import { TelegramDeposit } from "./types";
 
 export const getDepositWithUsername = async (
   transferProgram: Program<TelegramTransfer>,

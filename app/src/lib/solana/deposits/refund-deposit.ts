@@ -1,9 +1,9 @@
 import { AnchorProvider, Program } from "@coral-xyz/anchor";
 
 import type { TelegramTransfer } from "../../../../../target/types/telegram_transfer";
+import type { TelegramDeposit } from "../../../types/deposits";
 import { getDepositPda, getVaultPda, numberToBN } from "../solana-helpers";
 import { getDeposit } from "./get-deposit";
-import type { TelegramDeposit } from "./types";
 
 export const refundDeposit = async (
   provider: AnchorProvider,
