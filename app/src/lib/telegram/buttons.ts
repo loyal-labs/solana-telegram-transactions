@@ -217,7 +217,7 @@ export const showTransactionDetailsButtons = ({
   secondaryStyle,
 }: TransactionDetailsButtonsOptions): boolean => {
   const mainShown = showMainButton({
-    text: "Approve",
+    text: "Claim",
     onClick: onApprove,
     ...(mainStyle ?? {}),
   });

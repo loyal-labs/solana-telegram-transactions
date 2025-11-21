@@ -76,6 +76,7 @@ export default function Home() {
   const [selectedTransaction, setSelectedTransaction] = useState<IncomingTransaction | null>(null);
   const [isSendFormValid, setIsSendFormValid] = useState(false);
   const [sendAttempted, setSendAttempted] = useState(false);
+  const [isClaimingTransaction, setIsClaimingTransaction] = useState(false);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(secondaryButton.setParams.isAvailable);
@@ -160,13 +161,36 @@ export default function Home() {
     }
   }, [walletAddress]);
 
-  const handleApproveTransaction = useCallback((transactionId: string) => {
-    console.log("Approving transaction:", transactionId);
-    // TODO: Implement actual approval logic with Solana
-    setIncomingTransactions((prev) => prev.filter((tx) => tx.id !== transactionId));
-    setTransactionDetailsSheetOpen(false);
-    setSelectedTransaction(null);
+  const refreshWalletBalance = useCallback(async () => {
+    try {
+      const balanceLamports = await getWalletBalance();
+      setBalance(balanceLamports);
+    } catch (error) {
+      console.error("Failed to refresh wallet balance", error);
+    }
   }, []);
+
+  const handleApproveTransaction = useCallback(async (transactionId: string) => {
+    setIsClaimingTransaction(true);
+    try {
+      console.log("Claiming transaction:", transactionId);
+      // TODO: Implement actual claim logic with Solana
+      // Simulating the 2 operations that take 400ms each
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      setIncomingTransactions((prev) => prev.filter((tx) => tx.id !== transactionId));
+
+      // Refresh wallet balance after successful claim
+      await refreshWalletBalance();
+
+      setTransactionDetailsSheetOpen(false);
+      setSelectedTransaction(null);
+    } catch (error) {
+      console.error("Failed to claim transaction", error);
+    } finally {
+      setIsClaimingTransaction(false);
+    }
+  }, [refreshWalletBalance]);
 
   const handleIgnoreTransaction = useCallback((transactionId: string) => {
     console.log("Ignoring transaction:", transactionId);
@@ -293,10 +317,22 @@ export default function Home() {
     }
 
     if (isTransactionDetailsSheetOpen && selectedTransaction) {
-      showTransactionDetailsButtons({
-        onApprove: () => handleApproveTransaction(selectedTransaction.id),
-        onIgnore: () => handleIgnoreTransaction(selectedTransaction.id),
-      });
+      if (isClaimingTransaction) {
+        // Show only main button with loader during claim
+        hideSecondaryButton();
+        showMainButton({
+          text: "Claim",
+          onClick: () => {}, // No-op during loading
+          isEnabled: false,
+          showLoader: true,
+        });
+      } else {
+        // Show both buttons normally
+        showTransactionDetailsButtons({
+          onApprove: () => handleApproveTransaction(selectedTransaction.id),
+          onIgnore: () => handleIgnoreTransaction(selectedTransaction.id),
+        });
+      }
     } else if (isSendSheetOpen) {
       hideSecondaryButton();
       showMainButton({
@@ -332,6 +368,7 @@ export default function Home() {
     isReceiveSheetOpen,
     isSendFormValid,
     selectedTransaction,
+    isClaimingTransaction,
     mainButtonAvailable,
     secondaryButtonAvailable,
     handleOpenSendSheet,
