@@ -4,7 +4,7 @@ import type { TelegramTransfer } from "../../../../target/types/telegram_transfe
 import { getDepositPda, numberToBN } from "./solana-helpers";
 import type { TelegramDeposit } from "./solana-types";
 
-export const createDeposit = async (
+export const topUpDeposit = async (
   provider: AnchorProvider,
   transferProgram: Program<TelegramTransfer>,
   username: string,
