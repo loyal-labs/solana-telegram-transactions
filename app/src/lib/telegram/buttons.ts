@@ -1,5 +1,5 @@
 import type { SecondaryButtonPosition } from "@telegram-apps/bridge";
-import { mainButton, secondaryButton } from "@telegram-apps/sdk-react";
+import { hapticFeedback, mainButton, secondaryButton } from "@telegram-apps/sdk-react";
 
 import { BaseButtonOptions } from "@/types/telegram";
 
@@ -72,6 +72,9 @@ const bindMainClick = (onClick?: () => void) => {
 
   if (onClick) {
     const handler = () => {
+      if (hapticFeedback.impactOccurred.isAvailable()) {
+        hapticFeedback.impactOccurred('medium');
+      }
       onClick();
     };
 
@@ -89,6 +92,9 @@ const bindSecondaryClick = (onClick?: () => void) => {
 
   if (onClick) {
     const handler = () => {
+      if (hapticFeedback.impactOccurred.isAvailable()) {
+        hapticFeedback.impactOccurred('medium');
+      }
       onClick();
     };
 

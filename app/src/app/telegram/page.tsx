@@ -4,6 +4,7 @@ import { hashes } from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import {
+  hapticFeedback,
   mainButton,
   secondaryButton,
   useRawInitData,
@@ -83,6 +84,9 @@ export default function Home() {
   const ensuredWalletRef = useRef(false);
 
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
     if (recipientName) {
       setSelectedRecipient(recipientName);
     } else {
@@ -93,16 +97,43 @@ export default function Home() {
   }, []);
 
   const handleOpenReceiveSheet = useCallback(() => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
     setReceiveSheetOpen(true);
   }, []);
 
   const handleOpenTransactionDetails = useCallback((transaction: IncomingTransaction) => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
     setSelectedTransaction(transaction);
     setTransactionDetailsSheetOpen(true);
   }, []);
 
   const handleSendValidationChange = useCallback((isValid: boolean) => {
     setIsSendFormValid(isValid);
+  }, []);
+
+  const handleSendSheetChange = useCallback((open: boolean) => {
+    if (!open && hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
+    setSendSheetOpen(open);
+  }, []);
+
+  const handleReceiveSheetChange = useCallback((open: boolean) => {
+    if (!open && hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
+    setReceiveSheetOpen(open);
+  }, []);
+
+  const handleTransactionDetailsSheetChange = useCallback((open: boolean) => {
+    if (!open && hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
+    setTransactionDetailsSheetOpen(open);
   }, []);
 
   const handleShareAddress = useCallback(async () => {
@@ -171,6 +202,9 @@ export default function Home() {
   }, []);
 
   const handleApproveTransaction = useCallback(async (transactionId: string) => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('medium');
+    }
     setIsClaimingTransaction(true);
     try {
       console.log("Claiming transaction:", transactionId);
@@ -183,16 +217,27 @@ export default function Home() {
       // Refresh wallet balance after successful claim
       await refreshWalletBalance();
 
+      // Haptic feedback for successful claim
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred('success');
+      }
+
       setTransactionDetailsSheetOpen(false);
       setSelectedTransaction(null);
     } catch (error) {
       console.error("Failed to claim transaction", error);
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred('error');
+      }
     } finally {
       setIsClaimingTransaction(false);
     }
   }, [refreshWalletBalance]);
 
   const handleIgnoreTransaction = useCallback((transactionId: string) => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('medium');
+    }
     console.log("Ignoring transaction:", transactionId);
     // TODO: Implement actual ignore logic
     setIncomingTransactions((prev) => prev.filter((tx) => tx.id !== transactionId));
@@ -649,6 +694,9 @@ export default function Home() {
                 </div>
                 <button
                   onClick={async () => {
+                    if (hapticFeedback.impactOccurred.isAvailable()) {
+                      hapticFeedback.impactOccurred('light');
+                    }
                     if (walletAddress && navigator?.clipboard?.writeText) {
                       await navigator.clipboard.writeText(walletAddress);
                     }
@@ -746,16 +794,16 @@ export default function Home() {
 
       <SendSheet
         open={isSendSheetOpen}
-        onOpenChange={setSendSheetOpen}
+        onOpenChange={handleSendSheetChange}
         trigger={null}
         initialRecipient={selectedRecipient}
         onValidationChange={handleSendValidationChange}
         showErrors={sendAttempted}
       />
-      <ReceiveSheet open={isReceiveSheetOpen} onOpenChange={setReceiveSheetOpen} trigger={null} />
+      <ReceiveSheet open={isReceiveSheetOpen} onOpenChange={handleReceiveSheetChange} trigger={null} />
       <TransactionDetailsSheet
         open={isTransactionDetailsSheetOpen}
-        onOpenChange={setTransactionDetailsSheetOpen}
+        onOpenChange={handleTransactionDetailsSheetChange}
         trigger={null}
         transaction={selectedTransaction}
       />
