@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import {
   getWalletBalance,
   getWalletPublicKey,
-} from "@/lib/solana/wallet-details";
+} from "@/lib/solana/wallet/wallet-details";
 
 type WalletBalanceData = {
   lamports: number | null;
