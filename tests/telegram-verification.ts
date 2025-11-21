@@ -14,6 +14,7 @@ import { TelegramVerification } from "../target/types/telegram_verification";
 import { Ed25519Program } from "@solana/web3.js";
 import { publicKey } from "@coral-xyz/anchor/dist/cjs/utils";
 import { SYSVAR_INSTRUCTIONS_PUBKEY } from "@solana/web3.js";
+import bs58 from "bs58";
 
 // --- Testing fixtures ---
 const VALIDATION_BYTES: Uint8Array = new Uint8Array([
@@ -45,6 +46,14 @@ const VALIDATION_SIGNATURE_BYTES: Uint8Array = new Uint8Array([
   9, 176, 4, 81, 224, 69, 253, 250, 110, 16, 143, 73, 60, 35, 61, 66, 177, 139,
   178, 153, 248, 2, 121, 161, 49, 224, 103, 190, 108, 234, 4,
 ]);
+
+const encodeAnchorStringFilter = (value: string): string => {
+  const valueBytes = Buffer.from(value, "utf8");
+  const filterBuf = Buffer.alloc(4 + valueBytes.length);
+  filterBuf.writeUInt32LE(valueBytes.length, 0);
+  valueBytes.copy(filterBuf, 4);
+  return bs58.encode(filterBuf);
+};
 
 const VALIDATION_AUTH_DATE = 1763598375;
 const VALIDATION_USERNAME = "dig133713337";
@@ -165,6 +174,27 @@ describe.only("telegram-verification test suite", () => {
     expect(vault.totalDeposited.toNumber()).to.equal(
       totalDeposited + initialAmount / 2
     );
+  });
+
+  it("Scans deposits by username using memcmp filters", async () => {
+    const filters = [
+      {
+        memcmp: {
+          offset: 8 + 32,
+          bytes: encodeAnchorStringFilter(VALIDATION_USERNAME),
+        },
+      },
+    ];
+
+    const accounts = await transferProgram.account.deposit.all(filters);
+    expect(accounts.length).to.be.greaterThan(0);
+
+    const pubkeys = accounts.map(({ publicKey }) => publicKey.toBase58());
+    expect(pubkeys).to.include(depositPda.toBase58());
+
+    accounts.forEach(({ account }) => {
+      expect(account.username).to.equal(VALIDATION_USERNAME);
+    });
   });
 
   it("Top up existing deposit for user A", async () => {
