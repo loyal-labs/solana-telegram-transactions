@@ -19,7 +19,7 @@ export const claimDeposit = async (
   amount: number,
   username: string
 ): Promise<boolean> => {
-  const vaultPda = getVaultPda(username, transferProgram);
+  const vaultPda = getVaultPda(transferProgram);
   const depositPda = getDepositPda(user, username, transferProgram);
 
   const sessionPda = getSessionPda(recipient, verificationProgram);

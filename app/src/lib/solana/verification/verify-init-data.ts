@@ -1,4 +1,4 @@
-import { AnchorProvider, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
 import { AnchorWallet } from "@solana/wallet-adapter-react";
 import {
   Ed25519Program,
@@ -12,9 +12,9 @@ import { getSessionPda } from "../solana-helpers";
 
 export const verifyInitData = async (
   anchorProvider: AnchorProvider,
-  anchorWallet: AnchorWallet,
-  verificationProgram: Program<TelegramVerification>,
+  anchorWallet: Wallet,
   user: PublicKey,
+  verificationProgram: Program<TelegramVerification>,
   processedInitDataBytes: Uint8Array,
   telegramSignatureBytes: Uint8Array,
   telegramPublicKeyBytes: Uint8Array
@@ -38,6 +38,7 @@ export const verifyInitData = async (
   tx.feePayer = user;
   const { blockhash } = await anchorProvider.connection.getLatestBlockhash();
   tx.recentBlockhash = blockhash;
+
   anchorWallet.signTransaction(tx);
 
   let threw = false;

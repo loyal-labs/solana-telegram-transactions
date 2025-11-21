@@ -45,11 +45,10 @@ export function numberToBN(number: number): BN {
 }
 
 export function getVaultPda(
-  username: string,
   transferProgram: Program<TelegramTransfer>
 ): PublicKey {
   const [vaultPda] = PublicKey.findProgramAddressSync(
-    [VAULT_SEED_BYTES, Buffer.from(username)],
+    [VAULT_SEED_BYTES],
     transferProgram.programId
   );
   return vaultPda;
