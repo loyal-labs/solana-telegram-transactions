@@ -1,4 +1,4 @@
-import { AnchorProvider, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
 import type { AnchorWallet } from "@solana/wallet-adapter-react";
 import { Connection, PublicKey } from "@solana/web3.js";
 
@@ -37,4 +37,12 @@ export function getDepositPda(
     transferProgram.programId
   );
   return depositPda;
+}
+
+export function numberToBN(number: number): BN {
+  if (number < 0) {
+    throw new Error("Number must be positive");
+  }
+
+  return new BN(number);
 }

@@ -1,9 +1,7 @@
 import { AnchorProvider, Program } from "@coral-xyz/anchor";
-import { BN } from "@coral-xyz/anchor";
-import { PublicKey } from "@solana/web3.js";
 
-import { TelegramTransfer } from "../../../../target/types/telegram_transfer";
-import { getDepositPda } from "./solana-helpers";
+import type { TelegramTransfer } from "../../../../target/types/telegram_transfer";
+import { getDepositPda, numberToBN } from "./solana-helpers";
 import type { TelegramDeposit } from "./solana-types";
 
 export const createDeposit = async (
@@ -12,7 +10,7 @@ export const createDeposit = async (
   username: string,
   amount: number
 ): Promise<TelegramDeposit> => {
-  const amountBN = new BN(amount);
+  const amountBN = numberToBN(amount);
 
   await transferProgram.methods
     .depositForUsername(username, amountBN)
