@@ -15,8 +15,8 @@ import LightRays from '@/components/LightRays';
 import ReceiveSheet from '@/components/wallet/ReceiveSheet';
 import SendSheet from '@/components/wallet/SendSheet';
 import { TELEGRAM_BOT_ID } from '@/lib/constants';
-import { getWalletBalance, getWalletPublicKey } from '@/lib/solana/wallet-details';
-import { ensureWalletKeypair } from '@/lib/solana/wallet-keypair-logic';
+import { getWalletBalance, getWalletPublicKey } from '@/lib/solana/wallet/wallet-details';
+import { ensureWalletKeypair } from '@/lib/solana/wallet/wallet-keypair-logic';
 import { initTelegram, sendString } from '@/lib/telegram';
 import {
   hideMainButton,

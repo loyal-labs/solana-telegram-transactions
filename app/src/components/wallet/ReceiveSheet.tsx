@@ -16,7 +16,7 @@ import {
   useState,
 } from "react";
 
-import { getWalletPublicKey } from "@/lib/solana/wallet-details";
+import { getWalletPublicKey } from "@/lib/solana/wallet/wallet-details";
 
 export type ReceiveSheetProps = {
   trigger?: ReactNode | null;

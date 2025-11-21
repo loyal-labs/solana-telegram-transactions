@@ -2,12 +2,15 @@ import { Keypair } from "@solana/web3.js";
 
 import { StoredKeypairStrings, WalletKeypairResult } from "@/types/solana";
 
-import { PUBLIC_KEY_STORAGE_KEY, SECRET_KEY_STORAGE_KEY } from "../constants";
+import {
+  PUBLIC_KEY_STORAGE_KEY,
+  SECRET_KEY_STORAGE_KEY,
+} from "../../constants";
 import {
   deleteCloudValue,
   getCloudValue,
   setCloudValue,
-} from "../telegram/cloud-storage";
+} from "../../telegram/cloud-storage";
 
 const serializeSecretKey = (secretKey: Uint8Array): string =>
   JSON.stringify(Array.from(secretKey));
