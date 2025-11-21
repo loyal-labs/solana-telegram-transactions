@@ -1,4 +1,5 @@
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
+import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import type { AnchorWallet } from "@solana/wallet-adapter-react";
 import { Connection, PublicKey } from "@solana/web3.js";
 
@@ -71,4 +72,12 @@ export function getSessionPda(
     verificationProgram.programId
   );
   return sessionPda;
+}
+
+export function encodeAnchorStringFilter(value: string): string {
+  const valueBytes = Buffer.from(value, "utf8");
+  const filterBuf = Buffer.alloc(4 + valueBytes.length);
+  filterBuf.writeUInt32LE(valueBytes.length, 0);
+  valueBytes.copy(filterBuf, 4);
+  return bs58.encode(filterBuf);
 }
