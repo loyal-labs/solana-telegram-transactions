@@ -9,6 +9,7 @@ import {
   useRawInitData,
   useSignal,
 } from '@telegram-apps/sdk-react';
+import { Check, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import LightRays from '@/components/LightRays';
@@ -35,6 +36,12 @@ hashes.sha512 = sha512;
 
 const SOL_PRICE_USD = 180;
 
+// Mock incoming transactions - to be replaced with actual data from Solana
+const MOCK_INCOMING_TRANSACTIONS = [
+  { id: '1', amount: 0.5, sender: 'AbC123XyZ789PqR456MnO321LkJ987WxY654VbN432TgH876' },
+  { id: '2', amount: 1.25, sender: 'DeF456UvW123StU789HgF654RtY321QwE987XcV123ZaS456' },
+];
+
 // Commented out - Quick Send feature not yet complete
 // const QUICK_SEND_CONTACTS = [
 //   { id: '1', name: 'Alice', initials: 'AL' },
@@ -59,6 +66,7 @@ export default function Home() {
   const [balance, setBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
+  const [incomingTransactions, setIncomingTransactions] = useState(MOCK_INCOMING_TRANSACTIONS);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(secondaryButton.setParams.isAvailable);
@@ -132,6 +140,18 @@ export default function Home() {
       console.error("Failed to share wallet address", error);
     }
   }, [walletAddress]);
+
+  const handleApproveTransaction = useCallback((transactionId: string) => {
+    console.log("Approving transaction:", transactionId);
+    // TODO: Implement actual approval logic with Solana
+    setIncomingTransactions((prev) => prev.filter((tx) => tx.id !== transactionId));
+  }, []);
+
+  const handleIgnoreTransaction = useCallback((transactionId: string) => {
+    console.log("Ignoring transaction:", transactionId);
+    // TODO: Implement actual ignore logic
+    setIncomingTransactions((prev) => prev.filter((tx) => tx.id !== transactionId));
+  }, []);
 
   useEffect(() => {
     if (rawInitData) {
@@ -241,6 +261,10 @@ export default function Home() {
 
   const formatAddress = (address: string | null): string => {
     if (!address) return "Loading...";
+    return `${address.slice(0, 4)}...${address.slice(-4)}`;
+  };
+
+  const formatSenderAddress = (address: string): string => {
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
 
@@ -355,6 +379,70 @@ export default function Home() {
               )}
             </div>
           </div>
+
+          {/* Incoming Transactions Notifications */}
+          {incomingTransactions.length > 0 && (
+            <div className="relative mb-8">
+              <div className="space-y-3">
+                {incomingTransactions.map((transaction, idx) => (
+                  <div
+                    key={transaction.id}
+                    className="rounded-2xl p-4 shadow-lg transition-all hover:scale-[1.01]"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0.03) 100%)',
+                      backdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(99, 102, 241, 0.2)',
+                      animationDelay: `${idx * 0.1}s`,
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" style={{
+                            boxShadow: '0 0 6px rgba(99, 102, 241, 0.8)',
+                          }} />
+                          <p className="text-white/40 text-[10px] uppercase tracking-[0.15em] font-medium">
+                            Incoming
+                          </p>
+                        </div>
+                        <p className="text-white text-xl font-bold mono mb-1">
+                          {transaction.amount.toFixed(4)} SOL
+                        </p>
+                        <p className="text-white/50 text-xs mono">
+                          from {formatSenderAddress(transaction.sender)}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center space-x-2 ml-4">
+                        <button
+                          onClick={() => handleIgnoreTransaction(transaction.id)}
+                          className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:bg-white/[0.12] active:scale-95"
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.06)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                          }}
+                          aria-label="Ignore transaction"
+                        >
+                          <X className="w-4 h-4 text-white/60" />
+                        </button>
+                        <button
+                          onClick={() => handleApproveTransaction(transaction.id)}
+                          className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:bg-emerald-500/20 active:scale-95"
+                          style={{
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                          }}
+                          aria-label="Approve transaction"
+                        >
+                          <Check className="w-4 h-4 text-emerald-400" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Quick Send - Commented out until feature is complete */}
           {/* <div className="relative mb-8"> */}
