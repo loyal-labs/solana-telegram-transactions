@@ -6,7 +6,11 @@ import telegramTransferIdl from "../../../../target/idl/telegram_transfer.json";
 import telegramVerificationIdl from "../../../../target/idl/telegram_verification.json";
 import type { TelegramTransfer } from "../../../../target/types/telegram_transfer";
 import type { TelegramVerification } from "../../../../target/types/telegram_verification";
-import { DEPOSIT_SEED_BYTES, VAULT_SEED_BYTES } from "../constants";
+import {
+  DEPOSIT_SEED_BYTES,
+  SESSION_SEED_BYTES,
+  VAULT_SEED_BYTES,
+} from "../constants";
 
 export function getTelegramTransferProgram(
   provider: AnchorProvider
@@ -56,4 +60,15 @@ export function getVaultPda(
     transferProgram.programId
   );
   return vaultPda;
+}
+
+export function getSessionPda(
+  user: PublicKey,
+  verificationProgram: Program<TelegramVerification>
+): PublicKey {
+  const [sessionPda] = PublicKey.findProgramAddressSync(
+    [SESSION_SEED_BYTES, user.toBuffer()],
+    verificationProgram.programId
+  );
+  return sessionPda;
 }

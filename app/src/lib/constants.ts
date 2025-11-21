@@ -15,3 +15,6 @@ export const DEPOSIT_SEED_BYTES = Buffer.from(DEPOSIT_SEED);
 
 export const VAULT_SEED = "vault";
 export const VAULT_SEED_BYTES = Buffer.from(VAULT_SEED);
+
+export const SESSION_SEED = "tg_session";
+export const SESSION_SEED_BYTES = Buffer.from(SESSION_SEED);
