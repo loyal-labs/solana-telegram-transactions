@@ -9,6 +9,7 @@ import {
   secondaryButton,
   useRawInitData,
   useSignal,
+  viewport,
 } from '@telegram-apps/sdk-react';
 import { Check, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -304,6 +305,19 @@ export default function Home() {
   useEffect(() => {
     initTelegram();
     void ensureTelegramTheme();
+
+    // Enable fullscreen for mobile platforms
+    const hash = window.location.hash.slice(1);
+    const params = new URLSearchParams(hash);
+    const platform = params.get('tgWebAppPlatform');
+
+    if (platform === 'ios' || platform === 'android') {
+      if (viewport.requestFullscreen.isAvailable()) {
+        void viewport.requestFullscreen().catch((error) => {
+          console.warn('Failed to enable fullscreen:', error);
+        });
+      }
+    }
 
     // Suppress Telegram SDK viewport errors in non-TMA environment
     const originalError = console.error;
