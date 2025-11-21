@@ -1,16 +1,40 @@
-## Building Solana transactions over Telegram
+# How-tos
+## Local Development
+1. Run Solana validator
+```bash
+sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+npm install -g @magicblock-labs/ephemeral-validator@latest
+mb-test-validator --reset
+```
 
-Building this over 24h stream, please, have mercy on our souls.
+2. Upgrade and deploy the program
+```bash
+anchor build && anchor deploy --provider.cluster localnet
+```
 
-Plan:
-- Frontend setup:
-    -- Telegram intergration: ui + extracting user initData to pass to PDA for verification.
-    -- Separate page for sending transactions to avoid mini app lock-in.
+3. Run tests
+```bash
+EPHEMERAL_PROVIDER_ENDPOINT="http://localhost:7799" \
+EPHEMERAL_WS_ENDPOINT="ws://localhost:7800" \
+anchor test \
+--provider.cluster localnet \
+--skip-local-validator \
+--skip-build \
+--skip-deploy
+```
+## Devnet
+1. Upgrade and deploy
+```bash
+anchor build && anchor deploy --provider.cluster devnet
+```
 
-- Smart contracts setup:
-    -- PDA for escrow + set up some basic testing
-
-- Arcium circuits setup:
-    -- Expand PDA to handle verification requests from the client
-    -- Implement Arcium circuit to verify the data from the client
-    -- Implement the callback account to release the funds
+2. Run tests
+```bash
+EPHEMERAL_PROVIDER_ENDPOINT="http://localhost:7799" \
+EPHEMERAL_WS_ENDPOINT="ws://localhost:7800" \
+anchor test \
+--provider.cluster devnet \
+--skip-local-validator \
+--skip-build \
+--skip-deploy
+```
