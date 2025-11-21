@@ -9,3 +9,6 @@ export const TELEGRAM_PUBLIC_KEYS = [
   // Production key
   "e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d",
 ];
+
+export const DEPOSIT_SEED = "deposit";
+export const DEPOSIT_SEED_BYTES = Buffer.from(DEPOSIT_SEED);

@@ -1,7 +1,7 @@
 import { etc, verify } from "@noble/ed25519";
 import qs from "qs";
 
-import { TELEGRAM_PUBLIC_KEYS } from "../constants";
+import { TELEGRAM_BOT_ID, TELEGRAM_PUBLIC_KEYS } from "../constants";
 
 export const cleanInitData = (initData: string) => {
   const cleanInitData = qs.parse(initData);
@@ -109,4 +109,15 @@ export const validateInitData = (
     console.error("Failed to validate Telegram init data", error);
     return false;
   }
+};
+
+export const createValidationBytesFromRawInitData = (
+  rawInitData: string
+): { validationBytes: Uint8Array; signatureBytes: Uint8Array } => {
+  const cleanData = cleanInitData(rawInitData);
+  const validationString = createValidationString(TELEGRAM_BOT_ID, cleanData);
+  const validationBytes = new TextEncoder().encode(validationString);
+  const signatureBytes = parseSignature(cleanData.signature as string);
+
+  return { validationBytes, signatureBytes };
 };

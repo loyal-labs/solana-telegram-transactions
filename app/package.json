@@ -10,7 +10,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
     "@noble/ed25519": "^3.0.0",
+    "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/web3.js": "1",
     "@telegram-apps/sdk": "^3.11.8",
     "@telegram-apps/sdk-react": "^3.3.9",
