@@ -83,6 +83,7 @@ export default function Home() {
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(secondaryButton.setParams.isAvailable);
+  const safeAreaInsetTop = useSignal(viewport.safeAreaInsetTop);
   const ensuredWalletRef = useRef(false);
 
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
@@ -538,7 +539,7 @@ export default function Home() {
           }}
         />
 
-        <div className="relative z-0 px-5 pt-2 pb-28">
+        <div className="relative z-0 px-5 pb-28" style={{ paddingTop: `${(safeAreaInsetTop || 0) + 8}px` }}>
           {/* Header - empty space for visual balance */}
           <div className="mb-3 h-4" />
 
