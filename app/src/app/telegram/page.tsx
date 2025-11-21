@@ -17,7 +17,8 @@ import ReceiveSheet from '@/components/wallet/ReceiveSheet';
 import SendSheet from '@/components/wallet/SendSheet';
 import TransactionDetailsSheet from '@/components/wallet/TransactionDetailsSheet';
 import { TELEGRAM_BOT_ID } from '@/lib/constants';
-import { getWalletBalance, getWalletPublicKey } from '@/lib/solana/wallet/wallet-details';
+import { fetchDeposits } from '@/lib/solana/fetch-deposits';
+import { getWalletBalance, getWalletProvider, getWalletPublicKey } from '@/lib/solana/wallet/wallet-details';
 import { ensureWalletKeypair } from '@/lib/solana/wallet/wallet-keypair-logic';
 import { initTelegram, sendString } from '@/lib/telegram';
 import {
@@ -32,17 +33,18 @@ import {
   createValidationString,
   validateInitData,
 } from '@/lib/telegram/init-data-transform';
+import { parseUsernameFromInitData } from '@/lib/telegram/init-data-transform';
 import { ensureTelegramTheme } from '@/lib/telegram/theme';
 
 hashes.sha512 = sha512;
 
 const SOL_PRICE_USD = 180;
 
-// Mock incoming transactions - to be replaced with actual data from Solana
-const MOCK_INCOMING_TRANSACTIONS = [
-  { id: '1', amount: 0.5, sender: 'AbC123XyZ789PqR456MnO321LkJ987WxY654VbN432TgH876' },
-  { id: '2', amount: 1.25, sender: 'DeF456UvW123StU789HgF654RtY321QwE987XcV123ZaS456' },
-];
+type IncomingTransaction = {
+  id: string;
+  amount: number;
+  sender: string;
+};
 
 // Commented out - Quick Send feature not yet complete
 // const QUICK_SEND_CONTACTS = [
@@ -69,8 +71,9 @@ export default function Home() {
   const [balance, setBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
-  const [incomingTransactions, setIncomingTransactions] = useState(MOCK_INCOMING_TRANSACTIONS);
-  const [selectedTransaction, setSelectedTransaction] = useState<typeof MOCK_INCOMING_TRANSACTIONS[0] | null>(null);
+
+  const [incomingTransactions, setIncomingTransactions] = useState<IncomingTransaction[]>([]);
+  const [selectedTransaction, setSelectedTransaction] = useState<IncomingTransaction | null>(null);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(secondaryButton.setParams.isAvailable);
@@ -89,7 +92,7 @@ export default function Home() {
     setReceiveSheetOpen(true);
   }, []);
 
-  const handleOpenTransactionDetails = useCallback((transaction: typeof MOCK_INCOMING_TRANSACTIONS[0]) => {
+  const handleOpenTransactionDetails = useCallback((transaction: IncomingTransaction) => {
     setSelectedTransaction(transaction);
     setTransactionDetailsSheetOpen(true);
   }, []);
@@ -174,6 +177,52 @@ export default function Home() {
       const isValid = validateInitData(validationString, signature);
       console.log("Signature is valid: ", isValid);
     }
+  }, [rawInitData]);
+
+  useEffect(() => {
+    if (!rawInitData) return;
+
+    let isCancelled = false;
+
+    void (async () => {
+      try {
+        const cleanInitDataResult = cleanInitData(rawInitData);
+        const username = parseUsernameFromInitData(cleanInitDataResult);
+
+        if (!username) {
+          setIncomingTransactions([]);
+          return;
+        }
+
+        const provider = await getWalletProvider();
+        const deposits = await fetchDeposits(provider, username);
+        console.log("Deposits:", deposits);
+        if (isCancelled) {
+          return;
+        }
+
+        const mappedTransactions: IncomingTransaction[] = deposits.map((deposit) => {
+          const senderBase58 =
+            typeof (deposit.user as { toBase58?: () => string }).toBase58 === "function"
+              ? deposit.user.toBase58()
+              : String(deposit.user);
+
+          return {
+            id: `${senderBase58}-${deposit.lastNonce}`,
+            amount: deposit.amount / LAMPORTS_PER_SOL, // convert lamports to SOL for display
+            sender: senderBase58,
+          };
+        });
+
+        setIncomingTransactions(mappedTransactions);
+      } catch (error) {
+        console.error("Failed to fetch deposits", error);
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [rawInitData]);
 
   useEffect(() => {

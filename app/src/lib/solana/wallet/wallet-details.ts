@@ -1,3 +1,4 @@
+import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import {
   clusterApiUrl,
   Connection,
@@ -7,6 +8,7 @@ import {
   Transaction,
 } from "@solana/web3.js";
 
+import { SimpleWallet } from "./wallet-implementation";
 import { ensureWalletKeypair } from "./wallet-keypair-logic";
 
 const defaultEndpoint = clusterApiUrl("devnet");
@@ -46,6 +48,14 @@ const getWalletKeypair = async (): Promise<Keypair> => {
   }
 
   return walletKeypairPromise;
+};
+
+export const getWalletProvider = async (): Promise<AnchorProvider> => {
+  const keypair = await getWalletKeypair();
+  const connection = getConnection();
+  const wallet = new SimpleWallet(keypair);
+
+  return new AnchorProvider(connection, wallet);
 };
 
 export const getWalletPublicKey = async (): Promise<PublicKey> => {

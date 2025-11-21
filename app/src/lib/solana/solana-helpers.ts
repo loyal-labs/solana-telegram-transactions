@@ -1,7 +1,6 @@
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
-import type { AnchorWallet } from "@solana/wallet-adapter-react";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 
 import telegramTransferIdl from "../../../../target/idl/telegram_transfer.json";
 import telegramVerificationIdl from "../../../../target/idl/telegram_verification.json";
@@ -23,13 +22,6 @@ export function getTelegramVerificationProgram(
   provider: AnchorProvider
 ): Program<TelegramVerification> {
   return new Program(telegramVerificationIdl as TelegramVerification, provider);
-}
-
-export function getProvider(
-  connection: Connection,
-  wallet: AnchorWallet
-): AnchorProvider {
-  return new AnchorProvider(connection, wallet, { commitment: "confirmed" });
 }
 
 export function getDepositPda(

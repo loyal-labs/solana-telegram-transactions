@@ -2,6 +2,8 @@ import { etc, verify } from "@noble/ed25519";
 import qs from "qs";
 
 import { TELEGRAM_BOT_ID, TELEGRAM_PUBLIC_KEYS } from "../constants";
+import { fetchDeposits } from "../solana/fetch-deposits";
+import { getWalletProvider } from "../solana/wallet/wallet-details";
 
 export const cleanInitData = (initData: string) => {
   const cleanInitData = qs.parse(initData);
@@ -120,4 +122,37 @@ export const createValidationBytesFromRawInitData = (
   const signatureBytes = parseSignature(cleanData.signature as string);
 
   return { validationBytes, signatureBytes };
+};
+
+export const parseUsernameFromInitData = (
+  initData: Record<string, unknown>
+): string | null => {
+  const userField = initData["user"];
+
+  if (typeof userField === "string") {
+    try {
+      const parsedUser = JSON.parse(userField);
+      if (parsedUser && typeof parsedUser.username === "string") {
+        return parsedUser.username;
+      }
+    } catch (error) {
+      console.warn("Failed to parse Telegram user data", error);
+    }
+  } else if (
+    typeof userField === "object" &&
+    userField !== null &&
+    "username" in userField
+  ) {
+    const username = (userField as { username?: unknown }).username;
+    if (typeof username === "string") {
+      return username;
+    }
+  }
+
+  const usernameField = initData["username"];
+  if (typeof usernameField === "string") {
+    return usernameField;
+  }
+
+  return null;
 };
