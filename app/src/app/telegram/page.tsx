@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import LightRays from '@/components/LightRays';
 import ReceiveSheet from '@/components/wallet/ReceiveSheet';
 import SendSheet from '@/components/wallet/SendSheet';
+import TransactionDetailsSheet from '@/components/wallet/TransactionDetailsSheet';
 import { TELEGRAM_BOT_ID } from '@/lib/constants';
 import { getWalletBalance, getWalletPublicKey } from '@/lib/solana/wallet/wallet-details';
 import { ensureWalletKeypair } from '@/lib/solana/wallet/wallet-keypair-logic';
@@ -23,6 +24,7 @@ import {
   hideMainButton,
   hideSecondaryButton,
   showReceiveShareButton,
+  showTransactionDetailsButtons,
   showWalletHomeButtons,
 } from '@/lib/telegram/buttons';
 import {
@@ -62,11 +64,13 @@ export default function Home() {
   const rawInitData = useRawInitData();
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
   const [isReceiveSheetOpen, setReceiveSheetOpen] = useState(false);
+  const [isTransactionDetailsSheetOpen, setTransactionDetailsSheetOpen] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
   const [incomingTransactions, setIncomingTransactions] = useState(MOCK_INCOMING_TRANSACTIONS);
+  const [selectedTransaction, setSelectedTransaction] = useState<typeof MOCK_INCOMING_TRANSACTIONS[0] | null>(null);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(secondaryButton.setParams.isAvailable);
@@ -83,6 +87,11 @@ export default function Home() {
 
   const handleOpenReceiveSheet = useCallback(() => {
     setReceiveSheetOpen(true);
+  }, []);
+
+  const handleOpenTransactionDetails = useCallback((transaction: typeof MOCK_INCOMING_TRANSACTIONS[0]) => {
+    setSelectedTransaction(transaction);
+    setTransactionDetailsSheetOpen(true);
   }, []);
 
   const handleShareAddress = useCallback(async () => {
@@ -145,12 +154,16 @@ export default function Home() {
     console.log("Approving transaction:", transactionId);
     // TODO: Implement actual approval logic with Solana
     setIncomingTransactions((prev) => prev.filter((tx) => tx.id !== transactionId));
+    setTransactionDetailsSheetOpen(false);
+    setSelectedTransaction(null);
   }, []);
 
   const handleIgnoreTransaction = useCallback((transactionId: string) => {
     console.log("Ignoring transaction:", transactionId);
     // TODO: Implement actual ignore logic
     setIncomingTransactions((prev) => prev.filter((tx) => tx.id !== transactionId));
+    setTransactionDetailsSheetOpen(false);
+    setSelectedTransaction(null);
   }, []);
 
   useEffect(() => {
@@ -223,7 +236,12 @@ export default function Home() {
       };
     }
 
-    if (isReceiveSheetOpen) {
+    if (isTransactionDetailsSheetOpen && selectedTransaction) {
+      showTransactionDetailsButtons({
+        onApprove: () => handleApproveTransaction(selectedTransaction.id),
+        onIgnore: () => handleIgnoreTransaction(selectedTransaction.id),
+      });
+    } else if (isReceiveSheetOpen) {
       hideSecondaryButton();
       showReceiveShareButton({ onShare: handleShareAddress });
     } else {
@@ -238,12 +256,16 @@ export default function Home() {
       hideSecondaryButton();
     };
   }, [
+    isTransactionDetailsSheetOpen,
     isReceiveSheetOpen,
+    selectedTransaction,
     mainButtonAvailable,
     secondaryButtonAvailable,
     handleOpenSendSheet,
     handleOpenReceiveSheet,
     handleShareAddress,
+    handleApproveTransaction,
+    handleIgnoreTransaction,
   ]);
 
   const formatBalance = (lamports: number | null): string => {
@@ -387,7 +409,8 @@ export default function Home() {
                 {incomingTransactions.map((transaction, idx) => (
                   <div
                     key={transaction.id}
-                    className="rounded-2xl p-4 shadow-lg transition-all hover:scale-[1.01]"
+                    onClick={() => handleOpenTransactionDetails(transaction)}
+                    className="rounded-2xl p-4 shadow-lg transition-all hover:scale-[1.01] cursor-pointer"
                     style={{
                       background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0.03) 100%)',
                       backdropFilter: 'blur(20px)',
@@ -415,7 +438,10 @@ export default function Home() {
 
                       <div className="flex items-center space-x-2 ml-4">
                         <button
-                          onClick={() => handleIgnoreTransaction(transaction.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleIgnoreTransaction(transaction.id);
+                          }}
                           className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:bg-white/[0.12] active:scale-95"
                           style={{
                             background: 'rgba(255, 255, 255, 0.06)',
@@ -426,7 +452,10 @@ export default function Home() {
                           <X className="w-4 h-4 text-white/60" />
                         </button>
                         <button
-                          onClick={() => handleApproveTransaction(transaction.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApproveTransaction(transaction.id);
+                          }}
                           className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:bg-emerald-500/20 active:scale-95"
                           style={{
                             background: 'rgba(16, 185, 129, 0.1)',
@@ -612,6 +641,12 @@ export default function Home() {
         initialRecipient={selectedRecipient}
       />
       <ReceiveSheet open={isReceiveSheetOpen} onOpenChange={setReceiveSheetOpen} trigger={null} />
+      <TransactionDetailsSheet
+        open={isTransactionDetailsSheetOpen}
+        onOpenChange={setTransactionDetailsSheetOpen}
+        trigger={null}
+        transaction={selectedTransaction}
+      />
     </>
   );
 }

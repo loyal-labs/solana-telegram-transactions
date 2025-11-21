@@ -204,3 +204,30 @@ export const showReceiveShareButton = ({
 
   return mainShown;
 };
+
+type TransactionDetailsButtonsOptions = WalletButtonsBaseOptions & {
+  onApprove: () => void;
+  onIgnore: () => void;
+};
+
+export const showTransactionDetailsButtons = ({
+  onApprove,
+  onIgnore,
+  mainStyle,
+  secondaryStyle,
+}: TransactionDetailsButtonsOptions): boolean => {
+  const mainShown = showMainButton({
+    text: "Approve",
+    onClick: onApprove,
+    ...(mainStyle ?? {}),
+  });
+
+  const secondaryShown = showSecondaryButton({
+    text: "Ignore",
+    position: "left",
+    onClick: onIgnore,
+    ...(secondaryStyle ?? {}),
+  });
+
+  return mainShown && secondaryShown;
+};
