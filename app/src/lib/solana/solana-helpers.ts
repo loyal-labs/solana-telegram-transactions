@@ -6,7 +6,7 @@ import telegramTransferIdl from "../../../../target/idl/telegram_transfer.json";
 import telegramVerificationIdl from "../../../../target/idl/telegram_verification.json";
 import type { TelegramTransfer } from "../../../../target/types/telegram_transfer";
 import type { TelegramVerification } from "../../../../target/types/telegram_verification";
-import { DEPOSIT_SEED_BYTES } from "../constants";
+import { DEPOSIT_SEED_BYTES, VAULT_SEED_BYTES } from "../constants";
 
 export function getTelegramTransferProgram(
   provider: AnchorProvider
@@ -45,4 +45,15 @@ export function numberToBN(number: number): BN {
   }
 
   return new BN(number);
+}
+
+export function getVaultPda(
+  username: string,
+  transferProgram: Program<TelegramTransfer>
+): PublicKey {
+  const [vaultPda] = PublicKey.findProgramAddressSync(
+    [VAULT_SEED_BYTES, Buffer.from(username)],
+    transferProgram.programId
+  );
+  return vaultPda;
 }
