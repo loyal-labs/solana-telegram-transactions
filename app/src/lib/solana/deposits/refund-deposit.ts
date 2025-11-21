@@ -5,7 +5,7 @@ import { getDepositPda, getVaultPda, numberToBN } from "../solana-helpers";
 import { getDeposit } from "./get-deposit";
 import type { TelegramDeposit } from "./types";
 
-export const withdrawDeposit = async (
+export const refundDeposit = async (
   provider: AnchorProvider,
   transferProgram: Program<TelegramTransfer>,
   username: string,
