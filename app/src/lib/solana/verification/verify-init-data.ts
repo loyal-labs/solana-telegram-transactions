@@ -54,5 +54,5 @@ export const verifyInitData = async (
     threw = true;
     console.error("Error:", e);
   }
-  return threw;
+  return !threw;
 };

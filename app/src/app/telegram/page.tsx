@@ -2,7 +2,7 @@
 
 import { hashes } from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import {
   addToHomeScreen,
   checkHomeScreenStatus,
@@ -23,11 +23,13 @@ import LightRays from '@/components/LightRays';
 import ReceiveSheet from '@/components/wallet/ReceiveSheet';
 import SendSheet, { isValidSolanaAddress, isValidTelegramUsername } from '@/components/wallet/SendSheet';
 import TransactionDetailsSheet from '@/components/wallet/TransactionDetailsSheet';
-import { TELEGRAM_BOT_ID } from '@/lib/constants';
+import { TELEGRAM_BOT_ID, TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY } from '@/lib/constants';
 import { topUpDeposit } from '@/lib/solana/deposits';
 import { fetchDeposits } from '@/lib/solana/fetch-deposits';
 import { getTelegramTransferProgram } from '@/lib/solana/solana-helpers';
-import { getWalletBalance, getWalletProvider, getWalletPublicKey, sendSolTransaction } from '@/lib/solana/wallet/wallet-details';
+import { verifyAndClaimDeposit } from '@/lib/solana/verify-and-claim-deposit';
+import { getWalletBalance, getWalletKeypair, getWalletProvider, getWalletPublicKey, sendSolTransaction } from '@/lib/solana/wallet/wallet-details';
+import { SimpleWallet } from '@/lib/solana/wallet/wallet-implementation';
 import { ensureWalletKeypair } from '@/lib/solana/wallet/wallet-keypair-logic';
 import { initTelegram, sendString } from '@/lib/telegram';
 import {
@@ -40,6 +42,7 @@ import {
 } from '@/lib/telegram/buttons';
 import {
   cleanInitData,
+  createValidationBytesFromRawInitData,
   createValidationString,
   validateInitData,
 } from '@/lib/telegram/init-data-transform';
@@ -52,8 +55,9 @@ const SOL_PRICE_USD = 180;
 
 type IncomingTransaction = {
   id: string;
-  amount: number;
+  amountLamports: number;
   sender: string;
+  username: string;
 };
 
 // Commented out - Quick Send feature not yet complete
@@ -283,22 +287,50 @@ export default function Home() {
   }, [walletAddress]);
 
   const handleApproveTransaction = useCallback(async (transactionId: string) => {
+    if (!rawInitData) {
+      console.error("Cannot verify init data: raw init data missing");
+      return;
+    }
+
+    const transaction = incomingTransactions.find((tx) => tx.id === transactionId);
+    if (!transaction) {
+      console.warn("Transaction not found for approval:", transactionId);
+      return;
+    }
+
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred('medium');
     }
     setIsClaimingTransaction(true);
     try {
-      console.log("Claiming transaction:", transactionId);
-      // TODO: Implement actual claim logic with Solana
-      // Simulating the 2 operations that take 400ms each
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const provider = await getWalletProvider();
+      const keypair = await getWalletKeypair();
+      const wallet = new SimpleWallet(keypair);
+      const recipientPublicKey = provider.publicKey;
+
+      const { validationBytes, signatureBytes } = createValidationBytesFromRawInitData(rawInitData);
+      const senderPublicKey = new PublicKey(transaction.sender);
+
+      const username = transaction.username;
+      const amountLamports = transaction.amountLamports;
+      console.log("username:", username, " to:", recipientPublicKey.toBase58());
+
+      await verifyAndClaimDeposit(
+        provider,
+        wallet,
+        senderPublicKey,
+        recipientPublicKey,
+        username,
+        amountLamports,
+        validationBytes,
+        signatureBytes,
+        TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
+      );
 
       setIncomingTransactions((prev) => prev.filter((tx) => tx.id !== transactionId));
 
-      // Refresh wallet balance after successful claim
       await refreshWalletBalance();
 
-      // Haptic feedback for successful claim
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred('success');
       }
@@ -313,7 +345,7 @@ export default function Home() {
     } finally {
       setIsClaimingTransaction(false);
     }
-  }, [refreshWalletBalance]);
+  }, [incomingTransactions, rawInitData, refreshWalletBalance]);
 
   const handleIgnoreTransaction = useCallback((transactionId: string) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -366,8 +398,9 @@ export default function Home() {
 
           return {
             id: `${senderBase58}-${deposit.lastNonce}`,
-            amount: deposit.amount / LAMPORTS_PER_SOL, // convert lamports to SOL for display
+            amountLamports: deposit.amount,
             sender: senderBase58,
+            username: deposit.username,
           };
         });
 
@@ -753,7 +786,7 @@ export default function Home() {
                           </p>
                         </div>
                         <p className="text-white text-xl font-bold mono mb-1">
-                          {transaction.amount.toFixed(4)} SOL
+                          {(transaction.amountLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL
                         </p>
                         <p className="text-white/50 text-xs mono">
                           from {formatSenderAddress(transaction.sender)}

@@ -33,7 +33,7 @@ export const getConnection = (): Connection => {
 let cachedWalletKeypair: Keypair | null = null;
 let walletKeypairPromise: Promise<Keypair> | null = null;
 
-const getWalletKeypair = async (): Promise<Keypair> => {
+export const getWalletKeypair = async (): Promise<Keypair> => {
   if (cachedWalletKeypair) return cachedWalletKeypair;
 
   if (!walletKeypairPromise) {

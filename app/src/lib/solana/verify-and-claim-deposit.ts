@@ -25,14 +25,15 @@ export const verifyAndClaimDeposit = async (
   const transferProgram = getTelegramTransferProgram(provider);
   const verificationProgram = getTelegramVerificationProgram(provider);
 
-  await storeInitData(
+  const sessionData = await storeInitData(
     provider,
     verificationProgram,
     recipient,
     processedInitDataBytes
   );
+  console.log("sessionData:", sessionData);
 
-  await verifyInitData(
+  const verified = await verifyInitData(
     provider,
     wallet,
     recipient,
@@ -41,8 +42,9 @@ export const verifyAndClaimDeposit = async (
     telegramSignatureBytes,
     telegramPublicKeyBytes
   );
+  console.log("verified:", verified);
 
-  await claimDeposit(
+  const claimed = await claimDeposit(
     transferProgram,
     verificationProgram,
     user,
@@ -50,6 +52,7 @@ export const verifyAndClaimDeposit = async (
     amount,
     username
   );
+  console.log("claimed:", claimed);
 
-  return true;
+  return claimed;
 };

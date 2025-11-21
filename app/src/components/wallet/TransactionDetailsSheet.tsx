@@ -1,9 +1,7 @@
 "use client";
 
-import {
-  Modal,
-  VisuallyHidden,
-} from "@telegram-apps/telegram-ui";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Icon28Close } from "@telegram-apps/telegram-ui/dist/icons/28/close";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import {
@@ -18,7 +16,7 @@ export type TransactionDetailsSheetProps = {
   onOpenChange?: (open: boolean) => void;
   transaction: {
     id: string;
-    amount: number;
+    amountLamports: number;
     sender: string;
   } | null;
 };
@@ -104,14 +102,16 @@ export default function TransactionDetailsSheet({
               border: "1px solid rgba(255, 255, 255, 0.08)",
               borderRadius: "12px",
             }}>
-              <p style={{
-                color: "rgba(255, 255, 255, 0.9)",
-                fontSize: "20px",
-                fontFamily: "'JetBrains Mono', monospace",
-                fontWeight: "bold",
-                margin: 0
-              }}>
-                {transaction.amount.toFixed(4)} SOL
+              <p
+                style={{
+                  color: "rgba(255, 255, 255, 0.9)",
+                  fontSize: "20px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontWeight: "bold",
+                  margin: 0,
+                }}
+              >
+                {(transaction.amountLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL
               </p>
             </div>
           </div>
