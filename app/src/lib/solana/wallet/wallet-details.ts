@@ -1,4 +1,4 @@
-import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@coral-xyz/anchor";
 import {
   clusterApiUrl,
   Connection,
@@ -156,7 +156,9 @@ export const sendSolTransaction = async (
     skipPreflight: false,
   });
 
-  await connection.confirmTransaction(
+  console.log("Transaction sent:", signature);
+
+  const result = await connection.confirmTransaction(
     {
       blockhash: latestBlockhash.blockhash,
       lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
@@ -164,6 +166,8 @@ export const sendSolTransaction = async (
     },
     "confirmed"
   );
+
+  console.log("Transaction confirmed:", result);
 
   invalidateBalanceCache();
 

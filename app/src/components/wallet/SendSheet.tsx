@@ -10,25 +10,39 @@ export type SendSheetProps = {
   onOpenChange?: (open: boolean) => void;
   initialRecipient?: string;
   onValidationChange?: (isValid: boolean) => void;
+  onFormValuesChange?: (values: { amount: string; recipient: string }) => void;
   showErrors?: boolean;
 };
 
 const DEFAULT_TRIGGER = <Button size="m">Open modal</Button>;
 
 // Basic Solana address validation (base58, 32-44 chars)
-const isValidSolanaAddress = (address: string): boolean => {
+export const isValidSolanaAddress = (address: string): boolean => {
   const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-  return base58Regex.test(address);
+  console.log("isValidSolanaAddress address:", address);
+  const result = base58Regex.test(address);
+  console.log("isValidSolanaAddress result:", result);
+  return result;
 };
 
 // Telegram username validation (starts with @, 5-32 chars excluding @)
-const isValidTelegramUsername = (username: string): boolean => {
-  if (!username.startsWith('@')) return false;
+export const isValidTelegramUsername = (username: string): boolean => {
+  if (!username.startsWith("@")) return false;
   const usernameWithoutAt = username.slice(1);
-  return usernameWithoutAt.length >= 5 && usernameWithoutAt.length <= 32;
+  const result = usernameWithoutAt.length >= 5 && usernameWithoutAt.length <= 32;
+  console.log("isValidTelegramUsername result:", result);
+  return result;
 };
 
-export default function SendSheet({ trigger, open, onOpenChange, initialRecipient, onValidationChange, showErrors }: SendSheetProps) {
+export default function SendSheet({
+  trigger,
+  open,
+  onOpenChange,
+  initialRecipient,
+  onValidationChange,
+  onFormValuesChange,
+  showErrors,
+}: SendSheetProps) {
   const [sum, setSum] = useState("");
   const [recipient, setRecipient] = useState("");
 
@@ -50,6 +64,13 @@ export default function SendSheet({ trigger, open, onOpenChange, initialRecipien
       setRecipient("");
     }
   }, [open]);
+
+  // Notify parent about current field values
+  useEffect(() => {
+    if (onFormValuesChange) {
+      onFormValuesChange({ amount: sum, recipient });
+    }
+  }, [sum, recipient, onFormValuesChange]);
 
   // Validation effect
   useEffect(() => {

@@ -16,11 +16,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import LightRays from '@/components/LightRays';
 import ReceiveSheet from '@/components/wallet/ReceiveSheet';
-import SendSheet from '@/components/wallet/SendSheet';
+import SendSheet, { isValidSolanaAddress, isValidTelegramUsername } from '@/components/wallet/SendSheet';
 import TransactionDetailsSheet from '@/components/wallet/TransactionDetailsSheet';
 import { TELEGRAM_BOT_ID } from '@/lib/constants';
+import { topUpDeposit } from '@/lib/solana/deposits';
 import { fetchDeposits } from '@/lib/solana/fetch-deposits';
-import { getWalletBalance, getWalletProvider, getWalletPublicKey } from '@/lib/solana/wallet/wallet-details';
+import { getTelegramTransferProgram } from '@/lib/solana/solana-helpers';
+import { getWalletBalance, getWalletProvider, getWalletPublicKey, sendSolTransaction } from '@/lib/solana/wallet/wallet-details';
 import { ensureWalletKeypair } from '@/lib/solana/wallet/wallet-keypair-logic';
 import { initTelegram, sendString } from '@/lib/telegram';
 import {
@@ -79,6 +81,11 @@ export default function Home() {
   const [isSendFormValid, setIsSendFormValid] = useState(false);
   const [sendAttempted, setSendAttempted] = useState(false);
   const [isClaimingTransaction, setIsClaimingTransaction] = useState(false);
+  const [sendFormValues, setSendFormValues] = useState<{ amount: string; recipient: string }>({
+    amount: "",
+    recipient: "",
+  });
+  const [isSendingTransaction, setIsSendingTransaction] = useState(false);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(secondaryButton.setParams.isAvailable);
@@ -90,8 +97,10 @@ export default function Home() {
     }
     if (recipientName) {
       setSelectedRecipient(recipientName);
+      setSendFormValues({ amount: "", recipient: recipientName });
     } else {
       setSelectedRecipient("");
+      setSendFormValues({ amount: "", recipient: "" });
     }
     setSendAttempted(false); // Reset error state when opening
     setSendSheetOpen(true);
@@ -116,12 +125,86 @@ export default function Home() {
     setIsSendFormValid(isValid);
   }, []);
 
+  const handleSendFormValuesChange = useCallback((values: { amount: string; recipient: string }) => {
+    setSendFormValues(values);
+  }, []);
+
   const handleSendSheetChange = useCallback((open: boolean) => {
     if (!open && hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred('light');
     }
     setSendSheetOpen(open);
+    if (!open) {
+      setSelectedRecipient("");
+      setSendAttempted(false);
+      setSendFormValues({ amount: "", recipient: "" });
+    }
   }, []);
+
+  const refreshWalletBalance = useCallback(async () => {
+    try {
+      const balanceLamports = await getWalletBalance();
+      setBalance(balanceLamports);
+    } catch (error) {
+      console.error("Failed to refresh wallet balance", error);
+    }
+  }, []);
+
+  const handleSubmitSend = useCallback(async () => {
+    setSendAttempted(true);
+    if (!isSendFormValid || isSendingTransaction) {
+      return;
+    }
+
+    const trimmedRecipient = sendFormValues.recipient.trim();
+    console.log("Trimmed recipient:", trimmedRecipient);
+    const amountSol = parseFloat(sendFormValues.amount);
+    if (Number.isNaN(amountSol) || amountSol <= 0) {
+      return;
+    }
+
+    const lamports = Math.round(amountSol * LAMPORTS_PER_SOL);
+    if (lamports <= 0) {
+      console.warn("Lamports must be greater than zero");
+      return;
+    }
+
+    setIsSendingTransaction(true);
+    try {
+      console.log("Sending transaction to:", trimmedRecipient);
+
+      if (isValidSolanaAddress(trimmedRecipient)) {
+        console.log("Sending transaction to Solana address:")
+        await sendSolTransaction(trimmedRecipient, lamports);
+      } else if (isValidTelegramUsername(trimmedRecipient)) {
+        console.log("Sending transaction to Telegram username:", trimmedRecipient);
+        const username = trimmedRecipient.replace(/^@/, "");
+        const provider = await getWalletProvider();
+        const transferProgram = getTelegramTransferProgram(provider);
+        await topUpDeposit(provider, transferProgram, username, lamports);
+      } else {
+        throw new Error("Invalid recipient");
+      }
+
+      await refreshWalletBalance();
+
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred('success');
+      }
+
+      setSendSheetOpen(false);
+      setSelectedRecipient("");
+      setSendAttempted(false);
+      setSendFormValues({ amount: "", recipient: "" });
+    } catch (error) {
+      console.error("Failed to send transaction", error);
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred('error');
+      }
+    } finally {
+      setIsSendingTransaction(false);
+    }
+  }, [isSendFormValid, isSendingTransaction, sendFormValues, refreshWalletBalance]);
 
   const handleReceiveSheetChange = useCallback((open: boolean) => {
     if (!open && hapticFeedback.impactOccurred.isAvailable()) {
@@ -192,15 +275,6 @@ export default function Home() {
       console.error("Failed to share wallet address", error);
     }
   }, [walletAddress]);
-
-  const refreshWalletBalance = useCallback(async () => {
-    try {
-      const balanceLamports = await getWalletBalance();
-      setBalance(balanceLamports);
-    } catch (error) {
-      console.error("Failed to refresh wallet balance", error);
-    }
-  }, []);
 
   const handleApproveTransaction = useCallback(async (transactionId: string) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -396,16 +470,9 @@ export default function Home() {
       hideSecondaryButton();
       showMainButton({
         text: "Send",
-        onClick: () => {
-          setSendAttempted(true); // Mark that user tried to send
-          if (!isSendFormValid) {
-            return;
-          }
-          // TODO: Implement actual send logic
-          console.log("Send transaction");
-          setSendSheetOpen(false);
-        },
-        isEnabled: isSendFormValid,
+        onClick: handleSubmitSend,
+        isEnabled: isSendFormValid && !isSendingTransaction,
+        showLoader: isSendingTransaction,
       });
     } else if (isReceiveSheetOpen) {
       hideSecondaryButton();
@@ -426,6 +493,7 @@ export default function Home() {
     isSendSheetOpen,
     isReceiveSheetOpen,
     isSendFormValid,
+    isSendingTransaction,
     selectedTransaction,
     isClaimingTransaction,
     mainButtonAvailable,
@@ -435,6 +503,7 @@ export default function Home() {
     handleShareAddress,
     handleApproveTransaction,
     handleIgnoreTransaction,
+    handleSubmitSend,
   ]);
 
   const formatBalance = (lamports: number | null): string => {
@@ -812,6 +881,7 @@ export default function Home() {
         trigger={null}
         initialRecipient={selectedRecipient}
         onValidationChange={handleSendValidationChange}
+        onFormValuesChange={handleSendFormValuesChange}
         showErrors={sendAttempted}
       />
       <ReceiveSheet open={isReceiveSheetOpen} onOpenChange={handleReceiveSheetChange} trigger={null} />
