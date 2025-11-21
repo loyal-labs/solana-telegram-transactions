@@ -4,10 +4,12 @@ import { hashes } from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import {
+  hapticFeedback,
   mainButton,
   secondaryButton,
   useRawInitData,
   useSignal,
+  viewport,
 } from '@telegram-apps/sdk-react';
 import { Check, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -24,6 +26,7 @@ import { initTelegram, sendString } from '@/lib/telegram';
 import {
   hideMainButton,
   hideSecondaryButton,
+  showMainButton,
   showReceiveShareButton,
   showTransactionDetailsButtons,
   showWalletHomeButtons,
@@ -71,30 +74,67 @@ export default function Home() {
   const [balance, setBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
-
   const [incomingTransactions, setIncomingTransactions] = useState<IncomingTransaction[]>([]);
   const [selectedTransaction, setSelectedTransaction] = useState<IncomingTransaction | null>(null);
+  const [isSendFormValid, setIsSendFormValid] = useState(false);
+  const [sendAttempted, setSendAttempted] = useState(false);
+  const [isClaimingTransaction, setIsClaimingTransaction] = useState(false);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(secondaryButton.setParams.isAvailable);
   const ensuredWalletRef = useRef(false);
 
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
     if (recipientName) {
       setSelectedRecipient(recipientName);
     } else {
       setSelectedRecipient("");
     }
+    setSendAttempted(false); // Reset error state when opening
     setSendSheetOpen(true);
   }, []);
 
   const handleOpenReceiveSheet = useCallback(() => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
     setReceiveSheetOpen(true);
   }, []);
 
   const handleOpenTransactionDetails = useCallback((transaction: IncomingTransaction) => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
     setSelectedTransaction(transaction);
     setTransactionDetailsSheetOpen(true);
+  }, []);
+
+  const handleSendValidationChange = useCallback((isValid: boolean) => {
+    setIsSendFormValid(isValid);
+  }, []);
+
+  const handleSendSheetChange = useCallback((open: boolean) => {
+    if (!open && hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
+    setSendSheetOpen(open);
+  }, []);
+
+  const handleReceiveSheetChange = useCallback((open: boolean) => {
+    if (!open && hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
+    setReceiveSheetOpen(open);
+  }, []);
+
+  const handleTransactionDetailsSheetChange = useCallback((open: boolean) => {
+    if (!open && hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
+    setTransactionDetailsSheetOpen(open);
   }, []);
 
   const handleShareAddress = useCallback(async () => {
@@ -153,15 +193,52 @@ export default function Home() {
     }
   }, [walletAddress]);
 
-  const handleApproveTransaction = useCallback((transactionId: string) => {
-    console.log("Approving transaction:", transactionId);
-    // TODO: Implement actual approval logic with Solana
-    setIncomingTransactions((prev) => prev.filter((tx) => tx.id !== transactionId));
-    setTransactionDetailsSheetOpen(false);
-    setSelectedTransaction(null);
+  const refreshWalletBalance = useCallback(async () => {
+    try {
+      const balanceLamports = await getWalletBalance();
+      setBalance(balanceLamports);
+    } catch (error) {
+      console.error("Failed to refresh wallet balance", error);
+    }
   }, []);
 
+  const handleApproveTransaction = useCallback(async (transactionId: string) => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('medium');
+    }
+    setIsClaimingTransaction(true);
+    try {
+      console.log("Claiming transaction:", transactionId);
+      // TODO: Implement actual claim logic with Solana
+      // Simulating the 2 operations that take 400ms each
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      setIncomingTransactions((prev) => prev.filter((tx) => tx.id !== transactionId));
+
+      // Refresh wallet balance after successful claim
+      await refreshWalletBalance();
+
+      // Haptic feedback for successful claim
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred('success');
+      }
+
+      setTransactionDetailsSheetOpen(false);
+      setSelectedTransaction(null);
+    } catch (error) {
+      console.error("Failed to claim transaction", error);
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred('error');
+      }
+    } finally {
+      setIsClaimingTransaction(false);
+    }
+  }, [refreshWalletBalance]);
+
   const handleIgnoreTransaction = useCallback((transactionId: string) => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('medium');
+    }
     console.log("Ignoring transaction:", transactionId);
     // TODO: Implement actual ignore logic
     setIncomingTransactions((prev) => prev.filter((tx) => tx.id !== transactionId));
@@ -229,6 +306,19 @@ export default function Home() {
     initTelegram();
     void ensureTelegramTheme();
 
+    // Enable fullscreen for mobile platforms
+    const hash = window.location.hash.slice(1);
+    const params = new URLSearchParams(hash);
+    const platform = params.get('tgWebAppPlatform');
+
+    if (platform === 'ios' || platform === 'android') {
+      if (viewport.requestFullscreen.isAvailable()) {
+        void viewport.requestFullscreen().catch((error) => {
+          console.warn('Failed to enable fullscreen:', error);
+        });
+      }
+    }
+
     // Suppress Telegram SDK viewport errors in non-TMA environment
     const originalError = console.error;
     console.error = (...args) => {
@@ -286,9 +376,36 @@ export default function Home() {
     }
 
     if (isTransactionDetailsSheetOpen && selectedTransaction) {
-      showTransactionDetailsButtons({
-        onApprove: () => handleApproveTransaction(selectedTransaction.id),
-        onIgnore: () => handleIgnoreTransaction(selectedTransaction.id),
+      if (isClaimingTransaction) {
+        // Show only main button with loader during claim
+        hideSecondaryButton();
+        showMainButton({
+          text: "Claim",
+          onClick: () => {}, // No-op during loading
+          isEnabled: false,
+          showLoader: true,
+        });
+      } else {
+        // Show both buttons normally
+        showTransactionDetailsButtons({
+          onApprove: () => handleApproveTransaction(selectedTransaction.id),
+          onIgnore: () => handleIgnoreTransaction(selectedTransaction.id),
+        });
+      }
+    } else if (isSendSheetOpen) {
+      hideSecondaryButton();
+      showMainButton({
+        text: "Send",
+        onClick: () => {
+          setSendAttempted(true); // Mark that user tried to send
+          if (!isSendFormValid) {
+            return;
+          }
+          // TODO: Implement actual send logic
+          console.log("Send transaction");
+          setSendSheetOpen(false);
+        },
+        isEnabled: isSendFormValid,
       });
     } else if (isReceiveSheetOpen) {
       hideSecondaryButton();
@@ -306,8 +423,11 @@ export default function Home() {
     };
   }, [
     isTransactionDetailsSheetOpen,
+    isSendSheetOpen,
     isReceiveSheetOpen,
+    isSendFormValid,
     selectedTransaction,
+    isClaimingTransaction,
     mainButtonAvailable,
     secondaryButtonAvailable,
     handleOpenSendSheet,
@@ -588,6 +708,9 @@ export default function Home() {
                 </div>
                 <button
                   onClick={async () => {
+                    if (hapticFeedback.impactOccurred.isAvailable()) {
+                      hapticFeedback.impactOccurred('light');
+                    }
                     if (walletAddress && navigator?.clipboard?.writeText) {
                       await navigator.clipboard.writeText(walletAddress);
                     }
@@ -685,14 +808,16 @@ export default function Home() {
 
       <SendSheet
         open={isSendSheetOpen}
-        onOpenChange={setSendSheetOpen}
+        onOpenChange={handleSendSheetChange}
         trigger={null}
         initialRecipient={selectedRecipient}
+        onValidationChange={handleSendValidationChange}
+        showErrors={sendAttempted}
       />
-      <ReceiveSheet open={isReceiveSheetOpen} onOpenChange={setReceiveSheetOpen} trigger={null} />
+      <ReceiveSheet open={isReceiveSheetOpen} onOpenChange={handleReceiveSheetChange} trigger={null} />
       <TransactionDetailsSheet
         open={isTransactionDetailsSheetOpen}
-        onOpenChange={setTransactionDetailsSheetOpen}
+        onOpenChange={handleTransactionDetailsSheetChange}
         trigger={null}
         transaction={selectedTransaction}
       />
