@@ -24,6 +24,7 @@ import { initTelegram, sendString } from '@/lib/telegram';
 import {
   hideMainButton,
   hideSecondaryButton,
+  showMainButton,
   showReceiveShareButton,
   showTransactionDetailsButtons,
   showWalletHomeButtons,
@@ -71,9 +72,10 @@ export default function Home() {
   const [balance, setBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
-
   const [incomingTransactions, setIncomingTransactions] = useState<IncomingTransaction[]>([]);
   const [selectedTransaction, setSelectedTransaction] = useState<IncomingTransaction | null>(null);
+  const [isSendFormValid, setIsSendFormValid] = useState(false);
+  const [sendAttempted, setSendAttempted] = useState(false);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(secondaryButton.setParams.isAvailable);
@@ -85,6 +87,7 @@ export default function Home() {
     } else {
       setSelectedRecipient("");
     }
+    setSendAttempted(false); // Reset error state when opening
     setSendSheetOpen(true);
   }, []);
 
@@ -95,6 +98,10 @@ export default function Home() {
   const handleOpenTransactionDetails = useCallback((transaction: IncomingTransaction) => {
     setSelectedTransaction(transaction);
     setTransactionDetailsSheetOpen(true);
+  }, []);
+
+  const handleSendValidationChange = useCallback((isValid: boolean) => {
+    setIsSendFormValid(isValid);
   }, []);
 
   const handleShareAddress = useCallback(async () => {
@@ -290,6 +297,21 @@ export default function Home() {
         onApprove: () => handleApproveTransaction(selectedTransaction.id),
         onIgnore: () => handleIgnoreTransaction(selectedTransaction.id),
       });
+    } else if (isSendSheetOpen) {
+      hideSecondaryButton();
+      showMainButton({
+        text: "Send",
+        onClick: () => {
+          setSendAttempted(true); // Mark that user tried to send
+          if (!isSendFormValid) {
+            return;
+          }
+          // TODO: Implement actual send logic
+          console.log("Send transaction");
+          setSendSheetOpen(false);
+        },
+        isEnabled: isSendFormValid,
+      });
     } else if (isReceiveSheetOpen) {
       hideSecondaryButton();
       showReceiveShareButton({ onShare: handleShareAddress });
@@ -306,7 +328,9 @@ export default function Home() {
     };
   }, [
     isTransactionDetailsSheetOpen,
+    isSendSheetOpen,
     isReceiveSheetOpen,
+    isSendFormValid,
     selectedTransaction,
     mainButtonAvailable,
     secondaryButtonAvailable,
@@ -688,6 +712,8 @@ export default function Home() {
         onOpenChange={setSendSheetOpen}
         trigger={null}
         initialRecipient={selectedRecipient}
+        onValidationChange={handleSendValidationChange}
+        showErrors={sendAttempted}
       />
       <ReceiveSheet open={isReceiveSheetOpen} onOpenChange={setReceiveSheetOpen} trigger={null} />
       <TransactionDetailsSheet

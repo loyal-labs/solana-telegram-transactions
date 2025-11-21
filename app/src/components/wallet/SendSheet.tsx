@@ -9,13 +9,32 @@ export type SendSheetProps = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   initialRecipient?: string;
+  onValidationChange?: (isValid: boolean) => void;
+  showErrors?: boolean;
 };
 
 const DEFAULT_TRIGGER = <Button size="m">Open modal</Button>;
 
-export default function SendSheet({ trigger, open, onOpenChange, initialRecipient }: SendSheetProps) {
+// Basic Solana address validation (base58, 32-44 chars)
+const isValidSolanaAddress = (address: string): boolean => {
+  const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  return base58Regex.test(address);
+};
+
+// Telegram username validation (starts with @, 5-32 chars excluding @)
+const isValidTelegramUsername = (username: string): boolean => {
+  if (!username.startsWith('@')) return false;
+  const usernameWithoutAt = username.slice(1);
+  return usernameWithoutAt.length >= 5 && usernameWithoutAt.length <= 32;
+};
+
+export default function SendSheet({ trigger, open, onOpenChange, initialRecipient, onValidationChange, showErrors }: SendSheetProps) {
   const [sum, setSum] = useState("");
   const [recipient, setRecipient] = useState("");
+
+  // Check individual field validity for error display
+  const isAmountInvalid = showErrors && (!sum.trim() || isNaN(parseFloat(sum)) || parseFloat(sum) <= 0);
+  const isRecipientInvalid = showErrors && (!recipient.trim() || !(isValidSolanaAddress(recipient.trim()) || isValidTelegramUsername(recipient.trim())));
 
   // Update recipient when initialRecipient changes or when sheet opens
   useEffect(() => {
@@ -31,6 +50,35 @@ export default function SendSheet({ trigger, open, onOpenChange, initialRecipien
       setRecipient("");
     }
   }, [open]);
+
+  // Validation effect
+  useEffect(() => {
+    if (!open) {
+      // When sheet is closed, always invalid
+      if (onValidationChange) {
+        onValidationChange(false);
+      }
+      return;
+    }
+
+    // Check if fields are empty
+    if (!sum.trim() || !recipient.trim()) {
+      if (onValidationChange) {
+        onValidationChange(false);
+      }
+      return;
+    }
+
+    const amount = parseFloat(sum);
+    const isAmountValid = !isNaN(amount) && amount > 0;
+    const isRecipientValid = isValidSolanaAddress(recipient.trim()) || isValidTelegramUsername(recipient.trim());
+
+    const isValid = isAmountValid && isRecipientValid;
+
+    if (onValidationChange) {
+      onValidationChange(isValid);
+    }
+  }, [sum, recipient, onValidationChange, open]);
 
   const modalStyle = useMemo(
     () =>
@@ -94,7 +142,7 @@ export default function SendSheet({ trigger, open, onOpenChange, initialRecipien
               marginBottom: "8px",
               fontWeight: 500
             }}>
-              Amount
+              Amount (in SOL)
             </label>
             <input
               type="text"
@@ -105,7 +153,7 @@ export default function SendSheet({ trigger, open, onOpenChange, initialRecipien
                 width: "100%",
                 padding: "14px 16px",
                 background: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
+                border: isAmountInvalid ? "1px solid rgba(239, 68, 68, 0.5)" : "1px solid rgba(255, 255, 255, 0.08)",
                 borderRadius: "12px",
                 color: "rgba(255, 255, 255, 0.9)",
                 fontSize: "16px",
@@ -115,11 +163,15 @@ export default function SendSheet({ trigger, open, onOpenChange, initialRecipien
               }}
               onFocus={(e) => {
                 e.target.style.background = "rgba(255, 255, 255, 0.06)";
-                e.target.style.borderColor = "rgba(99, 102, 241, 0.3)";
+                if (!isAmountInvalid) {
+                  e.target.style.borderColor = "rgba(99, 102, 241, 0.3)";
+                }
               }}
               onBlur={(e) => {
                 e.target.style.background = "rgba(255, 255, 255, 0.04)";
-                e.target.style.borderColor = "rgba(255, 255, 255, 0.08)";
+                if (!isAmountInvalid) {
+                  e.target.style.borderColor = "rgba(255, 255, 255, 0.08)";
+                }
               }}
             />
           </div>
@@ -137,14 +189,14 @@ export default function SendSheet({ trigger, open, onOpenChange, initialRecipien
             </label>
             <input
               type="text"
-              placeholder="Username, phone, or wallet"
+              placeholder="Wallet address or Telegram username (with @)"
               value={recipient}
               onChange={(event) => setRecipient(event.target.value)}
               style={{
                 width: "100%",
                 padding: "14px 16px",
                 background: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
+                border: isRecipientInvalid ? "1px solid rgba(239, 68, 68, 0.5)" : "1px solid rgba(255, 255, 255, 0.08)",
                 borderRadius: "12px",
                 color: "rgba(255, 255, 255, 0.9)",
                 fontSize: "14px",
@@ -153,11 +205,15 @@ export default function SendSheet({ trigger, open, onOpenChange, initialRecipien
               }}
               onFocus={(e) => {
                 e.target.style.background = "rgba(255, 255, 255, 0.06)";
-                e.target.style.borderColor = "rgba(99, 102, 241, 0.3)";
+                if (!isRecipientInvalid) {
+                  e.target.style.borderColor = "rgba(99, 102, 241, 0.3)";
+                }
               }}
               onBlur={(e) => {
                 e.target.style.background = "rgba(255, 255, 255, 0.04)";
-                e.target.style.borderColor = "rgba(255, 255, 255, 0.08)";
+                if (!isRecipientInvalid) {
+                  e.target.style.borderColor = "rgba(255, 255, 255, 0.08)";
+                }
               }}
             />
           </div>
