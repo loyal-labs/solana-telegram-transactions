@@ -32,6 +32,8 @@ pub mod telegram_transfer {
             vault.bump = ctx.bumps.vault;
         }
 
+        require!(ctx.accounts.depositor.key() == deposit.user, ErrorCode::InvalidDepositor);
+
         // depositor -> vault lamports
         transfer(
             CpiContext::new(
@@ -120,7 +122,7 @@ pub struct DepositForUsername<'info> {
         init_if_needed,
         payer = payer,
         space = 8 + Vault::INIT_SPACE,
-        seeds = [VAULT_SEED, username.as_bytes()],
+        seeds = [VAULT_SEED], 
         bump
     )]
     pub vault: Account<'info, Vault>,
@@ -144,7 +146,7 @@ pub struct RefundDeposit<'info> {
 
     #[account(
         mut,
-        seeds = [VAULT_SEED, deposit.username.as_bytes()],
+        seeds = [VAULT_SEED],
         bump = vault.bump
     )]
     pub vault: Account<'info, Vault>,
@@ -166,7 +168,7 @@ pub struct ClaimDeposit<'info> {
 
     #[account(
         mut,
-        seeds = [VAULT_SEED, deposit.username.as_bytes()],
+        seeds = [VAULT_SEED],
         bump = vault.bump
     )]
     pub vault: Account<'info, Vault>,
@@ -225,4 +227,6 @@ pub enum ErrorCode {
     InvalidUsername,
     #[msg("Invalid Recipient")]
     InvalidRecipient,
+    #[msg("Invalid Depositor")]
+    InvalidDepositor,
 }

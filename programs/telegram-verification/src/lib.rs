@@ -22,6 +22,8 @@ const PUBKEY_LEN: usize = 32;
 const TELEGRAM_PUBKEY_PROD: [u8; 32] =
     hex!("e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d");
 
+const SESSION_SEED: &[u8] = b"tg_session";
+
 // ---- Program ----
 #[program]
 pub mod telegram_verification {
@@ -71,10 +73,10 @@ pub struct StoreTelegramInitData<'info> {
     pub user: Signer<'info>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = payer,
         space = 8 + TelegramSession::INIT_SPACE,
-        seeds = [b"tg_session", user.key().as_ref()],
+        seeds = [SESSION_SEED, user.key().as_ref()],
         bump
     )]
     pub session: Account<'info, TelegramSession>,
