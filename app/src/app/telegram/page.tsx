@@ -16,7 +16,7 @@ import {
   useSignal,
   viewport,
 } from '@telegram-apps/sdk-react';
-import { Check, X } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import LightRays from '@/components/LightRays';
@@ -347,17 +347,6 @@ export default function Home() {
     }
   }, [incomingTransactions, rawInitData, refreshWalletBalance]);
 
-  const handleIgnoreTransaction = useCallback((transactionId: string) => {
-    if (hapticFeedback.impactOccurred.isAvailable()) {
-      hapticFeedback.impactOccurred('medium');
-    }
-    console.log("Ignoring transaction:", transactionId);
-    // TODO: Implement actual ignore logic
-    setIncomingTransactions((prev) => prev.filter((tx) => tx.id !== transactionId));
-    setTransactionDetailsSheetOpen(false);
-    setSelectedTransaction(null);
-  }, []);
-
   useEffect(() => {
     if (rawInitData) {
       const cleanInitDataResult = cleanInitData(rawInitData);
@@ -569,9 +558,9 @@ export default function Home() {
     }
 
     if (isTransactionDetailsSheetOpen && selectedTransaction) {
+      hideSecondaryButton();
       if (isClaimingTransaction) {
         // Show only main button with loader during claim
-        hideSecondaryButton();
         showMainButton({
           text: "Claim",
           onClick: () => {}, // No-op during loading
@@ -579,10 +568,10 @@ export default function Home() {
           showLoader: true,
         });
       } else {
-        // Show both buttons normally
-        showTransactionDetailsButtons({
-          onApprove: () => handleApproveTransaction(selectedTransaction.id),
-          onIgnore: () => handleIgnoreTransaction(selectedTransaction.id),
+        // Show only Claim button (no Ignore)
+        showMainButton({
+          text: "Claim",
+          onClick: () => handleApproveTransaction(selectedTransaction.id),
         });
       }
     } else if (isSendSheetOpen) {
@@ -621,7 +610,6 @@ export default function Home() {
     handleOpenReceiveSheet,
     handleShareAddress,
     handleApproveTransaction,
-    handleIgnoreTransaction,
     handleSubmitSend,
   ]);
 
@@ -645,6 +633,12 @@ export default function Home() {
 
   const formatSenderAddress = (address: string): string => {
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
+  };
+
+  const formatTransactionAmount = (lamports: number): string => {
+    const sol = lamports / LAMPORTS_PER_SOL;
+    // Format to up to 4 decimal places, but remove trailing zeros
+    return parseFloat(sol.toFixed(4)).toString();
   };
 
   return (
@@ -786,28 +780,14 @@ export default function Home() {
                           </p>
                         </div>
                         <p className="text-white text-xl font-bold mono mb-1">
-                          {(transaction.amountLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL
+                          {formatTransactionAmount(transaction.amountLamports)} SOL
                         </p>
                         <p className="text-white/50 text-xs mono">
                           from {formatSenderAddress(transaction.sender)}
                         </p>
                       </div>
 
-                      <div className="flex items-center space-x-2 ml-4">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleIgnoreTransaction(transaction.id);
-                          }}
-                          className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:bg-white/[0.12] active:scale-95"
-                          style={{
-                            background: 'rgba(255, 255, 255, 0.06)',
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
-                          }}
-                          aria-label="Ignore transaction"
-                        >
-                          <X className="w-4 h-4 text-white/60" />
-                        </button>
+                      <div className="flex items-center ml-4">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -818,7 +798,7 @@ export default function Home() {
                             background: 'rgba(16, 185, 129, 0.1)',
                             border: '1px solid rgba(16, 185, 129, 0.3)',
                           }}
-                          aria-label="Approve transaction"
+                          aria-label="Claim transaction"
                         >
                           <Check className="w-4 h-4 text-emerald-400" />
                         </button>
