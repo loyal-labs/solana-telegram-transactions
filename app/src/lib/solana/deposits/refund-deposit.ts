@@ -13,7 +13,7 @@ export const refundDeposit = async (
 ): Promise<TelegramDeposit> => {
   const deposit = await getDeposit(provider, transferProgram, username);
   const userPublicKey = provider.wallet.publicKey;
-  const vaultPda = getVaultPda(username, transferProgram);
+  const vaultPda = getVaultPda(transferProgram);
   const depositPda = getDepositPda(userPublicKey, username, transferProgram);
 
   if (deposit.amount < amount) {
