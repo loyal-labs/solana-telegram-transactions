@@ -4,6 +4,7 @@ import { hashes } from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import {
+  closingBehavior,
   hapticFeedback,
   mainButton,
   secondaryButton,
@@ -305,6 +306,25 @@ export default function Home() {
   useEffect(() => {
     initTelegram();
     void ensureTelegramTheme();
+
+    // Enable closing confirmation always
+    try {
+      // Mount closing behavior if needed
+      if (closingBehavior.mount.isAvailable?.()) {
+        closingBehavior.mount();
+        console.log('Closing behavior mounted');
+      }
+
+      if (closingBehavior.enableConfirmation.isAvailable()) {
+        closingBehavior.enableConfirmation();
+        const isEnabled = closingBehavior.isConfirmationEnabled();
+        console.log('Closing confirmation enabled:', isEnabled);
+      } else {
+        console.warn('enableConfirmation is not available');
+      }
+    } catch (error) {
+      console.error('Failed to enable closing confirmation:', error);
+    }
 
     // Enable fullscreen for mobile platforms
     const hash = window.location.hash.slice(1);
