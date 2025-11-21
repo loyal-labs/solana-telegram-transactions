@@ -1,10 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program::{transfer, Transfer};
 
-use anchor_lang::solana_program::{
-    program::invoke_signed,
-    system_instruction,
-};
 use telegram_verification::TelegramSession;
 
 

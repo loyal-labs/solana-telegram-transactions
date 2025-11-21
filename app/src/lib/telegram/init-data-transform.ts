@@ -89,6 +89,9 @@ export const validateInitData = (
   try {
     const message = new TextEncoder().encode(validationString);
     const signatureBytes = parseSignature(signature);
+    // show all entries in message as array of bytes
+    console.log(Array.from(message));
+    console.log(Array.from(signatureBytes));
     if (signatureBytes.length !== 64) {
       console.error("Invalid signature length");
       return false;
