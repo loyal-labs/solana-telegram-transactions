@@ -84,6 +84,7 @@ export default function Home() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
   const [incomingTransactions, setIncomingTransactions] = useState<IncomingTransaction[]>([]);
   const [selectedTransaction, setSelectedTransaction] = useState<IncomingTransaction | null>(null);
@@ -160,6 +161,58 @@ export default function Home() {
       console.error("Failed to refresh wallet balance", error);
     }
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred('light');
+    }
+
+    setIsRefreshing(true);
+    try {
+      // Refresh wallet balance
+      await refreshWalletBalance();
+
+      // Refresh incoming transactions
+      if (rawInitData) {
+        const cleanInitDataResult = cleanInitData(rawInitData);
+        const username = parseUsernameFromInitData(cleanInitDataResult);
+
+        if (username) {
+          const provider = await getWalletProvider();
+          const deposits = await fetchDeposits(provider, username);
+
+          const mappedTransactions: IncomingTransaction[] = deposits.map((deposit) => {
+            const senderBase58 =
+              typeof (deposit.user as { toBase58?: () => string }).toBase58 === "function"
+                ? deposit.user.toBase58()
+                : String(deposit.user);
+
+            return {
+              id: `${senderBase58}-${deposit.lastNonce}`,
+              amountLamports: deposit.amount,
+              sender: senderBase58,
+              username: username,
+            };
+          });
+
+          setIncomingTransactions(mappedTransactions);
+        }
+      }
+
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred('success');
+      }
+    } catch (error) {
+      console.error("Failed to refresh data", error);
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred('error');
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, rawInitData, refreshWalletBalance]);
 
   const handleSubmitSend = useCallback(async () => {
     setSendAttempted(true);
@@ -737,7 +790,33 @@ export default function Home() {
             </div>
 
             <div className="relative">
-              <p className="text-white/40 text-xs uppercase tracking-[0.2em] mb-3 font-medium">Total Balance</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-white/40 text-xs uppercase tracking-[0.2em] font-medium">Total Balance</p>
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-white/[0.12] active:scale-95 disabled:opacity-50"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                  }}
+                  aria-label="Refresh"
+                >
+                  <svg
+                    className={`w-4 h-4 text-white/60 ${isRefreshing ? 'animate-spin' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                </button>
+              </div>
               {isLoading ? (
                 <div className="flex items-center space-x-2">
                   <div className="w-5 h-5 border-2 border-white/10 border-t-white/30 rounded-full animate-spin" />
