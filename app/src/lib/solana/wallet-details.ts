@@ -15,9 +15,8 @@ const envEndpoint =
     ? process.env.NEXT_PUBLIC_SOLANA_RPC_URL
     : undefined;
 
-const rpcEndpoint = envEndpoint && envEndpoint.length > 0
-  ? envEndpoint
-  : defaultEndpoint;
+const rpcEndpoint =
+  envEndpoint && envEndpoint.length > 0 ? envEndpoint : defaultEndpoint;
 
 let cachedConnection: Connection | null = null;
 
@@ -91,7 +90,10 @@ export const getWalletBalance = async (
     const connection = getConnection();
     const keypair = await getWalletKeypair();
 
-    const lamports = await connection.getBalance(keypair.publicKey, "confirmed");
+    const lamports = await connection.getBalance(
+      keypair.publicKey,
+      "confirmed"
+    );
     setCachedBalance(lamports);
 
     return lamports;
@@ -124,9 +126,7 @@ export const sendSolTransaction = async (
   const connection = getConnection();
   const keypair = await getWalletKeypair();
   const toPubkey =
-    typeof destination === "string"
-      ? new PublicKey(destination)
-      : destination;
+    typeof destination === "string" ? new PublicKey(destination) : destination;
 
   const transaction = new Transaction().add(
     SystemProgram.transfer({
