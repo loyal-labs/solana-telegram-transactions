@@ -90,6 +90,7 @@ export default function Home() {
   const [isSendFormValid, setIsSendFormValid] = useState(false);
   const [sendAttempted, setSendAttempted] = useState(false);
   const [isClaimingTransaction, setIsClaimingTransaction] = useState(false);
+  const [claimingTransactionId, setClaimingTransactionId] = useState<string | null>(null);
   const [sendFormValues, setSendFormValues] = useState<{ amount: string; recipient: string }>({
     amount: "",
     recipient: "",
@@ -302,6 +303,7 @@ export default function Home() {
       hapticFeedback.impactOccurred('medium');
     }
     setIsClaimingTransaction(true);
+    setClaimingTransactionId(transactionId);
     try {
       const provider = await getWalletProvider();
       const keypair = await getWalletKeypair();
@@ -344,6 +346,7 @@ export default function Home() {
       }
     } finally {
       setIsClaimingTransaction(false);
+      setClaimingTransactionId(null);
     }
   }, [incomingTransactions, rawInitData, refreshWalletBalance]);
 
@@ -757,11 +760,13 @@ export default function Home() {
           {incomingTransactions.length > 0 && (
             <div className="relative mb-8">
               <div className="space-y-3">
-                {incomingTransactions.map((transaction, idx) => (
+                {incomingTransactions.map((transaction, idx) => {
+                  const isClaiming = claimingTransactionId === transaction.id;
+                  return (
                   <div
                     key={transaction.id}
-                    onClick={() => handleOpenTransactionDetails(transaction)}
-                    className="rounded-2xl p-4 shadow-lg transition-all hover:scale-[1.01] cursor-pointer"
+                    onClick={() => !isClaiming && handleOpenTransactionDetails(transaction)}
+                    className={`rounded-2xl p-4 shadow-lg transition-all ${isClaiming ? 'cursor-not-allowed opacity-75' : 'hover:scale-[1.01] cursor-pointer'}`}
                     style={{
                       background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0.03) 100%)',
                       backdropFilter: 'blur(20px)',
@@ -793,19 +798,25 @@ export default function Home() {
                             e.stopPropagation();
                             handleApproveTransaction(transaction.id);
                           }}
-                          className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:bg-emerald-500/20 active:scale-95"
+                          disabled={claimingTransactionId === transaction.id}
+                          className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:bg-emerald-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                           style={{
                             background: 'rgba(16, 185, 129, 0.1)',
                             border: '1px solid rgba(16, 185, 129, 0.3)',
                           }}
                           aria-label="Claim transaction"
                         >
-                          <Check className="w-4 h-4 text-emerald-400" />
+                          {claimingTransactionId === transaction.id ? (
+                            <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Check className="w-4 h-4 text-emerald-400" />
+                          )}
                         </button>
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
