@@ -53,6 +53,21 @@ hashes.sha512 = sha512;
 
 const SOL_PRICE_USD = 180;
 
+type TransactionType = 'incoming' | 'outgoing' | 'pending';
+
+type Transaction = {
+  id: string;
+  type: TransactionType;
+  amountLamports: number;
+  // For incoming transactions
+  sender?: string;
+  username?: string;
+  // For outgoing transactions
+  recipient?: string;
+  timestamp: number;
+};
+
+// Legacy type for internal use - will be removed
 type IncomingTransaction = {
   id: string;
   amountLamports: number;
@@ -87,6 +102,23 @@ export default function Home() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
   const [incomingTransactions, setIncomingTransactions] = useState<IncomingTransaction[]>([]);
+  const [outgoingTransactions, setOutgoingTransactions] = useState<Transaction[]>([
+    // Mock transactions for UI testing
+    {
+      id: 'mock-1',
+      type: 'outgoing',
+      amountLamports: 500000000, // 0.5 SOL
+      recipient: '@alice',
+      timestamp: Date.now() - 3600000, // 1 hour ago
+    },
+    {
+      id: 'mock-2',
+      type: 'pending',
+      amountLamports: 250000000, // 0.25 SOL
+      recipient: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+      timestamp: Date.now() - 60000, // 1 minute ago
+    },
+  ]);
   const [selectedTransaction, setSelectedTransaction] = useState<IncomingTransaction | null>(null);
   const [isSendFormValid, setIsSendFormValid] = useState(false);
   const [sendAttempted, setSendAttempted] = useState(false);
@@ -233,7 +265,19 @@ export default function Home() {
       return;
     }
 
+    // Create a pending transaction
+    const pendingTxId = `pending-${Date.now()}`;
+    const pendingTransaction: Transaction = {
+      id: pendingTxId,
+      type: 'pending',
+      amountLamports: lamports,
+      recipient: trimmedRecipient,
+      timestamp: Date.now(),
+    };
+
     setIsSendingTransaction(true);
+    setOutgoingTransactions((prev) => [pendingTransaction, ...prev]);
+
     try {
       console.log("Sending transaction to:", trimmedRecipient);
 
@@ -250,6 +294,13 @@ export default function Home() {
         throw new Error("Invalid recipient");
       }
 
+      // Update pending transaction to confirmed
+      setOutgoingTransactions((prev) =>
+        prev.map((tx) =>
+          tx.id === pendingTxId ? { ...tx, type: 'outgoing' as TransactionType } : tx
+        )
+      );
+
       await refreshWalletBalance();
 
       if (hapticFeedback.notificationOccurred.isAvailable()) {
@@ -262,6 +313,8 @@ export default function Home() {
       setSendFormValues({ amount: "", recipient: "" });
     } catch (error) {
       console.error("Failed to send transaction", error);
+      // Remove failed pending transaction
+      setOutgoingTransactions((prev) => prev.filter((tx) => tx.id !== pendingTxId));
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred('error');
       }
@@ -429,8 +482,9 @@ export default function Home() {
         }
 
         const provider = await getWalletProvider();
+        console.log("Fetching deposits for username:", username);
         const deposits = await fetchDeposits(provider, username);
-        console.log("Deposits:", deposits);
+        console.log("Deposits fetched:", deposits.length, deposits);
         if (isCancelled) {
           return;
         }
@@ -449,6 +503,7 @@ export default function Home() {
           };
         });
 
+        console.log("Setting incoming transactions:", mappedTransactions.length, mappedTransactions);
         setIncomingTransactions(mappedTransactions);
       } catch (error) {
         console.error("Failed to fetch deposits", error);
@@ -835,71 +890,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Incoming Transactions Notifications */}
-          {incomingTransactions.length > 0 && (
-            <div className="relative mb-8">
-              <div className="space-y-3">
-                {incomingTransactions.map((transaction, idx) => {
-                  const isClaiming = claimingTransactionId === transaction.id;
-                  return (
-                  <div
-                    key={transaction.id}
-                    onClick={() => !isClaiming && handleOpenTransactionDetails(transaction)}
-                    className={`rounded-2xl p-4 shadow-lg transition-all ${isClaiming ? 'cursor-not-allowed opacity-75' : 'hover:scale-[1.01] cursor-pointer'}`}
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0.03) 100%)',
-                      backdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(99, 102, 241, 0.2)',
-                      animationDelay: `${idx * 0.1}s`,
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" style={{
-                            boxShadow: '0 0 6px rgba(99, 102, 241, 0.8)',
-                          }} />
-                          <p className="text-white/40 text-[10px] uppercase tracking-[0.15em] font-medium">
-                            Incoming
-                          </p>
-                        </div>
-                        <p className="text-white text-xl font-bold mono mb-1">
-                          {formatTransactionAmount(transaction.amountLamports)} SOL
-                        </p>
-                        <p className="text-white/50 text-xs mono">
-                          from {formatSenderAddress(transaction.sender)}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center ml-4">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleApproveTransaction(transaction.id);
-                          }}
-                          disabled={claimingTransactionId === transaction.id}
-                          className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:bg-emerald-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                          style={{
-                            background: 'rgba(16, 185, 129, 0.1)',
-                            border: '1px solid rgba(16, 185, 129, 0.3)',
-                          }}
-                          aria-label="Claim transaction"
-                        >
-                          {claimingTransactionId === transaction.id ? (
-                            <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <Check className="w-4 h-4 text-emerald-400" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
+          
           {/* Quick Send - Commented out until feature is complete */}
           {/* <div className="relative mb-8"> */}
             {/* Decorative dotted line */}
@@ -1035,31 +1026,137 @@ export default function Home() {
               {/* <button className="text-white/40 text-xs hover:text-white/60 transition-colors">See all →</button> */}
             </div>
 
-            {/* Empty state */}
-            <div className="flex flex-col items-center justify-center pt-6 pb-12 px-4">
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                }}
-              >
-                <svg
-                  className="w-6 h-6 text-white/30"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+            {/* Transactions list */}
+            {incomingTransactions.length === 0 && outgoingTransactions.length === 0 ? (
+              // Empty state
+              <div className="flex flex-col items-center justify-center pt-6 pb-12 px-4">
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                  }}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
+                  <svg
+                    className="w-6 h-6 text-white/30"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </div>
+                <p className="text-white/30 text-sm tracking-wide">Your transactions will appear here</p>
               </div>
-              <p className="text-white/30 text-sm tracking-wide">Your transactions will appear here</p>
-            </div>
+            ) : (
+              <div className="space-y-2 pb-4">
+                {/* Incoming transactions */}
+                {incomingTransactions.map((transaction) => {
+                  const isClaiming = claimingTransactionId === transaction.id;
+                  return (
+                    <div
+                      key={transaction.id}
+                      onClick={() => !isClaiming && handleOpenTransactionDetails(transaction)}
+                      className={`rounded-xl px-3 py-2.5 transition-all ${isClaiming ? 'cursor-not-allowed opacity-75' : 'hover:bg-white/[0.02] cursor-pointer'}`}
+                      style={{
+                        background: 'rgba(99, 102, 241, 0.04)',
+                        border: '1px solid rgba(99, 102, 241, 0.12)',
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
+                            background: 'rgba(99, 102, 241, 0.1)',
+                          }}>
+                            <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-white text-sm font-medium mono">
+                              +{formatTransactionAmount(transaction.amountLamports)} SOL
+                            </p>
+                            <p className="text-white/40 text-[11px] mono">
+                              from {formatSenderAddress(transaction.sender)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApproveTransaction(transaction.id);
+                          }}
+                          disabled={claimingTransactionId === transaction.id}
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-emerald-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                          style={{
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            color: 'rgb(52, 211, 153)',
+                          }}
+                        >
+                          {claimingTransactionId === transaction.id ? (
+                            <div className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            'Claim'
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Outgoing transactions */}
+                {outgoingTransactions.map((transaction) => {
+                  const isPending = transaction.type === 'pending';
+                  return (
+                    <div
+                      key={transaction.id}
+                      className="rounded-xl px-3 py-2.5"
+                      style={{
+                        background: isPending ? 'rgba(251, 191, 36, 0.04)' : 'rgba(255, 255, 255, 0.02)',
+                        border: isPending ? '1px solid rgba(251, 191, 36, 0.12)' : '1px solid rgba(255, 255, 255, 0.06)',
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
+                            background: isPending ? 'rgba(251, 191, 36, 0.1)' : 'rgba(255, 255, 255, 0.04)',
+                          }}>
+                            {isPending ? (
+                              <div className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                              </svg>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-white text-sm font-medium mono">
+                              -{formatTransactionAmount(transaction.amountLamports)} SOL
+                            </p>
+                            <p className="text-white/40 text-[11px] mono">
+                              to {transaction.recipient?.startsWith('@')
+                                ? transaction.recipient
+                                : formatSenderAddress(transaction.recipient || '')}
+                            </p>
+                          </div>
+                        </div>
+
+                        <span className={`text-[10px] uppercase tracking-wider font-medium ${isPending ? 'text-amber-400/70' : 'text-white/30'}`}>
+                          {isPending ? 'Pending' : 'Sent'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </main>
