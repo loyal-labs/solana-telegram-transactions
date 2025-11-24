@@ -23,6 +23,8 @@ import {
   Copy, 
   RefreshCw, 
   Wallet,
+  Sparkles,
+  Zap
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import React from 'react';
@@ -82,13 +84,19 @@ type IncomingTransaction = {
   username: string;
 };
 
-function ActionButton({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick: () => void }) {
+function ActionButton({ icon, label, onClick, colorClass = "text-white" }: { icon: React.ReactNode, label: string, onClick: () => void, colorClass?: string }) {
     return (
-        <button onClick={onClick} className="flex flex-col items-center gap-2 group">
-            <div className="w-14 h-14 rounded-2xl bg-zinc-800/80 border border-zinc-700/50 text-white flex items-center justify-center transition-all group-active:scale-95 group-hover:bg-zinc-700 group-hover:border-zinc-600 shadow-xl backdrop-blur-sm">
-                {React.cloneElement(icon as React.ReactElement, { size: 24, strokeWidth: 1.5 })}
+        <button 
+            onClick={onClick} 
+            className="flex flex-col items-center gap-3 group relative"
+        >
+            <div className="absolute inset-0 bg-indigo-500/20 rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="relative w-16 h-16 rounded-3xl bg-gradient-to-br from-[#2a2a2a] to-[#1a1a1a] border-t border-white/10 shadow-[0_8px_20px_-8px_rgba(0,0,0,0.6)] flex items-center justify-center transition-all duration-300 group-active:scale-90 group-hover:-translate-y-1 group-hover:shadow-[0_12px_24px_-8px_rgba(99,102,241,0.3)] z-10">
+                <div className={`transition-colors duration-300 group-hover:text-indigo-400 ${colorClass}`}>
+                    {React.cloneElement(icon as React.ReactElement, { size: 26, strokeWidth: 1.5 })}
+                </div>
             </div>
-            <span className="text-xs text-zinc-400 font-medium tracking-wide group-hover:text-zinc-300 transition-colors">{label}</span>
+            <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider group-hover:text-indigo-300 transition-colors z-10">{label}</span>
         </button>
     )
 }
@@ -756,37 +764,89 @@ export default function Home() {
 
   return (
     <>
-      <main className="min-h-screen bg-black text-white font-sans selection:bg-indigo-500/30 overflow-hidden">
-        {/* Abstract Background */}
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            border-left: 1px solid rgba(255, 255, 255, 0.04);
+            box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.4);
+        }
+        
+        .glass-highlight {
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            background: linear-gradient(120deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 70%);
+            background-size: 200% 100%;
+            animation: shine 4s infinite linear;
+        }
+
+        @keyframes shine {
+            from { background-position: 200% 0; }
+            to { background-position: -200% 0; }
+        }
+      `}</style>
+      
+      <main className="min-h-screen bg-[#050505] text-white font-sans selection:bg-indigo-500/30 overflow-hidden relative">
+        {/* Dynamic Abstract Background */}
         <div className="fixed inset-0 z-0 pointer-events-none">
-             <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-indigo-500/10 blur-[120px] animate-pulse" style={{ animationDuration: '8s' }} />
-             <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-500/5 blur-[100px]" />
+             {/* Main top gradient */}
+             <div className="absolute top-[-20%] left-0 right-0 h-[80%] bg-gradient-to-b from-[#1a1a2e] via-[#050505] to-[#050505] opacity-80" />
+             
+             {/* Colorful Orbs */}
+             <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-600/10 blur-[100px] animate-pulse" style={{ animationDuration: '6s' }} />
+             <div className="absolute top-[10%] right-[-20%] w-[50%] h-[50%] rounded-full bg-purple-600/10 blur-[100px] animate-pulse" style={{ animationDuration: '8s', animationDelay: '1s' }} />
+             <div className="absolute bottom-[-10%] left-[20%] w-[60%] h-[40%] rounded-full bg-emerald-900/10 blur-[120px]" />
+             
+             {/* Grid Texture */}
+             <div className="absolute inset-0 opacity-[0.03]" style={{ 
+                backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', 
+                backgroundSize: '40px 40px' 
+             }} />
         </div>
 
-        <div className="relative z-10 px-5 pt-6 pb-24 max-w-md mx-auto flex flex-col min-h-screen" style={{ paddingTop: `${(safeAreaInsetTop || 0) + 24}px` }}>
+        <div className="relative z-10 px-6 pt-6 pb-24 max-w-md mx-auto flex flex-col min-h-screen" style={{ paddingTop: `${(safeAreaInsetTop || 0) + 16}px` }}>
             
             {/* Header / Balance */}
-            <div className="flex flex-col items-center justify-center py-6 space-y-8">
-                 {/* Balance Display */}
-                 <div className="text-center space-y-3 scale-100 transition-transform active:scale-95 duration-200">
-                    <p className="text-zinc-500 text-xs font-semibold tracking-widest uppercase">Total Balance</p>
+            <div className="flex flex-col items-center justify-center py-8 space-y-10 relative perspective-1000">
+                 {/* Balance Display with Glow */}
+                 <div className="text-center space-y-2 relative group cursor-default">
+                    {/* Glow behind numbers */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-32 bg-indigo-500/10 blur-[60px] rounded-full group-hover:bg-indigo-500/20 transition-all duration-700" />
+                    
+                    <div className="relative flex items-center justify-center space-x-2 mb-4">
+                        <div className="h-[1px] w-8 bg-gradient-to-r from-transparent to-white/20" />
+                        <p className="text-indigo-200/60 text-[10px] font-bold tracking-[0.2em] uppercase">Total Balance</p>
+                        <div className="h-[1px] w-8 bg-gradient-to-l from-transparent to-white/20" />
+                    </div>
+
                     {isLoading ? (
-                        <div className="h-16 w-48 bg-zinc-900/50 animate-pulse rounded-2xl mx-auto" />
+                        <div className="h-20 w-56 bg-white/5 animate-pulse rounded-2xl mx-auto backdrop-blur-sm" />
                     ) : (
                         <div className="flex flex-col items-center">
-                            <h1 className="text-6xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-400">
+                            <h1 className="text-[3.5rem] leading-none font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-zinc-500 drop-shadow-2xl">
                                 ${formatUsdValue(balance)}
                             </h1>
-                            <div className="flex items-center space-x-2 mt-3 px-4 py-1.5 rounded-full bg-zinc-900/60 border border-zinc-800/60 backdrop-blur-md">
-                                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                <span className="text-zinc-300 text-sm font-mono tracking-tight">{formatBalance(balance)} SOL</span>
+                            
+                            {/* Crypto Pill */}
+                            <div className="mt-4 flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-zinc-900/80 border border-zinc-800 backdrop-blur-md shadow-lg transform transition-transform hover:scale-105">
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-emerald-400 to-emerald-600 flex items-center justify-center shadow-inner">
+                                    <Sparkles className="w-3 h-3 text-white" fill="white" />
+                                </div>
+                                <span className="text-zinc-200 text-sm font-mono font-medium tracking-tight">{formatBalance(balance)} SOL</span>
                             </div>
                         </div>
                     )}
                  </div>
 
-                 {/* Action Buttons */}
-                 <div className="flex items-center justify-center gap-6 w-full">
+                 {/* Action Buttons Row */}
+                 <div className="grid grid-cols-4 gap-4 w-full px-2">
                     <ActionButton icon={<ArrowUp />} label="Send" onClick={() => handleOpenSendSheet()} />
                     <ActionButton icon={<ArrowDown />} label="Receive" onClick={handleOpenReceiveSheet} />
                     <ActionButton icon={<Copy />} label="Copy" onClick={() => {
@@ -807,8 +867,8 @@ export default function Home() {
                  </div>
             </div>
 
-            {/* Wallet Address Card (Compact) */}
-             <div className="w-full bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-4 mb-8 flex items-center justify-between backdrop-blur-md hover:bg-zinc-900/60 transition-colors cursor-pointer group"
+            {/* Wallet Address Card - Glassmorphism */}
+             <div className="glass-card w-full rounded-2xl p-4 mb-10 flex items-center justify-between hover:bg-white/[0.04] transition-all cursor-pointer group relative overflow-hidden"
                   onClick={() => {
                       if (walletAddress) {
                           if (navigator?.clipboard?.writeText) {
@@ -819,64 +879,74 @@ export default function Home() {
                           }
                       }
                   }}>
-                <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 border border-indigo-500/20 flex items-center justify-center">
-                        <Wallet className="w-5 h-5 text-indigo-400" />
+                <div className="glass-highlight" />
+                <div className="flex items-center space-x-4 relative z-10">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 border border-indigo-400/20 flex items-center justify-center shadow-[0_0_15px_-3px_rgba(99,102,241,0.3)]">
+                        <Wallet className="w-6 h-6 text-indigo-400" />
                     </div>
                     <div>
-                        <p className="text-white font-medium text-sm group-hover:text-indigo-300 transition-colors">Solana Wallet</p>
-                        <p className="text-zinc-500 text-xs font-mono">{formatAddress(walletAddress)}</p>
+                        <p className="text-indigo-100 font-medium text-sm group-hover:text-white transition-colors">Solana Wallet</p>
+                        <p className="text-zinc-500 text-xs font-mono tracking-wide group-hover:text-zinc-400 transition-colors">{formatAddress(walletAddress)}</p>
                     </div>
                 </div>
-                <div className="p-2 rounded-lg bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Copy className="w-4 h-4 text-white/60" />
+                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+                    <Copy className="w-4 h-4 text-white/80" />
                 </div>
             </div>
 
             {/* Transactions List */}
-            <div className="flex-1 flex flex-col">
-                <div className="flex items-center justify-between mb-4 px-1">
-                    <h3 className="text-lg font-bold text-white tracking-tight">Activity</h3>
+            <div className="flex-1 flex flex-col relative">
+                <div className="flex items-center justify-between mb-5 px-1">
+                    <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                        Activity
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                    </h3>
                 </div>
                 
-                <div className="space-y-3 pb-safe">
+                <div className="space-y-3 pb-safe relative">
+                     {/* Connecting Line */}
+                     {/* <div className="absolute left-[27px] top-4 bottom-4 w-[2px] bg-zinc-800/50 -z-10" /> */}
+
                     {/* Empty State */}
                     {incomingTransactions.length === 0 && outgoingTransactions.length === 0 && !isLoading && (
-                        <div className="flex flex-col items-center justify-center py-12 text-zinc-600 space-y-4">
-                            <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center">
-                                <Clock className="w-8 h-8 opacity-50" />
+                        <div className="glass-card flex flex-col items-center justify-center py-12 rounded-2xl space-y-4">
+                            <div className="w-16 h-16 rounded-full bg-zinc-900/50 flex items-center justify-center border border-zinc-800">
+                                <Clock className="w-8 h-8 text-zinc-600" />
                             </div>
-                            <p className="text-sm font-medium">No recent activity</p>
+                            <p className="text-zinc-500 text-sm font-medium">No recent activity</p>
                         </div>
                     )}
 
                     {/* Incoming */}
-                    {incomingTransactions.map((transaction) => {
+                    {incomingTransactions.map((transaction, idx) => {
                          const isClaiming = claimingTransactionId === transaction.id;
                          return (
                             <div
                                 key={transaction.id}
                                 onClick={() => !isClaiming && handleOpenTransactionDetails(transaction)}
-                                className={`group flex items-center justify-between p-3 rounded-2xl bg-zinc-900/30 border border-zinc-800/50 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all cursor-pointer ${isClaiming ? 'opacity-60 pointer-events-none' : ''}`}
+                                className={`group flex items-center justify-between p-3.5 rounded-2xl bg-[#0a0a0a] border border-zinc-800/60 hover:border-zinc-700 hover:bg-zinc-900 transition-all cursor-pointer shadow-sm relative overflow-hidden ${isClaiming ? 'opacity-60 pointer-events-none' : ''}`}
+                                style={{ animationDelay: `${idx * 100}ms` }}
                             >
-                                <div className="flex items-center space-x-4">
-                                    <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
-                                        <ArrowDown className="w-5 h-5" />
+                                <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                
+                                <div className="flex items-center space-x-4 relative z-10">
+                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-emerald-900/20 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform shadow-[0_4px_12px_-4px_rgba(16,185,129,0.3)]">
+                                        <ArrowDown className="w-5 h-5" strokeWidth={2.5} />
                                     </div>
                                     <div>
                                         <div className="flex items-center space-x-2">
-                                            <p className="text-white font-semibold text-sm">Received</p>
-                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">NEW</span>
+                                            <p className="text-emerald-100 font-semibold text-sm group-hover:text-emerald-50 transition-colors">Received</p>
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-bold tracking-wider">NEW</span>
                                         </div>
-                                        <p className="text-zinc-500 text-xs mono">from {formatSenderAddress(transaction.sender)}</p>
+                                        <p className="text-zinc-500 text-xs mono mt-0.5 group-hover:text-zinc-400">from {formatSenderAddress(transaction.sender)}</p>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-emerald-400 font-bold text-sm">+{formatTransactionAmount(transaction.amountLamports)} SOL</p>
+                                <div className="text-right relative z-10">
+                                    <p className="text-emerald-400 font-bold text-sm tracking-tight">+{formatTransactionAmount(transaction.amountLamports)} SOL</p>
                                     {isClaiming ? (
-                                        <span className="text-xs text-zinc-500 animate-pulse">Claiming...</span>
+                                        <span className="text-xs text-zinc-500 animate-pulse font-medium">Claiming...</span>
                                     ) : (
-                                        <span className="text-xs text-zinc-500">Tap to claim</span>
+                                        <span className="text-xs text-indigo-400/80 font-medium group-hover:text-indigo-400 transition-colors">Tap to claim</span>
                                     )}
                                 </div>
                             </div>
@@ -884,26 +954,28 @@ export default function Home() {
                     })}
 
                     {/* Outgoing */}
-                    {outgoingTransactions.map((transaction) => {
+                    {outgoingTransactions.map((transaction, idx) => {
                          const isPending = transaction.type === 'pending';
                          return (
                             <div
                                 key={transaction.id}
-                                className={`flex items-center justify-between p-3 rounded-2xl border ${
+                                className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
                                     isPending 
-                                    ? 'bg-amber-500/5 border-amber-500/20' 
-                                    : 'bg-zinc-900/30 border-zinc-800/50'
+                                    ? 'bg-amber-950/10 border-amber-900/30' 
+                                    : 'bg-[#0a0a0a] border-zinc-800/60'
                                 }`}
                             >
                                 <div className="flex items-center space-x-4">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                        isPending ? 'bg-amber-500/10 text-amber-500' : 'bg-zinc-800 text-zinc-400'
+                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg border ${
+                                        isPending 
+                                        ? 'bg-amber-500/10 border-amber-500/20 text-amber-500 shadow-amber-900/20' 
+                                        : 'bg-zinc-900 border-zinc-800 text-zinc-500'
                                     }`}>
-                                        {isPending ? <Clock className="w-5 h-5 animate-pulse" /> : <ArrowUp className="w-5 h-5" />}
+                                        {isPending ? <Clock className="w-5 h-5 animate-pulse" /> : <ArrowUp className="w-5 h-5" strokeWidth={2.5} />}
                                     </div>
                                     <div>
                                         <p className="text-white font-semibold text-sm">{isPending ? 'Sending...' : 'Sent'}</p>
-                                        <p className="text-zinc-500 text-xs mono">to {
+                                        <p className="text-zinc-500 text-xs mono mt-0.5">to {
                                             transaction.recipient?.startsWith('@')
                                             ? transaction.recipient
                                             : formatSenderAddress(transaction.recipient || '')
@@ -911,8 +983,8 @@ export default function Home() {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-white font-bold text-sm">-{formatTransactionAmount(transaction.amountLamports)} SOL</p>
-                                    <p className="text-xs text-zinc-500">{
+                                    <p className="text-white font-bold text-sm tracking-tight">-{formatTransactionAmount(transaction.amountLamports)} SOL</p>
+                                    <p className="text-xs text-zinc-600 font-medium">{
                                         new Date(transaction.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                                     }</p>
                                 </div>
