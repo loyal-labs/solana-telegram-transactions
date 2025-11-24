@@ -46,6 +46,21 @@ const MOCK_CONTACTS = [
   { name: "Dave", username: "@dave", initials: "D", gradient: "from-amber-500 to-orange-500" },
 ];
 
+// Shared styles for tactile surfaces
+const surfaceRaised: CSSProperties = {
+  background: "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)",
+  border: "1px solid rgba(255, 255, 255, 0.1)",
+  borderBottomColor: "rgba(0, 0, 0, 0.2)",
+  boxShadow: "0 1px 0 0 rgba(255,255,255,0.05) inset, 0 -1px 0 0 rgba(0,0,0,0.1) inset, 0 4px 12px -2px rgba(0,0,0,0.4), 0 2px 4px -1px rgba(0,0,0,0.2)",
+};
+
+const surfaceInset: CSSProperties = {
+  background: "rgba(0, 0, 0, 0.2)",
+  border: "1px solid rgba(0, 0, 0, 0.3)",
+  borderTopColor: "rgba(0, 0, 0, 0.4)",
+  boxShadow: "0 1px 0 0 rgba(255,255,255,0.03), 0 2px 8px -2px rgba(0,0,0,0.5) inset",
+};
+
 const SOL_PRICE_USD = 180;
 const LAST_AMOUNT_KEY = 'lastSendAmount';
 
@@ -134,29 +149,26 @@ export default function SendSheet({
       return;
     }
 
+    const recipientTrimmed = recipient.trim();
+    const isRecipientValid = isValidSolanaAddress(recipientTrimmed) || isValidTelegramUsername(recipientTrimmed);
+
     if (step === 1) {
-      const isRecipientValid = isValidSolanaAddress(recipient.trim()) || isValidTelegramUsername(recipient.trim());
       onValidationChange?.(isRecipientValid);
       return;
     }
 
-    if (step === 2) {
-      const amount = parseFloat(amountStr);
-      const isAmountValid = !isNaN(amount) && amount > 0;
-      const isRecipientValid = isValidSolanaAddress(recipient.trim()) || isValidTelegramUsername(recipient.trim());
-      onValidationChange?.(isAmountValid && isRecipientValid);
+    // For steps 2 and 3, check both amount and recipient
+    const amount = parseFloat(amountStr);
+    const isAmountValid = !isNaN(amount) && amount > 0 && isFinite(amount);
+    const isValid = isAmountValid && isRecipientValid;
+
+    if (step === 2 || step === 3) {
+      onValidationChange?.(isValid);
       return;
     }
 
-    if (step === 3) {
-      // Always valid in step 3 (confirmation), unless fields are somehow empty
-      const amount = parseFloat(amountStr);
-      const isAmountValid = !isNaN(amount) && amount > 0;
-      const isRecipientValid = isValidSolanaAddress(recipient.trim()) || isValidTelegramUsername(recipient.trim());
-      onValidationChange?.(isAmountValid && isRecipientValid);
-      return;
-    }
-
+    // Default to invalid for any other state
+    onValidationChange?.(false);
   }, [step, amountStr, recipient, open, onValidationChange]);
 
 
@@ -206,9 +218,8 @@ export default function SendSheet({
   const modalStyle = useMemo(
     () =>
       ({
-        "--tgui--bg_color": "#050505",
-        "--tgui--divider": "rgba(255, 255, 255, 0.06)",
-        "--tgui--secondary_bg_color": "#0a0a0a",
+        "--tgui--bg_color": "transparent",
+        "--tgui--divider": "rgba(255, 255, 255, 0.04)",
       }) as CSSProperties,
     [],
   );
@@ -226,10 +237,16 @@ export default function SendSheet({
     }
   }, [amountStr, currency]);
 
-  // Recipient info for Step 2 and 3
+  // Recipient info for Step 2 and 3 - flat/non-interactive display
   const RecipientInfo = () => (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-white/[0.03] backdrop-blur-md rounded-2xl border border-white/[0.06] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.5)] w-auto max-w-full">
-        <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-indigo-500/80 to-purple-600/80 flex items-center justify-center shrink-0 shadow-lg">
+    <div
+      style={{
+        background: "rgba(0, 0, 0, 0.15)",
+        border: "1px solid rgba(255, 255, 255, 0.06)",
+      }}
+      className="flex items-center gap-3 px-4 py-2.5 rounded-xl w-auto max-w-full"
+    >
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500/70 to-purple-600/70 flex items-center justify-center shrink-0">
              {recipient.startsWith('@') ? <User size={14} className="text-white" /> : <Wallet size={14} className="text-white" />}
         </div>
         <span className="text-sm text-zinc-300 font-medium truncate max-w-[200px] font-mono tracking-tight">{recipient}</span>
@@ -263,10 +280,9 @@ export default function SendSheet({
             </Modal.Close>
           }
           style={{
-            background: "#050505",
-            color: "white",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
-            fontFamily: "Inter, sans-serif"
+            background: "linear-gradient(180deg, #1c1f26 0%, #151820 100%)",
+            color: "rgba(255, 255, 255, 0.9)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.06)"
           }}
         >
           <span className="font-semibold tracking-tight text-white/90">
@@ -275,9 +291,20 @@ export default function SendSheet({
         </Modal.Header>
       }
     >
-      <div className="bg-[#050505] min-h-[500px] flex flex-col text-white relative overflow-hidden">
-        {/* Background gradient orb */}
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-600/[0.06] blur-[80px] pointer-events-none" />
+      <div
+        style={{
+          background: "linear-gradient(180deg, #151820 0%, #0d0e12 100%)",
+          minHeight: "500px"
+        }}
+        className="flex flex-col text-white relative overflow-hidden"
+      >
+        {/* Noise texture for surface feel */}
+        <div
+          className="absolute inset-0 opacity-[0.03] pointer-events-none"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`
+          }}
+        />
 
         <Drawer.Title asChild>
           <VisuallyHidden>Send assets</VisuallyHidden>
@@ -287,7 +314,7 @@ export default function SendSheet({
           // STEP 1: RECIPIENT
           <div className="p-6 flex flex-col gap-5 relative z-10">
             <div className="relative group">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-indigo-400 transition-colors duration-300">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-zinc-300 transition-colors duration-300 z-10">
                 <Search size={18} strokeWidth={2.5} />
               </div>
               <input
@@ -300,7 +327,14 @@ export default function SendSheet({
                         setRecipient(val);
                     }
                 }}
-                className="w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/40 focus:bg-white/[0.05] transition-all font-mono text-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)]"
+                style={{
+                  ...surfaceInset,
+                  paddingTop: "14px",
+                  paddingBottom: "14px",
+                  paddingLeft: "48px",
+                  paddingRight: "16px",
+                }}
+                className="w-full rounded-xl text-white/70 placeholder:text-zinc-600 focus:outline-none focus:text-white transition-all font-mono text-sm relative z-0"
                 autoFocus
               />
             </div>
@@ -314,10 +348,11 @@ export default function SendSheet({
                      }
                 }}
                 disabled={!(isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient))}
-                className={`flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 group ${
+                style={(isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient)) ? surfaceRaised : undefined}
+                className={`flex items-center justify-between p-4 rounded-xl transition-all duration-200 group ${
                     (isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient))
-                    ? "bg-white/[0.03] border-indigo-500/20 active:scale-[0.98] hover:bg-white/[0.05] hover:border-indigo-500/30"
-                    : "bg-red-500/[0.03] border-red-500/10 opacity-50 cursor-not-allowed"
+                    ? "cursor-pointer active:translate-y-[1px] active:shadow-[0_1px_2px_0_rgba(0,0,0,0.2)]"
+                    : "bg-red-500/[0.03] border border-red-500/10 opacity-50 cursor-not-allowed"
                 }`}
               >
                 <div className="flex items-center gap-4 overflow-hidden">
@@ -347,7 +382,7 @@ export default function SendSheet({
 
             {/* Recent Contacts */}
             <div className="mt-2">
-              <h3 className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mb-4 px-1">
+              <h3 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-[0.15em] mb-4 px-1">
                 Suggested
               </h3>
               <div className="flex flex-col gap-1">
@@ -355,7 +390,7 @@ export default function SendSheet({
                   <button
                     key={contact.username}
                     onClick={() => handleRecipientSelect(contact.username)}
-                    className="flex items-center justify-between p-3.5 rounded-2xl hover:bg-white/[0.03] active:bg-white/[0.06] transition-all group"
+                    className="flex items-center justify-between p-3.5 rounded-xl transition-all group cursor-pointer bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] active:bg-white/[0.06]"
                   >
                     <div className="flex items-center gap-4">
                       <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${contact.gradient} flex items-center justify-center text-white font-semibold text-sm shadow-lg group-hover:scale-105 group-active:scale-95 transition-transform`}>
@@ -376,9 +411,8 @@ export default function SendSheet({
 
         {step === 2 && (
           // STEP 2: AMOUNT
-          <div className="flex flex-col h-full bg-[#050505] relative">
-            {/* Background Glow */}
-            <div className="absolute top-[10%] left-1/2 -translate-x-1/2 w-72 h-72 bg-indigo-500/[0.04] blur-[100px] rounded-full pointer-events-none" />
+          <div className="flex flex-col h-full relative">
+            {/* No additional background needed - uses parent gradient */}
 
             {/* Display Area */}
             <div className="flex-1 flex flex-col items-center justify-center py-8 gap-6 relative z-10">
@@ -388,7 +422,7 @@ export default function SendSheet({
                    {/* Currency Toggle */}
                    <button
                      onClick={toggleCurrency}
-                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs font-semibold text-zinc-500 hover:text-white hover:bg-white/[0.06] hover:border-white/10 transition-all active:scale-95"
+                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.05] text-xs font-semibold text-zinc-400 hover:bg-white/[0.05] active:bg-white/[0.08] transition-all"
                    >
                      <RefreshCw size={12} className="opacity-60" />
                      {currency}
@@ -411,14 +445,20 @@ export default function SendSheet({
             </div>
 
             {/* Presets & Numpad Container */}
-            <div className="bg-[#080808] border-t border-white/[0.04] rounded-t-[28px] pb-safe relative z-20">
+            <div
+              style={{
+                background: "linear-gradient(180deg, #0d0e12 0%, #0a0b0d 100%)",
+                borderTop: "1px solid rgba(255, 255, 255, 0.06)"
+              }}
+              className="rounded-t-[28px] pb-safe relative z-20"
+            >
               {/* Presets */}
               <div className="flex gap-2 px-6 pt-5 pb-3 overflow-x-auto no-scrollbar justify-center">
                 {/* Last used amount */}
                 {lastAmount && (
                   <button
                     onClick={() => handlePresetAmount(currency === 'SOL' ? lastAmount.sol : lastAmount.usd)}
-                    className="px-4 py-2 rounded-xl bg-indigo-500/[0.08] border border-indigo-500/20 text-sm font-medium text-indigo-400 hover:bg-indigo-500/[0.12] hover:text-indigo-300 hover:border-indigo-500/30 transition-all active:scale-95"
+                    className="px-4 py-2 rounded-xl bg-teal-500/[0.08] border border-teal-500/20 text-sm font-medium text-teal-400 hover:bg-teal-500/[0.12] active:bg-teal-500/[0.15] transition-all"
                   >
                     {currency === 'SOL' ? lastAmount.sol : `$${lastAmount.usd}`}
                   </button>
@@ -428,7 +468,7 @@ export default function SendSheet({
                     <button
                       key={val}
                       onClick={() => handlePresetAmount(val)}
-                      className="px-5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.04] text-sm font-medium text-zinc-400 hover:bg-white/[0.06] hover:text-white hover:border-white/[0.08] transition-all active:scale-95"
+                      className="px-5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.04] text-sm font-medium text-zinc-400 hover:bg-white/[0.05] active:bg-white/[0.08] transition-all"
                     >
                       {val}
                     </button>
@@ -438,7 +478,7 @@ export default function SendSheet({
                     <button
                       key={val}
                       onClick={() => handlePresetAmount(val)}
-                      className="px-5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.04] text-sm font-medium text-zinc-400 hover:bg-white/[0.06] hover:text-white hover:border-white/[0.08] transition-all active:scale-95"
+                      className="px-5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.04] text-sm font-medium text-zinc-400 hover:bg-white/[0.05] active:bg-white/[0.08] transition-all"
                     >
                       ${val}
                     </button>
@@ -447,15 +487,15 @@ export default function SendSheet({
               </div>
 
               {/* Numpad */}
-              <div className="grid grid-cols-3 gap-y-1 px-4 pb-4">
+              <div className="grid grid-cols-3 gap-1 px-4 pb-4">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0, 'delete'].map((item) => (
                   <button
                     key={item}
                     onClick={() => handleNumpadPress(item.toString())}
-                    className="h-14 flex items-center justify-center text-2xl font-medium text-white/90 rounded-2xl active:bg-white/[0.04] transition-colors"
+                    className="h-14 flex items-center justify-center text-2xl font-medium text-white/90 rounded-xl transition-all active:bg-white/[0.05]"
                   >
                     {item === 'delete' ? (
-                      <Delete size={24} className="text-zinc-600" />
+                      <Delete size={24} className="text-zinc-500" />
                     ) : (
                       item
                     )}
@@ -468,25 +508,30 @@ export default function SendSheet({
 
         {step === 3 && (
             // STEP 3: CONFIRMATION
-            <div className="flex flex-col h-full p-6 items-center bg-[#050505] relative">
-                {/* Background Glow */}
-                <div className="absolute top-[5%] left-1/2 -translate-x-1/2 w-64 h-64 bg-indigo-500/[0.05] blur-[100px] rounded-full pointer-events-none" />
+            <div className="flex flex-col h-full p-6 items-center relative">
+                {/* No additional background - uses parent gradient */}
 
                 <div className="flex-1 w-full flex flex-col items-center justify-center relative z-10">
                     {/* Icon */}
-                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/10 flex items-center justify-center mb-6 relative shadow-[0_8px_32px_-8px_rgba(99,102,241,0.3)]">
-                        <Send size={32} className="text-indigo-400 relative z-10" strokeWidth={1.5} />
+                    <div className="w-14 h-14 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mb-5">
+                        <Send size={22} className="text-teal-400" strokeWidth={2} />
                     </div>
 
-                    <h2 className="text-2xl font-bold text-white mb-1.5 tracking-tight">Review Transaction</h2>
+                    <h2 className="text-xl font-semibold text-white mb-1.5 tracking-tight">Review Transaction</h2>
                     <p className="text-zinc-500 text-center mb-8 text-sm max-w-[240px]">
                         Confirm the details below
                     </p>
 
                     <div className="w-full max-w-sm">
-                        <div className="bg-white/[0.02] backdrop-blur-sm rounded-2xl p-5 space-y-4 border border-white/[0.04] relative overflow-hidden">
-                            {/* Glass shine effect */}
-                            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+                        <div
+                          style={{
+                            background: "rgba(0, 0, 0, 0.15)",
+                            border: "1px solid rgba(255, 255, 255, 0.06)",
+                          }}
+                          className="rounded-xl p-5 space-y-4 relative overflow-hidden"
+                        >
+                            {/* Subtle top shine */}
+                            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
 
                             {/* Recipient Row */}
                             <div className="flex justify-between items-center">
