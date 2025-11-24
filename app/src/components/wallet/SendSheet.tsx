@@ -310,9 +310,17 @@ export default function SendSheet({
           <VisuallyHidden>Send assets</VisuallyHidden>
         </Drawer.Title>
 
-        {step === 1 && (
-          // STEP 1: RECIPIENT
-          <div className="p-6 flex flex-col gap-5 relative z-10">
+        {/* Steps Container with Slide Animation */}
+        <div className="relative flex-1 overflow-hidden">
+          {/* STEP 1: RECIPIENT */}
+          <div
+            className="absolute inset-0 p-6 flex flex-col gap-5 overflow-y-auto transition-all duration-300 ease-out"
+            style={{
+              transform: `translateX(${(1 - step) * 100}%)`,
+              opacity: step === 1 ? 1 : 0,
+              pointerEvents: step === 1 ? 'auto' : 'none'
+            }}
+          >
             <div className="relative group">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-zinc-300 transition-colors duration-300 z-10">
                 <Search size={18} strokeWidth={2.5} />
@@ -407,11 +415,16 @@ export default function SendSheet({
               </div>
             </div>
           </div>
-        )}
 
-        {step === 2 && (
-          // STEP 2: AMOUNT
-          <div className="flex flex-col h-full relative">
+          {/* STEP 2: AMOUNT */}
+          <div
+            className="absolute inset-0 flex flex-col overflow-y-auto transition-all duration-300 ease-out"
+            style={{
+              transform: `translateX(${(2 - step) * 100}%)`,
+              opacity: step === 2 ? 1 : 0,
+              pointerEvents: step === 2 ? 'auto' : 'none'
+            }}
+          >
             {/* No additional background needed - uses parent gradient */}
 
             {/* Display Area */}
@@ -504,11 +517,16 @@ export default function SendSheet({
               </div>
             </div>
           </div>
-        )}
 
-        {step === 3 && (
-            // STEP 3: CONFIRMATION
-            <div className="flex flex-col h-full p-6 items-center relative">
+          {/* STEP 3: CONFIRMATION */}
+          <div
+            className="absolute inset-0 flex flex-col p-6 items-center overflow-y-auto transition-all duration-300 ease-out"
+            style={{
+              transform: `translateX(${(3 - step) * 100}%)`,
+              opacity: step === 3 ? 1 : 0,
+              pointerEvents: step === 3 ? 'auto' : 'none'
+            }}
+          >
                 {/* No additional background - uses parent gradient */}
 
                 <div className="flex-1 w-full flex flex-col items-center justify-center relative z-10">
@@ -575,8 +593,8 @@ export default function SendSheet({
                          <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-[0.15em]">Solana Devnet</span>
                      </div>
                 </div>
-            </div>
-        )}
+          </div>
+        </div>
       </div>
     </Modal>
   );
