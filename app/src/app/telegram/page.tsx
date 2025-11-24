@@ -23,8 +23,7 @@ import {
   Copy, 
   RefreshCw, 
   Wallet,
-  Sparkles,
-  Zap
+  Sparkles
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import React from 'react';
@@ -46,7 +45,6 @@ import {
   hideSecondaryButton,
   showMainButton,
   showReceiveShareButton,
-  showTransactionDetailsButtons,
   showWalletHomeButtons,
 } from '@/lib/telegram/buttons';
 import {
@@ -104,6 +102,7 @@ function ActionButton({ icon, label, onClick, colorClass = "text-white" }: { ico
 export default function Home() {
   const rawInitData = useRawInitData();
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
+  const [sendStep, setSendStep] = useState<1 | 2 | 3>(1);
   const [isReceiveSheetOpen, setReceiveSheetOpen] = useState(false);
   const [isTransactionDetailsSheetOpen, setTransactionDetailsSheetOpen] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -149,6 +148,7 @@ export default function Home() {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred('light');
     }
+    setSendStep(1); // Reset step
     if (recipientName) {
       setSelectedRecipient(recipientName);
       setSendFormValues({ amount: "", recipient: recipientName });
@@ -189,6 +189,7 @@ export default function Home() {
     }
     setSendSheetOpen(open);
     if (!open) {
+      setSendStep(1); // Reset step when closing
       setSelectedRecipient("");
       setSendAttempted(false);
       setSendFormValues({ amount: "", recipient: "" });
@@ -697,20 +698,40 @@ export default function Home() {
       }
     } else if (isSendSheetOpen) {
       hideSecondaryButton();
-      showMainButton({
-        text: "Send",
-        onClick: handleSubmitSend,
-        isEnabled: isSendFormValid && !isSendingTransaction,
-        showLoader: isSendingTransaction,
-      });
+
+      if (sendStep === 1) {
+          showMainButton({
+            text: "Next",
+            onClick: () => {
+                 if (isSendFormValid) setSendStep(2);
+            },
+            isEnabled: isSendFormValid,
+            showLoader: false,
+          });
+      } else if (sendStep === 2) {
+          showMainButton({
+            text: "Review",
+            onClick: () => {
+                 if (isSendFormValid) setSendStep(3);
+            },
+            isEnabled: isSendFormValid,
+            showLoader: false,
+          });
+      } else {
+          showMainButton({
+            text: "Send",
+            onClick: handleSubmitSend,
+            isEnabled: isSendFormValid && !isSendingTransaction,
+            showLoader: isSendingTransaction,
+          });
+      }
+
     } else if (isReceiveSheetOpen) {
       hideSecondaryButton();
       showReceiveShareButton({ onShare: handleShareAddress });
     } else {
-      showWalletHomeButtons({
-        onSend: () => handleOpenSendSheet(),
-        onReceive: handleOpenReceiveSheet,
-      });
+      hideMainButton();
+      hideSecondaryButton();
     }
 
     return () => {
@@ -732,6 +753,7 @@ export default function Home() {
     handleShareAddress,
     handleApproveTransaction,
     handleSubmitSend,
+    sendStep // Added this dep
   ]);
 
   const formatBalance = (lamports: number | null): string => {
@@ -846,19 +868,9 @@ export default function Home() {
                  </div>
 
                  {/* Action Buttons Row */}
-                 <div className="grid grid-cols-4 gap-4 w-full px-2">
+                 <div className="grid grid-cols-3 gap-4 w-full px-2">
                     <ActionButton icon={<ArrowUp />} label="Send" onClick={() => handleOpenSendSheet()} />
                     <ActionButton icon={<ArrowDown />} label="Receive" onClick={handleOpenReceiveSheet} />
-                    <ActionButton icon={<Copy />} label="Copy" onClick={() => {
-                        if (walletAddress) {
-                            if (navigator?.clipboard?.writeText) {
-                                navigator.clipboard.writeText(walletAddress);
-                            }
-                            if (hapticFeedback.notificationOccurred.isAvailable()) {
-                                hapticFeedback.notificationOccurred('success');
-                            }
-                        }
-                    }} />
                     <ActionButton 
                         icon={<RefreshCw className={isRefreshing ? "animate-spin" : ""} />} 
                         label="Refresh" 
@@ -1005,6 +1017,8 @@ export default function Home() {
         onValidationChange={handleSendValidationChange}
         onFormValuesChange={handleSendFormValuesChange}
         showErrors={sendAttempted}
+        step={sendStep}
+        onStepChange={setSendStep}
       />
       <ReceiveSheet open={isReceiveSheetOpen} onOpenChange={handleReceiveSheetChange} trigger={null} />
       <TransactionDetailsSheet
