@@ -21,7 +21,7 @@ import {
   ArrowUp,
   Clock,
   Copy,
-  RefreshCw,
+  QrCode,
   Wallet
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -457,6 +457,14 @@ export default function Home() {
       console.error("Failed to share wallet address", error);
     }
   }, [walletAddress]);
+
+  const handleScanQR = useCallback(() => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    // TODO: Implement QR code scanning
+    console.log("Scan QR clicked");
+  }, []);
 
   const handleApproveTransaction = useCallback(
     async (transactionId: string) => {
@@ -1009,11 +1017,9 @@ export default function Home() {
                 onClick={handleOpenReceiveSheet}
               />
               <ActionButton
-                icon={
-                  <RefreshCw className={isRefreshing ? "animate-spin" : ""} />
-                }
-                label="Refresh"
-                onClick={handleRefresh}
+                icon={<QrCode />}
+                label="Scan QR"
+                onClick={handleScanQR}
               />
             </div>
           </div>

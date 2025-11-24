@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   ChevronRight,
   Delete,
+  Plus,
   RefreshCw,
   Search,
   Send,
@@ -393,6 +394,26 @@ export default function SendSheet({
                 Suggested
               </h3>
               <div className="flex flex-col gap-1">
+                {/* Choose Contact Button */}
+                <button
+                  onClick={() => {
+                    // TODO: Implement contact picker
+                    console.log("Choose contact clicked");
+                  }}
+                  className="flex items-center justify-between p-3.5 rounded-xl transition-all group cursor-pointer bg-white/[0.015] border border-dashed border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05]"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-sm group-hover:scale-105 group-active:scale-95 transition-transform">
+                      <Plus className="w-5 h-5 text-indigo-400" strokeWidth={2.5} />
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <span className="text-sm font-medium text-white/80 group-hover:text-white transition-colors">Choose contact</span>
+                      <span className="text-xs text-zinc-600">from Telegram</span>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-zinc-700 group-hover:text-zinc-500 transition-colors" />
+                </button>
+
                 {MOCK_CONTACTS.map((contact) => (
                   <button
                     key={contact.username}
