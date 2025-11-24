@@ -2,8 +2,6 @@ import { etc, verify } from "@noble/ed25519";
 import qs from "qs";
 
 import { TELEGRAM_BOT_ID, TELEGRAM_PUBLIC_KEYS } from "../constants";
-import { fetchDeposits } from "../solana/fetch-deposits";
-import { getWalletProvider } from "../solana/wallet/wallet-details";
 
 export const cleanInitData = (initData: string) => {
   const cleanInitData = qs.parse(initData);

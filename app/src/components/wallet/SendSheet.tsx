@@ -1,6 +1,5 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import {
@@ -14,6 +13,7 @@ import {
   Wallet,
   X
 } from "lucide-react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 
 export type SendSheetProps = {
   trigger?: ReactNode | null;
