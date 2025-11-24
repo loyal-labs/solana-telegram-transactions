@@ -16,10 +16,17 @@ import {
   useSignal,
   viewport,
 } from '@telegram-apps/sdk-react';
-import { ArrowDown, ArrowUp, Check, Clock, Copy, RefreshCw, Search } from 'lucide-react';
+import { 
+  ArrowDown, 
+  ArrowUp, 
+  Clock, 
+  Copy, 
+  RefreshCw, 
+  Wallet,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import React from 'react';
 
-import LightRays from '@/components/LightRays';
 import ReceiveSheet from '@/components/wallet/ReceiveSheet';
 import SendSheet, { isValidSolanaAddress, isValidTelegramUsername } from '@/components/wallet/SendSheet';
 import TransactionDetailsSheet from '@/components/wallet/TransactionDetailsSheet';
@@ -75,21 +82,16 @@ type IncomingTransaction = {
   username: string;
 };
 
-// Commented out - Quick Send feature not yet complete
-// const QUICK_SEND_CONTACTS = [
-//   { id: '1', name: 'Alice', initials: 'AL' },
-//   { id: '2', name: 'Bob', initials: 'BO' },
-//   { id: '3', name: 'Carol', initials: 'CA' },
-//   { id: '4', name: 'Dave', initials: 'DA' },
-//   { id: '5', name: 'Eve', initials: 'EV' },
-// ];
-
-// Commented out - Placeholder transactions
-// const MOCK_TRANSACTIONS = [
-//   { id: '1', name: 'Received from Alice', date: 'Today', amount: 0.5, type: 'receive' },
-//   { id: '2', name: 'Sent to Bob', date: 'Yesterday', amount: -0.25, type: 'send' },
-//   { id: '3', name: 'Received from Carol', date: 'Jan 15, 2025', amount: 1.0, type: 'receive' },
-// ];
+function ActionButton({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick: () => void }) {
+    return (
+        <button onClick={onClick} className="flex flex-col items-center gap-2 group">
+            <div className="w-14 h-14 rounded-2xl bg-zinc-800/80 border border-zinc-700/50 text-white flex items-center justify-center transition-all group-active:scale-95 group-hover:bg-zinc-700 group-hover:border-zinc-600 shadow-xl backdrop-blur-sm">
+                {React.cloneElement(icon as React.ReactElement, { size: 24, strokeWidth: 1.5 })}
+            </div>
+            <span className="text-xs text-zinc-400 font-medium tracking-wide group-hover:text-zinc-300 transition-colors">{label}</span>
+        </button>
+    )
+}
 
 export default function Home() {
   const rawInitData = useRawInitData();
@@ -754,380 +756,172 @@ export default function Home() {
 
   return (
     <>
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
-        .mono {
-          font-family: 'JetBrains Mono', monospace;
-        }
-
-        @keyframes particle-float {
-          0%, 100% { transform: translate(0, 0); opacity: 0.3; }
-          50% { transform: translate(10px, -10px); opacity: 0.6; }
-        }
-
-        @keyframes glow-pulse {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 0.8; }
-        }
-
-        .particle {
-          animation: particle-float 3s ease-in-out infinite;
-        }
-
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
-
-      <main className="relative min-h-screen overflow-hidden" style={{
-        background: '#0a0a0a',
-      }}>
-        {/* Animated background rays */}
-        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 1, opacity: 0.3 }}>
-          <LightRays
-            raysOrigin="top-center"
-            raysColor="#6366f1"
-            raysSpeed={0.8}
-            lightSpread={0.8}
-            rayLength={2.5}
-            followMouse={false}
-            noiseAmount={0.1}
-            distortion={0.05}
-            fadeDistance={1.2}
-            saturation={0.6}
-          />
+      <main className="min-h-screen bg-black text-white font-sans selection:bg-indigo-500/30 overflow-hidden">
+        {/* Abstract Background */}
+        <div className="fixed inset-0 z-0 pointer-events-none">
+             <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-indigo-500/10 blur-[120px] animate-pulse" style={{ animationDuration: '8s' }} />
+             <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-500/5 blur-[100px]" />
         </div>
 
-        {/* Subtle texture overlay */}
-        <div
-          className="fixed inset-0 opacity-[0.025] pointer-events-none"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }}
-        />
+        <div className="relative z-10 px-5 pt-6 pb-24 max-w-md mx-auto flex flex-col min-h-screen" style={{ paddingTop: `${(safeAreaInsetTop || 0) + 24}px` }}>
+            
+            {/* Header / Balance */}
+            <div className="flex flex-col items-center justify-center py-6 space-y-8">
+                 {/* Balance Display */}
+                 <div className="text-center space-y-3 scale-100 transition-transform active:scale-95 duration-200">
+                    <p className="text-zinc-500 text-xs font-semibold tracking-widest uppercase">Total Balance</p>
+                    {isLoading ? (
+                        <div className="h-16 w-48 bg-zinc-900/50 animate-pulse rounded-2xl mx-auto" />
+                    ) : (
+                        <div className="flex flex-col items-center">
+                            <h1 className="text-6xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-400">
+                                ${formatUsdValue(balance)}
+                            </h1>
+                            <div className="flex items-center space-x-2 mt-3 px-4 py-1.5 rounded-full bg-zinc-900/60 border border-zinc-800/60 backdrop-blur-md">
+                                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                <span className="text-zinc-300 text-sm font-mono tracking-tight">{formatBalance(balance)} SOL</span>
+                            </div>
+                        </div>
+                    )}
+                 </div>
 
-        <div className="relative z-0 px-5 pb-28" style={{ paddingTop: `${(safeAreaInsetTop || 0) + 8}px` }}>
-          {/* Header - empty space for visual balance */}
-          <div className="mb-3 h-4" />
-
-          {/* Balance - hero with radial glow and particles */}
-          <div className="relative mb-10">
-            {/* Radial glow effect behind balance */}
-            <div
-              className="absolute left-0 top-8 w-64 h-64 rounded-full pointer-events-none"
-              style={{
-                background: 'radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%)',
-                filter: 'blur(40px)',
-                animation: 'glow-pulse 4s ease-in-out infinite',
-              }}
-            />
-
-            {/* Floating particles */}
-            <div className="absolute top-0 right-0 pointer-events-none">
-              <div className="particle" style={{ animationDelay: '0s' }}>
-                <div className="w-1 h-1 rounded-full bg-white/20" />
-              </div>
+                 {/* Action Buttons */}
+                 <div className="flex items-center justify-center gap-6 w-full">
+                    <ActionButton icon={<ArrowUp />} label="Send" onClick={() => handleOpenSendSheet()} />
+                    <ActionButton icon={<ArrowDown />} label="Receive" onClick={handleOpenReceiveSheet} />
+                    <ActionButton icon={<Copy />} label="Copy" onClick={() => {
+                        if (walletAddress) {
+                            if (navigator?.clipboard?.writeText) {
+                                navigator.clipboard.writeText(walletAddress);
+                            }
+                            if (hapticFeedback.notificationOccurred.isAvailable()) {
+                                hapticFeedback.notificationOccurred('success');
+                            }
+                        }
+                    }} />
+                    <ActionButton 
+                        icon={<RefreshCw className={isRefreshing ? "animate-spin" : ""} />} 
+                        label="Refresh" 
+                        onClick={handleRefresh} 
+                    />
+                 </div>
             </div>
-            <div className="absolute top-12 right-16 pointer-events-none">
-              <div className="particle" style={{ animationDelay: '0.5s' }}>
-                <div className="w-1.5 h-1.5 rounded-full bg-white/15" />
-              </div>
-            </div>
-            <div className="absolute top-20 right-32 pointer-events-none">
-              <div className="particle" style={{ animationDelay: '1s' }}>
-                <div className="w-1 h-1 rounded-full bg-white/25" />
-              </div>
-            </div>
 
-            <div className="relative">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-white/40 text-xs uppercase tracking-[0.2em] font-medium">Total Balance</p>
-                <button
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-white/[0.12] active:scale-95 disabled:opacity-50"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                  }}
-                  aria-label="Refresh"
-                >
-                  <RefreshCw className={`w-4 h-4 text-white/60 ${isRefreshing ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-              {isLoading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 border-2 border-white/10 border-t-white/30 rounded-full animate-spin" />
-                  <span className="text-white/50 text-2xl font-semibold mono">Loading...</span>
-                </div>
-              ) : (
-                <>
-                  <h1 className="text-white text-5xl font-bold tracking-tighter mb-1.5 mono" style={{
-                    textShadow: '0 0 40px rgba(255, 255, 255, 0.1)',
+            {/* Wallet Address Card (Compact) */}
+             <div className="w-full bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-4 mb-8 flex items-center justify-between backdrop-blur-md hover:bg-zinc-900/60 transition-colors cursor-pointer group"
+                  onClick={() => {
+                      if (walletAddress) {
+                          if (navigator?.clipboard?.writeText) {
+                              navigator.clipboard.writeText(walletAddress);
+                          }
+                          if (hapticFeedback.notificationOccurred.isAvailable()) {
+                              hapticFeedback.notificationOccurred('success');
+                          }
+                      }
                   }}>
-                    ${formatUsdValue(balance)}
-                  </h1>
-                  <p className="text-white/30 text-sm mono">{formatBalance(balance)} SOL</p>
-                </>
-              )}
-            </div>
-          </div>
-
-          
-          {/* Quick Send - Commented out until feature is complete */}
-          {/* <div className="relative mb-8"> */}
-            {/* Decorative dotted line */}
-            {/* <div className="absolute left-0 top-0 w-8 h-px" style={{
-              backgroundImage: 'repeating-linear-gradient(90deg, rgba(255,255,255,0.2) 0px, rgba(255,255,255,0.2) 2px, transparent 2px, transparent 6px)',
-            }} /> */}
-
-            {/* <div className="flex items-center justify-between mb-4">
-              <h2 className="text-white/90 text-sm font-medium tracking-wide">Quick Send</h2>
-              <button
-                onClick={() => handleOpenSendSheet()}
-                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-white/[0.08]"
-                style={{ background: 'rgba(255, 255, 255, 0.04)' }}
-              >
-                <svg className="w-3.5 h-3.5 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
-            </div> */}
-
-            {/* <div className="flex space-x-3 overflow-x-auto pb-1 scrollbar-hide">
-              {QUICK_SEND_CONTACTS.map((contact, idx) => (
-                <button
-                  key={contact.id}
-                  onClick={() => handleOpenSendSheet(contact.name)}
-                  className="flex flex-col items-center flex-shrink-0 group"
-                >
-                  <div
-                    className="relative w-12 h-12 rounded-xl flex items-center justify-center text-white/70 font-medium text-xs mb-1.5 transition-all group-hover:scale-105 group-hover:bg-white/[0.08]"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1px solid rgba(255, 255, 255, 0.06)',
-                      animationDelay: `${idx * 0.1}s`,
-                    }}
-                  >
-                    {contact.initials} */}
-                    {/* Corner accent */}
-                    {/* <div className="absolute top-0 right-0 w-2 h-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-1 h-1 rounded-full bg-indigo-400" style={{
-                        boxShadow: '0 0 6px rgba(99, 102, 241, 0.6)',
-                      }} />
+                <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 border border-indigo-500/20 flex items-center justify-center">
+                        <Wallet className="w-5 h-5 text-indigo-400" />
                     </div>
-                  </div>
-                  <span className="text-white/40 text-[11px] tracking-wide">{contact.name}</span>
-                </button>
-              ))}
-            </div>
-          </div> */}
-
-          {/* Wallet Card - THE focal card with stacking */}
-          <div className="relative mb-8" style={{ perspective: '1000px' }}>
-            <div
-              className="rounded-3xl p-5 shadow-2xl"
-              style={{
-                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-              }}
-            >
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <p className="text-white/30 text-[10px] uppercase tracking-[0.15em] mb-1.5 font-medium">Address</p>
-                  <p className="text-white/80 mono text-xs">{formatAddress(walletAddress)}</p>
+                    <div>
+                        <p className="text-white font-medium text-sm group-hover:text-indigo-300 transition-colors">Solana Wallet</p>
+                        <p className="text-zinc-500 text-xs font-mono">{formatAddress(walletAddress)}</p>
+                    </div>
                 </div>
-                <button
-                  onClick={async () => {
-                    if (hapticFeedback.impactOccurred.isAvailable()) {
-                      hapticFeedback.impactOccurred('light');
-                    }
-                    if (walletAddress && navigator?.clipboard?.writeText) {
-                      await navigator.clipboard.writeText(walletAddress);
-                    }
-                  }}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:bg-white/[0.12] active:scale-95"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                  }}
-                >
-                  <Copy className="w-4 h-4 text-white/60" />
-                </button>
-              </div>
-
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-white/30 text-[10px] uppercase tracking-[0.15em] mb-1.5 font-medium">Balance</p>
-                  <p className="text-white text-xl font-bold mono">{formatBalance(balance)} SOL</p>
+                <div className="p-2 rounded-lg bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Copy className="w-4 h-4 text-white/60" />
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <div className="w-1 h-1 rounded-full bg-emerald-400" style={{
-                    boxShadow: '0 0 4px rgba(16, 185, 129, 0.6)',
-                  }} />
-                  <span className="text-white/30 text-[10px] tracking-wide">Devnet</span>
-                </div>
-              </div>
             </div>
 
-            {/* Stacked shadows */}
-            <div
-              className="absolute top-2 left-2 right-2 h-full rounded-3xl -z-10"
-              style={{
-                background: 'rgba(255, 255, 255, 0.04)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-              }}
-            />
-            <div
-              className="absolute top-4 left-4 right-4 h-full rounded-3xl -z-20"
-              style={{
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.04)',
-              }}
-            />
-          </div>
-
-          {/* Transactions - asymmetric layout with accent bar */}
-          <div className="relative">
-            {/* Decorative accent bar */}
-            <div className="absolute -left-5 top-0 bottom-0 w-px" style={{
-              background: 'linear-gradient(to bottom, transparent 0%, rgba(99, 102, 241, 0.3) 20%, rgba(99, 102, 241, 0.3) 80%, transparent 100%)',
-            }} />
-
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-white/90 text-sm font-medium tracking-wide">Transactions</h2>
-                <div className="w-12 h-px mt-1.5" style={{
-                  backgroundImage: 'repeating-linear-gradient(90deg, rgba(255,255,255,0.15) 0px, rgba(255,255,255,0.15) 2px, transparent 2px, transparent 6px)',
-                }} />
-              </div>
-              {/* Commented out - Transaction history page not yet designed */}
-              {/* <button className="text-white/40 text-xs hover:text-white/60 transition-colors">See all →</button> */}
-            </div>
-
-            {/* Transactions list */}
-            {incomingTransactions.length === 0 && outgoingTransactions.length === 0 ? (
-              // Empty state
-              <div className="flex flex-col items-center justify-center pt-6 pb-12 px-4">
-                <div
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.06)',
-                  }}
-                >
-                  <Search className="w-6 h-6 text-white/30" strokeWidth={1.5} />
+            {/* Transactions List */}
+            <div className="flex-1 flex flex-col">
+                <div className="flex items-center justify-between mb-4 px-1">
+                    <h3 className="text-lg font-bold text-white tracking-tight">Activity</h3>
                 </div>
-                <p className="text-white/30 text-sm tracking-wide">Your transactions will appear here</p>
-              </div>
-            ) : (
-              <div className="space-y-2 pb-4">
-                {/* Incoming transactions */}
-                {incomingTransactions.map((transaction) => {
-                  const isClaiming = claimingTransactionId === transaction.id;
-                  return (
-                    <div
-                      key={transaction.id}
-                      onClick={() => !isClaiming && handleOpenTransactionDetails(transaction)}
-                      className={`rounded-xl px-3 py-2.5 transition-all ${isClaiming ? 'cursor-not-allowed opacity-75' : 'hover:bg-white/[0.02] cursor-pointer'}`}
-                      style={{
-                        background: 'rgba(99, 102, 241, 0.04)',
-                        border: '1px solid rgba(99, 102, 241, 0.12)',
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
-                            background: 'rgba(99, 102, 241, 0.1)',
-                          }}>
-                            <ArrowDown className="w-4 h-4 text-indigo-400" />
-                          </div>
-                          <div>
-                            <p className="text-white text-sm font-medium mono">
-                              +{formatTransactionAmount(transaction.amountLamports)} SOL
-                            </p>
-                            <p className="text-white/40 text-[11px] mono">
-                              from {formatSenderAddress(transaction.sender)}
-                            </p>
-                          </div>
+                
+                <div className="space-y-3 pb-safe">
+                    {/* Empty State */}
+                    {incomingTransactions.length === 0 && outgoingTransactions.length === 0 && !isLoading && (
+                        <div className="flex flex-col items-center justify-center py-12 text-zinc-600 space-y-4">
+                            <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center">
+                                <Clock className="w-8 h-8 opacity-50" />
+                            </div>
+                            <p className="text-sm font-medium">No recent activity</p>
                         </div>
+                    )}
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleApproveTransaction(transaction.id);
-                          }}
-                          disabled={claimingTransactionId === transaction.id}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-emerald-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                          style={{
-                            background: 'rgba(16, 185, 129, 0.1)',
-                            border: '1px solid rgba(16, 185, 129, 0.3)',
-                            color: 'rgb(52, 211, 153)',
-                          }}
-                        >
-                          {claimingTransactionId === transaction.id ? (
-                            <div className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            'Claim'
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                    {/* Incoming */}
+                    {incomingTransactions.map((transaction) => {
+                         const isClaiming = claimingTransactionId === transaction.id;
+                         return (
+                            <div
+                                key={transaction.id}
+                                onClick={() => !isClaiming && handleOpenTransactionDetails(transaction)}
+                                className={`group flex items-center justify-between p-3 rounded-2xl bg-zinc-900/30 border border-zinc-800/50 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all cursor-pointer ${isClaiming ? 'opacity-60 pointer-events-none' : ''}`}
+                            >
+                                <div className="flex items-center space-x-4">
+                                    <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+                                        <ArrowDown className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center space-x-2">
+                                            <p className="text-white font-semibold text-sm">Received</p>
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">NEW</span>
+                                        </div>
+                                        <p className="text-zinc-500 text-xs mono">from {formatSenderAddress(transaction.sender)}</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-emerald-400 font-bold text-sm">+{formatTransactionAmount(transaction.amountLamports)} SOL</p>
+                                    {isClaiming ? (
+                                        <span className="text-xs text-zinc-500 animate-pulse">Claiming...</span>
+                                    ) : (
+                                        <span className="text-xs text-zinc-500">Tap to claim</span>
+                                    )}
+                                </div>
+                            </div>
+                         );
+                    })}
 
-                {/* Outgoing transactions */}
-                {outgoingTransactions.map((transaction) => {
-                  const isPending = transaction.type === 'pending';
-                  return (
-                    <div
-                      key={transaction.id}
-                      className="rounded-xl px-3 py-2.5"
-                      style={{
-                        background: isPending ? 'rgba(251, 191, 36, 0.04)' : 'rgba(255, 255, 255, 0.02)',
-                        border: isPending ? '1px solid rgba(251, 191, 36, 0.12)' : '1px solid rgba(255, 255, 255, 0.06)',
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
-                            background: isPending ? 'rgba(251, 191, 36, 0.1)' : 'rgba(255, 255, 255, 0.04)',
-                          }}>
-                            {isPending ? (
-                              <Clock className="w-4 h-4 text-amber-400" />
-                            ) : (
-                              <ArrowUp className="w-4 h-4 text-white/40" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-white text-sm font-medium mono">
-                              -{formatTransactionAmount(transaction.amountLamports)} SOL
-                            </p>
-                            <p className="text-white/40 text-[11px] mono">
-                              to {transaction.recipient?.startsWith('@')
-                                ? transaction.recipient
-                                : formatSenderAddress(transaction.recipient || '')}
-                            </p>
-                          </div>
-                        </div>
+                    {/* Outgoing */}
+                    {outgoingTransactions.map((transaction) => {
+                         const isPending = transaction.type === 'pending';
+                         return (
+                            <div
+                                key={transaction.id}
+                                className={`flex items-center justify-between p-3 rounded-2xl border ${
+                                    isPending 
+                                    ? 'bg-amber-500/5 border-amber-500/20' 
+                                    : 'bg-zinc-900/30 border-zinc-800/50'
+                                }`}
+                            >
+                                <div className="flex items-center space-x-4">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                        isPending ? 'bg-amber-500/10 text-amber-500' : 'bg-zinc-800 text-zinc-400'
+                                    }`}>
+                                        {isPending ? <Clock className="w-5 h-5 animate-pulse" /> : <ArrowUp className="w-5 h-5" />}
+                                    </div>
+                                    <div>
+                                        <p className="text-white font-semibold text-sm">{isPending ? 'Sending...' : 'Sent'}</p>
+                                        <p className="text-zinc-500 text-xs mono">to {
+                                            transaction.recipient?.startsWith('@')
+                                            ? transaction.recipient
+                                            : formatSenderAddress(transaction.recipient || '')
+                                        }</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-white font-bold text-sm">-{formatTransactionAmount(transaction.amountLamports)} SOL</p>
+                                    <p className="text-xs text-zinc-500">{
+                                        new Date(transaction.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                    }</p>
+                                </div>
+                            </div>
+                         );
+                    })}
+                </div>
+            </div>
 
-                        <span className={`text-[10px] uppercase tracking-wider font-medium ${isPending ? 'text-amber-400/70' : 'text-white/30'}`}>
-                          {isPending ? 'To claim' : 'Sent'}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </div>
       </main>
 
