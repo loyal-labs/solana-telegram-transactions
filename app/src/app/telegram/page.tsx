@@ -91,7 +91,7 @@ function ActionButton({ icon, label, onClick, colorClass = "text-white" }: { ico
             <div className="absolute inset-0 bg-indigo-500/20 rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div className="relative w-16 h-16 rounded-3xl bg-gradient-to-br from-[#2a2a2a] to-[#1a1a1a] border-t border-white/10 shadow-[0_8px_20px_-8px_rgba(0,0,0,0.6)] flex items-center justify-center transition-all duration-300 group-active:scale-90 group-hover:-translate-y-1 group-hover:shadow-[0_12px_24px_-8px_rgba(99,102,241,0.3)] z-10">
                 <div className={`transition-colors duration-300 group-hover:text-indigo-400 ${colorClass}`}>
-                    {React.cloneElement(icon as React.ReactElement, { size: 26, strokeWidth: 1.5 })}
+                    {React.cloneElement(icon as React.ReactElement<{ size?: number; strokeWidth?: number }>, { size: 26, strokeWidth: 1.5 })}
                 </div>
             </div>
             <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider group-hover:text-indigo-300 transition-colors z-10">{label}</span>
@@ -138,6 +138,7 @@ export default function Home() {
     recipient: "",
   });
   const [isSendingTransaction, setIsSendingTransaction] = useState(false);
+  const [displayCurrency, setDisplayCurrency] = useState<'USD' | 'SOL'>('USD');
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(secondaryButton.setParams.isAvailable);
@@ -838,10 +839,18 @@ export default function Home() {
             {/* Header / Balance */}
             <div className="flex flex-col items-center justify-center py-8 space-y-10 relative perspective-1000">
                  {/* Balance Display with Glow */}
-                 <div className="text-center space-y-2 relative group cursor-default">
+                 <button
+                    onClick={() => {
+                        if (hapticFeedback.impactOccurred.isAvailable()) {
+                            hapticFeedback.impactOccurred('light');
+                        }
+                        setDisplayCurrency(prev => prev === 'USD' ? 'SOL' : 'USD');
+                    }}
+                    className="text-center space-y-2 relative group cursor-pointer active:scale-[0.98] transition-transform"
+                 >
                     {/* Glow behind numbers */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-32 bg-indigo-500/10 blur-[60px] rounded-full group-hover:bg-indigo-500/20 transition-all duration-700" />
-                    
+
                     <div className="relative flex items-center justify-center space-x-2 mb-4">
                         <div className="h-[1px] w-8 bg-gradient-to-r from-transparent to-white/20" />
                         <p className="text-indigo-200/60 text-[10px] font-bold tracking-[0.2em] uppercase">Total Balance</p>
@@ -853,19 +862,24 @@ export default function Home() {
                     ) : (
                         <div className="flex flex-col items-center">
                             <h1 className="text-[3.5rem] leading-none font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-zinc-500 drop-shadow-2xl">
-                                ${formatUsdValue(balance)}
+                                {displayCurrency === 'USD' ? `$${formatUsdValue(balance)}` : formatBalance(balance)}
                             </h1>
-                            
-                            {/* Crypto Pill */}
-                            <div className="mt-4 flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-zinc-900/80 border border-zinc-800 backdrop-blur-md shadow-lg transform transition-transform hover:scale-105">
+                            {displayCurrency === 'SOL' && (
+                                <span className="text-xl text-zinc-500 font-medium -mt-1">SOL</span>
+                            )}
+
+                            {/* Secondary currency pill */}
+                            <div className="mt-4 flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-zinc-900/80 border border-zinc-800 backdrop-blur-md shadow-lg transform transition-transform group-hover:scale-105">
                                 <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-emerald-400 to-emerald-600 flex items-center justify-center shadow-inner">
                                     <Sparkles className="w-3 h-3 text-white" fill="white" />
                                 </div>
-                                <span className="text-zinc-200 text-sm font-mono font-medium tracking-tight">{formatBalance(balance)} SOL</span>
+                                <span className="text-zinc-200 text-sm font-mono font-medium tracking-tight">
+                                    {displayCurrency === 'USD' ? `${formatBalance(balance)} SOL` : `$${formatUsdValue(balance)}`}
+                                </span>
                             </div>
                         </div>
                     )}
-                 </div>
+                 </button>
 
                  {/* Action Buttons Row */}
                  <div className="grid grid-cols-3 gap-4 w-full px-2">
