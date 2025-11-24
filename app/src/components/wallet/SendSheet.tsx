@@ -1,18 +1,19 @@
 "use client";
+
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import {
   ArrowLeft,
   ChevronRight,
   Delete,
-  Search,
-  Wallet,
-  X,
   RefreshCw,
+  Search,
+  Send,
   User,
-  Send
+  Wallet,
+  X
 } from "lucide-react";
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 
 export type SendSheetProps = {
   trigger?: ReactNode | null;
@@ -21,7 +22,6 @@ export type SendSheetProps = {
   initialRecipient?: string;
   onValidationChange?: (isValid: boolean) => void;
   onFormValuesChange?: (values: { amount: string; recipient: string }) => void;
-  showErrors?: boolean;
   step: 1 | 2 | 3;
   onStepChange: (step: 1 | 2 | 3) => void;
 };
@@ -96,7 +96,6 @@ export default function SendSheet({
   initialRecipient,
   onValidationChange,
   onFormValuesChange,
-  showErrors,
   step,
   onStepChange,
 }: SendSheetProps) {

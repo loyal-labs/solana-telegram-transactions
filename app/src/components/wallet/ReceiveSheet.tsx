@@ -1,14 +1,6 @@
 "use client";
 
 import {
-  Button,
-  Modal,
-  VisuallyHidden,
-} from "@telegram-apps/telegram-ui";
-import { Icon28Close } from "@telegram-apps/telegram-ui/dist/icons/28/close";
-import { Drawer } from "@xelene/vaul-with-scroll-fix";
-import { Copy, Check } from "lucide-react";
-import {
   type CSSProperties,
   type ReactNode,
   useCallback,
@@ -16,6 +8,14 @@ import {
   useMemo,
   useState,
 } from "react";
+import {
+  Button,
+  Modal,
+  VisuallyHidden,
+} from "@telegram-apps/telegram-ui";
+import { Icon28Close } from "@telegram-apps/telegram-ui/dist/icons/28/close";
+import { Drawer } from "@xelene/vaul-with-scroll-fix";
+import { Check, Copy } from "lucide-react";
 
 import { getWalletPublicKey } from "@/lib/solana/wallet/wallet-details";
 

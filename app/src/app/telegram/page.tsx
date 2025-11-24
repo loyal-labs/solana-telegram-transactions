@@ -55,8 +55,7 @@ import {
   hideMainButton,
   hideSecondaryButton,
   showMainButton,
-  showReceiveShareButton,
-  showWalletHomeButtons
+  showReceiveShareButton
 } from "@/lib/telegram/buttons";
 import {
   cleanInitData,
@@ -163,7 +162,6 @@ export default function Home() {
     setSelectedTransaction
   ] = useState<IncomingTransaction | null>(null);
   const [isSendFormValid, setIsSendFormValid] = useState(false);
-  const [sendAttempted, setSendAttempted] = useState(false);
   const [isClaimingTransaction, setIsClaimingTransaction] = useState(false);
   const [claimingTransactionId, setClaimingTransactionId] = useState<
     string | null
@@ -197,7 +195,6 @@ export default function Home() {
       setSelectedRecipient("");
       setSendFormValues({ amount: "", recipient: "" });
     }
-    setSendAttempted(false); // Reset error state when opening
     setSendSheetOpen(true);
   }, []);
 
@@ -238,7 +235,6 @@ export default function Home() {
     if (!open) {
       setSendStep(1); // Reset step when closing
       setSelectedRecipient("");
-      setSendAttempted(false);
       setSendFormValues({ amount: "", recipient: "" });
     }
   }, []);
@@ -308,7 +304,6 @@ export default function Home() {
   }, [isRefreshing, rawInitData, refreshWalletBalance]);
 
   const handleSubmitSend = useCallback(async () => {
-    setSendAttempted(true);
     if (!isSendFormValid || isSendingTransaction) {
       return;
     }
@@ -375,7 +370,6 @@ export default function Home() {
 
       setSendSheetOpen(false);
       setSelectedRecipient("");
-      setSendAttempted(false);
       setSendFormValues({ amount: "", recipient: "" });
     } catch (error) {
       console.error("Failed to send transaction", error);
@@ -1193,7 +1187,6 @@ export default function Home() {
         initialRecipient={selectedRecipient}
         onValidationChange={handleSendValidationChange}
         onFormValuesChange={handleSendFormValuesChange}
-        showErrors={sendAttempted}
         step={sendStep}
         onStepChange={setSendStep}
       />
