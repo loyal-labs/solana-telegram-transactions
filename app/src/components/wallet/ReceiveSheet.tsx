@@ -7,6 +7,7 @@ import {
 } from "@telegram-apps/telegram-ui";
 import { Icon28Close } from "@telegram-apps/telegram-ui/dist/icons/28/close";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
+import { Copy, Check } from "lucide-react";
 import {
   type CSSProperties,
   type ReactNode,
@@ -27,6 +28,21 @@ export type ReceiveSheetProps = {
 const DEFAULT_TRIGGER = <Button size="m">Receive</Button>;
 
 const COPIED_RESET_TIMEOUT = 2000;
+
+// Shared styles for tactile surfaces
+const surfaceRaised: CSSProperties = {
+  background: "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)",
+  border: "1px solid rgba(255, 255, 255, 0.1)",
+  borderBottomColor: "rgba(0, 0, 0, 0.2)",
+  boxShadow: "0 1px 0 0 rgba(255,255,255,0.05) inset, 0 -1px 0 0 rgba(0,0,0,0.1) inset, 0 4px 12px -2px rgba(0,0,0,0.4), 0 2px 4px -1px rgba(0,0,0,0.2)",
+};
+
+const surfaceInset: CSSProperties = {
+  background: "rgba(0, 0, 0, 0.2)",
+  border: "1px solid rgba(0, 0, 0, 0.3)",
+  borderTopColor: "rgba(0, 0, 0, 0.4)",
+  boxShadow: "0 1px 0 0 rgba(255,255,255,0.03), 0 2px 8px -2px rgba(0,0,0,0.5) inset",
+};
 
 export default function ReceiveSheet({
   trigger,
@@ -105,7 +121,7 @@ export default function ReceiveSheet({
   const modalStyle = useMemo(
     () =>
       ({
-        "--tgui--bg_color": "#0a0a0a",
+        "--tgui--bg_color": "transparent",
         "--tgui--divider": "rgba(255, 255, 255, 0.04)",
       }) as CSSProperties,
     [],
@@ -122,13 +138,13 @@ export default function ReceiveSheet({
         <Modal.Header
           after={
             <Modal.Close aria-label="Close receive sheet">
-              <Icon28Close style={{ color: "rgba(255, 255, 255, 0.6)" }} />
+              <Icon28Close style={{ color: "rgba(255, 255, 255, 0.5)" }} />
             </Modal.Close>
           }
           style={{
-            background: "#0a0a0a",
+            background: "linear-gradient(180deg, #1c1f26 0%, #151820 100%)",
             color: "rgba(255, 255, 255, 0.9)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.04)"
+            borderBottom: "1px solid rgba(255, 255, 255, 0.06)"
           }}
         >
           Receive
@@ -137,8 +153,8 @@ export default function ReceiveSheet({
     >
       <div
         style={{
-          backgroundColor: "#0a0a0a",
-          padding: "20px 16px",
+          background: "linear-gradient(180deg, #151820 0%, #0d0e12 100%)",
+          padding: "24px 20px 32px",
         }}
       >
         <Drawer.Title asChild>
@@ -151,68 +167,75 @@ export default function ReceiveSheet({
             maxWidth: 420,
           }}
         >
+          {/* Wallet Address Section */}
           <div>
             <label style={{
               display: "block",
               color: "rgba(255, 255, 255, 0.4)",
               fontSize: "11px",
               textTransform: "uppercase",
-              letterSpacing: "0.15em",
-              marginBottom: "8px",
+              letterSpacing: "0.1em",
+              marginBottom: "10px",
               fontWeight: 500
             }}>
-              Wallet Address
+              Your Wallet Address
             </label>
+
+            {/* Address display - inset/recessed surface */}
             <div style={{
-              padding: "16px",
-              background: "rgba(255, 255, 255, 0.04)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              ...surfaceInset,
+              padding: "14px 16px",
               borderRadius: "12px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "12px"
+              marginBottom: "16px",
             }}>
               <p style={{
-                color: "rgba(255, 255, 255, 0.8)",
+                color: "rgba(255, 255, 255, 0.7)",
                 fontSize: "13px",
                 fontFamily: "'JetBrains Mono', monospace",
                 wordBreak: "break-all",
-                flex: 1,
-                margin: 0
+                margin: 0,
+                lineHeight: 1.5,
               }}>
                 {displayAddress}
               </p>
-              <button
-                onClick={copyAddress}
-                disabled={!address || isLoading}
-                style={{
-                  padding: "8px 16px",
-                  background: copied ? "rgba(16, 185, 129, 0.15)" : "rgba(99, 102, 241, 0.15)",
-                  border: copied ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(99, 102, 241, 0.3)",
-                  borderRadius: "8px",
-                  color: copied ? "rgba(16, 185, 129, 0.9)" : "rgba(99, 102, 241, 0.9)",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  cursor: address && !isLoading ? "pointer" : "not-allowed",
-                  opacity: address && !isLoading ? 1 : 0.5,
-                  transition: "all 0.2s",
-                  whiteSpace: "nowrap"
-                }}
-                onMouseEnter={(e) => {
-                  if (address && !isLoading && !copied) {
-                    e.currentTarget.style.background = "rgba(99, 102, 241, 0.25)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!copied) {
-                    e.currentTarget.style.background = "rgba(99, 102, 241, 0.15)";
-                  }
-                }}
-              >
-                {copied ? "✓ Copied" : "Copy"}
-              </button>
             </div>
+
+            {/* Copy button - tactile raised surface */}
+            <button
+              onClick={copyAddress}
+              disabled={!address || isLoading}
+              style={{
+                ...surfaceRaised,
+                width: "100%",
+                padding: "14px 20px",
+                borderRadius: "12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                color: copied ? "rgba(16, 185, 129, 1)" : "rgba(255, 255, 255, 0.9)",
+                fontSize: "15px",
+                fontWeight: 600,
+                cursor: address && !isLoading ? "pointer" : "not-allowed",
+                opacity: address && !isLoading ? 1 : 0.5,
+                background: copied
+                  ? "linear-gradient(180deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.1) 100%)"
+                  : surfaceRaised.background,
+                borderColor: copied ? "rgba(16, 185, 129, 0.3)" : "rgba(255, 255, 255, 0.1)",
+              }}
+            >
+              {copied ? (
+                <>
+                  <Check size={18} strokeWidth={2.5} />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy size={18} strokeWidth={2} />
+                  Copy Address
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>

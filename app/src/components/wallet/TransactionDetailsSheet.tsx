@@ -4,6 +4,7 @@ import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Icon28Close } from "@telegram-apps/telegram-ui/dist/icons/28/close";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
+import { ArrowDown } from "lucide-react";
 import {
   type CSSProperties,
   type ReactNode,
@@ -21,6 +22,14 @@ export type TransactionDetailsSheetProps = {
   } | null;
 };
 
+// Inset surface for display-only content
+const surfaceInset: CSSProperties = {
+  background: "rgba(0, 0, 0, 0.2)",
+  border: "1px solid rgba(0, 0, 0, 0.3)",
+  borderTopColor: "rgba(0, 0, 0, 0.4)",
+  boxShadow: "0 1px 0 0 rgba(255,255,255,0.03), 0 2px 8px -2px rgba(0,0,0,0.5) inset",
+};
+
 export default function TransactionDetailsSheet({
   trigger,
   open,
@@ -30,7 +39,7 @@ export default function TransactionDetailsSheet({
   const modalStyle = useMemo(
     () =>
       ({
-        "--tgui--bg_color": "#0a0a0a",
+        "--tgui--bg_color": "transparent",
         "--tgui--divider": "rgba(255, 255, 255, 0.04)",
       }) as CSSProperties,
     [],
@@ -39,6 +48,8 @@ export default function TransactionDetailsSheet({
   if (!transaction) {
     return null;
   }
+
+  const formattedAmount = (transaction.amountLamports / LAMPORTS_PER_SOL).toFixed(4);
 
   return (
     <Modal
@@ -51,23 +62,23 @@ export default function TransactionDetailsSheet({
         <Modal.Header
           after={
             <Modal.Close aria-label="Close transaction details">
-              <Icon28Close style={{ color: "rgba(255, 255, 255, 0.6)" }} />
+              <Icon28Close style={{ color: "rgba(255, 255, 255, 0.5)" }} />
             </Modal.Close>
           }
           style={{
-            background: "#0a0a0a",
+            background: "linear-gradient(180deg, #1c1f26 0%, #151820 100%)",
             color: "rgba(255, 255, 255, 0.9)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.04)"
+            borderBottom: "1px solid rgba(255, 255, 255, 0.06)"
           }}
         >
-          Incoming Transaction
+          Claim Transaction
         </Modal.Header>
       }
     >
       <div
         style={{
-          backgroundColor: "#0a0a0a",
-          padding: "20px 16px",
+          background: "linear-gradient(180deg, #151820 0%, #0d0e12 100%)",
+          padding: "24px 20px 32px",
         }}
       >
         <Drawer.Title asChild>
@@ -78,65 +89,66 @@ export default function TransactionDetailsSheet({
             width: "100%",
             margin: "0 auto",
             maxWidth: 420,
-            display: "flex",
-            flexDirection: "column",
-            gap: 20,
           }}
         >
-          {/* Amount */}
-          <div>
-            <label style={{
-              display: "block",
-              color: "rgba(255, 255, 255, 0.4)",
-              fontSize: "11px",
-              textTransform: "uppercase",
-              letterSpacing: "0.15em",
-              marginBottom: "8px",
-              fontWeight: 500
-            }}>
-              Amount
-            </label>
+          {/* Amount Hero Section */}
+          <div style={{
+            textAlign: "center",
+            marginBottom: "28px",
+          }}>
             <div style={{
-              padding: "16px",
-              background: "rgba(255, 255, 255, 0.04)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "12px",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "56px",
+              height: "56px",
+              borderRadius: "16px",
+              background: "linear-gradient(180deg, rgba(16,185,129,0.15) 0%, rgba(16,185,129,0.08) 100%)",
+              border: "1px solid rgba(16, 185, 129, 0.25)",
+              marginBottom: "16px",
             }}>
-              <p
-                style={{
-                  color: "rgba(255, 255, 255, 0.9)",
-                  fontSize: "20px",
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontWeight: "bold",
-                  margin: 0,
-                }}
-              >
-                {(transaction.amountLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL
-              </p>
+              <ArrowDown size={28} color="rgba(16, 185, 129, 1)" strokeWidth={2} />
             </div>
+            <p style={{
+              color: "rgba(16, 185, 129, 1)",
+              fontSize: "32px",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontWeight: 600,
+              margin: 0,
+              letterSpacing: "-0.02em",
+            }}>
+              +{formattedAmount} SOL
+            </p>
+            <p style={{
+              color: "rgba(255, 255, 255, 0.4)",
+              fontSize: "13px",
+              marginTop: "6px",
+              margin: "6px 0 0 0",
+            }}>
+              Ready to claim
+            </p>
           </div>
 
-          {/* Sender Address */}
+          {/* Sender Address - inset surface */}
           <div>
             <label style={{
               display: "block",
               color: "rgba(255, 255, 255, 0.4)",
               fontSize: "11px",
               textTransform: "uppercase",
-              letterSpacing: "0.15em",
-              marginBottom: "8px",
+              letterSpacing: "0.1em",
+              marginBottom: "10px",
               fontWeight: 500
             }}>
               From
             </label>
             <div style={{
-              padding: "16px",
-              background: "rgba(255, 255, 255, 0.04)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              ...surfaceInset,
+              padding: "14px 16px",
               borderRadius: "12px",
             }}>
               <p style={{
-                color: "rgba(255, 255, 255, 0.8)",
+                color: "rgba(255, 255, 255, 0.7)",
                 fontSize: "13px",
                 fontFamily: "'JetBrains Mono', monospace",
                 wordBreak: "break-all",
@@ -147,6 +159,8 @@ export default function TransactionDetailsSheet({
               </p>
             </div>
           </div>
+
+
         </div>
       </div>
     </Modal>

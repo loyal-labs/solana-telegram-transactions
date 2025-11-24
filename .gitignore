@@ -23,6 +23,8 @@
 /out/
 /app/.next/
 /app/out/
+/frontend/.next/
+/frontend/out/
 
 # production
 /build
@@ -31,6 +33,8 @@
 # misc
 .DS_Store
 *.pem
+/frontend/refs/
+.claude/
 
 # debug
 npm-debug.log*
