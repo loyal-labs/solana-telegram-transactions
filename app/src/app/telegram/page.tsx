@@ -16,14 +16,13 @@ import {
   useSignal,
   viewport,
 } from '@telegram-apps/sdk-react';
-import { 
-  ArrowDown, 
-  ArrowUp, 
-  Clock, 
-  Copy, 
-  RefreshCw, 
+import {
+  ArrowDown,
+  ArrowUp,
+  Clock,
+  Copy,
+  RefreshCw,
   Wallet,
-  Sparkles
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import React from 'react';
@@ -82,19 +81,18 @@ type IncomingTransaction = {
   username: string;
 };
 
-function ActionButton({ icon, label, onClick, colorClass = "text-white" }: { icon: React.ReactNode, label: string, onClick: () => void, colorClass?: string }) {
+function ActionButton({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick: () => void }) {
     return (
-        <button 
-            onClick={onClick} 
-            className="flex flex-col items-center gap-3 group relative"
+        <button
+            onClick={onClick}
+            className="flex flex-col items-center gap-2.5 group"
         >
-            <div className="absolute inset-0 bg-indigo-500/20 rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative w-16 h-16 rounded-3xl bg-gradient-to-br from-[#2a2a2a] to-[#1a1a1a] border-t border-white/10 shadow-[0_8px_20px_-8px_rgba(0,0,0,0.6)] flex items-center justify-center transition-all duration-300 group-active:scale-90 group-hover:-translate-y-1 group-hover:shadow-[0_12px_24px_-8px_rgba(99,102,241,0.3)] z-10">
-                <div className={`transition-colors duration-300 group-hover:text-indigo-400 ${colorClass}`}>
-                    {React.cloneElement(icon as React.ReactElement<{ size?: number; strokeWidth?: number }>, { size: 26, strokeWidth: 1.5 })}
+            <div className="relative w-14 h-14 rounded-2xl surface-raised flex items-center justify-center">
+                <div className="text-zinc-300 group-hover:text-white group-active:text-zinc-400">
+                    {React.cloneElement(icon as React.ReactElement<{ size?: number; strokeWidth?: number }>, { size: 22, strokeWidth: 2 })}
                 </div>
             </div>
-            <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider group-hover:text-indigo-300 transition-colors z-10">{label}</span>
+            <span className="text-xs font-medium text-zinc-500 group-hover:text-zinc-300">{label}</span>
         </button>
     )
 }
@@ -788,57 +786,73 @@ export default function Home() {
   return (
     <>
       <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
         .mono { font-family: 'JetBrains Mono', monospace; }
-        
-        .glass-card {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
-            border-left: 1px solid rgba(255, 255, 255, 0.04);
-            box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.4);
-        }
-        
-        .glass-highlight {
-            position: absolute;
-            inset: 0;
-            border-radius: inherit;
-            pointer-events: none;
-            background: linear-gradient(120deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 70%);
-            background-size: 200% 100%;
-            animation: shine 4s infinite linear;
+
+        /* Tactile raised surface - feels like you can touch it */
+        .surface-raised {
+            background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom-color: rgba(0, 0, 0, 0.2);
+            box-shadow:
+                0 1px 0 0 rgba(255,255,255,0.05) inset,
+                0 -1px 0 0 rgba(0,0,0,0.1) inset,
+                0 4px 12px -2px rgba(0,0,0,0.4),
+                0 2px 4px -1px rgba(0,0,0,0.2);
         }
 
-        @keyframes shine {
-            from { background-position: 200% 0; }
-            to { background-position: -200% 0; }
+        .surface-raised:active {
+            background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%);
+            box-shadow:
+                0 1px 0 0 rgba(255,255,255,0.03) inset,
+                0 1px 2px 0 rgba(0,0,0,0.2);
+            transform: translateY(1px);
+        }
+
+        /* Inset/recessed surface - feels sunken into the page */
+        .surface-inset {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(0, 0, 0, 0.3);
+            border-top-color: rgba(0, 0, 0, 0.4);
+            box-shadow:
+                0 1px 0 0 rgba(255,255,255,0.03),
+                0 2px 8px -2px rgba(0,0,0,0.5) inset;
+        }
+
+        /* Card surface - subtle lift */
+        .surface-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-bottom-color: rgba(0, 0, 0, 0.15);
+            box-shadow:
+                0 1px 0 0 rgba(255,255,255,0.04) inset,
+                0 4px 16px -4px rgba(0,0,0,0.5);
+        }
+
+        .text-gradient {
+            background: linear-gradient(180deg, #ffffff 0%, #a1a1aa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
       `}</style>
       
-      <main className="min-h-screen bg-[#050505] text-white font-sans selection:bg-indigo-500/30 overflow-hidden relative">
-        {/* Dynamic Abstract Background */}
-        <div className="fixed inset-0 z-0 pointer-events-none">
-             {/* Main top gradient */}
-             <div className="absolute top-[-20%] left-0 right-0 h-[80%] bg-gradient-to-b from-[#1a1a2e] via-[#050505] to-[#050505] opacity-80" />
-             
-             {/* Colorful Orbs */}
-             <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-600/10 blur-[100px] animate-pulse" style={{ animationDuration: '6s' }} />
-             <div className="absolute top-[10%] right-[-20%] w-[50%] h-[50%] rounded-full bg-purple-600/10 blur-[100px] animate-pulse" style={{ animationDuration: '8s', animationDelay: '1s' }} />
-             <div className="absolute bottom-[-10%] left-[20%] w-[60%] h-[40%] rounded-full bg-emerald-900/10 blur-[120px]" />
-             
-             {/* Grid Texture */}
-             <div className="absolute inset-0 opacity-[0.03]" style={{ 
-                backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', 
-                backgroundSize: '40px 40px' 
+      <main className="min-h-screen text-white font-sans selection:bg-teal-500/30 overflow-hidden relative">
+        {/* Deep Background with Gradient */}
+        <div className="fixed inset-0 z-0 pointer-events-none" style={{
+            background: 'linear-gradient(180deg, #1c1f26 0%, #111318 35%, #0a0b0d 100%)'
+        }}>
+             {/* Noise texture for surface feel */}
+             <div className="absolute inset-0 opacity-[0.03]" style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
              }} />
         </div>
 
         <div className="relative z-10 px-6 pt-6 pb-24 max-w-md mx-auto flex flex-col min-h-screen" style={{ paddingTop: `${(safeAreaInsetTop || 0) + 16}px` }}>
             
-            {/* Header / Balance */}
-            <div className="flex flex-col items-center justify-center py-8 space-y-10 relative perspective-1000">
-                 {/* Balance Display with Glow */}
+            {/* Balance Section */}
+            <div className="flex flex-col items-center pt-8 pb-6">
+                 {/* Balance Display */}
                  <button
                     onClick={() => {
                         if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -846,162 +860,144 @@ export default function Home() {
                         }
                         setDisplayCurrency(prev => prev === 'USD' ? 'SOL' : 'USD');
                     }}
-                    className="text-center space-y-2 relative group cursor-pointer active:scale-[0.98] transition-transform"
+                    className="text-center relative group cursor-pointer active:scale-[0.98] transition-transform"
                  >
-                    {/* Glow behind numbers */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-32 bg-indigo-500/10 blur-[60px] rounded-full group-hover:bg-indigo-500/20 transition-all duration-700" />
-
-                    <div className="relative flex items-center justify-center space-x-2 mb-4">
-                        <div className="h-[1px] w-8 bg-gradient-to-r from-transparent to-white/20" />
-                        <p className="text-indigo-200/60 text-[10px] font-bold tracking-[0.2em] uppercase">Total Balance</p>
-                        <div className="h-[1px] w-8 bg-gradient-to-l from-transparent to-white/20" />
-                    </div>
+                    <p className="text-zinc-500 text-xs font-medium tracking-wide uppercase mb-3">Balance</p>
 
                     {isLoading ? (
-                        <div className="h-20 w-56 bg-white/5 animate-pulse rounded-2xl mx-auto backdrop-blur-sm" />
+                        <div className="h-16 w-48 bg-white/5 animate-pulse rounded-xl mx-auto" />
                     ) : (
                         <div className="flex flex-col items-center">
-                            <h1 className="text-[3.5rem] leading-none font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-zinc-500 drop-shadow-2xl">
-                                {displayCurrency === 'USD' ? `$${formatUsdValue(balance)}` : formatBalance(balance)}
+                            <h1 className="text-5xl font-semibold tracking-tight text-gradient">
+                                {displayCurrency === 'USD' ? `$${formatUsdValue(balance)}` : `${formatBalance(balance)} SOL`}
                             </h1>
-                            {displayCurrency === 'SOL' && (
-                                <span className="text-xl text-zinc-500 font-medium -mt-1">SOL</span>
-                            )}
 
-                            {/* Secondary currency pill */}
-                            <div className="mt-4 flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-zinc-900/80 border border-zinc-800 backdrop-blur-md shadow-lg transform transition-transform group-hover:scale-105">
-                                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-emerald-400 to-emerald-600 flex items-center justify-center shadow-inner">
-                                    <Sparkles className="w-3 h-3 text-white" fill="white" />
-                                </div>
-                                <span className="text-zinc-200 text-sm font-mono font-medium tracking-tight">
-                                    {displayCurrency === 'USD' ? `${formatBalance(balance)} SOL` : `$${formatUsdValue(balance)}`}
-                                </span>
-                            </div>
+                            {/* Secondary currency */}
+                            <p className="mt-2 text-sm text-zinc-500 font-mono">
+                                {displayCurrency === 'USD' ? `${formatBalance(balance)} SOL` : `$${formatUsdValue(balance)}`}
+                            </p>
                         </div>
                     )}
                  </button>
-
-                 {/* Action Buttons Row */}
-                 <div className="grid grid-cols-3 gap-4 w-full px-2">
-                    <ActionButton icon={<ArrowUp />} label="Send" onClick={() => handleOpenSendSheet()} />
-                    <ActionButton icon={<ArrowDown />} label="Receive" onClick={handleOpenReceiveSheet} />
-                    <ActionButton 
-                        icon={<RefreshCw className={isRefreshing ? "animate-spin" : ""} />} 
-                        label="Refresh" 
-                        onClick={handleRefresh} 
-                    />
-                 </div>
             </div>
 
-            {/* Wallet Address Card - Glassmorphism */}
-             <div className="glass-card w-full rounded-2xl p-4 mb-10 flex items-center justify-between hover:bg-white/[0.04] transition-all cursor-pointer group relative overflow-hidden"
-                  onClick={() => {
-                      if (walletAddress) {
-                          if (navigator?.clipboard?.writeText) {
-                              navigator.clipboard.writeText(walletAddress);
-                          }
-                          if (hapticFeedback.notificationOccurred.isAvailable()) {
-                              hapticFeedback.notificationOccurred('success');
-                          }
-                      }
-                  }}>
-                <div className="glass-highlight" />
-                <div className="flex items-center space-x-4 relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 border border-indigo-400/20 flex items-center justify-center shadow-[0_0_15px_-3px_rgba(99,102,241,0.3)]">
-                        <Wallet className="w-6 h-6 text-indigo-400" />
+            {/* Action Buttons */}
+            <div className="surface-inset rounded-2xl p-5 mb-6">
+                <div className="flex justify-around">
+                    <ActionButton icon={<ArrowUp />} label="Send" onClick={() => handleOpenSendSheet()} />
+                    <ActionButton icon={<ArrowDown />} label="Receive" onClick={handleOpenReceiveSheet} />
+                    <ActionButton
+                        icon={<RefreshCw className={isRefreshing ? "animate-spin" : ""} />}
+                        label="Refresh"
+                        onClick={handleRefresh}
+                    />
+                </div>
+            </div>
+
+            {/* Wallet Address Card */}
+            <div
+                className="surface-card rounded-xl p-3.5 mb-6 flex items-center justify-between cursor-pointer group transition-all duration-150 hover:brightness-105 active:brightness-95 active:scale-[0.99]"
+                onClick={() => {
+                    if (walletAddress) {
+                        if (navigator?.clipboard?.writeText) {
+                            navigator.clipboard.writeText(walletAddress);
+                        }
+                        if (hapticFeedback.notificationOccurred.isAvailable()) {
+                            hapticFeedback.notificationOccurred('success');
+                        }
+                    }
+                }}
+            >
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shadow-sm">
+                        <Wallet className="w-5 h-5 text-teal-400" />
                     </div>
                     <div>
-                        <p className="text-indigo-100 font-medium text-sm group-hover:text-white transition-colors">Solana Wallet</p>
-                        <p className="text-zinc-500 text-xs font-mono tracking-wide group-hover:text-zinc-400 transition-colors">{formatAddress(walletAddress)}</p>
+                        <p className="text-white/90 font-medium text-sm">Wallet</p>
+                        <p className="text-zinc-500 text-xs font-mono">{formatAddress(walletAddress)}</p>
                     </div>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                    <Copy className="w-4 h-4 text-white/80" />
-                </div>
+                <Copy className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
             </div>
 
             {/* Transactions List */}
-            <div className="flex-1 flex flex-col relative">
-                <div className="flex items-center justify-between mb-5 px-1">
-                    <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                        Activity
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                    </h3>
+            <div className="flex-1 flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wide">Activity</h3>
                 </div>
-                
-                <div className="space-y-3 pb-safe relative">
-                     {/* Connecting Line */}
-                     {/* <div className="absolute left-[27px] top-4 bottom-4 w-[2px] bg-zinc-800/50 -z-10" /> */}
 
+                <div className="space-y-2.5 pb-safe">
                     {/* Empty State */}
                     {incomingTransactions.length === 0 && outgoingTransactions.length === 0 && !isLoading && (
-                        <div className="glass-card flex flex-col items-center justify-center py-12 rounded-2xl space-y-4">
-                            <div className="w-16 h-16 rounded-full bg-zinc-900/50 flex items-center justify-center border border-zinc-800">
-                                <Clock className="w-8 h-8 text-zinc-600" />
-                            </div>
-                            <p className="text-zinc-500 text-sm font-medium">No recent activity</p>
+                        <div className="surface-inset flex flex-col items-center justify-center py-16 rounded-xl">
+                            <Clock className="w-8 h-8 text-zinc-600 mb-3" />
+                            <p className="text-zinc-500 text-sm">No activity yet</p>
                         </div>
                     )}
 
                     {/* Incoming */}
-                    {incomingTransactions.map((transaction, idx) => {
+                    {incomingTransactions.map((transaction) => {
                          const isClaiming = claimingTransactionId === transaction.id;
                          return (
                             <div
                                 key={transaction.id}
                                 onClick={() => !isClaiming && handleOpenTransactionDetails(transaction)}
-                                className={`group flex items-center justify-between p-3.5 rounded-2xl bg-[#0a0a0a] border border-zinc-800/60 hover:border-zinc-700 hover:bg-zinc-900 transition-all cursor-pointer shadow-sm relative overflow-hidden ${isClaiming ? 'opacity-60 pointer-events-none' : ''}`}
-                                style={{ animationDelay: `${idx * 100}ms` }}
+                                className={`flex items-center justify-between p-3.5 rounded-xl cursor-pointer transition-all duration-150 hover:brightness-105 active:brightness-95 active:scale-[0.99] ${isClaiming ? 'opacity-60 pointer-events-none' : ''}`}
+                                style={{
+                                    background: 'linear-gradient(180deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.06) 100%)',
+                                    border: '1px solid rgba(16,185,129,0.2)',
+                                    borderBottomColor: 'rgba(0,0,0,0.15)',
+                                    boxShadow: '0 1px 0 0 rgba(16,185,129,0.1) inset, 0 4px 12px -4px rgba(0,0,0,0.4)'
+                                }}
                             >
-                                <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                
-                                <div className="flex items-center space-x-4 relative z-10">
-                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-emerald-900/20 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform shadow-[0_4px_12px_-4px_rgba(16,185,129,0.3)]">
-                                        <ArrowDown className="w-5 h-5" strokeWidth={2.5} />
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shadow-sm">
+                                        <ArrowDown className="w-5 h-5 text-emerald-400" strokeWidth={2} />
                                     </div>
                                     <div>
-                                        <div className="flex items-center space-x-2">
-                                            <p className="text-emerald-100 font-semibold text-sm group-hover:text-emerald-50 transition-colors">Received</p>
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-bold tracking-wider">NEW</span>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-white/90 font-medium text-sm">Received</p>
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/25 text-emerald-300 font-medium">Claim</span>
                                         </div>
-                                        <p className="text-zinc-500 text-xs mono mt-0.5 group-hover:text-zinc-400">from {formatSenderAddress(transaction.sender)}</p>
+                                        <p className="text-zinc-400 text-xs mono">from {formatSenderAddress(transaction.sender)}</p>
                                     </div>
                                 </div>
-                                <div className="text-right relative z-10">
-                                    <p className="text-emerald-400 font-bold text-sm tracking-tight">+{formatTransactionAmount(transaction.amountLamports)} SOL</p>
-                                    {isClaiming ? (
-                                        <span className="text-xs text-zinc-500 animate-pulse font-medium">Claiming...</span>
-                                    ) : (
-                                        <span className="text-xs text-indigo-400/80 font-medium group-hover:text-indigo-400 transition-colors">Tap to claim</span>
+                                <div className="text-right">
+                                    <p className="text-emerald-400 font-semibold text-sm">+{formatTransactionAmount(transaction.amountLamports)} SOL</p>
+                                    {isClaiming && (
+                                        <span className="text-xs text-zinc-500 animate-pulse">Claiming...</span>
                                     )}
                                 </div>
                             </div>
                          );
                     })}
 
-                    {/* Outgoing */}
-                    {outgoingTransactions.map((transaction, idx) => {
+                    {/* Outgoing - non-interactive, flat/recessed style */}
+                    {outgoingTransactions.map((transaction) => {
                          const isPending = transaction.type === 'pending';
                          return (
                             <div
                                 key={transaction.id}
-                                className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
-                                    isPending 
-                                    ? 'bg-amber-950/10 border-amber-900/30' 
-                                    : 'bg-[#0a0a0a] border-zinc-800/60'
+                                className={`flex items-center justify-between p-3.5 rounded-xl ${
+                                    isPending
+                                    ? 'bg-amber-500/[0.06] border border-amber-500/10'
+                                    : 'bg-white/[0.02] border border-white/[0.04]'
                                 }`}
                             >
-                                <div className="flex items-center space-x-4">
-                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg border ${
-                                        isPending 
-                                        ? 'bg-amber-500/10 border-amber-500/20 text-amber-500 shadow-amber-900/20' 
-                                        : 'bg-zinc-900 border-zinc-800 text-zinc-500'
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                        isPending
+                                        ? 'bg-amber-500/10 text-amber-400'
+                                        : 'bg-white/[0.04] text-zinc-500'
                                     }`}>
-                                        {isPending ? <Clock className="w-5 h-5 animate-pulse" /> : <ArrowUp className="w-5 h-5" strokeWidth={2.5} />}
+                                        {isPending
+                                            ? <Clock className="w-5 h-5 animate-pulse" />
+                                            : <ArrowUp className="w-5 h-5" strokeWidth={2} />
+                                        }
                                     </div>
                                     <div>
-                                        <p className="text-white font-semibold text-sm">{isPending ? 'Sending...' : 'Sent'}</p>
-                                        <p className="text-zinc-500 text-xs mono mt-0.5">to {
+                                        <p className="text-white/70 font-medium text-sm">{isPending ? 'Sending...' : 'Sent'}</p>
+                                        <p className="text-zinc-600 text-xs mono">to {
                                             transaction.recipient?.startsWith('@')
                                             ? transaction.recipient
                                             : formatSenderAddress(transaction.recipient || '')
@@ -1009,8 +1005,8 @@ export default function Home() {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-white font-bold text-sm tracking-tight">-{formatTransactionAmount(transaction.amountLamports)} SOL</p>
-                                    <p className="text-xs text-zinc-600 font-medium">{
+                                    <p className="text-white/60 font-medium text-sm">-{formatTransactionAmount(transaction.amountLamports)} SOL</p>
+                                    <p className="text-xs text-zinc-600">{
                                         new Date(transaction.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                                     }</p>
                                 </div>
