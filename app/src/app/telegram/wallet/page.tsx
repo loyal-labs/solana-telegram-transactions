@@ -175,12 +175,16 @@ function ScanIcon({ className }: { className?: string }) {
 export default function Home() {
   const rawInitData = useRawInitData();
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
-  const [sendStep, setSendStep] = useState<1 | 2 | 3>(1);
+  const [sendStep, setSendStep] = useState<1 | 2 | 3 | 4>(1);
+  const [sentAmountSol, setSentAmountSol] = useState<number | undefined>(undefined);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [isReceiveSheetOpen, setReceiveSheetOpen] = useState(false);
   const [
     isTransactionDetailsSheetOpen,
     setTransactionDetailsSheetOpen
   ] = useState(false);
+  const [showClaimSuccess, setShowClaimSuccess] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [starsBalance, setStarsBalance] = useState<number>(1267); // Mock Stars balance
@@ -321,6 +325,8 @@ export default function Home() {
       setSendStep(1); // Reset step when closing
       setSelectedRecipient("");
       setSendFormValues({ amount: "", recipient: "" });
+      setSentAmountSol(undefined); // Reset sent amount
+      setSendError(null); // Reset send error
     }
   }, []);
 
@@ -453,9 +459,12 @@ export default function Home() {
         hapticFeedback.notificationOccurred("success");
       }
 
-      setSendSheetOpen(false);
-      setSelectedRecipient("");
-      setSendFormValues({ amount: "", recipient: "" });
+      // Calculate and save the sent amount in SOL for the success screen
+      const sentSolAmount = lamports / LAMPORTS_PER_SOL;
+      setSentAmountSol(sentSolAmount);
+
+      // Transition to success step instead of closing
+      setSendStep(4);
     } catch (error) {
       console.error("Failed to send transaction", error);
       // Remove failed pending transaction
@@ -463,6 +472,11 @@ export default function Home() {
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred("error");
       }
+
+      // Set error message and transition to step 4
+      const errorMessage = error instanceof Error ? error.message : "Something went wrong. Please try again.";
+      setSendError(errorMessage);
+      setSendStep(4);
     } finally {
       setIsSendingTransaction(false);
     }
@@ -488,6 +502,8 @@ export default function Home() {
     if (!open) {
       setSelectedTransaction(null);
       setSelectedIncomingTransaction(null);
+      setShowClaimSuccess(false); // Reset claim success state
+      setClaimError(null); // Reset claim error state
     }
   }, []);
 
@@ -618,14 +634,17 @@ export default function Home() {
           hapticFeedback.notificationOccurred("success");
         }
 
-        setTransactionDetailsSheetOpen(false);
-        setSelectedTransaction(null);
-        setSelectedIncomingTransaction(null);
+        // Show success state instead of closing
+        setShowClaimSuccess(true);
       } catch (error) {
         console.error("Failed to claim transaction", error);
         if (hapticFeedback.notificationOccurred.isAvailable()) {
           hapticFeedback.notificationOccurred("error");
         }
+
+        // Set error message and show error state
+        const errorMessage = error instanceof Error ? error.message : "Something went wrong. Please try again.";
+        setClaimError(errorMessage);
       } finally {
         setIsClaimingTransaction(false);
         setClaimingTransactionId(null);
@@ -865,8 +884,23 @@ export default function Home() {
 
     if (isTransactionDetailsSheetOpen && selectedTransaction) {
       hideSecondaryButton();
-      // Only show Claim button for incoming (claimable) transactions
-      if (selectedIncomingTransaction) {
+
+      // Show "Done" button on claim success or error
+      if (showClaimSuccess || claimError) {
+        showMainButton({
+          text: "Done",
+          onClick: () => {
+            setTransactionDetailsSheetOpen(false);
+            setSelectedTransaction(null);
+            setSelectedIncomingTransaction(null);
+            setShowClaimSuccess(false);
+            setClaimError(null);
+          },
+          isEnabled: true,
+          showLoader: false
+        });
+      } else if (selectedIncomingTransaction) {
+        // Only show Claim button for incoming (claimable) transactions
         if (isClaimingTransaction) {
           // Show only main button with loader during claim
           showMainButton({
@@ -907,13 +941,52 @@ export default function Home() {
           isEnabled: isSendFormValid,
           showLoader: false
         });
-      } else {
+      } else if (sendStep === 3) {
         showMainButton({
           text: "Confirm and Send",
           onClick: handleSubmitSend,
           isEnabled: isSendFormValid && !isSendingTransaction,
           showLoader: isSendingTransaction
         });
+      } else if (sendStep === 4) {
+        if (sendError) {
+          // Error step - show Done button to close
+          showMainButton({
+            text: "Done",
+            onClick: () => {
+              setSendSheetOpen(false);
+            },
+            isEnabled: true,
+            showLoader: false
+          });
+        } else {
+          // Success step - show Transaction details button
+          showMainButton({
+            text: "Transaction details",
+            onClick: () => {
+              // Close send sheet and open transaction details
+              setSendSheetOpen(false);
+              // Create transaction details for the just-sent transaction
+              if (sentAmountSol && sendFormValues.recipient) {
+                const trimmedRecipient = sendFormValues.recipient.trim();
+                const detailsData: TransactionDetailsData = {
+                  id: `sent-${Date.now()}`,
+                  type: "outgoing",
+                  amountLamports: Math.round(sentAmountSol * LAMPORTS_PER_SOL),
+                  recipient: trimmedRecipient,
+                  recipientUsername: trimmedRecipient.startsWith("@") ? trimmedRecipient : undefined,
+                  status: "completed",
+                  timestamp: Date.now(),
+                };
+                setSelectedTransaction(detailsData);
+                setSelectedIncomingTransaction(null);
+                setTransactionDetailsSheetOpen(true);
+              }
+            },
+            isEnabled: true,
+            showLoader: false
+          });
+        }
       }
     } else if (isReceiveSheetOpen) {
       hideSecondaryButton();
@@ -943,7 +1016,12 @@ export default function Home() {
     handleShareAddress,
     handleApproveTransaction,
     handleSubmitSend,
-    sendStep
+    sendStep,
+    sentAmountSol,
+    sendFormValues,
+    showClaimSuccess,
+    claimError,
+    sendError
   ]);
 
   const formatBalance = (lamports: number | null): string => {
@@ -1000,6 +1078,9 @@ export default function Home() {
             ) : (
               <button
                 onClick={() => {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
                   if (walletAddress) {
                     if (navigator?.clipboard?.writeText) {
                       navigator.clipboard.writeText(walletAddress);
@@ -1024,8 +1105,8 @@ export default function Home() {
             <div className="flex flex-col items-center gap-1.5 mt-1.5">
               <button
                 onClick={() => {
-                  if (hapticFeedback.impactOccurred.isAvailable()) {
-                    hapticFeedback.impactOccurred("light");
+                  if (hapticFeedback.selectionChanged.isAvailable()) {
+                    hapticFeedback.selectionChanged();
                   }
                   setDisplayCurrency(prev => (prev === "USD" ? "SOL" : "USD"));
                 }}
@@ -1454,6 +1535,8 @@ export default function Home() {
         walletAddress={walletAddress ?? undefined}
         starsBalance={starsBalance}
         onTopUpStars={handleTopUpStars}
+        sentAmountSol={sentAmountSol}
+        sendError={sendError}
       />
       <ReceiveSheet
         open={isReceiveSheetOpen}
@@ -1466,6 +1549,8 @@ export default function Home() {
         onOpenChange={handleTransactionDetailsSheetChange}
         trigger={null}
         transaction={selectedTransaction}
+        showSuccess={showClaimSuccess}
+        showError={claimError}
       />
     </>
   );

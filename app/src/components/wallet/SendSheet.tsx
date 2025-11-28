@@ -1,5 +1,6 @@
 "use client";
 
+import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import {
@@ -279,11 +280,17 @@ export default function SendSheet({
 
 
   const handleRecipientSelect = (selected: string) => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
     setRecipient(selected);
     onStepChange(2);
   };
 
   const handlePresetAmount = (val: number | string) => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
     // Ensure we set a clean string value
     const strVal = typeof val === 'string' ? val : val.toString();
     setAmountStr(strVal);
@@ -356,7 +363,12 @@ export default function SendSheet({
           {/* Back Button - only for steps 2 and 3 */}
           {(step === 2 || step === 3) && (
             <button
-              onClick={() => onStepChange((step - 1) as 1 | 2)}
+              onClick={() => {
+                if (hapticFeedback.impactOccurred.isAvailable()) {
+                  hapticFeedback.impactOccurred("light");
+                }
+                onStepChange((step - 1) as 1 | 2);
+              }}
               className="absolute left-2 p-1.5 text-white/60 hover:text-white rounded-full bg-white/5 active:scale-95 active:bg-white/10 transition-all duration-150"
             >
               <ArrowLeft size={22} strokeWidth={1.5} />
@@ -449,6 +461,11 @@ export default function SendSheet({
           {/* Close Button */}
           <Modal.Close>
             <div
+              onClick={() => {
+                if (hapticFeedback.impactOccurred.isAvailable()) {
+                  hapticFeedback.impactOccurred("light");
+                }
+              }}
               className="absolute right-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 active:bg-white/10 transition-all duration-150 cursor-pointer"
               style={{
                 background: "rgba(255, 255, 255, 0.06)",
@@ -513,6 +530,9 @@ export default function SendSheet({
               {/* Choose Contact Button */}
               <button
                 onClick={() => {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
                   // TODO: Implement contact picker
                   console.log("Choose contact clicked");
                 }}
@@ -683,6 +703,9 @@ export default function SendSheet({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (hapticFeedback.selectionChanged.isAvailable()) {
+                        hapticFeedback.selectionChanged();
+                      }
                       // Convert the amount when switching
                       if (amountStr) {
                         const val = parseFloat(amountStr);
@@ -894,7 +917,14 @@ export default function SendSheet({
                       <div className="flex items-center pl-3 pr-4">
                         {/* Clickable area for selection (dimmed when insufficient) */}
                         <button
-                          onClick={() => hasEnoughStarsForFee && setFeePaymentMethod('stars')}
+                          onClick={() => {
+                            if (hasEnoughStarsForFee) {
+                              if (hapticFeedback.selectionChanged.isAvailable()) {
+                                hapticFeedback.selectionChanged();
+                              }
+                              setFeePaymentMethod('stars');
+                            }
+                          }}
                           disabled={!hasEnoughStarsForFee}
                           className={`flex items-center flex-1 transition-opacity ${
                             !hasEnoughStarsForFee ? 'opacity-40 cursor-not-allowed' : ''
@@ -924,6 +954,9 @@ export default function SendSheet({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (hapticFeedback.impactOccurred.isAvailable()) {
+                                hapticFeedback.impactOccurred("light");
+                              }
                               onTopUpStars();
                             }}
                             className="px-3 py-1.5 rounded-full text-sm text-white leading-5 active:opacity-80 transition-opacity mr-3"
@@ -942,7 +975,12 @@ export default function SendSheet({
 
                       {/* SOL Row */}
                       <button
-                        onClick={() => setFeePaymentMethod('solana')}
+                        onClick={() => {
+                          if (hapticFeedback.selectionChanged.isAvailable()) {
+                            hapticFeedback.selectionChanged();
+                          }
+                          setFeePaymentMethod('solana');
+                        }}
                         className="flex items-center pl-3 pr-4"
                       >
                         {/* Icon */}

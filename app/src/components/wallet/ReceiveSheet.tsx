@@ -1,5 +1,6 @@
 "use client";
 
+import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import { X } from "lucide-react";
@@ -260,6 +261,10 @@ export default function ReceiveSheet({
   const copyAddress = useCallback(async () => {
     if (!address) return;
 
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+
     try {
       if (!navigator?.clipboard?.writeText) {
         throw new Error("Clipboard API is not available");
@@ -267,13 +272,23 @@ export default function ReceiveSheet({
 
       await navigator.clipboard.writeText(address);
       setCopied(true);
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred("success");
+      }
     } catch (error) {
       console.error("Failed to copy wallet address", error);
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred("error");
+      }
     }
   }, [address]);
 
   const shareAddress = useCallback(async () => {
     if (!address) return;
+
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
 
     try {
       if (navigator?.share) {
@@ -332,6 +347,11 @@ export default function ReceiveSheet({
           {/* Close Button */}
           <Modal.Close>
             <div
+              onClick={() => {
+                if (hapticFeedback.impactOccurred.isAvailable()) {
+                  hapticFeedback.impactOccurred("light");
+                }
+              }}
               className="absolute right-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 active:bg-white/10 transition-all duration-150 cursor-pointer"
               style={{
                 background: "rgba(255, 255, 255, 0.06)",

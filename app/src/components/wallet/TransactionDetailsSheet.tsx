@@ -1,6 +1,7 @@
 "use client";
 
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import { Check, Globe, Share, ShieldAlert, X } from "lucide-react";
@@ -133,6 +134,9 @@ export default function TransactionDetailsSheet({
 
   // Handle view in explorer
   const handleViewInExplorer = () => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
     if (transaction.signature) {
       const explorerUrl = `https://explorer.solana.com/tx/${transaction.signature}?cluster=devnet`;
       window.open(explorerUrl, "_blank");
@@ -141,6 +145,10 @@ export default function TransactionDetailsSheet({
 
   // Handle share
   const handleShare = async () => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+
     const shareText = `Transaction: ${isIncoming ? "+" : "-"}${formattedAmount} SOL`;
 
     if (navigator?.share) {
@@ -154,6 +162,9 @@ export default function TransactionDetailsSheet({
       }
     } else if (navigator?.clipboard?.writeText) {
       await navigator.clipboard.writeText(shareText);
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred("success");
+      }
     }
   };
 
@@ -217,6 +228,11 @@ export default function TransactionDetailsSheet({
           {/* Close Button */}
           <Modal.Close>
             <div
+              onClick={() => {
+                if (hapticFeedback.impactOccurred.isAvailable()) {
+                  hapticFeedback.impactOccurred("light");
+                }
+              }}
               className="absolute right-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 active:bg-white/10 transition-all duration-150 cursor-pointer"
               style={{
                 background: "rgba(255, 255, 255, 0.06)",
