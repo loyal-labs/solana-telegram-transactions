@@ -2,8 +2,6 @@ import { etc, verify } from "@noble/ed25519";
 import qs from "qs";
 
 import { TELEGRAM_BOT_ID, TELEGRAM_PUBLIC_KEYS } from "../constants";
-import { fetchDeposits } from "../solana/fetch-deposits";
-import { getWalletProvider } from "../solana/wallet/wallet-details";
 
 export const cleanInitData = (initData: string) => {
   const cleanInitData = qs.parse(initData);
@@ -101,18 +99,29 @@ export const validateInitData = (
     console.log("Signature length:", signatureBytes.length);
 
     if (signatureBytes.length !== 64) {
-      console.error("Invalid signature length:", signatureBytes.length, "expected: 64");
+      console.error(
+        "Invalid signature length:",
+        signatureBytes.length,
+        "expected: 64"
+      );
       return false;
     }
 
     console.log("Testing against", TELEGRAM_PUBLIC_KEYS.length, "public keys");
 
     const result = TELEGRAM_PUBLIC_KEYS.some((publicKeyHex, index) => {
-      console.log(`Testing public key ${index + 1}/${TELEGRAM_PUBLIC_KEYS.length}:`, publicKeyHex);
+      console.log(
+        `Testing public key ${index + 1}/${TELEGRAM_PUBLIC_KEYS.length}:`,
+        publicKeyHex
+      );
       const publicKeyBytes = etc.hexToBytes(publicKeyHex);
 
       if (publicKeyBytes.length !== 32) {
-        console.error("Invalid public key length:", publicKeyBytes.length, "expected: 32");
+        console.error(
+          "Invalid public key length:",
+          publicKeyBytes.length,
+          "expected: 32"
+        );
         return false;
       }
 
