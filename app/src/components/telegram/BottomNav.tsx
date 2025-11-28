@@ -1,7 +1,13 @@
 "use client";
 
 import { hapticFeedback } from "@telegram-apps/sdk-react";
-import { Brain, LayoutGrid, User, Wallet } from "lucide-react";
+import {
+  Brain,
+  LayoutGrid,
+  MessageCircleMore,
+  User,
+  Wallet
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,6 +18,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: "/telegram/overview", icon: LayoutGrid },
+  { href: "/telegram/summaries", icon: MessageCircleMore },
   { href: "/telegram/wallet", icon: Wallet },
   { href: "/telegram/agents", icon: Brain },
   { href: "/telegram/profile", icon: User }
@@ -26,6 +33,13 @@ export default function BottomNav() {
     }
   };
 
+  // Find active index
+  const activeIndex = navItems.findIndex(
+    item =>
+      pathname === item.href ||
+      (item.href === "/telegram/wallet" && pathname === "/telegram")
+  );
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50">
       <div
@@ -35,12 +49,23 @@ export default function BottomNav() {
         }}
       >
         <div
-          className="flex items-center p-1 rounded-full overflow-hidden"
+          className="relative flex items-center p-1 rounded-full overflow-hidden"
           style={{
             background: "rgba(128, 128, 128, 0.1)",
             backdropFilter: "blur(22px)"
           }}
         >
+          {/* Sliding indicator */}
+          <div
+            className="absolute top-1 bottom-1 rounded-full transition-transform duration-300 ease-out"
+            style={{
+              width: `calc((100% - 8px) / ${navItems.length})`,
+              transform: `translateX(calc(${activeIndex} * 100%))`,
+              background: "rgba(255, 255, 255, 0.06)",
+              mixBlendMode: "lighten"
+            }}
+          />
+
           {navItems.map(item => {
             const isActive =
               pathname === item.href ||
@@ -52,15 +77,10 @@ export default function BottomNav() {
                 key={item.href}
                 href={item.href}
                 onClick={handleNavClick}
-                className={`flex-1 flex items-center justify-center py-3 rounded-full transition-all duration-150 ${
-                  isActive
-                    ? "bg-white/[0.06]"
-                    : "active:bg-white/[0.04]"
-                }`}
-                style={isActive ? { mixBlendMode: "lighten" } : undefined}
+                className="relative z-10 flex-1 flex items-center justify-center py-3 rounded-full active:bg-white/[0.04] transition-colors duration-150"
               >
                 <Icon
-                  className={`w-7 h-7 transition-colors ${
+                  className={`w-7 h-7 transition-colors duration-300 ${
                     isActive ? "text-white" : "text-white/60"
                   }`}
                   strokeWidth={1.5}

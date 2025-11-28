@@ -6,8 +6,6 @@ import {
   ArrowLeft,
   Plus,
   Search,
-  Send,
-  User,
   Wallet,
   X
 } from "lucide-react";
@@ -25,6 +23,8 @@ export type SendSheetProps = {
   onStepChange: (step: 1 | 2 | 3) => void;
   balance?: number | null; // Balance in lamports
   walletAddress?: string;
+  starsBalance?: number; // Balance in Stars
+  onTopUpStars?: () => void; // Callback when user wants to top up Stars
 };
 
 // Basic Solana address validation (base58, 32-44 chars)
@@ -50,6 +50,12 @@ const MOCK_CONTACTS = [
 const SOL_PRICE_USD = 180;
 const LAST_AMOUNT_KEY = 'lastSendAmount';
 const LAMPORTS_PER_SOL = 1_000_000_000;
+
+// Fee constants
+const SOLANA_FEE_SOL = 0.000005;
+const SOLANA_FEE_USD = SOLANA_FEE_SOL * SOL_PRICE_USD;
+const STARS_FEE_AMOUNT = 2000; // TODO: Change back to 1 Star for fee (hardcoded for testing)
+const STARS_TO_USD = 0.02; // 1 Star = $0.02
 
 type LastAmount = {
   sol: number;
@@ -106,6 +112,8 @@ export default function SendSheet({
   onStepChange,
   balance,
   walletAddress,
+  starsBalance = 0,
+  onTopUpStars,
 }: SendSheetProps) {
   // Convert balance from lamports to SOL
   const balanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
@@ -119,6 +127,7 @@ export default function SendSheet({
   const [recipient, setRecipient] = useState("");
   const [currency, setCurrency] = useState<'SOL' | 'USD'>('SOL');
   const [lastAmount, setLastAmount] = useState<LastAmount | null>(null);
+  const [feePaymentMethod, setFeePaymentMethod] = useState<'solana' | 'stars'>('solana');
   const inputRef = useRef<HTMLInputElement>(null);
   const amountInputRef = useRef<HTMLInputElement>(null);
   const amountTextRef = useRef<HTMLParagraphElement>(null);
@@ -236,16 +245,30 @@ export default function SendSheet({
     const amountInSol = currency === 'SOL' ? amount : amount / SOL_PRICE_USD;
     const hasEnoughBalance = !isNaN(amountInSol) && amountInSol <= balanceInSol;
 
-    const isValid = isAmountValid && isRecipientValid && hasEnoughBalance;
+    // For step 2, don't check fee method yet
+    if (step === 2) {
+      const isValid = isAmountValid && isRecipientValid && hasEnoughBalance;
+      onValidationChange?.(isValid);
+      return;
+    }
 
-    if (step === 2 || step === 3) {
+    // For step 3, also check if selected fee method has sufficient funds
+    if (step === 3) {
+      const hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
+      const hasEnoughStarsForFee = starsBalance >= STARS_FEE_AMOUNT;
+
+      const hasSufficientFeeBalance = feePaymentMethod === 'solana'
+        ? hasEnoughSolForFee
+        : hasEnoughStarsForFee;
+
+      const isValid = isAmountValid && isRecipientValid && hasEnoughBalance && hasSufficientFeeBalance;
       onValidationChange?.(isValid);
       return;
     }
 
     // Default to invalid for any other state
     onValidationChange?.(false);
-  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol]);
+  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, feePaymentMethod, starsBalance]);
 
 
   const handleRecipientSelect = (selected: string) => {
@@ -311,8 +334,9 @@ export default function SendSheet({
       <div
         style={{
           background: "rgba(38, 38, 38, 0.70)",
-          backdropFilter: "blur(56px)",
-          WebkitBackdropFilter: "blur(56px)",
+          backgroundBlendMode: "luminosity",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
         }}
         className="flex flex-col text-white relative overflow-hidden min-h-[500px] rounded-t-3xl"
       >
@@ -322,17 +346,11 @@ export default function SendSheet({
 
         {/* Custom Header */}
         <div className="relative h-[52px] flex items-center justify-center shrink-0">
-          {/* Drag Indicator */}
-          <div
-            className="absolute top-1 left-1/2 -translate-x-1/2 w-9 h-1 rounded-full"
-            style={{ background: "rgba(255, 255, 255, 0.1)" }}
-          />
-
           {/* Back Button */}
           {step > 1 && (
             <button
               onClick={() => onStepChange((step - 1) as 1 | 2)}
-              className="absolute left-2 p-1.5 text-white/60 hover:text-white transition-colors rounded-full bg-white/5 active:scale-95"
+              className="absolute left-2 p-1.5 text-white/60 hover:text-white rounded-full bg-white/5 active:scale-95 active:bg-white/10 transition-all duration-150"
             >
               <ArrowLeft size={22} strokeWidth={1.5} />
             </button>
@@ -383,16 +401,48 @@ export default function SendSheet({
             </div>
           )}
 
+          {/* Recipient Pill for Step 3 (same as Step 2) */}
           {step === 3 && (
-            <span className="text-base font-medium text-white tracking-[-0.176px]">
-              Review
-            </span>
+            <div
+              className="flex items-center pl-1 pr-3 py-1 rounded-[54px]"
+              style={{
+                background: "rgba(255, 255, 255, 0.06)",
+                mixBlendMode: "lighten",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+              }}
+            >
+              <div className="pr-1.5">
+                {recipient.startsWith('@') ? (
+                  /* Avatar for username */
+                  <div className="w-7 h-7 rounded-full overflow-hidden relative">
+                    <Image
+                      src="https://avatars.githubusercontent.com/u/537414?v=4"
+                      alt="Recipient"
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  /* Wallet icon for address */
+                  <div className="w-7 h-7 rounded-[16.8px] flex items-center justify-center text-white">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-60">
+                      <path d="M15.8333 5.83333V3.33333C15.8333 3.11232 15.7455 2.90036 15.5893 2.74408C15.433 2.5878 15.221 2.5 15 2.5H4.16667C3.72464 2.5 3.30072 2.67559 2.98816 2.98816C2.67559 3.30072 2.5 3.72464 2.5 4.16667C2.5 4.60869 2.67559 5.03262 2.98816 5.34518C3.30072 5.65774 3.72464 5.83333 4.16667 5.83333H16.6667C16.8877 5.83333 17.0996 5.92113 17.2559 6.07741C17.4122 6.23369 17.5 6.44565 17.5 6.66667V10M17.5 10H15C14.558 10 14.1341 10.1756 13.8215 10.4882C13.5089 10.8007 13.3333 11.2246 13.3333 11.6667C13.3333 12.1087 13.5089 12.5326 13.8215 12.8452C14.1341 13.1577 14.558 13.3333 15 13.3333H17.5C17.721 13.3333 17.933 13.2455 18.0893 13.0893C18.2455 12.933 18.3333 12.721 18.3333 12.5V10.8333C18.3333 10.6123 18.2455 10.4004 18.0893 10.2441C17.933 10.0878 17.721 10 17.5 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M2.5 4.16656V15.8332C2.5 16.2753 2.67559 16.6992 2.98816 17.0117C3.30072 17.3243 3.72464 17.4999 4.16667 17.4999H16.6667C16.8877 17.4999 17.0996 17.4121 17.2559 17.2558C17.4122 17.0995 17.5 16.8876 17.5 16.6666V13.3332" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <span className="text-sm leading-5">
+                <span className="text-white/60">Send to </span>
+                <span className="text-white">{recipient.startsWith('@') ? recipient : `${recipient.slice(0, 4)}…${recipient.slice(-4)}`}</span>
+              </span>
+            </div>
           )}
 
           {/* Close Button */}
           <Modal.Close>
             <div
-              className="absolute right-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
+              className="absolute right-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 active:bg-white/10 transition-all duration-150 cursor-pointer"
               style={{
                 background: "rgba(255, 255, 255, 0.06)",
               }}
@@ -756,79 +806,206 @@ export default function SendSheet({
 
           {/* STEP 3: CONFIRMATION */}
           <div
-            className="absolute inset-0 flex flex-col p-6 items-center overflow-y-auto transition-all duration-300 ease-out"
+            className="absolute inset-0 flex flex-col transition-all duration-300 ease-out"
             style={{
               transform: `translateX(${(3 - step) * 100}%)`,
               opacity: step === 3 ? 1 : 0,
               pointerEvents: step === 3 ? 'auto' : 'none'
             }}
           >
-                {/* No additional background - uses parent gradient */}
+            {/* Amount Display Section (same layout as Step 2, but read-only) */}
+            <div className="px-4 pt-2 pb-4">
+              <div className="px-2 flex flex-col gap-1">
+                {/* Amount Display */}
+                <div className="flex gap-2 items-baseline h-[48px]">
+                  <p className="text-[40px] font-semibold leading-[48px] text-white">
+                    {(() => {
+                      // Convert to SOL for display if needed
+                      const val = parseFloat(amountStr);
+                      if (isNaN(val)) return '0';
+                      if (currency === 'USD') {
+                        return (val / SOL_PRICE_USD).toFixed(4).replace(/\.?0+$/, '') || '0';
+                      }
+                      return amountStr || '0';
+                    })()}
+                  </p>
+                  <p className="text-[28px] font-semibold leading-8 text-white/40 tracking-[0.4px]">
+                    SOL
+                  </p>
+                </div>
+                {/* USD Conversion */}
+                <p className="text-base leading-[22px] text-white/40">
+                  {(() => {
+                    const val = parseFloat(amountStr);
+                    if (isNaN(val)) return '≈$0.00';
+                    const usdVal = currency === 'SOL' ? val * SOL_PRICE_USD : val;
+                    return `≈$${usdVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                  })()}
+                </p>
+              </div>
+            </div>
 
-                <div className="flex-1 w-full flex flex-col items-center justify-center relative z-10">
-                    {/* Icon */}
-                    <div className="w-14 h-14 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mb-5">
-                        <Send size={22} className="text-teal-400" strokeWidth={2} />
-                    </div>
+            {/* Payment Details Section */}
+            <div className="flex flex-col w-full">
+              {/* Transfer Fee Header */}
+              <div className="px-4 pt-3 pb-2">
+                <p className="text-base font-medium text-white tracking-[-0.176px]">Transfer fee</p>
+              </div>
 
-                    <h2 className="text-xl font-semibold text-white mb-1.5 tracking-tight">Review Transaction</h2>
-                    <p className="text-zinc-500 text-center mb-8 text-sm max-w-[240px]">
-                        Confirm the details below
-                    </p>
+              {/* Cards */}
+              <div className="px-4 flex flex-col gap-2">
+                {/* Transfer Fee Section */}
+                {(() => {
+                  // Calculate if user has enough balance for selected fee method
+                  const amountVal = parseFloat(amountStr);
+                  const amountInSol = isNaN(amountVal) ? 0 : (currency === 'SOL' ? amountVal : amountVal / SOL_PRICE_USD);
+                  const hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
+                  const hasEnoughStarsForFee = starsBalance >= STARS_FEE_AMOUNT;
 
-                    <div className="w-full max-w-sm">
-                        <div
-                          style={{
-                            background: "rgba(0, 0, 0, 0.15)",
-                            border: "1px solid rgba(255, 255, 255, 0.06)",
-                          }}
-                          className="rounded-xl p-5 space-y-4 relative overflow-hidden"
+                  // Check circle icons
+                  const CheckCircleOn = () => (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="12" cy="12" r="12" fill="#3F89F7"/>
+                      <path d="M6.5 12.5L10 16L17.5 8.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  );
+                  const CheckCircleOff = () => (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 0C18.6289 0 24 5.37258 24 12C24 18.6289 18.6274 24 12 24C5.37113 24 0 18.6274 0 12C0 5.37113 5.37258 0 12 0ZM12 1.5C6.20044 1.5 1.5 6.20005 1.5 12C1.5 17.7996 6.20005 22.5 12 22.5C17.7996 22.5 22.5 17.8 22.5 12C22.5 6.20044 17.8 1.5 12 1.5Z" fill="white" fillOpacity="0.1"/>
+                    </svg>
+                  );
+
+                  return (
+                    <div
+                      className="flex flex-col py-1 rounded-2xl"
+                      style={{
+                        background: "rgba(255, 255, 255, 0.06)",
+                        mixBlendMode: "lighten",
+                      }}
+                    >
+                      {/* Stars Row */}
+                      <div className="flex items-center pl-3 pr-4">
+                        {/* Clickable area for selection (dimmed when insufficient) */}
+                        <button
+                          onClick={() => hasEnoughStarsForFee && setFeePaymentMethod('stars')}
+                          disabled={!hasEnoughStarsForFee}
+                          className={`flex items-center flex-1 transition-opacity ${
+                            !hasEnoughStarsForFee ? 'opacity-40 cursor-not-allowed' : ''
+                          }`}
                         >
-                            {/* Subtle top shine */}
-                            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
-
-                            {/* Recipient Row */}
-                            <div className="flex justify-between items-center">
-                                <span className="text-zinc-600 text-sm">To</span>
-                                <div className="flex items-center gap-2.5">
-                                    <span className="text-white/90 font-mono text-sm truncate max-w-[180px]">{recipient}</span>
-                                    <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.04] flex items-center justify-center shrink-0">
-                                        {recipient.startsWith('@') ? <User size={12} className="text-zinc-500" /> : <Wallet size={12} className="text-zinc-500" />}
-                                    </div>
-                                </div>
+                          {/* Icon */}
+                          <div className="pr-3 py-1">
+                            <div
+                              className="w-10 h-10 rounded-full flex items-center justify-center"
+                              style={{ background: "rgba(255, 255, 255, 0.06)", mixBlendMode: "lighten" }}
+                            >
+                              <svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path fillRule="evenodd" clipRule="evenodd" d="M9.53309 15.7592L5.59486 18.1718C5.18536 18.4226 4.65002 18.294 4.39917 17.8845C4.27664 17.6845 4.24012 17.4435 4.29786 17.2162L4.9075 14.8167C5.12757 13.9504 5.72031 13.2264 6.52598 12.8396L10.8224 10.7768C11.0227 10.6806 11.1071 10.4403 11.0109 10.24C10.9331 10.0778 10.7569 9.98698 10.5796 10.0177L5.79718 10.8456C4.82501 11.0139 3.82807 10.7455 3.07187 10.1118L1.56105 8.84567C1.19298 8.53721 1.14465 7.98877 1.4531 7.62071C1.60313 7.44168 1.81886 7.33054 2.05172 7.31232L6.66772 6.95107C6.99383 6.92555 7.27802 6.71918 7.40322 6.41698L9.18399 2.11831C9.36778 1.67464 9.87644 1.46397 10.3201 1.64776C10.5331 1.73602 10.7024 1.90528 10.7907 2.11831L12.5714 6.41698C12.6966 6.71918 12.9808 6.92555 13.3069 6.95107L17.9483 7.31431C18.4271 7.35177 18.7848 7.77027 18.7473 8.24904C18.7293 8.47935 18.6203 8.69303 18.4446 8.84291L14.9049 11.8606C14.6555 12.0731 14.5469 12.4075 14.6235 12.7259L15.7117 17.2466C15.8241 17.7136 15.5367 18.1831 15.0699 18.2955C14.8455 18.3496 14.6089 18.3121 14.4121 18.1916L10.4416 15.7592C10.1628 15.5885 9.81183 15.5885 9.53309 15.7592Z" fill="white"/>
+                              </svg>
                             </div>
-
-                            <div className="h-px bg-white/[0.04]" />
-
-                            {/* Amount Row */}
-                            <div className="flex justify-between items-center">
-                                <span className="text-zinc-600 text-sm">Amount</span>
-                                <div className="text-right">
-                                    <div className="text-white font-semibold text-base">{amountStr} {currency}</div>
-                                    <div className="text-xs text-zinc-600">{secondaryDisplay}</div>
-                                </div>
-                            </div>
-
-                            <div className="h-px bg-white/[0.04]" />
-
-                            {/* Fee Row */}
-                            <div className="flex justify-between items-center">
-                                <span className="text-zinc-600 text-sm">Fee</span>
-                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/[0.08] border border-emerald-500/[0.08]">
-                                    <div className="w-1 h-1 rounded-full bg-emerald-500" />
-                                    <span className="text-emerald-400/90 text-xs font-semibold uppercase tracking-wide">Free</span>
-                                </div>
-                            </div>
+                          </div>
+                          {/* Text */}
+                          <div className="flex-1 flex flex-col gap-0.5 py-2.5 text-left">
+                            <p className="text-base leading-5 text-white">{STARS_FEE_AMOUNT} Stars</p>
+                            <p className="text-[13px] leading-4 text-white/60">
+                              {hasEnoughStarsForFee ? `≈ $${(STARS_FEE_AMOUNT * STARS_TO_USD).toFixed(2)}` : 'Not enough Stars'}
+                            </p>
+                          </div>
+                        </button>
+                        {/* Top up button (shown when not enough stars) - outside dimmed area */}
+                        {!hasEnoughStarsForFee && onTopUpStars && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onTopUpStars();
+                            }}
+                            className="px-3 py-1.5 rounded-full text-sm text-white leading-5 active:opacity-80 transition-opacity mr-3"
+                            style={{
+                              background: "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
+                            }}
+                          >
+                            Top up
+                          </button>
+                        )}
+                        {/* Check - also dimmed when insufficient */}
+                        <div className={`pl-4 py-1.5 shrink-0 ${!hasEnoughStarsForFee ? 'opacity-40' : ''}`}>
+                          {feePaymentMethod === 'stars' && hasEnoughStarsForFee ? <CheckCircleOn /> : <CheckCircleOff />}
                         </div>
-                    </div>
-                </div>
+                      </div>
 
-                <div className="mt-8 mb-4 w-full">
-                     <div className="flex items-center justify-center gap-2 opacity-50">
-                         <div className="w-1 h-1 rounded-full bg-indigo-500" />
-                         <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-[0.15em]">Solana Devnet</span>
-                     </div>
+                      {/* SOL Row */}
+                      <button
+                        onClick={() => setFeePaymentMethod('solana')}
+                        className="flex items-center pl-3 pr-4"
+                      >
+                        {/* Icon */}
+                        <div className="pr-3 py-1">
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center"
+                            style={{ background: "rgba(255, 255, 255, 0.06)", mixBlendMode: "lighten" }}
+                          >
+                            <svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M15.701 6.35782C15.601 6.44906 15.471 6.50032 15.3356 6.50184H2.51488C2.05973 6.50184 1.83037 5.98179 2.14507 5.67687L4.25105 3.64735C4.34876 3.55223 4.47918 3.49815 4.61553 3.49622H17.4852C17.9448 3.49622 18.1697 4.0216 17.8497 4.32741L15.701 6.35782ZM15.701 16.3632C15.6004 16.4528 15.4704 16.5025 15.3356 16.5028H2.51488C2.05973 16.5028 1.83037 15.9872 2.14507 15.6831L4.25105 13.6474C4.34973 13.5546 4.48004 13.5028 4.61553 13.5025H17.4852C17.9448 13.5025 18.1697 14.0225 17.8497 14.3275L15.701 16.3632ZM15.701 8.64159C15.6004 8.55197 15.4704 8.50232 15.3356 8.50202H2.51488C2.05973 8.50202 1.83037 9.01763 2.14507 9.32166L4.25105 11.3574C4.34973 11.4502 4.48004 11.5021 4.61553 11.5023H17.4852C17.9448 11.5023 18.1697 10.9823 17.8497 10.6773L15.701 8.64159Z" fill="white"/>
+                            </svg>
+                          </div>
+                        </div>
+                        {/* Text */}
+                        <div className="flex-1 flex flex-col gap-0.5 py-2.5 text-left">
+                          <p className="text-base leading-5 text-white">{SOLANA_FEE_SOL} SOL</p>
+                          <p className="text-[13px] leading-4 text-white/60">≈ ${SOLANA_FEE_USD.toFixed(2)}</p>
+                        </div>
+                        {/* Check */}
+                        <div className="pl-4 py-1.5 shrink-0">
+                          {feePaymentMethod === 'solana' ? <CheckCircleOn /> : <CheckCircleOff />}
+                        </div>
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                {/* Total Amount Card */}
+                <div
+                  className="flex items-center pl-3 pr-4 py-1 rounded-2xl"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    mixBlendMode: "lighten",
+                  }}
+                >
+                  <div className="flex-1 flex flex-col gap-0.5 py-2.5">
+                    <p className="text-[13px] leading-4 text-white/60">Total amount</p>
+                    <div className="flex items-baseline text-base leading-5">
+                      <span className="text-white">
+                        {(() => {
+                          const val = parseFloat(amountStr);
+                          if (isNaN(val)) {
+                            return feePaymentMethod === 'solana' ? `${SOLANA_FEE_SOL} SOL` : '0 SOL';
+                          }
+                          const solVal = currency === 'SOL' ? val : val / SOL_PRICE_USD;
+                          // Only add SOL fee if paying with Solana
+                          const total = feePaymentMethod === 'solana' ? solVal + SOLANA_FEE_SOL : solVal;
+                          return `${total.toFixed(6).replace(/\.?0+$/, '')} SOL`;
+                        })()}
+                      </span>
+                      <span className="text-white/60">
+                        {(() => {
+                          const val = parseFloat(amountStr);
+                          if (isNaN(val)) {
+                            return feePaymentMethod === 'solana' ? ` ≈ $${SOLANA_FEE_USD.toFixed(2)}` : ' ≈ $0.00';
+                          }
+                          const usdVal = currency === 'SOL' ? val * SOL_PRICE_USD : val;
+                          // Only add USD fee equivalent if paying with Solana
+                          const totalUsd = feePaymentMethod === 'solana' ? usdVal + SOLANA_FEE_USD : usdVal;
+                          return ` ≈ $${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                        })()}
+                      </span>
+                      {feePaymentMethod === 'stars' && (
+                        <span className="text-white/60">&nbsp;+ {STARS_FEE_AMOUNT} Star</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

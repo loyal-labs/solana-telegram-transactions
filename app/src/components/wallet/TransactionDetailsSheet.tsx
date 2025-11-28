@@ -2,33 +2,56 @@
 
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
-import { Icon28Close } from "@telegram-apps/telegram-ui/dist/icons/28/close";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
-import { ArrowDown } from "lucide-react";
+import { Globe, Share, X } from "lucide-react";
+import Image from "next/image";
 import {
   type CSSProperties,
   type ReactNode,
   useMemo,
 } from "react";
 
+const SOL_PRICE_USD = 180;
+const SOLANA_FEE_SOL = 0.000005;
+
+export type TransactionStatus = "pending" | "completed" | "error";
+
+export type TransactionDetailsData = {
+  id: string;
+  type: "incoming" | "outgoing";
+  amountLamports: number;
+  // For outgoing transactions
+  recipient?: string;
+  recipientUsername?: string;
+  recipientAvatar?: string;
+  // For incoming transactions
+  sender?: string;
+  senderUsername?: string;
+  senderAvatar?: string;
+  // Metadata
+  status: TransactionStatus;
+  timestamp: number;
+  networkFeeLamports?: number;
+  comment?: string;
+  signature?: string; // Transaction signature for explorer link
+};
+
 export type TransactionDetailsSheetProps = {
   trigger?: ReactNode | null;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  transaction: {
-    id: string;
-    amountLamports: number;
-    sender: string;
-  } | null;
+  transaction: TransactionDetailsData | null;
 };
 
-// Inset surface for display-only content
-const surfaceInset: CSSProperties = {
-  background: "rgba(0, 0, 0, 0.2)",
-  border: "1px solid rgba(0, 0, 0, 0.3)",
-  borderTopColor: "rgba(0, 0, 0, 0.4)",
-  boxShadow: "0 1px 0 0 rgba(255,255,255,0.03), 0 2px 8px -2px rgba(0,0,0,0.5) inset",
-};
+// Wallet icon SVG component
+function WalletIcon({ className }: { className?: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+      <path d="M15.8333 5.83333V3.33333C15.8333 3.11232 15.7455 2.90036 15.5893 2.74408C15.433 2.5878 15.221 2.5 15 2.5H4.16667C3.72464 2.5 3.30072 2.67559 2.98816 2.98816C2.67559 3.30072 2.5 3.72464 2.5 4.16667C2.5 4.60869 2.67559 5.03262 2.98816 5.34518C3.30072 5.65774 3.72464 5.83333 4.16667 5.83333H16.6667C16.8877 5.83333 17.0996 5.92113 17.2559 6.07741C17.4122 6.23369 17.5 6.44565 17.5 6.66667V10M17.5 10H15C14.558 10 14.1341 10.1756 13.8215 10.4882C13.5089 10.8007 13.3333 11.2246 13.3333 11.6667C13.3333 12.1087 13.5089 12.5326 13.8215 12.8452C14.1341 13.1577 14.558 13.3333 15 13.3333H17.5C17.721 13.3333 17.933 13.2455 18.0893 13.0893C18.2455 12.933 18.3333 12.721 18.3333 12.5V10.8333C18.3333 10.6123 18.2455 10.4004 18.0893 10.2441C17.933 10.0878 17.721 10 17.5 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M2.5 4.16656V15.8332C2.5 16.2753 2.67559 16.6992 2.98816 17.0117C3.30072 17.3243 3.72464 17.4999 4.16667 17.4999H16.6667C16.8877 17.4999 17.0996 17.4121 17.2559 17.2558C17.4122 17.0995 17.5 16.8876 17.5 16.6666V13.3332" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
 
 export default function TransactionDetailsSheet({
   trigger,
@@ -40,7 +63,7 @@ export default function TransactionDetailsSheet({
     () =>
       ({
         "--tgui--bg_color": "transparent",
-        "--tgui--divider": "rgba(255, 255, 255, 0.04)",
+        "--tgui--divider": "rgba(255, 255, 255, 0.05)",
       }) as CSSProperties,
     [],
   );
@@ -49,118 +72,257 @@ export default function TransactionDetailsSheet({
     return null;
   }
 
-  const formattedAmount = (transaction.amountLamports / LAMPORTS_PER_SOL).toFixed(4);
+  const isIncoming = transaction.type === "incoming";
+  const amountSol = transaction.amountLamports / LAMPORTS_PER_SOL;
+  const amountUsd = amountSol * SOL_PRICE_USD;
+  const networkFeeSol = transaction.networkFeeLamports
+    ? transaction.networkFeeLamports / LAMPORTS_PER_SOL
+    : SOLANA_FEE_SOL;
+  const networkFeeUsd = networkFeeSol * SOL_PRICE_USD;
+
+  // Format amount for display
+  const formattedAmount = amountSol.toFixed(4).replace(/\.?0+$/, '');
+
+  // Determine the address/username to show in the header pill
+  const displayAddress = isIncoming
+    ? (transaction.senderUsername || transaction.sender || "Unknown")
+    : (transaction.recipientUsername || transaction.recipient || "Unknown");
+
+  const hasAvatar = isIncoming
+    ? !!transaction.senderAvatar || !!transaction.senderUsername
+    : !!transaction.recipientAvatar || !!transaction.recipientUsername;
+
+  const avatarUrl = isIncoming ? transaction.senderAvatar : transaction.recipientAvatar;
+  const isUsername = displayAddress.startsWith("@");
+
+  // Abbreviated address for pill
+  const abbreviatedAddress = isUsername
+    ? displayAddress
+    : `${displayAddress.slice(0, 4)}…${displayAddress.slice(-4)}`;
+
+  // Full address for details
+  const fullAddress = isIncoming
+    ? (transaction.sender || "Unknown")
+    : (transaction.recipient || "Unknown");
+
+  // Format date
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+      ", " +
+      date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  // Get status text
+  const getStatusText = (status: TransactionStatus) => {
+    // For incoming pending transactions, show "Ready to claim"
+    if (isIncoming && status === "pending") {
+      return "Ready to claim";
+    }
+    switch (status) {
+      case "completed": return "Completed";
+      case "pending": return "Pending";
+      case "error": return "Failed";
+      default: return status;
+    }
+  };
+
+  // Handle view in explorer
+  const handleViewInExplorer = () => {
+    if (transaction.signature) {
+      const explorerUrl = `https://explorer.solana.com/tx/${transaction.signature}?cluster=devnet`;
+      window.open(explorerUrl, "_blank");
+    }
+  };
+
+  // Handle share
+  const handleShare = async () => {
+    const shareText = `Transaction: ${isIncoming ? "+" : "-"}${formattedAmount} SOL`;
+
+    if (navigator?.share) {
+      try {
+        await navigator.share({
+          title: "Transaction Details",
+          text: shareText,
+        });
+      } catch {
+        // User cancelled or error
+      }
+    } else if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(shareText);
+    }
+  };
 
   return (
     <Modal
       aria-label="Transaction details"
-      trigger={trigger === null ? null : trigger}
+      trigger={trigger || <button style={{ display: 'none' }} />}
       open={open}
       onOpenChange={onOpenChange}
       style={modalStyle}
-      header={
-        <Modal.Header
-          after={
-            <Modal.Close aria-label="Close transaction details">
-              <Icon28Close style={{ color: "rgba(255, 255, 255, 0.5)" }} />
-            </Modal.Close>
-          }
-          style={{
-            background: "linear-gradient(180deg, #1c1f26 0%, #151820 100%)",
-            color: "rgba(255, 255, 255, 0.9)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.06)"
-          }}
-        >
-          Claim Transaction
-        </Modal.Header>
-      }
+      snapPoints={[1]}
     >
       <div
         style={{
-          background: "linear-gradient(180deg, #151820 0%, #0d0e12 100%)",
-          padding: "24px 20px 32px",
+          background: "rgba(38, 38, 38, 0.70)",
+          backgroundBlendMode: "luminosity",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
         }}
+        className="flex flex-col text-white relative overflow-hidden min-h-[500px] rounded-t-3xl"
       >
         <Drawer.Title asChild>
           <VisuallyHidden>Transaction details</VisuallyHidden>
         </Drawer.Title>
-        <div
-          style={{
-            width: "100%",
-            margin: "0 auto",
-            maxWidth: 420,
-          }}
-        >
-          {/* Amount Hero Section */}
-          <div style={{
-            textAlign: "center",
-            marginBottom: "28px",
-          }}>
-            <div style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "56px",
-              height: "56px",
-              borderRadius: "16px",
-              background: "linear-gradient(180deg, rgba(16,185,129,0.15) 0%, rgba(16,185,129,0.08) 100%)",
-              border: "1px solid rgba(16, 185, 129, 0.25)",
-              marginBottom: "16px",
-            }}>
-              <ArrowDown size={28} color="rgba(16, 185, 129, 1)" strokeWidth={2} />
+
+        {/* Custom Header */}
+        <div className="relative h-[52px] flex items-center justify-center shrink-0">
+          {/* Header Pill */}
+          <div
+            className="flex items-center pl-1 pr-3 py-1 rounded-[54px]"
+            style={{
+              background: "rgba(255, 255, 255, 0.06)",
+              mixBlendMode: "lighten",
+              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+            }}
+          >
+            <div className="pr-1.5">
+              {hasAvatar && avatarUrl ? (
+                <div className="w-7 h-7 rounded-full overflow-hidden relative">
+                  <Image
+                    src={avatarUrl}
+                    alt="Avatar"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-7 h-7 rounded-[16.8px] flex items-center justify-center text-white">
+                  <WalletIcon className="opacity-60" />
+                </div>
+              )}
             </div>
-            <p style={{
-              color: "rgba(16, 185, 129, 1)",
-              fontSize: "32px",
-              fontFamily: "'JetBrains Mono', monospace",
-              fontWeight: 600,
-              margin: 0,
-              letterSpacing: "-0.02em",
-            }}>
-              +{formattedAmount} SOL
-            </p>
-            <p style={{
-              color: "rgba(255, 255, 255, 0.4)",
-              fontSize: "13px",
-              marginTop: "6px",
-              margin: "6px 0 0 0",
-            }}>
-              Ready to claim
-            </p>
+            <span className="text-sm leading-5">
+              <span className="text-white/60">{isIncoming ? "Sent from " : "Sent to "}</span>
+              <span className="text-white">{abbreviatedAddress}</span>
+            </span>
           </div>
 
-          {/* Sender Address - inset surface */}
-          <div>
-            <label style={{
-              display: "block",
-              color: "rgba(255, 255, 255, 0.4)",
-              fontSize: "11px",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-              marginBottom: "10px",
-              fontWeight: 500
-            }}>
-              From
-            </label>
-            <div style={{
-              ...surfaceInset,
-              padding: "14px 16px",
-              borderRadius: "12px",
-            }}>
-              <p style={{
-                color: "rgba(255, 255, 255, 0.7)",
-                fontSize: "13px",
-                fontFamily: "'JetBrains Mono', monospace",
-                wordBreak: "break-all",
-                margin: 0,
-                lineHeight: 1.5
-              }}>
-                {transaction.sender}
+          {/* Close Button */}
+          <Modal.Close>
+            <div
+              className="absolute right-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 active:bg-white/10 transition-all duration-150 cursor-pointer"
+              style={{
+                background: "rgba(255, 255, 255, 0.06)",
+              }}
+            >
+              <X size={24} strokeWidth={1.5} className="text-white/60" />
+            </div>
+          </Modal.Close>
+        </div>
+
+        {/* Amount Section */}
+        <div className="flex flex-col items-center justify-center px-4 pt-8 pb-6">
+          <div className="flex flex-col items-center gap-1">
+            {/* Amount */}
+            <div className="flex items-baseline gap-2">
+              <p className="text-[40px] font-semibold leading-[48px] text-white">
+                {isIncoming ? "+" : "−"}{formattedAmount}
+              </p>
+              <p className="text-[28px] font-semibold leading-8 text-white/40 tracking-[0.4px]">
+                SOL
               </p>
             </div>
+            {/* USD Value */}
+            <p className="text-base leading-[22px] text-white/40 text-center">
+              ≈${amountUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            {/* Date */}
+            <p className="text-base leading-[22px] text-white/40 text-center">
+              {formatDate(transaction.timestamp)}
+            </p>
           </div>
+        </div>
 
+        {/* Details Card */}
+        <div className="px-4">
+          <div
+            className="flex flex-col rounded-2xl overflow-hidden"
+            style={{
+              background: "rgba(255, 255, 255, 0.06)",
+              mixBlendMode: "lighten",
+            }}
+          >
+            {/* Status */}
+            <div className="flex flex-col gap-0.5 px-4 py-2.5">
+              <p className="text-[13px] leading-4 text-white/60">Status</p>
+              <p className="text-base leading-5 text-white">{getStatusText(transaction.status)}</p>
+            </div>
 
+            {/* Recipient/Sender */}
+            <div className="flex flex-col gap-0.5 px-4 py-2.5">
+              <p className="text-[13px] leading-4 text-white/60">
+                {isIncoming ? "Sender" : "Recipient"}
+              </p>
+              <p className="text-base leading-5 text-white break-all">{fullAddress}</p>
+            </div>
+
+            {/* Network Fee (only for outgoing) */}
+            {!isIncoming && (
+              <div className="flex flex-col gap-0.5 px-4 py-2.5">
+                <p className="text-[13px] leading-4 text-white/60">Network fee</p>
+                <p className="text-base leading-5">
+                  <span className="text-white">{networkFeeSol} SOL</span>
+                  <span className="text-white/60"> ≈ ${networkFeeUsd.toFixed(2)}</span>
+                </p>
+              </div>
+            )}
+
+            {/* Comment (only for incoming) */}
+            {isIncoming && transaction.comment && (
+              <div className="flex flex-col gap-0.5 px-4 py-2.5">
+                <p className="text-[13px] leading-4 text-white/60">Comment</p>
+                <p className="text-base leading-5 text-white">{transaction.comment}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-center gap-2 px-6 pt-8 pb-4">
+          {/* View in Explorer */}
+          <button
+            onClick={handleViewInExplorer}
+            className="flex-1 flex flex-col items-center gap-2 rounded-2xl overflow-hidden group"
+          >
+            <div
+              className="w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-150 group-active:scale-95 group-active:bg-white/10"
+              style={{
+                background: "rgba(255, 255, 255, 0.06)",
+                mixBlendMode: "lighten"
+              }}
+            >
+              <Globe className="w-7 h-7 text-white" strokeWidth={1.5} />
+            </div>
+            <span className="text-[13px] text-white/60 leading-4">View in explorer</span>
+          </button>
+
+          {/* Share */}
+          <button
+            onClick={handleShare}
+            className="flex-1 flex flex-col items-center gap-2 rounded-2xl overflow-hidden group"
+          >
+            <div
+              className="w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-150 group-active:scale-95 group-active:bg-white/10"
+              style={{
+                background: "rgba(255, 255, 255, 0.06)",
+                mixBlendMode: "lighten"
+              }}
+            >
+              <Share className="w-7 h-7 text-white" strokeWidth={1.5} />
+            </div>
+            <span className="text-[13px] text-white/60 leading-4">Share</span>
+          </button>
         </div>
       </div>
     </Modal>

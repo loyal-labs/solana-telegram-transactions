@@ -26,7 +26,9 @@ import SendSheet, {
   isValidSolanaAddress,
   isValidTelegramUsername
 } from "@/components/wallet/SendSheet";
-import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
+import TransactionDetailsSheet, {
+  type TransactionDetailsData
+} from "@/components/wallet/TransactionDetailsSheet";
 import {
   TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
@@ -101,10 +103,10 @@ function ActionButton({
     <button
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
-      className={`flex-1 flex flex-col items-center justify-center gap-2 min-w-0 overflow-hidden rounded-2xl ${disabled ? "opacity-40" : ""}`}
+      className={`flex-1 flex flex-col items-center justify-center gap-2 min-w-0 overflow-hidden rounded-2xl ${disabled ? "opacity-40" : ""} group`}
     >
       <div
-        className="w-[52px] h-[52px] rounded-full flex items-center justify-center"
+        className="w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-150 group-active:scale-95 group-active:bg-white/10"
         style={{
           background: "rgba(255, 255, 255, 0.06)",
           mixBlendMode: "lighten"
@@ -194,6 +196,11 @@ export default function Home() {
   const [
     selectedTransaction,
     setSelectedTransaction
+  ] = useState<TransactionDetailsData | null>(null);
+  // Keep original incoming transaction for claim functionality
+  const [
+    selectedIncomingTransaction,
+    setSelectedIncomingTransaction
   ] = useState<IncomingTransaction | null>(null);
   const [isSendFormValid, setIsSendFormValid] = useState(false);
   const [isClaimingTransaction, setIsClaimingTransaction] = useState(false);
@@ -253,7 +260,42 @@ export default function Home() {
       if (hapticFeedback.impactOccurred.isAvailable()) {
         hapticFeedback.impactOccurred("light");
       }
-      setSelectedTransaction(transaction);
+      // Store original incoming transaction for claim functionality
+      setSelectedIncomingTransaction(transaction);
+      // Convert to TransactionDetailsData format
+      const detailsData: TransactionDetailsData = {
+        id: transaction.id,
+        type: "incoming",
+        amountLamports: transaction.amountLamports,
+        sender: transaction.sender,
+        senderUsername: transaction.username ? `@${transaction.username}` : undefined,
+        status: "pending", // Incoming claimable transactions are pending
+        timestamp: Date.now(), // TODO: Get actual timestamp from transaction
+      };
+      setSelectedTransaction(detailsData);
+      setTransactionDetailsSheetOpen(true);
+    },
+    []
+  );
+
+  const handleOpenOutgoingTransactionDetails = useCallback(
+    (transaction: Transaction) => {
+      if (hapticFeedback.impactOccurred.isAvailable()) {
+        hapticFeedback.impactOccurred("light");
+      }
+      // Clear incoming transaction ref
+      setSelectedIncomingTransaction(null);
+      // Convert to TransactionDetailsData format
+      const detailsData: TransactionDetailsData = {
+        id: transaction.id,
+        type: "outgoing",
+        amountLamports: transaction.amountLamports,
+        recipient: transaction.recipient,
+        recipientUsername: transaction.recipient?.startsWith("@") ? transaction.recipient : undefined,
+        status: transaction.type === "pending" ? "pending" : "completed",
+        timestamp: transaction.timestamp,
+      };
+      setSelectedTransaction(detailsData);
       setTransactionDetailsSheetOpen(true);
     },
     []
@@ -443,6 +485,10 @@ export default function Home() {
       hapticFeedback.impactOccurred("light");
     }
     setTransactionDetailsSheetOpen(open);
+    if (!open) {
+      setSelectedTransaction(null);
+      setSelectedIncomingTransaction(null);
+    }
   }, []);
 
   const handleShareAddress = useCallback(async () => {
@@ -574,6 +620,7 @@ export default function Home() {
 
         setTransactionDetailsSheetOpen(false);
         setSelectedTransaction(null);
+        setSelectedIncomingTransaction(null);
       } catch (error) {
         console.error("Failed to claim transaction", error);
         if (hapticFeedback.notificationOccurred.isAvailable()) {
@@ -818,20 +865,26 @@ export default function Home() {
 
     if (isTransactionDetailsSheetOpen && selectedTransaction) {
       hideSecondaryButton();
-      if (isClaimingTransaction) {
-        // Show only main button with loader during claim
-        showMainButton({
-          text: "Claim",
-          onClick: () => {}, // No-op during loading
-          isEnabled: false,
-          showLoader: true
-        });
+      // Only show Claim button for incoming (claimable) transactions
+      if (selectedIncomingTransaction) {
+        if (isClaimingTransaction) {
+          // Show only main button with loader during claim
+          showMainButton({
+            text: "Claim",
+            onClick: () => {}, // No-op during loading
+            isEnabled: false,
+            showLoader: true
+          });
+        } else {
+          // Show only Claim button (no Ignore)
+          showMainButton({
+            text: "Claim",
+            onClick: () => handleApproveTransaction(selectedIncomingTransaction.id)
+          });
+        }
       } else {
-        // Show only Claim button (no Ignore)
-        showMainButton({
-          text: "Claim",
-          onClick: () => handleApproveTransaction(selectedTransaction.id)
-        });
+        // For outgoing transactions, hide the main button
+        hideMainButton();
       }
     } else if (isSendSheetOpen) {
       hideSecondaryButton();
@@ -881,6 +934,7 @@ export default function Home() {
     isSendFormValid,
     isSendingTransaction,
     selectedTransaction,
+    selectedIncomingTransaction,
     isClaimingTransaction,
     mainButtonAvailable,
     secondaryButtonAvailable,
@@ -889,7 +943,7 @@ export default function Home() {
     handleShareAddress,
     handleApproveTransaction,
     handleSubmitSend,
-    sendStep // Added this dep
+    sendStep
   ]);
 
   const formatBalance = (lamports: number | null): string => {
@@ -938,26 +992,33 @@ export default function Home() {
           {/* Balance Section */}
           <div className="flex flex-col items-center pb-6 px-6">
             {/* Wallet Address */}
-            <button
-              onClick={() => {
-                if (walletAddress) {
-                  if (navigator?.clipboard?.writeText) {
-                    navigator.clipboard.writeText(walletAddress);
-                    setAddressCopied(true);
-                    setTimeout(() => setAddressCopied(false), 2000);
+            {isLoading || !walletAddress ? (
+              <div className="flex items-center gap-1">
+                <div className="w-4 h-4 bg-white/5 animate-pulse rounded" />
+                <div className="w-24 h-5 bg-white/5 animate-pulse rounded" />
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  if (walletAddress) {
+                    if (navigator?.clipboard?.writeText) {
+                      navigator.clipboard.writeText(walletAddress);
+                      setAddressCopied(true);
+                      setTimeout(() => setAddressCopied(false), 2000);
+                    }
+                    if (hapticFeedback.notificationOccurred.isAvailable()) {
+                      hapticFeedback.notificationOccurred("success");
+                    }
                   }
-                  if (hapticFeedback.notificationOccurred.isAvailable()) {
-                    hapticFeedback.notificationOccurred("success");
-                  }
-                }
-              }}
-              className="flex items-center gap-1 active:opacity-70 transition-opacity"
-            >
-              <Copy className="w-4 h-4 text-white/60" strokeWidth={1.5} />
-              <span className="text-base text-white/60 leading-5">
-                {addressCopied ? "Copied!" : formatAddress(walletAddress)}
-              </span>
-            </button>
+                }}
+                className="flex items-center gap-1 active:opacity-70 transition-opacity"
+              >
+                <Copy className="w-4 h-4 text-white/60" strokeWidth={1.5} />
+                <span className="text-base text-white/60 leading-5">
+                  {addressCopied ? "Copied!" : formatAddress(walletAddress)}
+                </span>
+              </button>
+            )}
 
             {/* Balance Display */}
             <div className="flex flex-col items-center gap-1.5 mt-1.5">
@@ -994,11 +1055,15 @@ export default function Home() {
               </button>
 
               {/* Secondary Amount */}
-              <p className="text-base text-white/60 leading-5">
-                {displayCurrency === "USD"
-                  ? `${formatBalance(balance)} SOL`
-                  : `$${formatUsdValue(balance)}`}
-              </p>
+              {isLoading ? (
+                <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
+              ) : (
+                <p className="text-base text-white/60 leading-5">
+                  {displayCurrency === "USD"
+                    ? `${formatBalance(balance)} SOL`
+                    : `$${formatUsdValue(balance)}`}
+                </p>
+              )}
             </div>
 
             {/* Action Buttons */}
@@ -1024,46 +1089,83 @@ export default function Home() {
 
           {/* Stars Card Section */}
           <div className="px-4 pb-4">
-            <div
-              className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
-              style={{
-                background: "rgba(255, 255, 255, 0.06)",
-                mixBlendMode: "lighten"
-              }}
-            >
-              {/* Left - Icon */}
-              <div className="py-1.5 pr-3">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.06)",
-                    mixBlendMode: "lighten"
-                  }}
-                >
+            {isLoading ? (
+              <div
+                className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full"
+                style={{
+                  background: "rgba(255, 255, 255, 0.06)",
+                  mixBlendMode: "lighten"
+                }}
+              >
+                {/* Skeleton Icon */}
+                <div className="py-1.5 pr-3">
+                  <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
+                </div>
+                {/* Skeleton Text */}
+                <div className="flex-1 py-2.5 flex flex-col gap-1.5">
+                  <div className="w-12 h-5 bg-white/5 animate-pulse rounded" />
+                  <div className="w-16 h-4 bg-white/5 animate-pulse rounded" />
+                </div>
+                {/* Skeleton Value */}
+                <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
+                  <div className="w-12 h-5 bg-white/5 animate-pulse rounded" />
+                  <div className="w-10 h-4 bg-white/5 animate-pulse rounded" />
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={handleTopUpStars}
+                className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
+                style={{
+                  background: "rgba(255, 255, 255, 0.06)",
+                  mixBlendMode: "lighten"
+                }}
+              >
+                {/* Left - Icon */}
+                <div className="py-1.5 pr-3">
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.06)",
+                      mixBlendMode: "lighten"
+                    }}
+                  >
+                    <Image
+                      src="/icons/telegram-stars.svg"
+                      alt="Stars"
+                      width={28}
+                      height={28}
+                      className="opacity-60"
+                    />
+                  </div>
+                </div>
+
+                {/* Middle - Text */}
+                <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                  <p className="text-base text-white leading-5">Stars</p>
+                  <p className="text-[13px] text-white/60 leading-4">
+                    for free gas
+                  </p>
+                </div>
+
+                {/* Right - Value */}
+                <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
+                  <p className="text-base text-white leading-5">{starsBalance.toLocaleString()}</p>
+                  <p className="text-[13px] text-white/60 leading-4">${(starsBalance * 0.02).toFixed(2)}</p>
+                </div>
+
+                {/* Chevron */}
+                <div className="pl-3 py-2 flex items-center justify-center">
                   <Image
-                    src="/icons/telegram-stars.svg"
-                    alt="Stars"
-                    width={28}
-                    height={28}
+                    src="/icons/chevron-right.svg"
+                    alt=""
+                    width={7}
+                    height={12}
                     className="opacity-60"
                   />
                 </div>
-              </div>
-
-              {/* Middle - Text */}
-              <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                <p className="text-base text-white leading-5">Stars</p>
-                <p className="text-[13px] text-white/60 leading-4">
-                  for free gas
-                </p>
-              </div>
-
-              {/* Right - Value */}
-              <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
-                <p className="text-base text-white leading-5">{starsBalance.toLocaleString()}</p>
-                <p className="text-[13px] text-white/60 leading-4">${(starsBalance * 0.02).toFixed(2)}</p>
-              </div>
-            </div>
+              </button>
+            )}
           </div>
 
           {/* Activity Section - conditionally rendered */}
@@ -1074,9 +1176,59 @@ export default function Home() {
             const isEmptyWallet =
               (balance === null || balance === 0) && starsBalance === 0;
 
+            // Loading state - show skeleton transaction cards
+            if (isLoading) {
+              return (
+                <div className="flex-1 px-4 pb-4">
+                  <div className="flex flex-col gap-2">
+                    {/* Skeleton Transaction Card 1 */}
+                    <div
+                      className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
+                      style={{
+                        background: "rgba(255, 255, 255, 0.06)",
+                        mixBlendMode: "lighten"
+                      }}
+                    >
+                      <div className="py-1.5 pr-3">
+                        <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
+                      </div>
+                      <div className="flex-1 py-2.5 flex flex-col gap-1.5">
+                        <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
+                        <div className="w-28 h-4 bg-white/5 animate-pulse rounded" />
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
+                        <div className="w-16 h-5 bg-white/5 animate-pulse rounded" />
+                        <div className="w-12 h-4 bg-white/5 animate-pulse rounded" />
+                      </div>
+                    </div>
+                    {/* Skeleton Transaction Card 2 */}
+                    <div
+                      className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
+                      style={{
+                        background: "rgba(255, 255, 255, 0.06)",
+                        mixBlendMode: "lighten"
+                      }}
+                    >
+                      <div className="py-1.5 pr-3">
+                        <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
+                      </div>
+                      <div className="flex-1 py-2.5 flex flex-col gap-1.5">
+                        <div className="w-16 h-5 bg-white/5 animate-pulse rounded" />
+                        <div className="w-24 h-4 bg-white/5 animate-pulse rounded" />
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
+                        <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
+                        <div className="w-14 h-4 bg-white/5 animate-pulse rounded" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
             // Empty wallet state - no SOL, no Stars, no transactions
             // Activity title is NOT shown in this state
-            if (isEmptyWallet && hasNoTransactions && !isLoading) {
+            if (isEmptyWallet && hasNoTransactions) {
               return (
                 <div className="flex-1 px-4 pb-4">
                   <div
@@ -1107,7 +1259,7 @@ export default function Home() {
             }
 
             // Has balance but no transactions - no Activity label
-            if (hasNoTransactions && !isLoading) {
+            if (hasNoTransactions) {
               return (
                 <div className="flex-1 px-4 pb-4">
                   <div
@@ -1140,10 +1292,14 @@ export default function Home() {
               {incomingTransactions.map(transaction => {
                 const isClaiming = claimingTransactionId === transaction.id;
                 return (
-                  <div
+                  <button
                     key={transaction.id}
-                    className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden ${
-                      isClaiming ? "opacity-60 pointer-events-none" : ""
+                    onClick={() =>
+                      !isClaiming && handleOpenTransactionDetails(transaction)
+                    }
+                    disabled={isClaiming}
+                    className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity ${
+                      isClaiming ? "opacity-60" : ""
                     }`}
                     style={{
                       background: "rgba(255, 255, 255, 0.06)",
@@ -1166,20 +1322,16 @@ export default function Home() {
 
                     {/* Middle - Text */}
                     <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                      <p className="text-base text-white leading-5">Recieved</p>
+                      <p className="text-base text-white leading-5">Received</p>
                       <p className="text-[13px] text-white/60 leading-4">
                         from {formatSenderAddress(transaction.sender)}
                       </p>
                     </div>
 
-                    {/* Right - Claim Button */}
+                    {/* Right - Claim Badge */}
                     <div className="py-2.5 pl-3">
-                      <button
-                        onClick={() =>
-                          !isClaiming &&
-                          handleOpenTransactionDetails(transaction)
-                        }
-                        className="px-4 py-2 rounded-full text-sm text-white leading-5 active:opacity-80 transition-opacity"
+                      <div
+                        className="px-4 py-2 rounded-full text-sm text-white leading-5"
                         style={{
                           background:
                             "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
@@ -1188,9 +1340,9 @@ export default function Home() {
                         {isClaiming
                           ? "Claiming..."
                           : `Claim ${formatTransactionAmount(transaction.amountLamports)} SOL`}
-                      </button>
+                      </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
 
@@ -1198,9 +1350,10 @@ export default function Home() {
               {outgoingTransactions.map(transaction => {
                 const isPending = transaction.type === "pending";
                 return (
-                  <div
+                  <button
                     key={transaction.id}
-                    className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
+                    onClick={() => handleOpenOutgoingTransactionDetails(transaction)}
+                    className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
                     style={{
                       background: "rgba(255, 255, 255, 0.06)",
                       mixBlendMode: "lighten"
@@ -1266,7 +1419,7 @@ export default function Home() {
                         )}
                       </p>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
                   </div>
