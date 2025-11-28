@@ -178,6 +178,7 @@ export default function Home() {
   ] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
+  const [starsBalance, setStarsBalance] = useState<number>(1267); // Mock Stars balance
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
@@ -186,23 +187,7 @@ export default function Home() {
   >([]);
   const [outgoingTransactions, setOutgoingTransactions] = useState<
     Transaction[]
-  >([
-    // Mock transactions for UI testing
-    {
-      id: "mock-1",
-      type: "outgoing",
-      amountLamports: 500000000, // 0.5 SOL
-      recipient: "@alice",
-      timestamp: Date.now() - 3600000 // 1 hour ago
-    },
-    {
-      id: "mock-2",
-      type: "pending",
-      amountLamports: 250000000, // 0.25 SOL
-      recipient: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
-      timestamp: Date.now() - 60000 // 1 minute ago
-    }
-  ]);
+  >([]);
   const [
     selectedTransaction,
     setSelectedTransaction
@@ -221,6 +206,7 @@ export default function Home() {
   });
   const [isSendingTransaction, setIsSendingTransaction] = useState(false);
   const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">("USD");
+  const [addressCopied, setAddressCopied] = useState(false);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(
@@ -249,6 +235,14 @@ export default function Home() {
       hapticFeedback.impactOccurred("light");
     }
     setReceiveSheetOpen(true);
+  }, []);
+
+  const handleTopUpStars = useCallback(() => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    // TODO: Implement Stars top-up flow (e.g., open Telegram Stars purchase)
+    console.log("Top up stars clicked");
   }, []);
 
   const handleOpenTransactionDetails = useCallback(
@@ -859,7 +853,7 @@ export default function Home() {
         });
       } else {
         showMainButton({
-          text: "Send",
+          text: "Confirm and Send",
           onClick: handleSubmitSend,
           isEnabled: isSendFormValid && !isSendingTransaction,
           showLoader: isSendingTransaction
@@ -932,14 +926,6 @@ export default function Home() {
         className="min-h-screen text-white font-sans overflow-hidden relative flex flex-col"
         style={{ background: "#16161a" }}
       >
-        {/* Top Fade Gradient */}
-        <div
-          className="absolute top-0 left-0 right-0 h-16 z-10 pointer-events-none"
-          style={{
-            background:
-              "linear-gradient(180deg, #16161a 0%, rgba(22, 22, 26, 0) 100%)"
-          }}
-        />
 
         {/* Main Content */}
         <div
@@ -954,6 +940,8 @@ export default function Home() {
                 if (walletAddress) {
                   if (navigator?.clipboard?.writeText) {
                     navigator.clipboard.writeText(walletAddress);
+                    setAddressCopied(true);
+                    setTimeout(() => setAddressCopied(false), 2000);
                   }
                   if (hapticFeedback.notificationOccurred.isAvailable()) {
                     hapticFeedback.notificationOccurred("success");
@@ -964,7 +952,7 @@ export default function Home() {
             >
               <Copy className="w-4 h-4 text-white/60" strokeWidth={1.5} />
               <span className="text-base text-white/60 leading-5">
-                {formatAddress(walletAddress)}
+                {addressCopied ? "Copied!" : formatAddress(walletAddress)}
               </span>
             </button>
 
@@ -1068,37 +1056,81 @@ export default function Home() {
 
               {/* Right - Value */}
               <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
-                <p className="text-base text-white leading-5">1,267</p>
-                <p className="text-[13px] text-white/60 leading-4">$2.12</p>
+                <p className="text-base text-white leading-5">{starsBalance.toLocaleString()}</p>
+                <p className="text-[13px] text-white/60 leading-4">${(starsBalance * 0.02).toFixed(2)}</p>
               </div>
             </div>
           </div>
 
-          {/* Activity Section Header */}
-          <div className="px-4 pt-3 pb-2">
-            <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
-              Activity
-            </p>
-          </div>
+          {/* Activity Section - conditionally rendered */}
+          {(() => {
+            const hasNoTransactions =
+              incomingTransactions.length === 0 &&
+              outgoingTransactions.length === 0;
+            const isEmptyWallet =
+              (balance === null || balance === 0) && starsBalance === 0;
 
-          {/* Transactions List */}
-          <div className="flex-1 px-4 pb-4">
-            <div className="flex flex-col gap-2 pb-36">
-              {/* Empty State */}
-              {incomingTransactions.length === 0 &&
-                outgoingTransactions.length === 0 &&
-                !isLoading && (
+            // Empty wallet state - no SOL, no Stars, no transactions
+            // Activity title is NOT shown in this state
+            if (isEmptyWallet && hasNoTransactions && !isLoading) {
+              return (
+                <div className="flex-1 px-4 pb-4">
                   <div
-                    className="flex flex-col items-center justify-center py-16 rounded-2xl"
+                    className="flex flex-col gap-4 items-center justify-center px-8 py-6 rounded-2xl h-[200px]"
                     style={{
-                      background: "rgba(255, 255, 255, 0.06)",
+                      background: "rgba(255, 255, 255, 0.03)",
                       mixBlendMode: "lighten"
                     }}
                   >
-                    <Clock className="w-8 h-8 text-white/40 mb-3" />
-                    <p className="text-white/60 text-base">No activity yet</p>
+                    <p className="text-base text-white/60 leading-5 text-center">
+                      You don&apos;t have SOL yet. Network fees (gas) can be
+                      paid with Telegram Stars, so add a small Stars balance to
+                      receive tokens.
+                    </p>
+                    <button
+                      onClick={handleTopUpStars}
+                      className="px-4 py-2 rounded-[40px] text-sm text-white leading-5"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
+                      }}
+                    >
+                      Add Stars
+                    </button>
                   </div>
-                )}
+                </div>
+              );
+            }
+
+            // Has balance but no transactions - no Activity label
+            if (hasNoTransactions && !isLoading) {
+              return (
+                <div className="flex-1 px-4 pb-4">
+                  <div
+                    className="flex items-center justify-center px-8 py-6 rounded-2xl h-[200px]"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.03)",
+                      mixBlendMode: "lighten"
+                    }}
+                  >
+                    <p className="text-base text-white/60 leading-5 text-center">
+                      You don&apos;t have any transactions yet
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
+            // Normal state with transactions
+            return (
+              <>
+                <div className="px-4 pt-3 pb-2">
+                  <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
+                    Activity
+                  </p>
+                </div>
+                <div className="flex-1 px-4 pb-4">
+                  <div className="flex flex-col gap-2 pb-36">
 
               {/* Incoming Transactions (Claimable) */}
               {incomingTransactions.map(transaction => {
@@ -1233,8 +1265,11 @@ export default function Home() {
                   </div>
                 );
               })}
-            </div>
-          </div>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </div>
 
         {/* Bottom Fade Gradient */}
@@ -1260,11 +1295,14 @@ export default function Home() {
         onStepChange={setSendStep}
         balance={balance}
         walletAddress={walletAddress ?? undefined}
+        starsBalance={starsBalance}
+        onTopUpStars={handleTopUpStars}
       />
       <ReceiveSheet
         open={isReceiveSheetOpen}
         onOpenChange={handleReceiveSheetChange}
         trigger={null}
+        walletAddress={walletAddress ?? undefined}
       />
       <TransactionDetailsSheet
         open={isTransactionDetailsSheetOpen}
