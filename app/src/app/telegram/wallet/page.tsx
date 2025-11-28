@@ -19,12 +19,11 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  ChevronRight,
   Clock,
-  Copy,
-  QrCode,
-  Star,
-  Wallet
+  Copy
 } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import React from "react";
 
@@ -105,20 +104,72 @@ function ActionButton({
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-2.5 group"
+      className="flex-1 flex flex-col items-center justify-center gap-2 min-w-0 overflow-hidden rounded-2xl"
     >
-      <div className="relative w-14 h-14 rounded-2xl surface-raised flex items-center justify-center">
-        <div className="text-zinc-300 group-hover:text-white group-active:text-zinc-400">
+      <div
+        className="w-[52px] h-[52px] rounded-full flex items-center justify-center"
+        style={{
+          background: "rgba(255, 255, 255, 0.06)",
+          mixBlendMode: "lighten"
+        }}
+      >
+        <div className="text-white">
           {React.cloneElement(
             icon as React.ReactElement<{ size?: number; strokeWidth?: number }>,
-            { size: 22, strokeWidth: 2 }
+            { size: 28, strokeWidth: 1.5 }
           )}
         </div>
       </div>
-      <span className="text-xs font-medium text-zinc-500 group-hover:text-zinc-300">
-        {label}
-      </span>
+      <span className="text-[13px] text-white/60 leading-4">{label}</span>
     </button>
+  );
+}
+
+function ScanIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 28 28"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <path
+        d="M3.5 8.167V5.833A2.333 2.333 0 0 1 5.833 3.5h2.334"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M19.833 3.5h2.334A2.333 2.333 0 0 1 24.5 5.833v2.334"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M24.5 19.833v2.334a2.333 2.333 0 0 1-2.333 2.333h-2.334"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8.167 24.5H5.833A2.333 2.333 0 0 1 3.5 22.167v-2.334"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8.167 14h11.666"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 
@@ -883,130 +934,90 @@ export default function Home() {
 
   return (
     <>
-      <style jsx global>{`
-        @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
-        .mono {
-          font-family: "JetBrains Mono", monospace;
-        }
-
-        /* Tactile raised surface - feels like you can touch it */
-        .surface-raised {
-          background: linear-gradient(
-            180deg,
-            rgba(255, 255, 255, 0.08) 0%,
-            rgba(255, 255, 255, 0.03) 100%
-          );
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-bottom-color: rgba(0, 0, 0, 0.2);
-          box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
-            0 -1px 0 0 rgba(0, 0, 0, 0.1) inset,
-            0 4px 12px -2px rgba(0, 0, 0, 0.4),
-            0 2px 4px -1px rgba(0, 0, 0, 0.2);
-        }
-
-        .surface-raised:active {
-          background: linear-gradient(
-            180deg,
-            rgba(255, 255, 255, 0.04) 0%,
-            rgba(255, 255, 255, 0.02) 100%
-          );
-          box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
-            0 1px 2px 0 rgba(0, 0, 0, 0.2);
-          transform: translateY(1px);
-        }
-
-        /* Inset/recessed surface - feels sunken into the page */
-        .surface-inset {
-          background: rgba(0, 0, 0, 0.2);
-          border: 1px solid rgba(0, 0, 0, 0.3);
-          border-top-color: rgba(0, 0, 0, 0.4);
-          box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.03),
-            0 2px 8px -2px rgba(0, 0, 0, 0.5) inset;
-        }
-
-        /* Card surface - subtle lift */
-        .surface-card {
-          background: linear-gradient(
-            180deg,
-            rgba(255, 255, 255, 0.05) 0%,
-            rgba(255, 255, 255, 0.02) 100%
-          );
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-bottom-color: rgba(0, 0, 0, 0.15);
-          box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
-            0 4px 16px -4px rgba(0, 0, 0, 0.5);
-        }
-
-        .text-gradient {
-          background: linear-gradient(180deg, #ffffff 0%, #a1a1aa 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-      `}</style>
-
-      <main className="min-h-screen text-white font-sans selection:bg-teal-500/30 overflow-hidden relative">
-        {/* Deep Background with Gradient */}
+      <main
+        className="min-h-screen text-white font-sans overflow-hidden relative flex flex-col"
+        style={{ background: "#16161a" }}
+      >
+        {/* Top Fade Gradient */}
         <div
-          className="fixed inset-0 z-0 pointer-events-none"
+          className="absolute top-0 left-0 right-0 h-16 z-10 pointer-events-none"
           style={{
             background:
-              "linear-gradient(180deg, #1c1f26 0%, #111318 35%, #0a0b0d 100%)"
+              "linear-gradient(180deg, #16161a 0%, rgba(22, 22, 26, 0) 100%)"
           }}
-        >
-          {/* Noise texture for surface feel */}
-          <div
-            className="absolute inset-0 opacity-[0.03]"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`
-            }}
-          />
-        </div>
+        />
 
+        {/* Main Content */}
         <div
-          className="relative z-10 px-6 pt-6 pb-20 max-w-md mx-auto flex flex-col min-h-screen"
-          style={{ paddingTop: `${(safeAreaInsetTop || 0) + 16}px` }}
+          className="relative flex-1 flex flex-col w-full"
+          style={{ paddingTop: `${(safeAreaInsetTop || 0) + 36}px` }}
         >
           {/* Balance Section */}
-          <div className="flex flex-col items-center pt-8 pb-6">
-            {/* Balance Display */}
+          <div className="flex flex-col items-center pb-6 px-6">
+            {/* Wallet Address */}
             <button
               onClick={() => {
-                if (hapticFeedback.impactOccurred.isAvailable()) {
-                  hapticFeedback.impactOccurred("light");
+                if (walletAddress) {
+                  if (navigator?.clipboard?.writeText) {
+                    navigator.clipboard.writeText(walletAddress);
+                  }
+                  if (hapticFeedback.notificationOccurred.isAvailable()) {
+                    hapticFeedback.notificationOccurred("success");
+                  }
                 }
-                setDisplayCurrency(prev => (prev === "USD" ? "SOL" : "USD"));
               }}
-              className="text-center relative group cursor-pointer active:scale-[0.98] transition-transform"
+              className="flex items-center gap-1 active:opacity-70 transition-opacity"
             >
-              <p className="text-zinc-500 text-xs font-medium tracking-wide uppercase mb-3">
-                Balance
-              </p>
-
-              {isLoading ? (
-                <div className="h-16 w-48 bg-white/5 animate-pulse rounded-xl mx-auto" />
-              ) : (
-                <div className="flex flex-col items-center">
-                  <h1 className="text-5xl font-semibold tracking-tight text-gradient">
-                    {displayCurrency === "USD"
-                      ? `$${formatUsdValue(balance)}`
-                      : `${formatBalance(balance)} SOL`}
-                  </h1>
-
-                  {/* Secondary currency */}
-                  <p className="mt-2 text-sm text-zinc-500 font-mono">
-                    {displayCurrency === "USD"
-                      ? `${formatBalance(balance)} SOL`
-                      : `$${formatUsdValue(balance)}`}
-                  </p>
-                </div>
-              )}
+              <Copy className="w-4 h-4 text-white/60" strokeWidth={1.5} />
+              <span className="text-base text-white/60 leading-5">
+                {formatAddress(walletAddress)}
+              </span>
             </button>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="surface-inset rounded-2xl p-5 mb-6">
-            <div className="flex justify-around">
+            {/* Balance Display */}
+            <div className="flex flex-col items-center gap-1.5 mt-1.5">
+              <button
+                onClick={() => {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
+                  setDisplayCurrency(prev => (prev === "USD" ? "SOL" : "USD"));
+                }}
+                className="active:scale-[0.98] transition-transform"
+              >
+                {isLoading ? (
+                  <div className="h-12 w-48 bg-white/5 animate-pulse rounded-xl mx-auto" />
+                ) : displayCurrency === "USD" ? (
+                  <div className="flex items-center leading-[48px]">
+                    <span className="text-[40px] font-semibold text-white/60">
+                      $
+                    </span>
+                    <span className="text-[40px] font-semibold text-white">
+                      {formatUsdValue(balance)}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center leading-[48px] gap-2">
+                    <span className="text-[40px] font-semibold text-white">
+                      {formatBalance(balance)}
+                    </span>
+                    <span className="text-[40px] font-semibold text-white/60">
+                      SOL
+                    </span>
+                  </div>
+                )}
+              </button>
+
+              {/* Secondary Amount */}
+              <p className="text-base text-white/60 leading-5">
+                {displayCurrency === "USD"
+                  ? `${formatBalance(balance)} SOL`
+                  : `$${formatUsdValue(balance)}`}
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 w-full px-6 mt-8">
               <ActionButton
                 icon={<ArrowUp />}
                 label="Send"
@@ -1018,70 +1029,92 @@ export default function Home() {
                 onClick={handleOpenReceiveSheet}
               />
               <ActionButton
-                icon={<QrCode />}
-                label="Scan QR"
+                icon={<ScanIcon />}
+                label="Scan"
                 onClick={handleScanQR}
               />
             </div>
           </div>
 
-          {/* Wallet Address Card */}
-          <div
-            className="surface-card rounded-xl p-3.5 mb-6 flex items-center justify-between cursor-pointer group transition-all duration-150 hover:brightness-105 active:brightness-95 active:scale-[0.99]"
-            onClick={() => {
-              if (walletAddress) {
-                if (navigator?.clipboard?.writeText) {
-                  navigator.clipboard.writeText(walletAddress);
-                }
-                if (hapticFeedback.notificationOccurred.isAvailable()) {
-                  hapticFeedback.notificationOccurred("success");
-                }
-              }
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shadow-sm">
-                <Wallet className="w-5 h-5 text-teal-400" />
+          {/* Stars Card Section */}
+          <div className="px-4 pb-4">
+            <div
+              className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
+              style={{
+                background: "rgba(255, 255, 255, 0.06)",
+                mixBlendMode: "lighten"
+              }}
+            >
+              {/* Left - Icon */}
+              <div className="py-1.5 pr-3">
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    mixBlendMode: "lighten"
+                  }}
+                >
+                  <Image
+                    src="/icons/telegram-stars.svg"
+                    alt="Stars"
+                    width={28}
+                    height={28}
+                    className="opacity-60"
+                  />
+                </div>
               </div>
-              <div>
-                <p className="text-white/90 font-medium text-sm">Wallet</p>
-                <p className="text-zinc-500 text-xs font-mono">
-                  {formatAddress(walletAddress)}
+
+              {/* Middle - Text */}
+              <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                <p className="text-base text-white leading-5">Stars</p>
+                <p className="text-[13px] text-white/60 leading-4">
+                  for free gas
                 </p>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col items-end">
-                <div className="flex items-center gap-1">
-                  <Star className="w-3.5 h-3.5 text-white" />
-                  <span className="text-white/90 font-medium text-sm">12</span>
+
+              {/* Right - Value & Chevron */}
+              <div className="flex items-center pl-3">
+                <div className="flex flex-col items-end gap-0.5 py-2.5">
+                  <p className="text-base text-white leading-5">1,267</p>
+                  <p className="text-[13px] text-white/60 leading-4">$2.12</p>
                 </div>
-                <p className="text-zinc-500 text-[10px]">for free gas</p>
+                <div className="h-10 flex items-center justify-center pl-3">
+                  <ChevronRight
+                    className="w-4 h-6 text-white/60"
+                    strokeWidth={2}
+                  />
+                </div>
               </div>
-              <Copy className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
             </div>
           </div>
 
-          {/* Transactions List */}
-          <div className="flex-1 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wide">
-                Activity
-              </h3>
-            </div>
+          {/* Activity Section Header */}
+          <div className="px-4 pt-3 pb-2">
+            <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
+              Activity
+            </p>
+          </div>
 
-            <div className="space-y-2.5 pb-safe">
+          {/* Transactions List */}
+          <div className="flex-1 px-4 pb-4">
+            <div className="flex flex-col gap-2 pb-36">
               {/* Empty State */}
               {incomingTransactions.length === 0 &&
                 outgoingTransactions.length === 0 &&
                 !isLoading && (
-                  <div className="surface-inset flex flex-col items-center justify-center py-16 rounded-xl">
-                    <Clock className="w-8 h-8 text-zinc-600 mb-3" />
-                    <p className="text-zinc-500 text-sm">No activity yet</p>
+                  <div
+                    className="flex flex-col items-center justify-center py-16 rounded-2xl"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.06)",
+                      mixBlendMode: "lighten"
+                    }}
+                  >
+                    <Clock className="w-8 h-8 text-white/40 mb-3" />
+                    <p className="text-white/60 text-base">No activity yet</p>
                   </div>
                 )}
 
-              {/* Incoming */}
+              {/* Incoming Transactions */}
               {incomingTransactions.map(transaction => {
                 const isClaiming = claimingTransactionId === transaction.id;
                 return (
@@ -1090,101 +1123,122 @@ export default function Home() {
                     onClick={() =>
                       !isClaiming && handleOpenTransactionDetails(transaction)
                     }
-                    className={`flex items-center justify-between p-3.5 rounded-xl cursor-pointer transition-all duration-150 hover:brightness-105 active:brightness-95 active:scale-[0.99] ${
+                    className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden cursor-pointer active:opacity-80 transition-opacity ${
                       isClaiming ? "opacity-60 pointer-events-none" : ""
                     }`}
                     style={{
-                      background:
-                        "linear-gradient(180deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.06) 100%)",
-                      border: "1px solid rgba(16,185,129,0.2)",
-                      borderBottomColor: "rgba(0,0,0,0.15)",
-                      boxShadow:
-                        "0 1px 0 0 rgba(16,185,129,0.1) inset, 0 4px 12px -4px rgba(0,0,0,0.4)"
+                      background: "rgba(255, 255, 255, 0.06)",
+                      mixBlendMode: "lighten"
                     }}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shadow-sm">
+                    {/* Left - Icon */}
+                    <div className="py-1.5 pr-3">
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center"
+                        style={{ background: "rgba(50, 229, 94, 0.15)" }}
+                      >
                         <ArrowDown
-                          className="w-5 h-5 text-emerald-400"
-                          strokeWidth={2}
+                          className="w-7 h-7"
+                          strokeWidth={1.5}
+                          style={{ color: "#32e55e" }}
                         />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-white/90 font-medium text-sm">
-                            Received
-                          </p>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/25 text-emerald-300 font-medium">
-                            Claim
-                          </span>
-                        </div>
-                        <p className="text-zinc-400 text-xs mono">
-                          from {formatSenderAddress(transaction.sender)}
-                        </p>
-                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-emerald-400 font-semibold text-sm">
+
+                    {/* Middle - Text */}
+                    <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                      <p className="text-base text-white leading-5">Recieved</p>
+                      <p className="text-[13px] text-white/60 leading-4">
+                        from {formatSenderAddress(transaction.sender)}
+                      </p>
+                    </div>
+
+                    {/* Right - Value */}
+                    <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
+                      <p
+                        className="text-base leading-5"
+                        style={{ color: "#32e55e" }}
+                      >
                         +{formatTransactionAmount(transaction.amountLamports)}{" "}
                         SOL
                       </p>
-                      {isClaiming && (
-                        <span className="text-xs text-zinc-500 animate-pulse">
-                          Claiming...
-                        </span>
-                      )}
+                      <p className="text-[13px] text-white/60 leading-4">
+                        {isClaiming ? "Claiming..." : "Today, 11:05 PM"}
+                      </p>
                     </div>
                   </div>
                 );
               })}
 
-              {/* Outgoing - non-interactive, flat/recessed style */}
+              {/* Outgoing Transactions */}
               {outgoingTransactions.map(transaction => {
                 const isPending = transaction.type === "pending";
                 return (
                   <div
                     key={transaction.id}
-                    className={`flex items-center justify-between p-3.5 rounded-xl ${
-                      isPending
-                        ? "bg-amber-500/[0.06] border border-amber-500/10"
-                        : "bg-white/[0.02] border border-white/[0.04]"
-                    }`}
+                    className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.06)",
+                      mixBlendMode: "lighten"
+                    }}
                   >
-                    <div className="flex items-center gap-3">
+                    {/* Left - Icon */}
+                    <div className="py-1.5 pr-3">
                       <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                          isPending
-                            ? "bg-amber-500/10 text-amber-400"
-                            : "bg-white/[0.04] text-zinc-500"
-                        }`}
+                        className="w-12 h-12 rounded-full flex items-center justify-center"
+                        style={{
+                          background: isPending
+                            ? "rgba(0, 177, 251, 0.15)"
+                            : "rgba(255, 255, 255, 0.06)",
+                          mixBlendMode: isPending ? "normal" : "lighten"
+                        }}
                       >
                         {isPending ? (
-                          <Clock className="w-5 h-5 animate-pulse" />
+                          <Clock
+                            className="w-7 h-7"
+                            strokeWidth={1.5}
+                            style={{ color: "#00b1fb" }}
+                          />
                         ) : (
-                          <ArrowUp className="w-5 h-5" strokeWidth={2} />
+                          <ArrowUp
+                            className="w-7 h-7 text-white/60"
+                            strokeWidth={1.5}
+                          />
                         )}
                       </div>
-                      <div>
-                        <p className="text-white/70 font-medium text-sm">
-                          {isPending ? "To be claimed..." : "Sent"}
-                        </p>
-                        <p className="text-zinc-600 text-xs mono">
-                          {isPending ? "by" : "to"}{" "}
-                          {transaction.recipient?.startsWith("@")
-                            ? transaction.recipient
-                            : formatSenderAddress(transaction.recipient || "")}
-                        </p>
-                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-white/60 font-medium text-sm">
-                        -{formatTransactionAmount(transaction.amountLamports)}{" "}
+
+                    {/* Middle - Text */}
+                    <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                      <p className="text-base text-white leading-5">
+                        {isPending ? "To be claimed" : "Sent"}
+                      </p>
+                      <p className="text-[13px] text-white/60 leading-4">
+                        {isPending ? "by" : "to"}{" "}
+                        {transaction.recipient?.startsWith("@")
+                          ? transaction.recipient
+                          : formatSenderAddress(transaction.recipient || "")}
+                      </p>
+                    </div>
+
+                    {/* Right - Value */}
+                    <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
+                      <p
+                        className="text-base leading-5"
+                        style={{ color: isPending ? "#00b1fb" : "white" }}
+                      >
+                        −{formatTransactionAmount(transaction.amountLamports)}{" "}
                         SOL
                       </p>
-                      <p className="text-xs text-zinc-600">
+                      <p className="text-[13px] text-white/60 leading-4">
+                        {new Date(transaction.timestamp).toLocaleDateString(
+                          "en-US",
+                          { month: "short", day: "numeric" }
+                        )}
+                        ,{" "}
                         {new Date(transaction.timestamp).toLocaleTimeString(
                           [],
-                          { hour: "2-digit", minute: "2-digit" }
+                          { hour: "numeric", minute: "2-digit" }
                         )}
                       </p>
                     </div>
@@ -1193,6 +1247,17 @@ export default function Home() {
               })}
             </div>
           </div>
+        </div>
+
+        {/* Bottom Fade Gradient */}
+        <div className="fixed bottom-0 left-0 right-0 h-32 z-40 pointer-events-none">
+          <Image
+            src="/icons/fade-up.png"
+            alt=""
+            fill
+            className="object-cover object-bottom"
+            priority
+          />
         </div>
       </main>
 

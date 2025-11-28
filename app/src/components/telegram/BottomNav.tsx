@@ -1,21 +1,20 @@
 "use client";
 
 import { hapticFeedback } from "@telegram-apps/sdk-react";
-import { Bot, LayoutGrid, User, Wallet } from "lucide-react";
+import { Brain, LayoutGrid, User, Wallet } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 type NavItem = {
   href: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
 };
 
 const navItems: NavItem[] = [
-  { href: "/telegram/overview", label: "Overview", icon: LayoutGrid },
-  { href: "/telegram/wallet", label: "Wallet", icon: Wallet },
-  { href: "/telegram/agents", label: "Agents", icon: Bot },
-  { href: "/telegram/profile", label: "Profile", icon: User }
+  { href: "/telegram/overview", icon: LayoutGrid },
+  { href: "/telegram/wallet", icon: Wallet },
+  { href: "/telegram/agents", icon: Brain },
+  { href: "/telegram/profile", icon: User }
 ];
 
 export default function BottomNav() {
@@ -28,19 +27,21 @@ export default function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 pb-safe">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 overflow-hidden"
+      style={{ backdropFilter: "blur(22px)" }}
+    >
       <div
-        className="mx-auto max-w-md px-3"
+        className="mx-auto max-w-md px-4 pb-2"
         style={{
-          paddingBottom: "max(6px, env(safe-area-inset-bottom))"
+          paddingBottom: "max(8px, env(safe-area-inset-bottom))"
         }}
       >
         <div
-          className="flex items-center justify-around rounded-xl px-1 py-1"
+          className="flex items-center p-1 rounded-full"
           style={{
-            background: "rgba(28, 31, 38, 0.95)",
-            border: "1px solid rgba(255, 255, 255, 0.06)",
-            backdropFilter: "blur(20px)"
+            background: "rgba(128, 128, 128, 0.1)",
+            mixBlendMode: "luminosity"
           }}
         >
           {navItems.map(item => {
@@ -54,24 +55,19 @@ export default function BottomNav() {
                 key={item.href}
                 href={item.href}
                 onClick={handleNavClick}
-                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-150 ${
+                className={`flex-1 flex items-center justify-center py-3 rounded-full transition-all duration-150 ${
                   isActive
-                    ? "bg-white/10"
-                    : "active:bg-white/10"
+                    ? "bg-white/[0.06]"
+                    : "active:bg-white/[0.04]"
                 }`}
+                style={isActive ? { mixBlendMode: "lighten" } : undefined}
               >
                 <Icon
-                  className={`w-4 h-4 transition-colors ${
-                    isActive ? "text-white" : "text-zinc-500"
+                  className={`w-7 h-7 transition-colors ${
+                    isActive ? "text-white" : "text-white/60"
                   }`}
+                  strokeWidth={1.5}
                 />
-                <span
-                  className={`text-[9px] font-medium transition-colors ${
-                    isActive ? "text-white" : "text-zinc-500"
-                  }`}
-                >
-                  {item.label}
-                </span>
               </Link>
             );
           })}
