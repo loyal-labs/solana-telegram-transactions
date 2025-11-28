@@ -27,10 +27,7 @@ export default function BottomNav() {
   };
 
   return (
-    <nav
-      className="fixed bottom-0 left-0 right-0 z-50 overflow-hidden"
-      style={{ backdropFilter: "blur(22px)" }}
-    >
+    <nav className="fixed bottom-0 left-0 right-0 z-50">
       <div
         className="mx-auto max-w-md px-4 pb-2"
         style={{
@@ -38,10 +35,10 @@ export default function BottomNav() {
         }}
       >
         <div
-          className="flex items-center p-1 rounded-full"
+          className="flex items-center p-1 rounded-full overflow-hidden"
           style={{
             background: "rgba(128, 128, 128, 0.1)",
-            mixBlendMode: "luminosity"
+            backdropFilter: "blur(22px)"
           }}
         >
           {navItems.map(item => {

@@ -4,7 +4,6 @@ import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import {
   ArrowLeft,
-  ChevronRight,
   Delete,
   Plus,
   RefreshCw,
@@ -14,7 +13,8 @@ import {
   Wallet,
   X
 } from "lucide-react";
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 export type SendSheetProps = {
   trigger?: ReactNode | null;
@@ -41,26 +41,11 @@ export const isValidTelegramUsername = (username: string): boolean => {
 };
 
 const MOCK_CONTACTS = [
-  { name: "Alice", username: "@alice", initials: "A", gradient: "from-pink-500 to-rose-500" },
-  { name: "Bob", username: "@bob", initials: "B", gradient: "from-blue-500 to-cyan-500" },
-  { name: "Carol", username: "@carol", initials: "C", gradient: "from-emerald-500 to-teal-500" },
-  { name: "Dave", username: "@dave", initials: "D", gradient: "from-amber-500 to-orange-500" },
+  { name: "Alice", username: "@alice_wonderland", avatar: "https://avatars.githubusercontent.com/u/537414?v=4" },
+  { name: "Arthur", username: "@arthur_morgan", avatar: "https://avatars.githubusercontent.com/u/537414?v=4" },
+  { name: "Bob", username: "@bob_builder", avatar: null },
+  { name: "Carol", username: "@carol_danvers", avatar: null },
 ];
-
-// Shared styles for tactile surfaces
-const surfaceRaised: CSSProperties = {
-  background: "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)",
-  border: "1px solid rgba(255, 255, 255, 0.1)",
-  borderBottomColor: "rgba(0, 0, 0, 0.2)",
-  boxShadow: "0 1px 0 0 rgba(255,255,255,0.05) inset, 0 -1px 0 0 rgba(0,0,0,0.1) inset, 0 4px 12px -2px rgba(0,0,0,0.4), 0 2px 4px -1px rgba(0,0,0,0.2)",
-};
-
-const surfaceInset: CSSProperties = {
-  background: "rgba(0, 0, 0, 0.2)",
-  border: "1px solid rgba(0, 0, 0, 0.3)",
-  borderTopColor: "rgba(0, 0, 0, 0.4)",
-  boxShadow: "0 1px 0 0 rgba(255,255,255,0.03), 0 2px 8px -2px rgba(0,0,0,0.5) inset",
-};
 
 const SOL_PRICE_USD = 180;
 const LAST_AMOUNT_KEY = 'lastSendAmount';
@@ -90,6 +75,25 @@ const saveLastAmount = (solAmount: number) => {
   } catch {}
 };
 
+// Generate initials from name
+const getInitials = (name: string): string => {
+  return name.charAt(0).toUpperCase();
+};
+
+// Generate a consistent color based on name
+const getAvatarColor = (name: string): string => {
+  const colors = [
+    "rgba(99, 102, 241, 0.3)", // indigo
+    "rgba(236, 72, 153, 0.3)", // pink
+    "rgba(34, 197, 94, 0.3)", // green
+    "rgba(249, 115, 22, 0.3)", // orange
+    "rgba(139, 92, 246, 0.3)", // violet
+    "rgba(14, 165, 233, 0.3)", // sky
+  ];
+  const index = name.charCodeAt(0) % colors.length;
+  return colors[index];
+};
+
 export default function SendSheet({
   trigger,
   open,
@@ -104,6 +108,7 @@ export default function SendSheet({
   const [recipient, setRecipient] = useState("");
   const [currency, setCurrency] = useState<'SOL' | 'USD'>('SOL');
   const [lastAmount, setLastAmount] = useState<LastAmount | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Reset state when opening
   useEffect(() => {
@@ -114,6 +119,17 @@ export default function SendSheet({
       setLastAmount(getLastAmount());
     }
   }, [open, initialRecipient]);
+
+  // Auto-focus input on step 1
+  useEffect(() => {
+    if (open && step === 1) {
+      // Delay to allow modal animation
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [open, step]);
 
   // Save last amount when moving to step 3 (confirmation)
   useEffect(() => {
@@ -219,7 +235,7 @@ export default function SendSheet({
     () =>
       ({
         "--tgui--bg_color": "transparent",
-        "--tgui--divider": "rgba(255, 255, 255, 0.04)",
+        "--tgui--divider": "rgba(255, 255, 255, 0.05)",
       }) as CSSProperties,
     [],
   );
@@ -229,7 +245,7 @@ export default function SendSheet({
   const secondaryDisplay = useMemo(() => {
     const val = parseFloat(amountStr);
     if (isNaN(val)) return currency === 'SOL' ? '≈ $0.00' : '≈ 0.00 SOL';
-    
+
     if (currency === 'SOL') {
       return `≈ $${(val * SOL_PRICE_USD).toFixed(2)}`;
     } else {
@@ -253,6 +269,13 @@ export default function SendSheet({
     </div>
   );
 
+  // Chevron icon component
+  const ChevronIcon = () => (
+    <svg width="16" height="24" viewBox="0 0 16 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5.5 6L11 12L5.5 18" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+
   return (
     <Modal
       aria-label="Send assets"
@@ -260,179 +283,198 @@ export default function SendSheet({
       open={open}
       onOpenChange={onOpenChange}
       style={modalStyle}
-      header={
-        <Modal.Header
-          before={
-            step > 1 && (
-              <button
-                onClick={() => onStepChange((step - 1) as 1 | 2)}
-                className="p-1.5 -ml-1 text-zinc-500 hover:text-white transition-colors rounded-xl hover:bg-white/5 active:scale-95"
-              >
-                <ArrowLeft size={22} strokeWidth={2} />
-              </button>
-            )
-          }
-          after={
-            <Modal.Close>
-              <div className="p-1.5 -mr-1 text-zinc-500 hover:text-white transition-colors rounded-xl hover:bg-white/5 active:scale-95">
-                <X size={22} strokeWidth={2} />
-              </div>
-            </Modal.Close>
-          }
-          style={{
-            background: "linear-gradient(180deg, #1c1f26 0%, #151820 100%)",
-            color: "rgba(255, 255, 255, 0.9)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.06)"
-          }}
-        >
-          <span className="font-semibold tracking-tight text-white/90">
-            {step === 1 ? "Send to" : step === 2 ? "Amount" : "Review"}
-          </span>
-        </Modal.Header>
-      }
+      snapPoints={[1]}
     >
       <div
         style={{
-          background: "linear-gradient(180deg, #151820 0%, #0d0e12 100%)",
-          minHeight: "500px"
+          background: "rgba(38, 38, 38, 0.70)",
+          backdropFilter: "blur(56px)",
+          WebkitBackdropFilter: "blur(56px)",
         }}
-        className="flex flex-col text-white relative overflow-hidden"
+        className="flex flex-col text-white relative overflow-hidden min-h-[500px] rounded-t-3xl"
       >
-        {/* Noise texture for surface feel */}
-        <div
-          className="absolute inset-0 opacity-[0.03] pointer-events-none"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`
-          }}
-        />
-
         <Drawer.Title asChild>
           <VisuallyHidden>Send assets</VisuallyHidden>
         </Drawer.Title>
+
+        {/* Custom Header */}
+        <div className="relative h-[52px] flex items-center justify-center shrink-0">
+          {/* Drag Indicator */}
+          <div
+            className="absolute top-1 left-1/2 -translate-x-1/2 w-9 h-1 rounded-full"
+            style={{ background: "rgba(255, 255, 255, 0.1)" }}
+          />
+
+          {/* Back Button */}
+          {step > 1 && (
+            <button
+              onClick={() => onStepChange((step - 1) as 1 | 2)}
+              className="absolute left-2 p-1.5 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/5 active:scale-95"
+            >
+              <ArrowLeft size={22} strokeWidth={1.5} />
+            </button>
+          )}
+
+          {/* Title */}
+          <span className="text-base font-medium text-white tracking-[-0.176px]">
+            {step === 1 ? "Send to" : step === 2 ? "Amount" : "Review"}
+          </span>
+
+          {/* Close Button */}
+          <Modal.Close>
+            <div
+              className="absolute right-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
+              style={{
+                background: "rgba(255, 255, 255, 0.06)",
+              }}
+            >
+              <X size={24} strokeWidth={1.5} className="text-white/60" />
+            </div>
+          </Modal.Close>
+        </div>
 
         {/* Steps Container with Slide Animation */}
         <div className="relative flex-1 overflow-hidden">
           {/* STEP 1: RECIPIENT */}
           <div
-            className="absolute inset-0 p-6 flex flex-col gap-5 overflow-y-auto transition-all duration-300 ease-out"
+            className="absolute inset-0 flex flex-col overflow-y-auto transition-all duration-300 ease-out"
             style={{
               transform: `translateX(${(1 - step) * 100}%)`,
               opacity: step === 1 ? 1 : 0,
               pointerEvents: step === 1 ? 'auto' : 'none'
             }}
           >
-            <div className="relative group">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-zinc-300 transition-colors duration-300 z-10">
-                <Search size={18} strokeWidth={2.5} />
-              </div>
-              <input
-                type="text"
-                placeholder="Address or @username"
-                value={recipient}
-                onChange={(e) => {
-                    const val = e.target.value;
-                    if (/^[a-zA-Z0-9@.]*$/.test(val)) {
+            {/* Search Input */}
+            <div className="px-4 pt-2 pb-2">
+              <div className="flex flex-col gap-2">
+                <div
+                  className="flex items-center rounded-xl overflow-hidden"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                  }}
+                >
+                  <div className="pl-3 pr-3 py-3 flex items-center justify-center">
+                    <Search size={24} strokeWidth={1.5} className="text-white/40" />
+                  </div>
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    placeholder="Adress or @username"
+                    value={recipient}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (/^[a-zA-Z0-9@._]*$/.test(val)) {
                         setRecipient(val);
-                    }
-                }}
-                style={{
-                  ...surfaceInset,
-                  paddingTop: "14px",
-                  paddingBottom: "14px",
-                  paddingLeft: "48px",
-                  paddingRight: "16px",
-                }}
-                className="w-full rounded-xl text-white/70 placeholder:text-zinc-600 focus:outline-none focus:text-white transition-all font-mono text-sm relative z-0"
-                autoFocus
-              />
+                      }
+                    }}
+                    className="flex-1 py-3.5 pr-3 bg-transparent text-base text-white placeholder:text-white/40 focus:outline-none"
+                  />
+                </div>
+                {/* Validation Error - always reserve space to prevent layout shift */}
+                <div className="h-4 px-1">
+                  {recipient.trim().length > 0 && !isValidSolanaAddress(recipient) && !isValidTelegramUsername(recipient) && (
+                    <p className="text-[13px] text-red-400 leading-4">Invalid address</p>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Manual Entry Confirm */}
-            {recipient.trim().length > 0 && (
+            {/* Suggested Section Header */}
+            <div className="px-4 pt-3 pb-2">
+              <p className="text-base font-medium text-white tracking-[-0.176px]">Suggested</p>
+            </div>
+
+            {/* Contact List */}
+            <div className="pb-4">
+              {/* Choose Contact Button */}
               <button
                 onClick={() => {
-                     if (isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient)) {
-                         handleRecipientSelect(recipient)
-                     }
+                  // TODO: Implement contact picker
+                  console.log("Choose contact clicked");
                 }}
-                disabled={!(isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient))}
-                style={(isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient)) ? surfaceRaised : undefined}
-                className={`flex items-center justify-between p-4 rounded-xl transition-all duration-200 group ${
-                    (isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient))
-                    ? "cursor-pointer active:translate-y-[1px] active:shadow-[0_1px_2px_0_rgba(0,0,0,0.2)]"
-                    : "bg-red-500/[0.03] border border-red-500/10 opacity-50 cursor-not-allowed"
-                }`}
+                className="w-full flex items-center px-3 py-1 rounded-2xl active:bg-white/[0.03] transition-colors"
               >
-                <div className="flex items-center gap-4 overflow-hidden">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                       (isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient))
-                       ? "bg-gradient-to-br from-indigo-500/80 to-purple-600/80 text-white shadow-[0_4px_12px_-2px_rgba(99,102,241,0.4)]"
-                       : "bg-zinc-800/50 text-zinc-500"
-                  }`}>
-                    <Wallet size={18} strokeWidth={2} />
-                  </div>
-                  <div className="flex flex-col overflow-hidden items-start">
-                    <span className={`text-sm font-semibold truncate ${
-                         (isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient))
-                         ? "text-white"
-                         : "text-red-400/80"
-                    }`}>
-                        {(isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient)) ? "Send to this address" : "Invalid address"}
-                    </span>
-                    <span className="text-xs text-zinc-500 truncate font-mono max-w-[200px]">{recipient}</span>
+                <div className="py-1.5 pr-3">
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.06)",
+                      mixBlendMode: "lighten"
+                    }}
+                  >
+                    <Plus size={28} strokeWidth={1.5} className="text-white/60" />
                   </div>
                 </div>
-                {(isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient)) && (
-                    <ChevronRight size={18} className="text-zinc-600 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
-                )}
+                <div className="flex-1 flex flex-col gap-0.5 py-2.5">
+                  <p className="text-base text-white text-left leading-5">Choose contact</p>
+                  <p className="text-[13px] text-white/60 text-left leading-4">from Telegram</p>
+                </div>
+                <div className="pl-3 py-2 flex items-center justify-center h-10">
+                  <ChevronIcon />
+                </div>
               </button>
-            )}
 
-            {/* Recent Contacts */}
-            <div className="mt-2">
-              <h3 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-[0.15em] mb-4 px-1">
-                Suggested
-              </h3>
-              <div className="flex flex-col gap-1">
-                {/* Choose Contact Button */}
+              {/* Contact Items */}
+              {MOCK_CONTACTS.map((contact) => (
                 <button
-                  onClick={() => {
-                    // TODO: Implement contact picker
-                    console.log("Choose contact clicked");
-                  }}
-                  className="flex items-center justify-between p-3.5 rounded-xl transition-all group cursor-pointer bg-white/[0.015] border border-dashed border-white/[0.08] hover:bg-white/[0.03] active:bg-white/[0.05]"
+                  key={contact.username}
+                  onClick={() => handleRecipientSelect(contact.username)}
+                  className="w-full flex items-center px-3 py-1 rounded-2xl active:bg-white/[0.03] transition-colors"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-sm group-hover:scale-105 group-active:scale-95 transition-transform">
-                      <Plus className="w-5 h-5 text-indigo-400" strokeWidth={2.5} />
-                    </div>
-                    <div className="flex flex-col items-start">
-                      <span className="text-sm font-medium text-white/80 group-hover:text-white transition-colors">Choose contact</span>
-                      <span className="text-xs text-zinc-600">from Telegram</span>
+                  <div className="py-1.5 pr-3">
+                    {contact.avatar ? (
+                      <div className="w-12 h-12 rounded-full overflow-hidden relative">
+                        <Image
+                          src={contact.avatar}
+                          alt={contact.name}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white font-medium text-lg"
+                        style={{ background: getAvatarColor(contact.name) }}
+                      >
+                        {getInitials(contact.name)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 flex flex-col gap-0.5 py-2.5">
+                    <p className="text-base text-white text-left leading-5">{contact.name}</p>
+                    <p className="text-[13px] text-white/60 text-left leading-4">{contact.username}</p>
+                  </div>
+                  <div className="pl-3 py-2 flex items-center justify-center h-10">
+                    <ChevronIcon />
+                  </div>
+                </button>
+              ))}
+
+              {/* Manual Entry - Show when typing a valid address/username */}
+              {recipient.trim().length > 0 && (isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient)) && (
+                <button
+                  onClick={() => handleRecipientSelect(recipient)}
+                  className="w-full flex items-center px-3 py-1 rounded-2xl active:bg-white/[0.03] transition-colors"
+                >
+                  <div className="py-1.5 pr-3">
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center"
+                      style={{
+                        background: "rgba(99, 102, 241, 0.2)",
+                      }}
+                    >
+                      <Wallet size={24} strokeWidth={1.5} className="text-indigo-400" />
                     </div>
                   </div>
-                  <ChevronRight size={16} className="text-zinc-700 group-hover:text-zinc-500 transition-colors" />
+                  <div className="flex-1 flex flex-col gap-0.5 py-2.5">
+                    <p className="text-base text-white text-left leading-5">Send to address</p>
+                    <p className="text-[13px] text-white/60 text-left leading-4 truncate max-w-[200px]">{recipient}</p>
+                  </div>
+                  <div className="pl-3 py-2 flex items-center justify-center h-10">
+                    <ChevronIcon />
+                  </div>
                 </button>
-
-                {MOCK_CONTACTS.map((contact) => (
-                  <button
-                    key={contact.username}
-                    onClick={() => handleRecipientSelect(contact.username)}
-                    className="flex items-center justify-between p-3.5 rounded-xl transition-all group cursor-pointer bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] active:bg-white/[0.06]"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${contact.gradient} flex items-center justify-center text-white font-semibold text-sm shadow-lg group-hover:scale-105 group-active:scale-95 transition-transform`}>
-                        {contact.initials}
-                      </div>
-                      <div className="flex flex-col items-start">
-                        <span className="text-sm font-medium text-white/90 group-hover:text-white transition-colors">{contact.name}</span>
-                        <span className="text-xs text-zinc-600 font-mono">{contact.username}</span>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className="text-zinc-700 group-hover:text-zinc-500 transition-colors" />
-                  </button>
-                ))}
-              </div>
+              )}
             </div>
           </div>
 

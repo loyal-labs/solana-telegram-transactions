@@ -16,13 +16,7 @@ import {
   useSignal,
   viewport
 } from "@telegram-apps/sdk-react";
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronRight,
-  Clock,
-  Copy
-} from "lucide-react";
+import { ArrowDown, ArrowUp, Clock, Copy } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import React from "react";
@@ -1072,18 +1066,10 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Right - Value & Chevron */}
-              <div className="flex items-center pl-3">
-                <div className="flex flex-col items-end gap-0.5 py-2.5">
-                  <p className="text-base text-white leading-5">1,267</p>
-                  <p className="text-[13px] text-white/60 leading-4">$2.12</p>
-                </div>
-                <div className="h-10 flex items-center justify-center pl-3">
-                  <ChevronRight
-                    className="w-4 h-6 text-white/60"
-                    strokeWidth={2}
-                  />
-                </div>
+              {/* Right - Value */}
+              <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
+                <p className="text-base text-white leading-5">1,267</p>
+                <p className="text-[13px] text-white/60 leading-4">$2.12</p>
               </div>
             </div>
           </div>
@@ -1114,16 +1100,13 @@ export default function Home() {
                   </div>
                 )}
 
-              {/* Incoming Transactions */}
+              {/* Incoming Transactions (Claimable) */}
               {incomingTransactions.map(transaction => {
                 const isClaiming = claimingTransactionId === transaction.id;
                 return (
                   <div
                     key={transaction.id}
-                    onClick={() =>
-                      !isClaiming && handleOpenTransactionDetails(transaction)
-                    }
-                    className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden cursor-pointer active:opacity-80 transition-opacity ${
+                    className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden ${
                       isClaiming ? "opacity-60 pointer-events-none" : ""
                     }`}
                     style={{
@@ -1153,18 +1136,23 @@ export default function Home() {
                       </p>
                     </div>
 
-                    {/* Right - Value */}
-                    <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
-                      <p
-                        className="text-base leading-5"
-                        style={{ color: "#32e55e" }}
+                    {/* Right - Claim Button */}
+                    <div className="py-2.5 pl-3">
+                      <button
+                        onClick={() =>
+                          !isClaiming &&
+                          handleOpenTransactionDetails(transaction)
+                        }
+                        className="px-4 py-2 rounded-full text-sm text-white leading-5 active:opacity-80 transition-opacity"
+                        style={{
+                          background:
+                            "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
+                        }}
                       >
-                        +{formatTransactionAmount(transaction.amountLamports)}{" "}
-                        SOL
-                      </p>
-                      <p className="text-[13px] text-white/60 leading-4">
-                        {isClaiming ? "Claiming..." : "Today, 11:05 PM"}
-                      </p>
+                        {isClaiming
+                          ? "Claiming..."
+                          : `Claim ${formatTransactionAmount(transaction.amountLamports)} SOL`}
+                      </button>
                     </div>
                   </div>
                 );
