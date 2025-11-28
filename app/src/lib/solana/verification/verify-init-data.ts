@@ -1,5 +1,4 @@
 import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
-import { AnchorWallet } from "@solana/wallet-adapter-react";
 import {
   Ed25519Program,
   PublicKey,
