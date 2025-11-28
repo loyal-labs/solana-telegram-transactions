@@ -162,16 +162,20 @@ export default function SendSheet({
   }, [amountStr]);
 
   // Prevent backspace from navigating when on step 2
+  // We use a ref to track current amountStr to avoid stale closure issues
+  const amountStrRef = useRef(amountStr);
+  useEffect(() => {
+    amountStrRef.current = amountStr;
+  }, [amountStr]);
+
   useEffect(() => {
     if (!open || step !== 2) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Backspace') {
-        // Only prevent if we're not in an input or if input is empty
-        const target = e.target as HTMLElement;
-        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-
-        if (!isInput || (isInput && !(target as HTMLInputElement).value)) {
+        // Only prevent if amount is empty (to avoid Telegram navigation)
+        // Let the input handle backspace when there's content
+        if (!amountStrRef.current) {
           e.preventDefault();
           e.stopPropagation();
         }
@@ -244,8 +248,10 @@ export default function SendSheet({
     onStepChange(2);
   };
 
-  const handlePresetAmount = (val: number) => {
-    setAmountStr(val.toString());
+  const handlePresetAmount = (val: number | string) => {
+    // Ensure we set a clean string value
+    const strVal = typeof val === 'string' ? val : val.toString();
+    setAmountStr(strVal);
     // Re-focus the input after selecting preset
     setTimeout(() => {
       amountInputRef.current?.focus();
@@ -277,6 +283,14 @@ export default function SendSheet({
   const ChevronIcon = () => (
     <svg width="16" height="24" viewBox="0 0 16 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M5.5 6L11 12L5.5 18" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+
+  // Arrow up/down icon for currency switch
+  const ArrowUpDownIcon = () => (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9.33 5.25V22.75M9.33 22.75L5.25 18.67M9.33 22.75L13.42 18.67" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M18.67 22.75V5.25M18.67 5.25L14.58 9.33M18.67 5.25L22.75 9.33" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 
@@ -313,7 +327,7 @@ export default function SendSheet({
           {step > 1 && (
             <button
               onClick={() => onStepChange((step - 1) as 1 | 2)}
-              className="absolute left-2 p-1.5 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/5 active:scale-95"
+              className="absolute left-2 p-1.5 text-white/60 hover:text-white transition-colors rounded-full bg-white/5 active:scale-95"
             >
               <ArrowLeft size={22} strokeWidth={1.5} />
             </button>
@@ -329,13 +343,13 @@ export default function SendSheet({
           {/* Recipient Pill for Step 2 */}
           {step === 2 && (
             <div
-              className="flex items-center pl-1 pr-3 py-0 rounded-[54px]"
+              className="flex items-center pl-1 pr-3 py-1 rounded-[54px]"
               style={{
                 background: "rgba(255, 255, 255, 0.06)",
                 mixBlendMode: "lighten",
               }}
             >
-              <div className="pr-1.5 py-0">
+              <div className="pr-1.5">
                 <div className="w-7 h-7 rounded-full overflow-hidden relative">
                   <Image
                     src="https://avatars.githubusercontent.com/u/537414?v=4"
@@ -570,25 +584,54 @@ export default function SendSheet({
                   className="absolute inset-0 opacity-0 z-10 cursor-text"
                   autoComplete="off"
                 />
-                {/* Amount Input with Currency */}
-                <div className="flex gap-2 items-baseline relative">
-                  <p
-                    ref={amountTextRef}
-                    className="text-[40px] font-semibold leading-[48px] text-white"
-                  >
-                    {amountStr || ''}
-                  </p>
-                  <p className="text-[28px] font-semibold leading-8 text-white/40 tracking-[0.4px]">
-                    {currency}
-                  </p>
-                  {/* Caret - positioned after the number, vertically centered */}
-                  <div
-                    className="absolute w-[1.5px] h-[44px] bg-white top-1/2 -translate-y-1/2"
-                    style={{
-                      left: `${caretLeft}px`,
-                      animation: 'blink 1s step-end infinite'
+                {/* Amount Input Row with Switch Button */}
+                <div className="flex gap-1 items-end h-[48px]">
+                  {/* Amount Input with Currency */}
+                  <div className="flex-1 flex gap-2 items-baseline relative">
+                    <p
+                      ref={amountTextRef}
+                      className="text-[40px] font-semibold leading-[48px] text-white"
+                    >
+                      {amountStr || '\u200B'}
+                    </p>
+                    <p className="text-[28px] font-semibold leading-8 text-white/40 tracking-[0.4px]">
+                      {currency}
+                    </p>
+                    {/* Caret - positioned after the number, vertically centered */}
+                    <div
+                      className="absolute w-[1.5px] h-[44px] bg-white top-1/2 -translate-y-1/2"
+                      style={{
+                        left: `${caretLeft}px`,
+                        animation: 'blink 1s step-end infinite'
+                      }}
+                    />
+                  </div>
+                  {/* Currency Switch Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Convert the amount when switching
+                      if (amountStr) {
+                        const val = parseFloat(amountStr);
+                        if (!isNaN(val)) {
+                          if (currency === 'SOL') {
+                            setAmountStr((val * SOL_PRICE_USD).toFixed(2));
+                          } else {
+                            setAmountStr((val / SOL_PRICE_USD).toFixed(4));
+                          }
+                        }
+                      }
+                      setCurrency(currency === 'SOL' ? 'USD' : 'SOL');
+                      // Refocus input after switching
+                      setTimeout(() => {
+                        amountInputRef.current?.focus();
+                      }, 0);
                     }}
-                  />
+                    className="z-20 opacity-40 hover:opacity-60 transition-opacity text-white shrink-0 mb-1"
+                  >
+                    <ArrowUpDownIcon />
+                  </button>
                 </div>
                 {/* USD Conversion */}
                 <p className="text-base leading-5 text-white/40 h-[22px]">
@@ -632,7 +675,16 @@ export default function SendSheet({
                   </button>
                 ))}
                 <button
-                  onClick={() => handlePresetAmount(balanceInSol)}
+                  onClick={() => {
+                    // Format based on current currency
+                    if (currency === 'SOL') {
+                      const maxVal = balanceInSol.toFixed(4).replace(/\.?0+$/, '');
+                      handlePresetAmount(maxVal || '0');
+                    } else {
+                      const maxVal = balanceInUsd.toFixed(2).replace(/\.?0+$/, '');
+                      handlePresetAmount(maxVal || '0');
+                    }
+                  }}
                   className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm font-normal leading-5 text-white text-center transition-all active:opacity-70"
                   style={{
                     background: "rgba(255, 255, 255, 0.06)",
