@@ -400,7 +400,7 @@ export default function ReceiveSheet({
                 <StyledQRCode
                   value={address}
                   size={192}
-                  logoSrc="/qr-center-mark.svg"
+                  logoSrc="/Mark.svg"
                   logoSize={48}
                 />
               ) : (
@@ -410,12 +410,14 @@ export default function ReceiveSheet({
               )}
             </div>
 
-            {/* Address Display */}
-            <p
-              className="text-center text-sm text-white/80 leading-5 mt-4 font-mono break-all max-w-[192px]"
+            {/* Address Display - Clickable to copy */}
+            <button
+              onClick={copyAddress}
+              disabled={!address || isLoading}
+              className="text-center text-sm text-white/80 leading-5 mt-4 font-mono break-all max-w-[192px] active:opacity-70 transition-opacity disabled:opacity-50"
             >
-              {isLoading ? "Loading..." : address || "—"}
-            </p>
+              {isLoading ? "Loading..." : copied ? "Copied!" : address || "—"}
+            </button>
           </div>
 
           {/* Action Buttons */}

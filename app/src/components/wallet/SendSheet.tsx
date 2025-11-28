@@ -167,6 +167,11 @@ export default function SendSheet({
       }, 300);
       return () => clearTimeout(timer);
     }
+    if (open && step === 3) {
+      // Blur inputs to close keyboard on Review step
+      amountInputRef.current?.blur();
+      inputRef.current?.blur();
+    }
   }, [open, step]);
 
   // Update caret position based on actual text width

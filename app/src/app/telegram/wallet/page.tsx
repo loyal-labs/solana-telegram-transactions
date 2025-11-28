@@ -16,7 +16,7 @@ import {
   useSignal,
   viewport
 } from "@telegram-apps/sdk-react";
-import { ArrowDown, ArrowUp, Clock, Copy } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, Clock, Copy } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import React from "react";
@@ -1237,13 +1237,7 @@ export default function Home() {
 
                 {/* Chevron */}
                 <div className="pl-3 py-2 flex items-center justify-center">
-                  <Image
-                    src="/icons/chevron-right.svg"
-                    alt=""
-                    width={7}
-                    height={12}
-                    className="opacity-60"
-                  />
+                  <ChevronRight size={16} strokeWidth={1.5} className="text-white/60" />
                 </div>
               </button>
             )}
