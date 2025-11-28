@@ -1258,6 +1258,8 @@ export default function Home() {
         onFormValuesChange={handleSendFormValuesChange}
         step={sendStep}
         onStepChange={setSendStep}
+        balance={balance}
+        walletAddress={walletAddress ?? undefined}
       />
       <ReceiveSheet
         open={isReceiveSheetOpen}

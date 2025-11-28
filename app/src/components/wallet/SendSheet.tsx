@@ -4,9 +4,7 @@ import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import {
   ArrowLeft,
-  Delete,
   Plus,
-  RefreshCw,
   Search,
   Send,
   User,
@@ -25,6 +23,8 @@ export type SendSheetProps = {
   onFormValuesChange?: (values: { amount: string; recipient: string }) => void;
   step: 1 | 2 | 3;
   onStepChange: (step: 1 | 2 | 3) => void;
+  balance?: number | null; // Balance in lamports
+  walletAddress?: string;
 };
 
 // Basic Solana address validation (base58, 32-44 chars)
@@ -49,6 +49,7 @@ const MOCK_CONTACTS = [
 
 const SOL_PRICE_USD = 180;
 const LAST_AMOUNT_KEY = 'lastSendAmount';
+const LAMPORTS_PER_SOL = 1_000_000_000;
 
 type LastAmount = {
   sol: number;
@@ -103,12 +104,25 @@ export default function SendSheet({
   onFormValuesChange,
   step,
   onStepChange,
+  balance,
+  walletAddress,
 }: SendSheetProps) {
+  // Convert balance from lamports to SOL
+  const balanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
+  const balanceInUsd = balanceInSol * SOL_PRICE_USD;
+
+  // Abbreviate wallet address for display
+  const abbreviatedAddress = walletAddress
+    ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
+    : '';
   const [amountStr, setAmountStr] = useState("");
   const [recipient, setRecipient] = useState("");
   const [currency, setCurrency] = useState<'SOL' | 'USD'>('SOL');
   const [lastAmount, setLastAmount] = useState<LastAmount | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const amountInputRef = useRef<HTMLInputElement>(null);
+  const amountTextRef = useRef<HTMLParagraphElement>(null);
+  const [caretLeft, setCaretLeft] = useState(0);
 
   // Reset state when opening
   useEffect(() => {
@@ -120,7 +134,7 @@ export default function SendSheet({
     }
   }, [open, initialRecipient]);
 
-  // Auto-focus input on step 1
+  // Auto-focus input based on step
   useEffect(() => {
     if (open && step === 1) {
       // Delay to allow modal animation
@@ -129,6 +143,43 @@ export default function SendSheet({
       }, 300);
       return () => clearTimeout(timer);
     }
+    if (open && step === 2) {
+      // Focus amount input on step 2
+      const timer = setTimeout(() => {
+        amountInputRef.current?.focus();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [open, step]);
+
+  // Update caret position based on actual text width
+  useEffect(() => {
+    if (amountTextRef.current) {
+      setCaretLeft(amountTextRef.current.offsetWidth);
+    } else {
+      setCaretLeft(0);
+    }
+  }, [amountStr]);
+
+  // Prevent backspace from navigating when on step 2
+  useEffect(() => {
+    if (!open || step !== 2) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Backspace') {
+        // Only prevent if we're not in an input or if input is empty
+        const target = e.target as HTMLElement;
+        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+
+        if (!isInput || (isInput && !(target as HTMLInputElement).value)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [open, step]);
 
   // Save last amount when moving to step 3 (confirmation)
@@ -193,42 +244,12 @@ export default function SendSheet({
     onStepChange(2);
   };
 
-  const handleNumpadPress = (value: string) => {
-    if (value === '.') {
-      if (!amountStr.includes('.')) {
-        setAmountStr(prev => (prev || '0') + '.');
-      }
-    } else if (value === 'delete') {
-      setAmountStr(prev => prev.slice(0, -1));
-    } else {
-      // Prevent too many decimals
-      if (amountStr.includes('.') && amountStr.split('.')[1].length >= (currency === 'SOL' ? 4 : 2)) {
-        return;
-      }
-      setAmountStr(prev => prev + value);
-    }
-  };
-
   const handlePresetAmount = (val: number) => {
     setAmountStr(val.toString());
-  };
-
-  const toggleCurrency = () => {
-    const currentVal = parseFloat(amountStr);
-    if (isNaN(currentVal)) {
-      setCurrency(prev => prev === 'SOL' ? 'USD' : 'SOL');
-      return;
-    }
-
-    if (currency === 'SOL') {
-      // SOL to USD
-      setAmountStr((currentVal * SOL_PRICE_USD).toFixed(2));
-      setCurrency('USD');
-    } else {
-      // USD to SOL
-      setAmountStr((currentVal / SOL_PRICE_USD).toFixed(4));
-      setCurrency('SOL');
-    }
+    // Re-focus the input after selecting preset
+    setTimeout(() => {
+      amountInputRef.current?.focus();
+    }, 0);
   };
 
   const modalStyle = useMemo(
@@ -241,7 +262,6 @@ export default function SendSheet({
   );
 
   // Computed display values
-  const displayAmount = amountStr || "0";
   const secondaryDisplay = useMemo(() => {
     const val = parseFloat(amountStr);
     if (isNaN(val)) return currency === 'SOL' ? '≈ $0.00' : '≈ 0.00 SOL';
@@ -252,22 +272,6 @@ export default function SendSheet({
       return `≈ ${(val / SOL_PRICE_USD).toFixed(4)} SOL`;
     }
   }, [amountStr, currency]);
-
-  // Recipient info for Step 2 and 3 - flat/non-interactive display
-  const RecipientInfo = () => (
-    <div
-      style={{
-        background: "rgba(0, 0, 0, 0.15)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
-      }}
-      className="flex items-center gap-3 px-4 py-2.5 rounded-xl w-auto max-w-full"
-    >
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500/70 to-purple-600/70 flex items-center justify-center shrink-0">
-             {recipient.startsWith('@') ? <User size={14} className="text-white" /> : <Wallet size={14} className="text-white" />}
-        </div>
-        <span className="text-sm text-zinc-300 font-medium truncate max-w-[200px] font-mono tracking-tight">{recipient}</span>
-    </div>
-  );
 
   // Chevron icon component
   const ChevronIcon = () => (
@@ -315,10 +319,44 @@ export default function SendSheet({
             </button>
           )}
 
-          {/* Title */}
-          <span className="text-base font-medium text-white tracking-[-0.176px]">
-            {step === 1 ? "Send to" : step === 2 ? "Amount" : "Review"}
-          </span>
+          {/* Title - changes based on step */}
+          {step === 1 && (
+            <span className="text-base font-medium text-white tracking-[-0.176px]">
+              Send to
+            </span>
+          )}
+
+          {/* Recipient Pill for Step 2 */}
+          {step === 2 && (
+            <div
+              className="flex items-center pl-1 pr-3 py-0 rounded-[54px]"
+              style={{
+                background: "rgba(255, 255, 255, 0.06)",
+                mixBlendMode: "lighten",
+              }}
+            >
+              <div className="pr-1.5 py-0">
+                <div className="w-7 h-7 rounded-full overflow-hidden relative">
+                  <Image
+                    src="https://avatars.githubusercontent.com/u/537414?v=4"
+                    alt="Recipient"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              </div>
+              <span className="text-sm leading-5">
+                <span className="text-white/60">Send to </span>
+                <span className="text-white">{recipient.startsWith('@') ? recipient : `${recipient.slice(0, 4)}...${recipient.slice(-4)}`}</span>
+              </span>
+            </div>
+          )}
+
+          {step === 3 && (
+            <span className="text-base font-medium text-white tracking-[-0.176px]">
+              Review
+            </span>
+          )}
 
           {/* Close Button */}
           <Modal.Close>
@@ -359,7 +397,7 @@ export default function SendSheet({
                   <input
                     ref={inputRef}
                     type="text"
-                    placeholder="Adress or @username"
+                    placeholder="Address or @username"
                     value={recipient}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -480,104 +518,163 @@ export default function SendSheet({
 
           {/* STEP 2: AMOUNT */}
           <div
-            className="absolute inset-0 flex flex-col overflow-y-auto transition-all duration-300 ease-out"
+            className="absolute inset-0 flex flex-col transition-all duration-300 ease-out"
             style={{
               transform: `translateX(${(2 - step) * 100}%)`,
               opacity: step === 2 ? 1 : 0,
               pointerEvents: step === 2 ? 'auto' : 'none'
             }}
+            onKeyDownCapture={(e) => {
+              // Capture backspace at container level to prevent Telegram navigation
+              if (e.key === 'Backspace') {
+                e.stopPropagation();
+                if (!amountStr) {
+                  e.preventDefault();
+                }
+              }
+            }}
           >
-            {/* No additional background needed - uses parent gradient */}
+            {/* Content Area */}
+            <div className="flex-1 flex flex-col px-4 pt-2 pb-4 gap-2.5 overflow-hidden">
+              {/* Amount Input Section */}
+              <div className="px-2 flex flex-col gap-1 relative">
+                {/* Hidden input for keyboard - positioned to cover the area */}
+                <input
+                  ref={amountInputRef}
+                  type="text"
+                  inputMode="decimal"
+                  value={amountStr}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (/^[0-9]*\.?[0-9]*$/.test(val)) {
+                      if (val.includes('.')) {
+                        const [, decimals] = val.split('.');
+                        if (decimals && decimals.length > (currency === 'SOL' ? 4 : 2)) {
+                          return;
+                        }
+                      }
+                      setAmountStr(val);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    // Prevent backspace from triggering navigation
+                    if (e.key === 'Backspace') {
+                      e.stopPropagation();
+                      e.nativeEvent.stopImmediatePropagation();
+                      // Only prevent default if input is empty to avoid going back
+                      if (!amountStr) {
+                        e.preventDefault();
+                      }
+                    }
+                  }}
+                  className="absolute inset-0 opacity-0 z-10 cursor-text"
+                  autoComplete="off"
+                />
+                {/* Amount Input with Currency */}
+                <div className="flex gap-2 items-baseline relative">
+                  <p
+                    ref={amountTextRef}
+                    className="text-[40px] font-semibold leading-[48px] text-white"
+                  >
+                    {amountStr || ''}
+                  </p>
+                  <p className="text-[28px] font-semibold leading-8 text-white/40 tracking-[0.4px]">
+                    {currency}
+                  </p>
+                  {/* Caret - positioned after the number, vertically centered */}
+                  <div
+                    className="absolute w-[1.5px] h-[44px] bg-white top-1/2 -translate-y-1/2"
+                    style={{
+                      left: `${caretLeft}px`,
+                      animation: 'blink 1s step-end infinite'
+                    }}
+                  />
+                </div>
+                {/* USD Conversion */}
+                <p className="text-base leading-5 text-white/40 h-[22px]">
+                  {secondaryDisplay.replace('≈ ', '~')}
+                </p>
+                {/* Blink animation style */}
+                <style jsx>{`
+                  @keyframes blink {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0; }
+                  }
+                `}</style>
+              </div>
 
-            {/* Display Area */}
-            <div className="flex-1 flex flex-col items-center justify-center py-8 gap-6 relative z-10">
-               <RecipientInfo />
-
-               <div className="flex flex-col items-center gap-4 mt-2">
-                   {/* Currency Toggle */}
-                   <button
-                     onClick={toggleCurrency}
-                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.05] text-xs font-semibold text-zinc-400 hover:bg-white/[0.05] active:bg-white/[0.08] transition-all"
-                   >
-                     <RefreshCw size={12} className="opacity-60" />
-                     {currency}
-                   </button>
-
-                   {/* Amount Input Display */}
-                   <div className="flex items-baseline gap-1 text-white relative px-4">
-                     <span className="text-6xl font-bold tracking-tight text-white">
-                        {displayAmount}
-                     </span>
-                     <span className="text-2xl font-medium text-zinc-600 ml-2">
-                        {currency}
-                     </span>
-                   </div>
-
-                   <p className="text-zinc-600 text-sm font-medium">
-                     {secondaryDisplay}
-                   </p>
-               </div>
-            </div>
-
-            {/* Presets & Numpad Container */}
-            <div
-              style={{
-                background: "linear-gradient(180deg, #0d0e12 0%, #0a0b0d 100%)",
-                borderTop: "1px solid rgba(255, 255, 255, 0.06)"
-              }}
-              className="rounded-t-[28px] pb-safe relative z-20"
-            >
-              {/* Presets */}
-              <div className="flex gap-2 px-6 pt-5 pb-3 overflow-x-auto no-scrollbar justify-center">
-                {/* Last used amount */}
+              {/* Quick Amount Presets */}
+              <div className="flex gap-2 w-full">
+                {/* Last used amount (first position) */}
                 {lastAmount && (
                   <button
-                    onClick={() => handlePresetAmount(currency === 'SOL' ? lastAmount.sol : lastAmount.usd)}
-                    className="px-4 py-2 rounded-xl bg-teal-500/[0.08] border border-teal-500/20 text-sm font-medium text-teal-400 hover:bg-teal-500/[0.12] active:bg-teal-500/[0.15] transition-all"
+                    onClick={() => handlePresetAmount(lastAmount.sol)}
+                    className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm font-normal leading-5 text-white text-center transition-all active:opacity-70"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.06)",
+                      mixBlendMode: "lighten",
+                    }}
                   >
-                    {currency === 'SOL' ? lastAmount.sol : `$${lastAmount.usd}`}
+                    {lastAmount.sol}
                   </button>
                 )}
-                {currency === 'SOL' ? (
-                  [0.1, 0.5, 1, 2].map(val => (
-                    <button
-                      key={val}
-                      onClick={() => handlePresetAmount(val)}
-                      className="px-5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.04] text-sm font-medium text-zinc-400 hover:bg-white/[0.05] active:bg-white/[0.08] transition-all"
-                    >
-                      {val}
-                    </button>
-                  ))
-                ) : (
-                  [10, 50, 100, 200].map(val => (
-                    <button
-                      key={val}
-                      onClick={() => handlePresetAmount(val)}
-                      className="px-5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.04] text-sm font-medium text-zinc-400 hover:bg-white/[0.05] active:bg-white/[0.08] transition-all"
-                    >
-                      ${val}
-                    </button>
-                  ))
-                )}
-              </div>
-
-              {/* Numpad */}
-              <div className="grid grid-cols-3 gap-1 px-4 pb-4">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0, 'delete'].map((item) => (
+                {[0.1, 1].map(val => (
                   <button
-                    key={item}
-                    onClick={() => handleNumpadPress(item.toString())}
-                    className="h-14 flex items-center justify-center text-2xl font-medium text-white/90 rounded-xl transition-all active:bg-white/[0.05]"
+                    key={val}
+                    onClick={() => handlePresetAmount(val)}
+                    className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm font-normal leading-5 text-white text-center transition-all active:opacity-70"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.06)",
+                      mixBlendMode: "lighten",
+                    }}
                   >
-                    {item === 'delete' ? (
-                      <Delete size={24} className="text-zinc-500" />
-                    ) : (
-                      item
-                    )}
+                    {val}
                   </button>
                 ))}
+                <button
+                  onClick={() => handlePresetAmount(balanceInSol)}
+                  className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm font-normal leading-5 text-white text-center transition-all active:opacity-70"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    mixBlendMode: "lighten",
+                  }}
+                >
+                  Max
+                </button>
+              </div>
+
+              {/* Balance Card */}
+              <div
+                className="flex items-center pl-3 pr-4 py-1 rounded-2xl overflow-hidden"
+                style={{
+                  background: "rgba(255, 255, 255, 0.06)",
+                  mixBlendMode: "lighten",
+                }}
+              >
+                {/* Left: Solana Icon */}
+                <div className="py-1.5 pr-3">
+                  <div className="w-12 h-12 overflow-hidden flex items-center justify-center">
+                    <Image
+                      src="/icons/solana.svg"
+                      alt="Solana"
+                      width={48}
+                      height={48}
+                    />
+                  </div>
+                </div>
+                {/* Middle: Balance label + wallet address */}
+                <div className="flex-1 flex flex-col gap-0.5 py-2.5">
+                  <p className="text-base leading-5 text-white">Balance</p>
+                  <p className="text-[13px] leading-4 text-white/60">{abbreviatedAddress}</p>
+                </div>
+                {/* Right: Balance amount + USD */}
+                <div className="flex flex-col gap-0.5 items-end py-2.5 pl-3">
+                  <p className="text-base leading-5 text-white text-right">{balanceInSol.toFixed(2)} SOL</p>
+                  <p className="text-[13px] leading-4 text-white/60 text-right">~${balanceInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                </div>
               </div>
             </div>
+
           </div>
 
           {/* STEP 3: CONFIRMATION */}
