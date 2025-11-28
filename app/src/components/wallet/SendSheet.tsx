@@ -231,7 +231,12 @@ export default function SendSheet({
     // For steps 2 and 3, check both amount and recipient
     const amount = parseFloat(amountStr);
     const isAmountValid = !isNaN(amount) && amount > 0 && isFinite(amount);
-    const isValid = isAmountValid && isRecipientValid;
+
+    // Check if amount exceeds balance
+    const amountInSol = currency === 'SOL' ? amount : amount / SOL_PRICE_USD;
+    const hasEnoughBalance = !isNaN(amountInSol) && amountInSol <= balanceInSol;
+
+    const isValid = isAmountValid && isRecipientValid && hasEnoughBalance;
 
     if (step === 2 || step === 3) {
       onValidationChange?.(isValid);
@@ -240,7 +245,7 @@ export default function SendSheet({
 
     // Default to invalid for any other state
     onValidationChange?.(false);
-  }, [step, amountStr, recipient, open, onValidationChange]);
+  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol]);
 
 
   const handleRecipientSelect = (selected: string) => {
@@ -347,21 +352,33 @@ export default function SendSheet({
               style={{
                 background: "rgba(255, 255, 255, 0.06)",
                 mixBlendMode: "lighten",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
               }}
             >
               <div className="pr-1.5">
-                <div className="w-7 h-7 rounded-full overflow-hidden relative">
-                  <Image
-                    src="https://avatars.githubusercontent.com/u/537414?v=4"
-                    alt="Recipient"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
+                {recipient.startsWith('@') ? (
+                  /* Avatar for username */
+                  <div className="w-7 h-7 rounded-full overflow-hidden relative">
+                    <Image
+                      src="https://avatars.githubusercontent.com/u/537414?v=4"
+                      alt="Recipient"
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  /* Wallet icon for address */
+                  <div className="w-7 h-7 rounded-[16.8px] flex items-center justify-center text-white">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-60">
+                      <path d="M15.8333 5.83333V3.33333C15.8333 3.11232 15.7455 2.90036 15.5893 2.74408C15.433 2.5878 15.221 2.5 15 2.5H4.16667C3.72464 2.5 3.30072 2.67559 2.98816 2.98816C2.67559 3.30072 2.5 3.72464 2.5 4.16667C2.5 4.60869 2.67559 5.03262 2.98816 5.34518C3.30072 5.65774 3.72464 5.83333 4.16667 5.83333H16.6667C16.8877 5.83333 17.0996 5.92113 17.2559 6.07741C17.4122 6.23369 17.5 6.44565 17.5 6.66667V10M17.5 10H15C14.558 10 14.1341 10.1756 13.8215 10.4882C13.5089 10.8007 13.3333 11.2246 13.3333 11.6667C13.3333 12.1087 13.5089 12.5326 13.8215 12.8452C14.1341 13.1577 14.558 13.3333 15 13.3333H17.5C17.721 13.3333 17.933 13.2455 18.0893 13.0893C18.2455 12.933 18.3333 12.721 18.3333 12.5V10.8333C18.3333 10.6123 18.2455 10.4004 18.0893 10.2441C17.933 10.0878 17.721 10 17.5 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M2.5 4.16656V15.8332C2.5 16.2753 2.67559 16.6992 2.98816 17.0117C3.30072 17.3243 3.72464 17.4999 4.16667 17.4999H16.6667C16.8877 17.4999 17.0996 17.4121 17.2559 17.2558C17.4122 17.0995 17.5 16.8876 17.5 16.6666V13.3332" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                )}
               </div>
               <span className="text-sm leading-5">
                 <span className="text-white/60">Send to </span>
-                <span className="text-white">{recipient.startsWith('@') ? recipient : `${recipient.slice(0, 4)}...${recipient.slice(-4)}`}</span>
+                <span className="text-white">{recipient.startsWith('@') ? recipient : `${recipient.slice(0, 4)}…${recipient.slice(-4)}`}</span>
               </span>
             </div>
           )}
@@ -422,12 +439,10 @@ export default function SendSheet({
                     className="flex-1 py-3.5 pr-3 bg-transparent text-base text-white placeholder:text-white/40 focus:outline-none"
                   />
                 </div>
-                {/* Validation Error - always reserve space to prevent layout shift */}
-                <div className="h-4 px-1">
-                  {recipient.trim().length > 0 && !isValidSolanaAddress(recipient) && !isValidTelegramUsername(recipient) && (
-                    <p className="text-[13px] text-red-400 leading-4">Invalid address</p>
-                  )}
-                </div>
+                {/* Validation Error */}
+                {recipient.trim().length > 0 && !isValidSolanaAddress(recipient) && !isValidTelegramUsername(recipient) && (
+                  <p className="text-[13px] text-red-400 leading-4 px-1">Invalid address</p>
+                )}
               </div>
             </div>
 
@@ -637,6 +652,16 @@ export default function SendSheet({
                 <p className="text-base leading-5 text-white/40 h-[22px]">
                   {secondaryDisplay.replace('≈ ', '~')}
                 </p>
+                {/* Insufficient balance error */}
+                {(() => {
+                  const val = parseFloat(amountStr);
+                  if (isNaN(val) || val <= 0) return null;
+                  const amountInSol = currency === 'SOL' ? val : val / SOL_PRICE_USD;
+                  if (amountInSol > balanceInSol) {
+                    return <p className="text-[13px] text-red-400 leading-4 px-1">Insufficient balance</p>;
+                  }
+                  return null;
+                })()}
                 {/* Blink animation style */}
                 <style jsx>{`
                   @keyframes blink {
