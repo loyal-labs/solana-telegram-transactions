@@ -89,16 +89,19 @@ type IncomingTransaction = {
 function ActionButton({
   icon,
   label,
-  onClick
+  onClick,
+  disabled
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
-      onClick={onClick}
-      className="flex-1 flex flex-col items-center justify-center gap-2 min-w-0 overflow-hidden rounded-2xl"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className={`flex-1 flex flex-col items-center justify-center gap-2 min-w-0 overflow-hidden rounded-2xl ${disabled ? "opacity-40" : ""}`}
     >
       <div
         className="w-[52px] h-[52px] rounded-full flex items-center justify-center"
@@ -1004,6 +1007,7 @@ export default function Home() {
                 icon={<ArrowUp />}
                 label="Send"
                 onClick={() => handleOpenSendSheet()}
+                disabled={balance === null || balance === 0}
               />
               <ActionButton
                 icon={<ArrowDown />}
