@@ -311,7 +311,7 @@ export default function ReceiveSheet({
     >
       <div
         style={{
-          background: "rgba(38, 38, 38, 0.70)",
+          background: "rgba(38, 38, 38, 0.55)",
           backgroundBlendMode: "luminosity",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",

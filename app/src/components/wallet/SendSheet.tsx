@@ -4,8 +4,10 @@ import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import {
   ArrowLeft,
+  Check,
   Plus,
   Search,
+  ShieldAlert,
   Wallet,
   X
 } from "lucide-react";
@@ -19,12 +21,15 @@ export type SendSheetProps = {
   initialRecipient?: string;
   onValidationChange?: (isValid: boolean) => void;
   onFormValuesChange?: (values: { amount: string; recipient: string }) => void;
-  step: 1 | 2 | 3;
-  onStepChange: (step: 1 | 2 | 3) => void;
+  step: 1 | 2 | 3 | 4;
+  onStepChange: (step: 1 | 2 | 3 | 4) => void;
   balance?: number | null; // Balance in lamports
   walletAddress?: string;
   starsBalance?: number; // Balance in Stars
   onTopUpStars?: () => void; // Callback when user wants to top up Stars
+  // Success/Error step props
+  sentAmountSol?: number; // Amount sent in SOL (for success display)
+  sendError?: string | null; // Error message (if present, shows error state instead of success)
 };
 
 // Basic Solana address validation (base58, 32-44 chars)
@@ -114,6 +119,8 @@ export default function SendSheet({
   walletAddress,
   starsBalance = 0,
   onTopUpStars,
+  sentAmountSol,
+  sendError,
 }: SendSheetProps) {
   // Convert balance from lamports to SOL
   const balanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
@@ -333,7 +340,7 @@ export default function SendSheet({
     >
       <div
         style={{
-          background: "rgba(38, 38, 38, 0.70)",
+          background: "rgba(38, 38, 38, 0.55)",
           backgroundBlendMode: "luminosity",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
@@ -346,8 +353,8 @@ export default function SendSheet({
 
         {/* Custom Header */}
         <div className="relative h-[52px] flex items-center justify-center shrink-0">
-          {/* Back Button */}
-          {step > 1 && (
+          {/* Back Button - only for steps 2 and 3 */}
+          {(step === 2 || step === 3) && (
             <button
               onClick={() => onStepChange((step - 1) as 1 | 2)}
               className="absolute left-2 p-1.5 text-white/60 hover:text-white rounded-full bg-white/5 active:scale-95 active:bg-white/10 transition-all duration-150"
@@ -401,8 +408,8 @@ export default function SendSheet({
             </div>
           )}
 
-          {/* Recipient Pill for Step 3 (same as Step 2) */}
-          {step === 3 && (
+          {/* Recipient Pill for Step 3 and 4 */}
+          {(step === 3 || step === 4) && (
             <div
               className="flex items-center pl-1 pr-3 py-1 rounded-[54px]"
               style={{
@@ -433,7 +440,7 @@ export default function SendSheet({
                 )}
               </div>
               <span className="text-sm leading-5">
-                <span className="text-white/60">Send to </span>
+                <span className="text-white/60">{step === 4 ? "Sent to " : "Send to "}</span>
                 <span className="text-white">{recipient.startsWith('@') ? recipient : `${recipient.slice(0, 4)}…${recipient.slice(-4)}`}</span>
               </span>
             </div>
@@ -1006,6 +1013,117 @@ export default function SendSheet({
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* STEP 4: SUCCESS or ERROR */}
+          <div
+            className="absolute inset-0 flex flex-col transition-all duration-300 ease-out"
+            style={{
+              transform: `translateX(${(4 - step) * 100}%)`,
+              opacity: step === 4 ? 1 : 0,
+              pointerEvents: step === 4 ? 'auto' : 'none'
+            }}
+          >
+            {sendError ? (
+              /* Error Content */
+              <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+                {/* Animated Error Icon */}
+                <div className="relative mb-5">
+                  <div
+                    className="w-[72px] h-[72px] rounded-full flex items-center justify-center"
+                    style={{
+                      background: "#FF4D4D",
+                      animation: step === 4 ? "result-pulse 0.6s ease-out" : "none"
+                    }}
+                  >
+                    <ShieldAlert
+                      className="text-white"
+                      size={40}
+                      strokeWidth={2}
+                      style={{
+                        animation: step === 4 ? "result-icon 0.4s ease-out 0.2s both" : "none"
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Error Text */}
+                <div className="flex flex-col gap-3 items-center text-center max-w-[280px]">
+                  <h2 className="text-2xl font-semibold text-white leading-7">
+                    Transaction failed
+                  </h2>
+                  <p className="text-base leading-5 text-white/60">
+                    {sendError}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              /* Success Content */
+              <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+                {/* Animated Success Icon */}
+                <div className="relative mb-5">
+                  <div
+                    className="w-[72px] h-[72px] rounded-full flex items-center justify-center"
+                    style={{
+                      background: "#2990ff",
+                      animation: step === 4 ? "result-pulse 0.6s ease-out" : "none"
+                    }}
+                  >
+                    <Check
+                      className="text-white"
+                      size={40}
+                      strokeWidth={2.5}
+                      style={{
+                        animation: step === 4 ? "result-icon 0.4s ease-out 0.2s both" : "none"
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Success Text */}
+                <div className="flex flex-col gap-3 items-center text-center max-w-[280px]">
+                  <h2 className="text-2xl font-semibold text-white leading-7">
+                    SOL sent
+                  </h2>
+                  <p className="text-base leading-5 text-white/60">
+                    <span className="text-white">
+                      {sentAmountSol?.toFixed(4).replace(/\.?0+$/, '') || '0'} SOL
+                    </span>
+                    {" "}successfully sent to{" "}
+                    <span className="text-white">
+                      {recipient.startsWith('@') ? recipient : `${recipient.slice(0, 4)}…${recipient.slice(-4)}`}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Animation keyframes */}
+            <style jsx>{`
+              @keyframes result-pulse {
+                0% {
+                  transform: scale(0);
+                  opacity: 0;
+                }
+                50% {
+                  transform: scale(1.1);
+                }
+                100% {
+                  transform: scale(1);
+                  opacity: 1;
+                }
+              }
+              @keyframes result-icon {
+                0% {
+                  transform: scale(0) rotate(-45deg);
+                  opacity: 0;
+                }
+                100% {
+                  transform: scale(1) rotate(0deg);
+                  opacity: 1;
+                }
+              }
+            `}</style>
           </div>
         </div>
       </div>

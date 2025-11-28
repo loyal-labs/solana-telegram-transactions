@@ -129,3 +129,8 @@
 .dialog-overlay {
   z-index: 9999 !important;
 }
+
+/* Make modal overlay more subtle */
+[data-vaul-overlay] {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+}

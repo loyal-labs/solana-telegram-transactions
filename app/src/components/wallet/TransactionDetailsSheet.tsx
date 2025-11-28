@@ -3,7 +3,7 @@
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
-import { Globe, Share, X } from "lucide-react";
+import { Check, Globe, Share, ShieldAlert, X } from "lucide-react";
 import Image from "next/image";
 import {
   type CSSProperties,
@@ -41,6 +41,8 @@ export type TransactionDetailsSheetProps = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   transaction: TransactionDetailsData | null;
+  showSuccess?: boolean; // Show success state after claiming
+  showError?: string | null; // Show error state with message after failed claim
 };
 
 // Wallet icon SVG component
@@ -58,6 +60,8 @@ export default function TransactionDetailsSheet({
   open,
   onOpenChange,
   transaction,
+  showSuccess = false,
+  showError = null,
 }: TransactionDetailsSheetProps) {
   const modalStyle = useMemo(
     () =>
@@ -164,7 +168,7 @@ export default function TransactionDetailsSheet({
     >
       <div
         style={{
-          background: "rgba(38, 38, 38, 0.70)",
+          background: "rgba(38, 38, 38, 0.55)",
           backgroundBlendMode: "luminosity",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
@@ -203,7 +207,9 @@ export default function TransactionDetailsSheet({
               )}
             </div>
             <span className="text-sm leading-5">
-              <span className="text-white/60">{isIncoming ? "Sent from " : "Sent to "}</span>
+              <span className="text-white/60">
+                {showSuccess ? "Claimed from " : showError ? "Claim from " : (isIncoming ? "Sent from " : "Sent to ")}
+              </span>
               <span className="text-white">{abbreviatedAddress}</span>
             </span>
           </div>
@@ -221,109 +227,237 @@ export default function TransactionDetailsSheet({
           </Modal.Close>
         </div>
 
-        {/* Amount Section */}
-        <div className="flex flex-col items-center justify-center px-4 pt-8 pb-6">
-          <div className="flex flex-col items-center gap-1">
-            {/* Amount */}
-            <div className="flex items-baseline gap-2">
-              <p className="text-[40px] font-semibold leading-[48px] text-white">
-                {isIncoming ? "+" : "−"}{formattedAmount}
-              </p>
-              <p className="text-[28px] font-semibold leading-8 text-white/40 tracking-[0.4px]">
-                SOL
+        {/* Content - error view, success view, or details view */}
+        {showError ? (
+          /* Error View */
+          <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+            {/* Animated Error Icon */}
+            <div className="relative mb-5">
+              <div
+                className="w-[72px] h-[72px] rounded-full flex items-center justify-center"
+                style={{
+                  background: "#FF4D4D",
+                  animation: "result-pulse 0.6s ease-out"
+                }}
+              >
+                <ShieldAlert
+                  className="text-white"
+                  size={40}
+                  strokeWidth={2}
+                  style={{
+                    animation: "result-icon 0.4s ease-out 0.2s both"
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Error Text */}
+            <div className="flex flex-col gap-3 items-center text-center max-w-[280px]">
+              <h2 className="text-2xl font-semibold text-white leading-7">
+                Claim failed
+              </h2>
+              <p className="text-base leading-5 text-white/60">
+                {showError}
               </p>
             </div>
-            {/* USD Value */}
-            <p className="text-base leading-[22px] text-white/40 text-center">
-              ≈${amountUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-            {/* Date */}
-            <p className="text-base leading-[22px] text-white/40 text-center">
-              {formatDate(transaction.timestamp)}
-            </p>
+
+            {/* Animation keyframes */}
+            <style jsx>{`
+              @keyframes result-pulse {
+                0% {
+                  transform: scale(0);
+                  opacity: 0;
+                }
+                50% {
+                  transform: scale(1.1);
+                }
+                100% {
+                  transform: scale(1);
+                  opacity: 1;
+                }
+              }
+              @keyframes result-icon {
+                0% {
+                  transform: scale(0) rotate(-45deg);
+                  opacity: 0;
+                }
+                100% {
+                  transform: scale(1) rotate(0deg);
+                  opacity: 1;
+                }
+              }
+            `}</style>
           </div>
-        </div>
-
-        {/* Details Card */}
-        <div className="px-4">
-          <div
-            className="flex flex-col rounded-2xl overflow-hidden"
-            style={{
-              background: "rgba(255, 255, 255, 0.06)",
-              mixBlendMode: "lighten",
-            }}
-          >
-            {/* Status */}
-            <div className="flex flex-col gap-0.5 px-4 py-2.5">
-              <p className="text-[13px] leading-4 text-white/60">Status</p>
-              <p className="text-base leading-5 text-white">{getStatusText(transaction.status)}</p>
+        ) : showSuccess ? (
+          /* Success View */
+          <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+            {/* Animated Success Icon */}
+            <div className="relative mb-5">
+              <div
+                className="w-[72px] h-[72px] rounded-full flex items-center justify-center"
+                style={{
+                  background: "#2990ff",
+                  animation: "result-pulse 0.6s ease-out"
+                }}
+              >
+                <Check
+                  className="text-white"
+                  size={40}
+                  strokeWidth={2.5}
+                  style={{
+                    animation: "result-icon 0.4s ease-out 0.2s both"
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Recipient/Sender */}
-            <div className="flex flex-col gap-0.5 px-4 py-2.5">
-              <p className="text-[13px] leading-4 text-white/60">
-                {isIncoming ? "Sender" : "Recipient"}
+            {/* Success Text */}
+            <div className="flex flex-col gap-3 items-center text-center max-w-[280px]">
+              <h2 className="text-2xl font-semibold text-white leading-7">
+                SOL claimed
+              </h2>
+              <p className="text-base leading-5 text-white/60">
+                <span className="text-white">{formattedAmount} SOL</span>
+                {" "}successfully claimed from{" "}
+                <span className="text-white">{abbreviatedAddress}</span>
               </p>
-              <p className="text-base leading-5 text-white break-all">{fullAddress}</p>
             </div>
 
-            {/* Network Fee (only for outgoing) */}
-            {!isIncoming && (
-              <div className="flex flex-col gap-0.5 px-4 py-2.5">
-                <p className="text-[13px] leading-4 text-white/60">Network fee</p>
-                <p className="text-base leading-5">
-                  <span className="text-white">{networkFeeSol} SOL</span>
-                  <span className="text-white/60"> ≈ ${networkFeeUsd.toFixed(2)}</span>
+            {/* Animation keyframes */}
+            <style jsx>{`
+              @keyframes result-pulse {
+                0% {
+                  transform: scale(0);
+                  opacity: 0;
+                }
+                50% {
+                  transform: scale(1.1);
+                }
+                100% {
+                  transform: scale(1);
+                  opacity: 1;
+                }
+              }
+              @keyframes result-icon {
+                0% {
+                  transform: scale(0) rotate(-45deg);
+                  opacity: 0;
+                }
+                100% {
+                  transform: scale(1) rotate(0deg);
+                  opacity: 1;
+                }
+              }
+            `}</style>
+          </div>
+        ) : (
+          /* Details View */
+          <>
+            {/* Amount Section */}
+            <div className="flex flex-col items-center justify-center px-4 pt-8 pb-6">
+              <div className="flex flex-col items-center gap-1">
+                {/* Amount */}
+                <div className="flex items-baseline gap-2">
+                  <p className="text-[40px] font-semibold leading-[48px] text-white">
+                    {isIncoming ? "+" : "−"}{formattedAmount}
+                  </p>
+                  <p className="text-[28px] font-semibold leading-8 text-white/40 tracking-[0.4px]">
+                    SOL
+                  </p>
+                </div>
+                {/* USD Value */}
+                <p className="text-base leading-[22px] text-white/40 text-center">
+                  ≈${amountUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                {/* Date */}
+                <p className="text-base leading-[22px] text-white/40 text-center">
+                  {formatDate(transaction.timestamp)}
                 </p>
               </div>
-            )}
+            </div>
 
-            {/* Comment (only for incoming) */}
-            {isIncoming && transaction.comment && (
-              <div className="flex flex-col gap-0.5 px-4 py-2.5">
-                <p className="text-[13px] leading-4 text-white/60">Comment</p>
-                <p className="text-base leading-5 text-white">{transaction.comment}</p>
+            {/* Details Card */}
+            <div className="px-4">
+              <div
+                className="flex flex-col rounded-2xl overflow-hidden"
+                style={{
+                  background: "rgba(255, 255, 255, 0.06)",
+                  mixBlendMode: "lighten",
+                }}
+              >
+                {/* Status */}
+                <div className="flex flex-col gap-0.5 px-4 py-2.5">
+                  <p className="text-[13px] leading-4 text-white/60">Status</p>
+                  <p className="text-base leading-5 text-white">{getStatusText(transaction.status)}</p>
+                </div>
+
+                {/* Recipient/Sender */}
+                <div className="flex flex-col gap-0.5 px-4 py-2.5">
+                  <p className="text-[13px] leading-4 text-white/60">
+                    {isIncoming ? "Sender" : "Recipient"}
+                  </p>
+                  <p className="text-base leading-5 text-white break-all">{fullAddress}</p>
+                </div>
+
+                {/* Network Fee (only for outgoing) */}
+                {!isIncoming && (
+                  <div className="flex flex-col gap-0.5 px-4 py-2.5">
+                    <p className="text-[13px] leading-4 text-white/60">Network fee</p>
+                    <p className="text-base leading-5">
+                      <span className="text-white">{networkFeeSol} SOL</span>
+                      <span className="text-white/60"> ≈ ${networkFeeUsd.toFixed(2)}</span>
+                    </p>
+                  </div>
+                )}
+
+                {/* Comment (only for incoming) */}
+                {isIncoming && transaction.comment && (
+                  <div className="flex flex-col gap-0.5 px-4 py-2.5">
+                    <p className="text-[13px] leading-4 text-white/60">Comment</p>
+                    <p className="text-base leading-5 text-white">{transaction.comment}</p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center justify-center gap-2 px-6 pt-8 pb-4">
-          {/* View in Explorer */}
-          <button
-            onClick={handleViewInExplorer}
-            className="flex-1 flex flex-col items-center gap-2 rounded-2xl overflow-hidden group"
-          >
-            <div
-              className="w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-150 group-active:scale-95 group-active:bg-white/10"
-              style={{
-                background: "rgba(255, 255, 255, 0.06)",
-                mixBlendMode: "lighten"
-              }}
-            >
-              <Globe className="w-7 h-7 text-white" strokeWidth={1.5} />
             </div>
-            <span className="text-[13px] text-white/60 leading-4">View in explorer</span>
-          </button>
 
-          {/* Share */}
-          <button
-            onClick={handleShare}
-            className="flex-1 flex flex-col items-center gap-2 rounded-2xl overflow-hidden group"
-          >
-            <div
-              className="w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-150 group-active:scale-95 group-active:bg-white/10"
-              style={{
-                background: "rgba(255, 255, 255, 0.06)",
-                mixBlendMode: "lighten"
-              }}
-            >
-              <Share className="w-7 h-7 text-white" strokeWidth={1.5} />
+            {/* Action Buttons */}
+            <div className="flex items-center justify-center gap-2 px-6 pt-8 pb-4">
+              {/* View in Explorer */}
+              <button
+                onClick={handleViewInExplorer}
+                className="flex-1 flex flex-col items-center gap-2 rounded-2xl overflow-hidden group"
+              >
+                <div
+                  className="w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-150 group-active:scale-95 group-active:bg-white/10"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    mixBlendMode: "lighten"
+                  }}
+                >
+                  <Globe className="w-7 h-7 text-white" strokeWidth={1.5} />
+                </div>
+                <span className="text-[13px] text-white/60 leading-4">View in explorer</span>
+              </button>
+
+              {/* Share */}
+              <button
+                onClick={handleShare}
+                className="flex-1 flex flex-col items-center gap-2 rounded-2xl overflow-hidden group"
+              >
+                <div
+                  className="w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-150 group-active:scale-95 group-active:bg-white/10"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    mixBlendMode: "lighten"
+                  }}
+                >
+                  <Share className="w-7 h-7 text-white" strokeWidth={1.5} />
+                </div>
+                <span className="text-[13px] text-white/60 leading-4">Share</span>
+              </button>
             </div>
-            <span className="text-[13px] text-white/60 leading-4">Share</span>
-          </button>
-        </div>
+          </>
+        )}
       </div>
     </Modal>
   );
