@@ -156,24 +156,9 @@ export default function SendSheet({
     }
   }, [open, initialRecipient]);
 
-  // Auto-focus input based on step
+  // Blur inputs when moving to review/success steps to close keyboard
   useEffect(() => {
-    if (open && step === 1) {
-      // Delay to allow modal animation
-      const timer = setTimeout(() => {
-        inputRef.current?.focus();
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-    if (open && step === 2) {
-      // Focus amount input on step 2
-      const timer = setTimeout(() => {
-        amountInputRef.current?.focus();
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-    if (open && step === 3) {
-      // Blur inputs to close keyboard on Review step
+    if (open && (step === 3 || step === 4)) {
       amountInputRef.current?.blur();
       inputRef.current?.blur();
     }
@@ -293,6 +278,8 @@ export default function SendSheet({
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
+    // Focus immediately in user interaction context - required for iOS keyboard
+    amountInputRef.current?.focus();
     setRecipient(selected);
     onStepChange(2);
   };
@@ -301,13 +288,13 @@ export default function SendSheet({
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
+    // Only focus if not already focused - avoids keyboard open/close causing modal jump
+    if (document.activeElement !== amountInputRef.current) {
+      amountInputRef.current?.focus();
+    }
     // Ensure we set a clean string value
     const strVal = typeof val === 'string' ? val : val.toString();
     setAmountStr(strVal);
-    // Re-focus the input after selecting preset
-    setTimeout(() => {
-      amountInputRef.current?.focus();
-    }, 0);
   };
 
   const modalStyle = useMemo(
@@ -318,6 +305,9 @@ export default function SendSheet({
       }) as CSSProperties,
     [],
   );
+
+  // Memoize snapPoints array to prevent vaul from recalculating on every render
+  const snapPoints = useMemo(() => [snapPoint], [snapPoint]);
 
   // Computed display values
   const secondaryDisplay = useMemo(() => {
@@ -353,7 +343,7 @@ export default function SendSheet({
       open={open}
       onOpenChange={onOpenChange}
       style={modalStyle}
-      snapPoints={[snapPoint]}
+      snapPoints={snapPoints}
     >
       <div
         style={{
@@ -374,6 +364,7 @@ export default function SendSheet({
           {/* Back Button - only for steps 2 and 3 */}
           {(step === 2 || step === 3) && (
             <button
+              onMouseDown={(e) => e.preventDefault()} // Prevent blur to keep keyboard open
               onClick={() => {
                 if (hapticFeedback.impactOccurred.isAvailable()) {
                   hapticFeedback.impactOccurred("light");
@@ -631,7 +622,8 @@ export default function SendSheet({
                   inputMode="decimal"
                   value={amountStr}
                   onChange={(e) => {
-                    const val = e.target.value;
+                    // Convert comma to dot for locales that use comma as decimal separator
+                    const val = e.target.value.replace(',', '.');
                     if (/^[0-9]*\.?[0-9]*$/.test(val)) {
                       if (val.includes('.')) {
                         const [, decimals] = val.split('.');
@@ -681,6 +673,7 @@ export default function SendSheet({
                   {/* Currency Switch Button */}
                   <button
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (hapticFeedback.selectionChanged.isAvailable()) {
@@ -698,10 +691,6 @@ export default function SendSheet({
                         }
                       }
                       setCurrency(currency === 'SOL' ? 'USD' : 'SOL');
-                      // Refocus input after switching
-                      setTimeout(() => {
-                        amountInputRef.current?.focus();
-                      }, 0);
                     }}
                     className="z-20 opacity-40 hover:opacity-60 transition-opacity text-white shrink-0 mb-1"
                   >
@@ -736,6 +725,7 @@ export default function SendSheet({
                 {/* Last used amount (first position) */}
                 {lastAmount && (
                   <button
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handlePresetAmount(lastAmount.sol)}
                     className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm font-normal leading-5 text-white text-center transition-all active:opacity-70"
                     style={{
@@ -749,6 +739,7 @@ export default function SendSheet({
                 {[0.1, 1].map(val => (
                   <button
                     key={val}
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handlePresetAmount(val)}
                     className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm font-normal leading-5 text-white text-center transition-all active:opacity-70"
                     style={{
@@ -760,6 +751,7 @@ export default function SendSheet({
                   </button>
                 ))}
                 <button
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     // Format based on current currency
                     if (currency === 'SOL') {

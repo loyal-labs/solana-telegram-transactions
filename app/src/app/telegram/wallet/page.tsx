@@ -26,6 +26,7 @@ import SendSheet, {
 import TransactionDetailsSheet, {
   type TransactionDetailsData
 } from "@/components/wallet/TransactionDetailsSheet";
+import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
   TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
@@ -171,6 +172,7 @@ function ScanIcon({ className }: { className?: string }) {
 
 export default function Home() {
   const rawInitData = useRawInitData();
+  const { bottom: safeBottom } = useTelegramSafeArea();
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
   const [sendStep, setSendStep] = useState<1 | 2 | 3 | 4>(1);
   const [sentAmountSol, setSentAmountSol] = useState<number | undefined>(undefined);
@@ -1033,7 +1035,7 @@ export default function Home() {
     <>
       <main
         className="min-h-screen text-white font-sans overflow-hidden relative flex flex-col"
-        style={{ background: "#16161a" }}
+        style={{ background: "#16161a", paddingBottom: Math.max(safeBottom, 34) }}
       >
 
         {/* Main Content */}

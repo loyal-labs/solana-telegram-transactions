@@ -60,22 +60,9 @@ export function useTelegramSafeArea(): SafeAreaInsets {
 }
 
 /**
- * Calculate modal snap point that leaves room for top safe area.
+ * Fixed modal snap point.
+ * Using a constant value to prevent any recalculation that could cause jumping.
  */
 export function useModalSnapPoint(): number {
-  const { top } = useTelegramSafeArea();
-  const [snapPoint, setSnapPoint] = useState(0.92);
-
-  useEffect(() => {
-    const vh = window.innerHeight;
-    if (vh <= 0 || top <= 0) {
-      setSnapPoint(0.92);
-      return;
-    }
-    // Leave room for top safe area + small buffer
-    const maxHeight = vh - top - 8;
-    setSnapPoint(Math.max(0.7, Math.min(0.95, maxHeight / vh)));
-  }, [top]);
-
-  return snapPoint;
+  return 0.92;
 }
