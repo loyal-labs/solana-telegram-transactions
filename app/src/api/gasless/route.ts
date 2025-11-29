@@ -1,9 +1,7 @@
 import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import {
-  clusterApiUrl,
   ComputeBudgetProgram,
-  Connection,
   Ed25519Program,
   Keypair,
   PublicKey,
@@ -14,6 +12,7 @@ import {
 } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
+import { GaslessRequest } from "./types";
 import {
   getDepositPda,
   getSessionPda,
@@ -22,32 +21,9 @@ import {
   getVaultPda,
 } from "@/lib/solana/solana-helpers";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
+import { getConnection } from "@/lib/solana/wallet/wallet-details";
 
-type GaslessRequest = {
-  serializedTransaction: string;
-  sender: string;
-  recipient: string;
-  username: string;
-  amountLamports: number;
-  processedInitData: string;
-  telegramSignature: string;
-  telegramPublicKey: string;
-};
-
-const defaultEndpoint = clusterApiUrl("devnet");
-const rpcEndpoint =
-  process.env.SOLANA_RPC_URL ||
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-  defaultEndpoint;
-
-let cachedConnection: Connection | null = null;
 let cachedPayer: Keypair | null = null;
-
-const getConnection = () => {
-  if (cachedConnection) return cachedConnection;
-  cachedConnection = new Connection(rpcEndpoint, "confirmed");
-  return cachedConnection;
-};
 
 const getPayer = (): Keypair => {
   if (cachedPayer) return cachedPayer;
