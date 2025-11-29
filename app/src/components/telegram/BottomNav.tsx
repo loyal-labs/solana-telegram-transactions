@@ -45,7 +45,7 @@ export default function BottomNav() {
       <div
         className="mx-auto max-w-md px-4 pb-2"
         style={{
-          paddingBottom: "max(8px, env(safe-area-inset-bottom))"
+          paddingBottom: "max(8px, var(--tg-content-safe-area-inset-bottom, 0px))"
         }}
       >
         <div

@@ -408,9 +408,9 @@ export default function ReceiveSheet({
             <button
               onClick={copyAddress}
               disabled={!address || isLoading}
-              className="text-center text-sm text-white/80 leading-5 mt-4 font-mono break-all max-w-[192px] active:opacity-70 transition-opacity disabled:opacity-50"
+              className="text-center text-sm text-white/80 leading-5 mt-4 font-mono break-all w-[192px] h-[60px] active:opacity-70 transition-opacity disabled:opacity-50 flex items-center justify-center"
             >
-              {isLoading ? "Loading..." : copied ? "Copied!" : address || "—"}
+              {isLoading ? "Loading..." : address || "—"}
             </button>
           </div>
 
@@ -430,7 +430,7 @@ export default function ReceiveSheet({
               >
                 <CopyIcon />
               </div>
-              <span className="text-[13px] text-white/60">
+              <span className="text-[13px] text-white/60 min-w-[52px] text-center">
                 {copied ? "Copied!" : "Copy"}
               </span>
             </button>

@@ -4,13 +4,9 @@ import { hashes } from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha512";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import {
-  addToHomeScreen,
-  checkHomeScreenStatus,
   closingBehavior,
   hapticFeedback,
   mainButton,
-  off,
-  on,
   secondaryButton,
   useRawInitData,
   useSignal,
@@ -221,12 +217,12 @@ export default function Home() {
   const [isSendingTransaction, setIsSendingTransaction] = useState(false);
   const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">("USD");
   const [addressCopied, setAddressCopied] = useState(false);
+  const [isMobilePlatform, setIsMobilePlatform] = useState(false);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(
     secondaryButton.setParams.isAvailable
   );
-  const safeAreaInsetTop = useSignal(viewport.safeAreaInsetTop);
   const ensuredWalletRef = useRef(false);
 
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
@@ -745,12 +741,14 @@ export default function Home() {
       console.error("Failed to enable closing confirmation:", error);
     }
 
-    // Enable fullscreen for mobile platforms
+    // Check platform and enable fullscreen for mobile
     const hash = window.location.hash.slice(1);
     const params = new URLSearchParams(hash);
     const platform = params.get("tgWebAppPlatform");
+    const isMobile = platform === "ios" || platform === "android";
+    setIsMobilePlatform(isMobile);
 
-    if (platform === "ios" || platform === "android") {
+    if (isMobile) {
       if (viewport.requestFullscreen.isAvailable()) {
         void viewport.requestFullscreen().catch(error => {
           console.warn("Failed to enable fullscreen:", error);
@@ -801,67 +799,6 @@ export default function Home() {
         setIsLoading(false);
       }
     })();
-  }, []);
-
-  // Add to home screen prompt
-  useEffect(() => {
-    const HOME_SCREEN_PROMPT_KEY = "homeScreenPrompted";
-
-    const promptAddToHomeScreen = async () => {
-      try {
-        // Check if already prompted
-        const alreadyPrompted = localStorage.getItem(HOME_SCREEN_PROMPT_KEY);
-        if (alreadyPrompted === "true") {
-          console.log("Home screen prompt already shown");
-          return;
-        }
-
-        // Check if already added
-        if (checkHomeScreenStatus.isAvailable()) {
-          const status = await checkHomeScreenStatus();
-          if (status === "added") {
-            console.log("Already added to home screen");
-            return;
-          }
-        }
-
-        // Prompt user to add
-        if (addToHomeScreen.isAvailable()) {
-          addToHomeScreen();
-          // Mark as prompted immediately
-          localStorage.setItem(HOME_SCREEN_PROMPT_KEY, "true");
-          console.log("Prompted to add to home screen");
-        }
-      } catch (error) {
-        console.error("Failed to prompt add to home screen:", error);
-      }
-    };
-
-    // Event handlers
-    const onAdded = () => {
-      console.log("App added to home screen");
-      localStorage.setItem(HOME_SCREEN_PROMPT_KEY, "true");
-    };
-
-    const onFailed = () => {
-      console.log("User declined add to home screen");
-      localStorage.setItem(HOME_SCREEN_PROMPT_KEY, "true");
-    };
-
-    // Attach event listeners
-    on("home_screen_added", onAdded);
-    on("home_screen_failed", onFailed);
-
-    // Prompt after a short delay to let the app initialize
-    const timeoutId = setTimeout(() => {
-      void promptAddToHomeScreen();
-    }, 2000);
-
-    return () => {
-      clearTimeout(timeoutId);
-      off("home_screen_added", onAdded);
-      off("home_screen_failed", onFailed);
-    };
   }, []);
 
   useEffect(() => {
@@ -1065,7 +1002,7 @@ export default function Home() {
         {/* Main Content */}
         <div
           className="relative flex-1 flex flex-col w-full"
-          style={{ paddingTop: `${(safeAreaInsetTop || 0) + 36}px` }}
+          style={{ paddingTop: "calc(var(--tg-content-safe-area-inset-top, 0px) + 36px)" }}
         >
           {/* Balance Section */}
           <div className="flex flex-col items-center pb-6 px-6">
@@ -1162,8 +1099,9 @@ export default function Home() {
               />
               <ActionButton
                 icon={<ScanIcon />}
-                label="Scan"
+                label={isMobilePlatform ? "Scan" : "Mobile only"}
                 onClick={handleScanQR}
+                disabled={!isMobilePlatform}
               />
             </div>
           </div>

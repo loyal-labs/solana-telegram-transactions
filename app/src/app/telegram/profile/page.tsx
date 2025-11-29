@@ -1,11 +1,6 @@
-"use client";
-
-import { useSignal, viewport } from "@telegram-apps/sdk-react";
 import { User } from "lucide-react";
 
 export default function ProfilePage() {
-  const safeAreaInsetTop = useSignal(viewport.safeAreaInsetTop);
-
   return (
     <main className="min-h-screen text-white font-sans selection:bg-teal-500/30 overflow-hidden relative">
       <div
@@ -18,7 +13,7 @@ export default function ProfilePage() {
 
       <div
         className="relative z-10 px-6 pt-6 pb-20 max-w-md mx-auto flex flex-col min-h-screen"
-        style={{ paddingTop: `${(safeAreaInsetTop || 0) + 16}px` }}
+        style={{ paddingTop: "calc(var(--tg-content-safe-area-inset-top, 0px) + 16px)" }}
       >
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
