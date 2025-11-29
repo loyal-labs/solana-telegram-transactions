@@ -1,6 +1,6 @@
 "use client";
 
-import { hapticFeedback, themeParams } from "@telegram-apps/sdk-react";
+import { hapticFeedback, retrieveLaunchParams, themeParams } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import {
@@ -15,7 +15,6 @@ import Image from "next/image";
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
-import { retrieveLaunchParams } from "@telegram-apps/sdk-react";
 
 export type SendSheetProps = {
   trigger?: ReactNode | null;
@@ -909,7 +908,7 @@ export default function SendSheet({
                   // Calculate if user has enough balance for selected fee method
                   const amountVal = parseFloat(amountStr);
                   const amountInSol = isNaN(amountVal) ? 0 : (currency === 'SOL' ? amountVal : amountVal / SOL_PRICE_USD);
-                  const hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
+                  const _hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
                   const hasEnoughStarsForFee = starsBalance >= STARS_FEE_AMOUNT;
 
                   // Check circle icons

@@ -172,7 +172,7 @@ function ScanIcon({ className }: { className?: string }) {
 
 export default function Home() {
   const rawInitData = useRawInitData();
-  const { bottom: safeBottom } = useTelegramSafeArea();
+  const { bottom: _safeBottom } = useTelegramSafeArea();
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
   const [sendStep, setSendStep] = useState<1 | 2 | 3 | 4>(1);
   const [sentAmountSol, setSentAmountSol] = useState<number | undefined>(undefined);
@@ -186,7 +186,7 @@ export default function Home() {
   const [claimError, setClaimError] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
-  const [starsBalance, setStarsBalance] = useState<number>(1267); // Mock Stars balance
+  const [starsBalance] = useState<number>(1267); // Mock Stars balance
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
@@ -338,7 +338,7 @@ export default function Home() {
     }
   }, []);
 
-  const handleRefresh = useCallback(async () => {
+  const _handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
 
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -749,7 +749,7 @@ export default function Home() {
     try {
       const launchParams = retrieveLaunchParams();
       platform = launchParams.tgWebAppPlatform;
-    } catch (e) {
+    } catch {
       // Fallback to hash parsing if SDK fails
       const hash = window.location.hash.slice(1);
       const params = new URLSearchParams(hash);

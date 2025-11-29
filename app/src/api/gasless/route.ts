@@ -47,7 +47,7 @@ const decodeBytes = (value: string, field: string): Buffer => {
 
   try {
     return isHex ? Buffer.from(trimmed, "hex") : Buffer.from(trimmed, "base64");
-  } catch (error) {
+  } catch {
     throw new Error(`Invalid encoding for ${field}`);
   }
 };
