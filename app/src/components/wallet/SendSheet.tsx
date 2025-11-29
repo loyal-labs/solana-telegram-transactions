@@ -347,7 +347,7 @@ export default function SendSheet({
       open={open}
       onOpenChange={onOpenChange}
       style={modalStyle}
-      snapPoints={[1]}
+      snapPoints={[0.93]}
     >
       <div
         style={{

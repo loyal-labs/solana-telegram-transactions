@@ -138,12 +138,6 @@
   z-index: 9999 !important;
 }
 
-/* Force modals to have safe top margin */
-[data-vaul-drawer] {
-  margin-top: 56px !important;
-  max-height: calc(100% - 56px) !important;
-}
-
 /* Make modal overlay more subtle */
 [data-vaul-overlay] {
   background-color: rgba(0, 0, 0, 0.3) !important;
