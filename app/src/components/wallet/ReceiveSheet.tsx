@@ -318,10 +318,10 @@ export default function ReceiveSheet({
       open={open}
       onOpenChange={onOpenChange}
       style={modalStyle}
-      snapPoints={[isMobilePlatform ? 0.87 : 0.93]}
+      snapPoints={[isMobilePlatform ? 0.9 : 0.96]}
     >
       {/* Safe area spacer for Telegram header */}
-      <div className="shrink-0" style={{ height: isMobilePlatform ? 44 : 0 }} />
+      <div className="shrink-0" style={{ height: isMobilePlatform ? 16 : 0 }} />
       <div
         style={{
           background: "rgba(38, 38, 38, 0.55)",
