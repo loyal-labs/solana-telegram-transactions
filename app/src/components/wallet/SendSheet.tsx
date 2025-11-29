@@ -46,8 +46,8 @@ export const isValidTelegramUsername = (username: string): boolean => {
 };
 
 const MOCK_CONTACTS = [
-  { name: "Alice", username: "@alice_wonderland", avatar: "https://avatars.githubusercontent.com/u/537414?v=4" },
-  { name: "Arthur", username: "@arthur_morgan", avatar: "https://avatars.githubusercontent.com/u/537414?v=4" },
+  { name: "Vlad", username: "@vlad_arbatov", avatar: "https://avatars.githubusercontent.com/u/537414?v=4" },
+  { name: "Candy", username: "@candyflipline", avatar: "https://avatars.githubusercontent.com/u/537414?v=4" },
   { name: "Bob", username: "@bob_builder", avatar: null },
   { name: "Carol", username: "@carol_danvers", avatar: null },
 ];
