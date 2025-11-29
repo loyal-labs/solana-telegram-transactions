@@ -12,6 +12,7 @@ import {
   useSignal,
   viewport
 } from "@telegram-apps/sdk-react";
+import type { Signal } from "@telegram-apps/signals";
 import { ArrowDown, ArrowUp, ChevronRight, Clock, Copy } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -223,6 +224,8 @@ export default function Home() {
   const secondaryButtonAvailable = useSignal(
     secondaryButton.setParams.isAvailable
   );
+  const safeAreaInsetTop = useSignal(viewport.safeAreaInsetTop as Signal<number>);
+  const contentSafeAreaInsetTop = useSignal(viewport.contentSafeAreaInsetTop as Signal<number>);
   const ensuredWalletRef = useRef(false);
 
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
@@ -1002,7 +1005,7 @@ export default function Home() {
         {/* Main Content */}
         <div
           className="relative flex-1 flex flex-col w-full"
-          style={{ paddingTop: "calc(var(--tg-content-safe-area-inset-top, 0px) + 36px)" }}
+          style={{ paddingTop: `${Math.max((safeAreaInsetTop || 0) + (contentSafeAreaInsetTop || 0), 20) + 16}px` }}
         >
           {/* Balance Section */}
           <div className="flex flex-col items-center pb-6 px-6">
