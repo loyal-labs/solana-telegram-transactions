@@ -1,7 +1,7 @@
 "use client";
 
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { hapticFeedback, shareURL } from "@telegram-apps/sdk-react";
+import { hapticFeedback, shareURL, themeParams } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import { Check, Globe, Share, ShieldAlert, X } from "lucide-react";
@@ -10,6 +10,7 @@ import {
   type CSSProperties,
   type ReactNode,
   useMemo,
+  useState,
 } from "react";
 
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
@@ -69,6 +70,15 @@ export default function TransactionDetailsSheet({
   // Safe area handling - must be before early return
   const snapPoint = useModalSnapPoint();
   const { bottom: safeBottom } = useTelegramSafeArea();
+
+  // Get Telegram theme button color
+  const [buttonColor] = useState(() => {
+    try {
+      return themeParams.buttonColor() || "#2990ff";
+    } catch {
+      return "#2990ff";
+    }
+  });
 
   const modalStyle = useMemo(
     () =>
@@ -316,7 +326,7 @@ export default function TransactionDetailsSheet({
               <div
                 className="w-[72px] h-[72px] rounded-full flex items-center justify-center"
                 style={{
-                  background: "#2990ff",
+                  background: buttonColor,
                   animation: "result-pulse 0.6s ease-out"
                 }}
               >

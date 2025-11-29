@@ -1,6 +1,6 @@
 "use client";
 
-import { hapticFeedback } from "@telegram-apps/sdk-react";
+import { hapticFeedback, themeParams } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import {
@@ -143,6 +143,15 @@ export default function SendSheet({
       return params.tgWebAppPlatform === "ios";
     } catch {
       return false;
+    }
+  });
+
+  // Get Telegram theme button color
+  const [buttonColor] = useState(() => {
+    try {
+      return themeParams.buttonColor() || "#2990ff";
+    } catch {
+      return "#2990ff";
     }
   });
 
@@ -906,7 +915,7 @@ export default function SendSheet({
                   // Check circle icons
                   const CheckCircleOn = () => (
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="12" cy="12" r="12" fill="#3F89F7"/>
+                      <circle cx="12" cy="12" r="12" fill={buttonColor}/>
                       <path d="M6.5 12.5L10 16L17.5 8.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   );
@@ -1114,7 +1123,7 @@ export default function SendSheet({
                   <div
                     className="w-[72px] h-[72px] rounded-full flex items-center justify-center"
                     style={{
-                      background: "#2990ff",
+                      background: buttonColor,
                       animation: step === 4 ? "result-pulse 0.6s ease-out" : "none"
                     }}
                   >
