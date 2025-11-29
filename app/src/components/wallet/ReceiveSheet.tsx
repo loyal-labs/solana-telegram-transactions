@@ -177,6 +177,7 @@ export type ReceiveSheetProps = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   walletAddress?: string;
+  isMobilePlatform?: boolean;
 };
 
 const COPIED_RESET_TIMEOUT = 2000;
@@ -204,6 +205,7 @@ export default function ReceiveSheet({
   open,
   onOpenChange,
   walletAddress: propAddress,
+  isMobilePlatform = false,
 }: ReceiveSheetProps) {
   const [copied, setCopied] = useState(false);
   const [address, setAddress] = useState<string | null>(propAddress || null);
@@ -316,10 +318,10 @@ export default function ReceiveSheet({
       open={open}
       onOpenChange={onOpenChange}
       style={modalStyle}
-      snapPoints={[1]}
+      snapPoints={[isMobilePlatform ? 0.87 : 0.93]}
     >
-      {/* Safe area spacer - pointer-events-none allows clicks to pass through to overlay */}
-      <div className="shrink-0 pointer-events-none" style={{ height: 64 }} />
+      {/* Safe area spacer for Telegram header */}
+      <div className="shrink-0" style={{ height: isMobilePlatform ? 44 : 0 }} />
       <div
         style={{
           background: "rgba(38, 38, 38, 0.55)",

@@ -30,6 +30,7 @@ export type SendSheetProps = {
   // Success/Error step props
   sentAmountSol?: number; // Amount sent in SOL (for success display)
   sendError?: string | null; // Error message (if present, shows error state instead of success)
+  isMobilePlatform?: boolean; // Whether running on mobile Telegram client
 };
 
 // Basic Solana address validation (base58, 32-44 chars)
@@ -121,6 +122,7 @@ export default function SendSheet({
   onTopUpStars,
   sentAmountSol,
   sendError,
+  isMobilePlatform = false,
 }: SendSheetProps) {
   // Convert balance from lamports to SOL
   const balanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
@@ -347,10 +349,10 @@ export default function SendSheet({
       open={open}
       onOpenChange={onOpenChange}
       style={modalStyle}
-      snapPoints={[1]}
+      snapPoints={[isMobilePlatform ? 0.87 : 0.93]}
     >
-      {/* Safe area spacer - pointer-events-none allows clicks to pass through to overlay */}
-      <div className="shrink-0 pointer-events-none" style={{ height: 64 }} />
+      {/* Safe area spacer for Telegram header */}
+      <div className="shrink-0" style={{ height: isMobilePlatform ? 44 : 0 }} />
       <div
         style={{
           background: "rgba(38, 38, 38, 0.55)",

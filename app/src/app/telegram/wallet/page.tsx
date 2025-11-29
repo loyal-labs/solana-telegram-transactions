@@ -1482,12 +1482,14 @@ export default function Home() {
         onTopUpStars={handleTopUpStars}
         sentAmountSol={sentAmountSol}
         sendError={sendError}
+        isMobilePlatform={isMobilePlatform}
       />
       <ReceiveSheet
         open={isReceiveSheetOpen}
         onOpenChange={handleReceiveSheetChange}
         trigger={null}
         walletAddress={walletAddress ?? undefined}
+        isMobilePlatform={isMobilePlatform}
       />
       <TransactionDetailsSheet
         open={isTransactionDetailsSheetOpen}
@@ -1496,6 +1498,7 @@ export default function Home() {
         transaction={selectedTransaction}
         showSuccess={showClaimSuccess}
         showError={claimError}
+        isMobilePlatform={isMobilePlatform}
       />
     </>
   );

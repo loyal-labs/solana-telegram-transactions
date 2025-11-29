@@ -44,6 +44,7 @@ export type TransactionDetailsSheetProps = {
   transaction: TransactionDetailsData | null;
   showSuccess?: boolean; // Show success state after claiming
   showError?: string | null; // Show error state with message after failed claim
+  isMobilePlatform?: boolean;
 };
 
 // Wallet icon SVG component
@@ -63,6 +64,7 @@ export default function TransactionDetailsSheet({
   transaction,
   showSuccess = false,
   showError = null,
+  isMobilePlatform = false,
 }: TransactionDetailsSheetProps) {
   const modalStyle = useMemo(
     () =>
@@ -172,10 +174,10 @@ export default function TransactionDetailsSheet({
       open={open}
       onOpenChange={onOpenChange}
       style={modalStyle}
-      snapPoints={[1]}
+      snapPoints={[isMobilePlatform ? 0.87 : 0.93]}
     >
-      {/* Safe area spacer - pointer-events-none allows clicks to pass through to overlay */}
-      <div className="shrink-0 pointer-events-none" style={{ height: 64 }} />
+      {/* Safe area spacer for Telegram header */}
+      <div className="shrink-0" style={{ height: isMobilePlatform ? 44 : 0 }} />
       <div
         style={{
           background: "rgba(38, 38, 38, 0.55)",
