@@ -316,8 +316,10 @@ export default function ReceiveSheet({
       open={open}
       onOpenChange={onOpenChange}
       style={modalStyle}
-      snapPoints={[0.93]}
+      snapPoints={[1]}
     >
+      {/* Safe area spacer */}
+      <div className="shrink-0" style={{ height: 56 }} />
       <div
         style={{
           background: "rgba(38, 38, 38, 0.55)",
