@@ -349,8 +349,8 @@ export default function SendSheet({
       style={modalStyle}
       snapPoints={[1]}
     >
-      {/* Safe area spacer */}
-      <div className="shrink-0" style={{ height: 100 }} />
+      {/* Safe area spacer - pointer-events-none allows clicks to pass through to overlay */}
+      <div className="shrink-0 pointer-events-none" style={{ height: 64 }} />
       <div
         style={{
           background: "rgba(38, 38, 38, 0.55)",
