@@ -4,6 +4,7 @@ import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Badge, Cell, Info } from "@telegram-apps/telegram-ui";
 import { useEffect, useState } from "react";
 
+import { fetchSolPriceUsd } from "@/lib/solana/fetch-sol-price";
 import {
   getWalletBalance,
   getWalletPublicKey,
@@ -19,8 +20,6 @@ const INITIAL_DATA: WalletBalanceData = {
   publicKey: null,
 };
 
-const SOL_PRICE_USD = 180; // TODO: Replace with live SOL price feed.
-
 const formatBalance = (lamports: number | null): string => {
   if (lamports === null) return "—";
 
@@ -28,11 +27,14 @@ const formatBalance = (lamports: number | null): string => {
   return `${sol.toFixed(4)} SOL`;
 };
 
-const formatUsdValue = (lamports: number | null): string => {
-  if (lamports === null) return "—";
+const formatUsdValue = (
+  lamports: number | null,
+  solPriceUsd: number | null
+): string => {
+  if (lamports === null || solPriceUsd === null) return "—";
 
   const sol = lamports / LAMPORTS_PER_SOL;
-  const usd = sol * SOL_PRICE_USD;
+  const usd = sol * solPriceUsd;
 
   return `$${usd.toFixed(2)}`;
 };
@@ -40,6 +42,8 @@ const formatUsdValue = (lamports: number | null): string => {
 export default function WalletBalance() {
   const [data, setData] = useState<WalletBalanceData>(INITIAL_DATA);
   const [isLoading, setIsLoading] = useState(true);
+  const [solPriceUsd, setSolPriceUsd] = useState<number | null>(null);
+  const [isPriceLoading, setIsPriceLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -74,9 +78,35 @@ export default function WalletBalance() {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadPrice = async () => {
+      try {
+        const price = await fetchSolPriceUsd();
+        if (!isMounted) return;
+        setSolPriceUsd(price);
+      } catch (error) {
+        console.error("Failed to fetch SOL price", error);
+        if (!isMounted) return;
+        setSolPriceUsd(null);
+      } finally {
+        if (isMounted) {
+          setIsPriceLoading(false);
+        }
+      }
+    };
+
+    void loadPrice();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const balanceDisplay = formatBalance(data.lamports);
-  const usdDisplay = formatUsdValue(data.lamports);
-  const subtitle = isLoading ? "Loading…" : usdDisplay;
+  const usdDisplay = formatUsdValue(data.lamports, solPriceUsd);
+  const subtitle = isLoading || isPriceLoading ? "Loading…" : usdDisplay;
 
   return (
     <Cell
