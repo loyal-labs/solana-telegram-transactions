@@ -6,7 +6,6 @@ import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import {
   ArrowLeft,
   Check,
-  Plus,
   Search,
   ShieldAlert,
   Wallet,
@@ -525,44 +524,13 @@ export default function SendSheet({
               </div>
             </div>
 
-            {/* Suggested Section Header */}
+            {/* Recent Section Header */}
             <div className="px-4 pt-3 pb-2">
-              <p className="text-base font-medium text-white tracking-[-0.176px]">Suggested</p>
+              <p className="text-base font-medium text-white tracking-[-0.176px]">Recent</p>
             </div>
 
             {/* Contact List */}
             <div className="pb-4">
-              {/* Choose Contact Button */}
-              <button
-                onClick={() => {
-                  if (hapticFeedback.impactOccurred.isAvailable()) {
-                    hapticFeedback.impactOccurred("light");
-                  }
-                  // TODO: Implement contact picker
-                  console.log("Choose contact clicked");
-                }}
-                className="w-full flex items-center px-3 py-1 rounded-2xl active:bg-white/[0.03] transition-colors"
-              >
-                <div className="py-1.5 pr-3">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center"
-                    style={{
-                      background: "rgba(255, 255, 255, 0.06)",
-                      mixBlendMode: "lighten"
-                    }}
-                  >
-                    <Plus size={28} strokeWidth={1.5} className="text-white/60" />
-                  </div>
-                </div>
-                <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                  <p className="text-base text-white text-left leading-5">Choose contact</p>
-                  <p className="text-[13px] text-white/60 text-left leading-4">from Telegram</p>
-                </div>
-                <div className="pl-3 py-2 flex items-center justify-center h-10">
-                  <ChevronIcon />
-                </div>
-              </button>
-
               {/* Contact Items */}
               {MOCK_CONTACTS.map((contact) => (
                 <button

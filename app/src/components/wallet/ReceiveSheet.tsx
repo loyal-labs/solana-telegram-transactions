@@ -1,6 +1,6 @@
 "use client";
 
-import { hapticFeedback } from "@telegram-apps/sdk-react";
+import { hapticFeedback, shareURL } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import { X } from "lucide-react";
@@ -283,26 +283,20 @@ export default function ReceiveSheet({
     }
   }, [address]);
 
-  const shareAddress = useCallback(async () => {
+  const shareAddress = useCallback(() => {
     if (!address) return;
 
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
 
-    try {
-      if (navigator?.share) {
-        await navigator.share({
-          title: "Solana Wallet Address",
-          text: address,
-        });
-      } else {
-        // Fallback to copy if share is not available
-        await copyAddress();
-      }
-    } catch (error) {
-      // User cancelled share or other error
-      console.error("Failed to share wallet address", error);
+    // Use Telegram native share
+    if (shareURL.isAvailable()) {
+      const solscanUrl = `https://solscan.io/account/${address}`;
+      shareURL(solscanUrl, `My Solana wallet address:\n${address}`);
+    } else {
+      // Fallback to copy if Telegram share is not available
+      void copyAddress();
     }
   }, [address, copyAddress]);
 

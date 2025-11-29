@@ -1,7 +1,7 @@
 "use client";
 
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { hapticFeedback } from "@telegram-apps/sdk-react";
+import { hapticFeedback, shareURL } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import { Check, Globe, Share, ShieldAlert, X } from "lucide-react";
@@ -144,24 +144,21 @@ export default function TransactionDetailsSheet({
   };
 
   // Handle share
-  const handleShare = async () => {
+  const handleShare = () => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
 
     const shareText = `Transaction: ${isIncoming ? "+" : "-"}${formattedAmount} SOL`;
 
-    if (navigator?.share) {
-      try {
-        await navigator.share({
-          title: "Transaction Details",
-          text: shareText,
-        });
-      } catch {
-        // User cancelled or error
-      }
+    // Use Telegram native share
+    if (shareURL.isAvailable()) {
+      const explorerUrl = transaction.signature
+        ? `https://explorer.solana.com/tx/${transaction.signature}?cluster=devnet`
+        : `https://solscan.io/account/${fullAddress}`;
+      shareURL(explorerUrl, shareText);
     } else if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(shareText);
+      void navigator.clipboard.writeText(shareText);
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred("success");
       }
