@@ -7,6 +7,7 @@ import {
   closingBehavior,
   hapticFeedback,
   mainButton,
+  retrieveLaunchParams,
   secondaryButton,
   useRawInitData,
   useSignal,
@@ -745,11 +746,20 @@ export default function Home() {
     }
 
     // Check platform and enable fullscreen for mobile
-    const hash = window.location.hash.slice(1);
-    const params = new URLSearchParams(hash);
-    const platform = params.get("tgWebAppPlatform");
+    let platform: string | undefined;
+    try {
+      const launchParams = retrieveLaunchParams();
+      platform = launchParams.tgWebAppPlatform;
+    } catch (e) {
+      // Fallback to hash parsing if SDK fails
+      const hash = window.location.hash.slice(1);
+      const params = new URLSearchParams(hash);
+      platform = params.get("tgWebAppPlatform") || undefined;
+    }
+
     const isMobile = platform === "ios" || platform === "android";
     setIsMobilePlatform(isMobile);
+    console.log("Platform detected:", platform, "isMobile:", isMobile);
 
     if (isMobile) {
       if (viewport.requestFullscreen.isAvailable()) {

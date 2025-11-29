@@ -175,7 +175,7 @@ export default function TransactionDetailsSheet({
       snapPoints={[1]}
     >
       {/* Safe area spacer */}
-      <div className="shrink-0" style={{ height: 56 }} />
+      <div className="shrink-0" style={{ height: 100 }} />
       <div
         style={{
           background: "rgba(38, 38, 38, 0.55)",
