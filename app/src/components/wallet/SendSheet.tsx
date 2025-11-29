@@ -15,6 +15,7 @@ import Image from "next/image";
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+import { retrieveLaunchParams } from "@telegram-apps/sdk-react";
 
 export type SendSheetProps = {
   trigger?: ReactNode | null;
@@ -128,6 +129,16 @@ export default function SendSheet({
   const snapPoint = useModalSnapPoint();
   const { bottom: safeBottom } = useTelegramSafeArea();
 
+  // Detect iOS for platform-specific focus handling
+  const [isIOS] = useState(() => {
+    try {
+      const params = retrieveLaunchParams();
+      return params.tgWebAppPlatform === "ios";
+    } catch {
+      return false;
+    }
+  });
+
   // Convert balance from lamports to SOL
   const balanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
   const balanceInUsd = balanceInSol * SOL_PRICE_USD;
@@ -156,13 +167,32 @@ export default function SendSheet({
     }
   }, [open, initialRecipient]);
 
-  // Blur inputs when moving to review/success steps to close keyboard
+  // Auto-focus and blur based on step
   useEffect(() => {
-    if (open && (step === 3 || step === 4)) {
+    if (!open) return;
+
+    // iOS handles focus in click handlers, Android uses setTimeout
+    if (!isIOS) {
+      if (step === 1) {
+        const timer = setTimeout(() => {
+          inputRef.current?.focus();
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+      if (step === 2) {
+        const timer = setTimeout(() => {
+          amountInputRef.current?.focus();
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    }
+
+    if (step === 3 || step === 4) {
+      // Blur inputs to close keyboard (both platforms)
       amountInputRef.current?.blur();
       inputRef.current?.blur();
     }
-  }, [open, step]);
+  }, [open, step, isIOS]);
 
   // Update caret position based on actual text width
   useEffect(() => {
@@ -278,8 +308,10 @@ export default function SendSheet({
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
-    // Focus immediately in user interaction context - required for iOS keyboard
-    amountInputRef.current?.focus();
+    // iOS requires focus in direct user interaction context
+    if (isIOS) {
+      amountInputRef.current?.focus();
+    }
     setRecipient(selected);
     onStepChange(2);
   };
@@ -306,8 +338,8 @@ export default function SendSheet({
     [],
   );
 
-  // Memoize snapPoints array to prevent vaul from recalculating on every render
-  const snapPoints = useMemo(() => [snapPoint], [snapPoint]);
+  // Stable snapPoints array - created once
+  const [snapPoints] = useState(() => [snapPoint]);
 
   // Computed display values
   const secondaryDisplay = useMemo(() => {
