@@ -12,7 +12,6 @@ import {
 } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
-import { GaslessRequest } from "./types";
 import {
   getDepositPda,
   getSessionPda,
@@ -20,8 +19,10 @@ import {
   getTelegramVerificationProgram,
   getVaultPda,
 } from "@/lib/solana/solana-helpers";
-import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
 import { getConnection } from "@/lib/solana/wallet/wallet-details";
+import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
+
+import { GaslessRequest } from "./types";
 
 let cachedPayer: Keypair | null = null;
 

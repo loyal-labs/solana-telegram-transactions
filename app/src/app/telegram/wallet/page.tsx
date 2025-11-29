@@ -814,6 +814,33 @@ export default function Home() {
     })();
   }, []);
 
+  // Poll for balance updates while the page stays open so inbound funds appear without manual refresh
+  useEffect(() => {
+    if (!walletAddress) return;
+
+    let isCancelled = false;
+
+    const pollBalance = async () => {
+      try {
+        const lamports = await getWalletBalance(true /* force refresh */);
+        if (!isCancelled) {
+          setBalance(lamports);
+        }
+      } catch (error) {
+        console.error("Failed to poll wallet balance", error);
+      }
+    };
+
+    // Start immediately, then poll on interval
+    void pollBalance();
+    const intervalId = setInterval(pollBalance, 15_000);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [walletAddress]);
+
   useEffect(() => {
     if (!mainButtonAvailable) {
       mainButton.mount.ifAvailable?.();
