@@ -65,6 +65,13 @@ const SOLANA_FEE_USD = SOLANA_FEE_SOL * SOL_PRICE_USD;
 const STARS_FEE_AMOUNT = 2000; // TODO: Change back to 1 Star for fee (hardcoded for testing)
 const STARS_TO_USD = 0.02; // 1 Star = $0.02
 
+// Truncate (floor) to specific decimal places - never rounds up
+const truncateDecimals = (num: number, decimals: number): string => {
+  const factor = Math.pow(10, decimals);
+  const truncated = Math.floor(num * factor) / factor;
+  return truncated.toFixed(decimals);
+};
+
 type LastAmount = {
   sol: number;
   usd: number;
@@ -785,12 +792,12 @@ export default function SendSheet({
                 <button
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
-                    // Format based on current currency
+                    // Format based on current currency - use truncate to never show more than available
                     if (currency === 'SOL') {
-                      const maxVal = balanceInSol.toFixed(4).replace(/\.?0+$/, '');
+                      const maxVal = truncateDecimals(balanceInSol, 4).replace(/\.?0+$/, '');
                       handlePresetAmount(maxVal || '0');
                     } else {
-                      const maxVal = balanceInUsd.toFixed(2).replace(/\.?0+$/, '');
+                      const maxVal = truncateDecimals(balanceInUsd, 2).replace(/\.?0+$/, '');
                       handlePresetAmount(maxVal || '0');
                     }
                   }}
@@ -830,8 +837,8 @@ export default function SendSheet({
                 </div>
                 {/* Right: Balance amount + USD */}
                 <div className="flex flex-col gap-0.5 items-end py-2.5 pl-3">
-                  <p className="text-base leading-5 text-white text-right">{balanceInSol.toFixed(2)} SOL</p>
-                  <p className="text-[13px] leading-4 text-white/60 text-right">~${balanceInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="text-base leading-5 text-white text-right">{truncateDecimals(balanceInSol, 4)} SOL</p>
+                  <p className="text-[13px] leading-4 text-white/60 text-right">~${truncateDecimals(balanceInUsd, 2)}</p>
                 </div>
               </div>
             </div>

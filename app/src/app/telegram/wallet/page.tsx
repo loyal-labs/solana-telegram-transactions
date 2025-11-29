@@ -1000,20 +1000,24 @@ export default function Home() {
     sendError
   ]);
 
+  // Truncate (floor) to specific decimal places - never rounds up
+  const truncateDecimals = (num: number, decimals: number): string => {
+    const factor = Math.pow(10, decimals);
+    const truncated = Math.floor(num * factor) / factor;
+    return truncated.toFixed(decimals);
+  };
+
   const formatBalance = (lamports: number | null): string => {
     if (lamports === null) return "0.0000";
     const sol = lamports / LAMPORTS_PER_SOL;
-    return sol.toFixed(4);
+    return truncateDecimals(sol, 4);
   };
 
   const formatUsdValue = (lamports: number | null): string => {
     if (lamports === null) return "0.00";
     const sol = lamports / LAMPORTS_PER_SOL;
     const usd = sol * SOL_PRICE_USD;
-    return usd.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+    return truncateDecimals(usd, 2);
   };
 
   const formatAddress = (address: string | null): string => {
@@ -1027,15 +1031,15 @@ export default function Home() {
 
   const formatTransactionAmount = (lamports: number): string => {
     const sol = lamports / LAMPORTS_PER_SOL;
-    // Format to up to 4 decimal places, but remove trailing zeros
-    return parseFloat(sol.toFixed(4)).toString();
+    // Truncate to 4 decimal places, then remove trailing zeros
+    return parseFloat(truncateDecimals(sol, 4)).toString();
   };
 
   return (
     <>
       <main
         className="min-h-screen text-white font-sans overflow-hidden relative flex flex-col"
-        style={{ background: "#16161a", paddingBottom: Math.max(safeBottom, 34) }}
+        style={{ background: "#16161a" }}
       >
 
         {/* Main Content */}
