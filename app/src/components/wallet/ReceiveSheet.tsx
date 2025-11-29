@@ -14,6 +14,7 @@ import {
   useState,
 } from "react";
 
+import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import { getWalletPublicKey } from "@/lib/solana/wallet/wallet-details";
 
 // Custom QR Code with rounded finder patterns
@@ -177,7 +178,6 @@ export type ReceiveSheetProps = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   walletAddress?: string;
-  isMobilePlatform?: boolean;
 };
 
 const COPIED_RESET_TIMEOUT = 2000;
@@ -205,8 +205,11 @@ export default function ReceiveSheet({
   open,
   onOpenChange,
   walletAddress: propAddress,
-  isMobilePlatform = false,
 }: ReceiveSheetProps) {
+  // Safe area handling
+  const snapPoint = useModalSnapPoint();
+  const { bottom: safeBottom } = useTelegramSafeArea();
+
   const [copied, setCopied] = useState(false);
   const [address, setAddress] = useState<string | null>(propAddress || null);
   const [isLoading, setIsLoading] = useState(false);
@@ -318,16 +321,15 @@ export default function ReceiveSheet({
       open={open}
       onOpenChange={onOpenChange}
       style={modalStyle}
-      snapPoints={[isMobilePlatform ? 0.9 : 0.96]}
+      snapPoints={[snapPoint]}
     >
-      {/* Safe area spacer for Telegram header */}
-      <div className="shrink-0" style={{ height: isMobilePlatform ? 16 : 0 }} />
       <div
         style={{
           background: "rgba(38, 38, 38, 0.55)",
           backgroundBlendMode: "luminosity",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
+          paddingBottom: Math.max(safeBottom, 80),
         }}
         className="flex flex-col text-white relative overflow-hidden min-h-[500px] rounded-t-3xl"
       >
@@ -419,7 +421,7 @@ export default function ReceiveSheet({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 w-full px-6 pb-4 mt-auto">
+          <div className="flex gap-2 w-full px-6 mt-auto pb-4">
             {/* Copy Button */}
             <button
               onClick={copyAddress}

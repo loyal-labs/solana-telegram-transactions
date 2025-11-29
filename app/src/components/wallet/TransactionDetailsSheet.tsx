@@ -12,6 +12,8 @@ import {
   useMemo,
 } from "react";
 
+import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+
 const SOL_PRICE_USD = 180;
 const SOLANA_FEE_SOL = 0.000005;
 
@@ -44,7 +46,6 @@ export type TransactionDetailsSheetProps = {
   transaction: TransactionDetailsData | null;
   showSuccess?: boolean; // Show success state after claiming
   showError?: string | null; // Show error state with message after failed claim
-  isMobilePlatform?: boolean;
 };
 
 // Wallet icon SVG component
@@ -64,8 +65,11 @@ export default function TransactionDetailsSheet({
   transaction,
   showSuccess = false,
   showError = null,
-  isMobilePlatform = false,
 }: TransactionDetailsSheetProps) {
+  // Safe area handling - must be before early return
+  const snapPoint = useModalSnapPoint();
+  const { bottom: safeBottom } = useTelegramSafeArea();
+
   const modalStyle = useMemo(
     () =>
       ({
@@ -174,16 +178,15 @@ export default function TransactionDetailsSheet({
       open={open}
       onOpenChange={onOpenChange}
       style={modalStyle}
-      snapPoints={[isMobilePlatform ? 0.9 : 0.96]}
+      snapPoints={[snapPoint]}
     >
-      {/* Safe area spacer for Telegram header */}
-      <div className="shrink-0" style={{ height: isMobilePlatform ? 16 : 0 }} />
       <div
         style={{
           background: "rgba(38, 38, 38, 0.55)",
           backgroundBlendMode: "luminosity",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
+          paddingBottom: Math.max(safeBottom, 80),
         }}
         className="flex flex-col text-white relative overflow-hidden min-h-[500px] rounded-t-3xl"
       >

@@ -14,6 +14,8 @@ import {
 import Image from "next/image";
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+
 export type SendSheetProps = {
   trigger?: ReactNode | null;
   open?: boolean;
@@ -30,7 +32,6 @@ export type SendSheetProps = {
   // Success/Error step props
   sentAmountSol?: number; // Amount sent in SOL (for success display)
   sendError?: string | null; // Error message (if present, shows error state instead of success)
-  isMobilePlatform?: boolean; // Whether running on mobile Telegram client
 };
 
 // Basic Solana address validation (base58, 32-44 chars)
@@ -122,8 +123,11 @@ export default function SendSheet({
   onTopUpStars,
   sentAmountSol,
   sendError,
-  isMobilePlatform = false,
 }: SendSheetProps) {
+  // Safe area handling
+  const snapPoint = useModalSnapPoint();
+  const { bottom: safeBottom } = useTelegramSafeArea();
+
   // Convert balance from lamports to SOL
   const balanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
   const balanceInUsd = balanceInSol * SOL_PRICE_USD;
@@ -349,16 +353,15 @@ export default function SendSheet({
       open={open}
       onOpenChange={onOpenChange}
       style={modalStyle}
-      snapPoints={[isMobilePlatform ? 0.9 : 0.96]}
+      snapPoints={[snapPoint]}
     >
-      {/* Safe area spacer for Telegram header */}
-      <div className="shrink-0" style={{ height: isMobilePlatform ? 16 : 0 }} />
       <div
         style={{
           background: "rgba(38, 38, 38, 0.55)",
           backgroundBlendMode: "luminosity",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
+          paddingBottom: Math.max(safeBottom, 80),
         }}
         className="flex flex-col text-white relative overflow-hidden min-h-[500px] rounded-t-3xl"
       >
