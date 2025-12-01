@@ -16,16 +16,15 @@ import {
 import { ArrowDown, ArrowUp, ChevronRight, Clock, Copy } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
-import React from "react";
 
+import { ScanIcon } from "@/components/ui/icons/ScanIcon";
+import { ActionButton } from "@/components/wallet/ActionButton";
 import ReceiveSheet from "@/components/wallet/ReceiveSheet";
 import SendSheet, {
   isValidSolanaAddress,
   isValidTelegramUsername
 } from "@/components/wallet/SendSheet";
-import TransactionDetailsSheet, {
-  type TransactionDetailsData
-} from "@/components/wallet/TransactionDetailsSheet";
+import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
   TELEGRAM_BOT_ID,
@@ -59,116 +58,21 @@ import {
 } from "@/lib/telegram/init-data-transform";
 import { parseUsernameFromInitData } from "@/lib/telegram/init-data-transform";
 import { ensureTelegramTheme } from "@/lib/telegram/theme";
+import {
+  formatAddress,
+  formatBalance,
+  formatSenderAddress,
+  formatTransactionAmount,
+  formatUsdValue
+} from "@/lib/wallet/formatters";
+import type {
+  IncomingTransaction,
+  Transaction,
+  TransactionDetailsData,
+  TransactionType
+} from "@/types/wallet";
 
 hashes.sha512 = sha512;
-
-const SOL_PRICE_USD = 180;
-
-type TransactionType = "incoming" | "outgoing" | "pending";
-
-type Transaction = {
-  id: string;
-  type: TransactionType;
-  amountLamports: number;
-  // For incoming transactions
-  sender?: string;
-  username?: string;
-  // For outgoing transactions
-  recipient?: string;
-  timestamp: number;
-};
-
-// Legacy type for internal use - will be removed
-type IncomingTransaction = {
-  id: string;
-  amountLamports: number;
-  sender: string;
-  username: string;
-};
-
-function ActionButton({
-  icon,
-  label,
-  onClick,
-  disabled
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      className={`flex-1 flex flex-col items-center justify-center gap-2 min-w-0 overflow-hidden rounded-2xl ${disabled ? "opacity-40" : ""} group`}
-    >
-      <div
-        className="w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-150 group-active:scale-95 group-active:bg-white/10"
-        style={{
-          background: "rgba(255, 255, 255, 0.06)",
-          mixBlendMode: "lighten"
-        }}
-      >
-        <div className="text-white">
-          {React.cloneElement(
-            icon as React.ReactElement<{ size?: number; strokeWidth?: number }>,
-            { size: 28, strokeWidth: 1.5 }
-          )}
-        </div>
-      </div>
-      <span className="text-[13px] text-white/60 leading-4">{label}</span>
-    </button>
-  );
-}
-
-function ScanIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      width="28"
-      height="28"
-      viewBox="0 0 28 28"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-    >
-      <path
-        d="M3.5 8.167V5.833A2.333 2.333 0 0 1 5.833 3.5h2.334"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M19.833 3.5h2.334A2.333 2.333 0 0 1 24.5 5.833v2.334"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M24.5 19.833v2.334a2.333 2.333 0 0 1-2.333 2.333h-2.334"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M8.167 24.5H5.833A2.333 2.333 0 0 1 3.5 22.167v-2.334"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M8.167 14h11.666"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 export default function Home() {
   const rawInitData = useRawInitData();
@@ -999,41 +903,6 @@ export default function Home() {
     claimError,
     sendError
   ]);
-
-  // Truncate (floor) to specific decimal places - never rounds up
-  const truncateDecimals = (num: number, decimals: number): string => {
-    const factor = Math.pow(10, decimals);
-    const truncated = Math.floor(num * factor) / factor;
-    return truncated.toFixed(decimals);
-  };
-
-  const formatBalance = (lamports: number | null): string => {
-    if (lamports === null) return "0.0000";
-    const sol = lamports / LAMPORTS_PER_SOL;
-    return truncateDecimals(sol, 4);
-  };
-
-  const formatUsdValue = (lamports: number | null): string => {
-    if (lamports === null) return "0.00";
-    const sol = lamports / LAMPORTS_PER_SOL;
-    const usd = sol * SOL_PRICE_USD;
-    return truncateDecimals(usd, 2);
-  };
-
-  const formatAddress = (address: string | null): string => {
-    if (!address) return "Loading...";
-    return `${address.slice(0, 4)}...${address.slice(-4)}`;
-  };
-
-  const formatSenderAddress = (address: string): string => {
-    return `${address.slice(0, 4)}...${address.slice(-4)}`;
-  };
-
-  const formatTransactionAmount = (lamports: number): string => {
-    const sol = lamports / LAMPORTS_PER_SOL;
-    // Truncate to 4 decimal places, then remove trailing zeros
-    return parseFloat(truncateDecimals(sol, 4)).toString();
-  };
 
   return (
     <>

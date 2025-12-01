@@ -14,31 +14,11 @@ import {
 } from "react";
 
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+import { SOL_PRICE_USD, SOLANA_FEE_SOL } from "@/lib/constants";
+import { formatTransactionDate, getStatusText } from "@/lib/wallet/formatters";
+import type { TransactionDetailsData, TransactionStatus } from "@/types/wallet";
 
-const SOL_PRICE_USD = 180;
-const SOLANA_FEE_SOL = 0.000005;
-
-export type TransactionStatus = "pending" | "completed" | "error";
-
-export type TransactionDetailsData = {
-  id: string;
-  type: "incoming" | "outgoing";
-  amountLamports: number;
-  // For outgoing transactions
-  recipient?: string;
-  recipientUsername?: string;
-  recipientAvatar?: string;
-  // For incoming transactions
-  sender?: string;
-  senderUsername?: string;
-  senderAvatar?: string;
-  // Metadata
-  status: TransactionStatus;
-  timestamp: number;
-  networkFeeLamports?: number;
-  comment?: string;
-  signature?: string; // Transaction signature for explorer link
-};
+export type { TransactionDetailsData, TransactionStatus };
 
 export type TransactionDetailsSheetProps = {
   trigger?: ReactNode | null;
@@ -125,28 +105,6 @@ export default function TransactionDetailsSheet({
   const fullAddress = isIncoming
     ? (transaction.sender || "Unknown")
     : (transaction.recipient || "Unknown");
-
-  // Format date
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
-      ", " +
-      date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-
-  // Get status text
-  const getStatusText = (status: TransactionStatus) => {
-    // For incoming pending transactions, show "Ready to claim"
-    if (isIncoming && status === "pending") {
-      return "Ready to claim";
-    }
-    switch (status) {
-      case "completed": return "Completed";
-      case "pending": return "Pending";
-      case "error": return "Failed";
-      default: return status;
-    }
-  };
 
   // Handle view in explorer
   const handleViewInExplorer = () => {
@@ -401,7 +359,7 @@ export default function TransactionDetailsSheet({
                 </p>
                 {/* Date */}
                 <p className="text-base leading-[22px] text-white/40 text-center">
-                  {formatDate(transaction.timestamp)}
+                  {formatTransactionDate(transaction.timestamp)}
                 </p>
               </div>
             </div>
@@ -418,7 +376,7 @@ export default function TransactionDetailsSheet({
                 {/* Status */}
                 <div className="flex flex-col gap-0.5 px-4 py-2.5">
                   <p className="text-[13px] leading-4 text-white/60">Status</p>
-                  <p className="text-base leading-5 text-white">{getStatusText(transaction.status)}</p>
+                  <p className="text-base leading-5 text-white">{getStatusText(transaction.status, isIncoming)}</p>
                 </div>
 
                 {/* Recipient/Sender */}

@@ -28,3 +28,9 @@ export const VAULT_SEED_BYTES = Buffer.from(VAULT_SEED);
 
 export const SESSION_SEED = "tg_session";
 export const SESSION_SEED_BYTES = Buffer.from(SESSION_SEED);
+
+// SOL price for USD conversions (hardcoded for now)
+export const SOL_PRICE_USD = 180;
+
+// Solana network fee
+export const SOLANA_FEE_SOL = 0.000005;
