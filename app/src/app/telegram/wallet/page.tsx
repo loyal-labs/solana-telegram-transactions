@@ -33,8 +33,16 @@ import {
 import { topUpDeposit } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
+import { getAccountTransactionHistory } from "@/lib/solana/rpc/get-account-txn-history";
 import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import { verifyAndClaimDeposit } from "@/lib/solana/verify-and-claim-deposit";
+import {
+  formatAddress,
+  formatBalance,
+  formatSenderAddress,
+  formatTransactionAmount,
+  formatUsdValue
+} from "@/lib/solana/wallet/formatters";
 import {
   getWalletBalance,
   getWalletKeypair,
@@ -59,13 +67,6 @@ import {
 } from "@/lib/telegram/init-data-transform";
 import { parseUsernameFromInitData } from "@/lib/telegram/init-data-transform";
 import { ensureTelegramTheme } from "@/lib/telegram/theme";
-import {
-  formatAddress,
-  formatBalance,
-  formatSenderAddress,
-  formatTransactionAmount,
-  formatUsdValue
-} from "@/lib/solana/wallet/formatters";
 import type {
   IncomingTransaction,
   Transaction,
@@ -98,9 +99,10 @@ export default function Home() {
   const [incomingTransactions, setIncomingTransactions] = useState<
     IncomingTransaction[]
   >([]);
-  const [outgoingTransactions, setOutgoingTransactions] = useState<
-    Transaction[]
-  >([]);
+  const [walletTransactions, setWalletTransactions] = useState<Transaction[]>(
+    []
+  );
+  const [isFetchingTransactions, setIsFetchingTransactions] = useState(false);
   const [
     selectedTransaction,
     setSelectedTransaction
@@ -188,7 +190,7 @@ export default function Home() {
     []
   );
 
-  const handleOpenOutgoingTransactionDetails = useCallback(
+  const handleOpenWalletTransactionDetails = useCallback(
     (transaction: Transaction) => {
       if (hapticFeedback.impactOccurred.isAvailable()) {
         hapticFeedback.impactOccurred("light");
@@ -198,12 +200,18 @@ export default function Home() {
       // Convert to TransactionDetailsData format
       const detailsData: TransactionDetailsData = {
         id: transaction.id,
-        type: "outgoing",
+        type: transaction.type === "incoming" ? "incoming" : "outgoing",
         amountLamports: transaction.amountLamports,
         recipient: transaction.recipient,
         recipientUsername: transaction.recipient?.startsWith("@") ? transaction.recipient : undefined,
-        status: transaction.type === "pending" ? "pending" : "completed",
+        sender: transaction.sender,
+        senderUsername: transaction.sender?.startsWith("@") ? transaction.sender : undefined,
+        status:
+          transaction.status ??
+          (transaction.type === "pending" ? "pending" : "completed"),
         timestamp: transaction.timestamp,
+        networkFeeLamports: transaction.networkFeeLamports,
+        signature: transaction.signature
       };
       setSelectedTransaction(detailsData);
       setTransactionDetailsSheetOpen(true);
@@ -245,6 +253,65 @@ export default function Home() {
     }
   }, []);
 
+  const loadWalletTransactions = useCallback(async () => {
+    if (!walletAddress) return;
+
+    setIsFetchingTransactions(true);
+    try {
+      const { transfers } = await getAccountTransactionHistory(
+        new PublicKey(walletAddress),
+        {
+          limit: 10,
+          onlySystemTransfers: false
+        }
+      );
+
+      const mappedTransactions: Transaction[] = transfers.map(transfer => {
+        const isIncoming = transfer.direction === "in";
+        const counterparty =
+          transfer.counterparty ||
+          (isIncoming ? "Unknown sender" : "Unknown recipient");
+
+        return {
+          id: transfer.signature,
+          type: isIncoming ? "incoming" : "outgoing",
+          amountLamports: transfer.amountLamports,
+          sender: isIncoming ? counterparty : undefined,
+          recipient: !isIncoming ? counterparty : undefined,
+          timestamp: transfer.timestamp ?? Date.now(),
+          networkFeeLamports: transfer.feeLamports,
+          signature: transfer.signature,
+          status: transfer.status === "failed" ? "error" : "completed"
+        };
+      });
+
+      setWalletTransactions(prev => {
+        const pending = prev.filter(
+          tx => tx.type === "pending" && !tx.signature
+        );
+        const existingBySignature = new Map(
+          prev
+            .filter(tx => tx.signature)
+            .map(tx => [tx.signature as string, tx])
+        );
+
+        const merged = mappedTransactions.map(tx => {
+          if (!tx.signature) return tx;
+          const existing = existingBySignature.get(tx.signature);
+          return existing ? { ...existing, ...tx } : tx;
+        });
+
+        const combined = [...pending, ...merged];
+        return combined.sort((a, b) => b.timestamp - a.timestamp);
+      });
+
+    } catch (error) {
+      console.error("Failed to fetch wallet transactions", error);
+    } finally {
+      setIsFetchingTransactions(false);
+    }
+  }, [walletAddress]);
+
   const _handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
 
@@ -262,6 +329,12 @@ export default function Home() {
         setSolPriceUsd(latestPrice);
       } catch (priceError) {
         console.error("Failed to refresh SOL price", priceError);
+      }
+
+      try {
+        await loadWalletTransactions();
+      } catch (txError) {
+        console.error("Failed to refresh wallet transactions", txError);
       }
 
       // Refresh incoming transactions
@@ -305,7 +378,7 @@ export default function Home() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [isRefreshing, rawInitData, refreshWalletBalance]);
+  }, [isRefreshing, loadWalletTransactions, rawInitData, refreshWalletBalance]);
 
   const handleSubmitSend = useCallback(async () => {
     if (!isSendFormValid || isSendingTransaction) {
@@ -336,14 +409,16 @@ export default function Home() {
     };
 
     setIsSendingTransaction(true);
-    setOutgoingTransactions(prev => [pendingTransaction, ...prev]);
+    setWalletTransactions(prev => [pendingTransaction, ...prev]);
 
     try {
       console.log("Sending transaction to:", trimmedRecipient);
 
+      let signature: string | null = null;
+
       if (isValidSolanaAddress(trimmedRecipient)) {
         console.log("Sending transaction to Solana address:");
-        await sendSolTransaction(trimmedRecipient, lamports);
+        signature = await sendSolTransaction(trimmedRecipient, lamports);
       } else if (isValidTelegramUsername(trimmedRecipient)) {
         console.log(
           "Sending transaction to Telegram username:",
@@ -358,15 +433,23 @@ export default function Home() {
       }
 
       // Update pending transaction to confirmed
-      setOutgoingTransactions(prev =>
+      setWalletTransactions(prev =>
         prev.map(tx =>
           tx.id === pendingTxId
-            ? { ...tx, type: "outgoing" as TransactionType }
+            ? {
+                ...tx,
+                type: "outgoing" as TransactionType,
+                signature: signature ?? tx.signature,
+                status: "completed"
+              }
             : tx
         )
       );
 
       await refreshWalletBalance();
+      if (signature) {
+        void loadWalletTransactions();
+      }
 
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred("success");
@@ -381,7 +464,7 @@ export default function Home() {
     } catch (error) {
       console.error("Failed to send transaction", error);
       // Remove failed pending transaction
-      setOutgoingTransactions(prev => prev.filter(tx => tx.id !== pendingTxId));
+      setWalletTransactions(prev => prev.filter(tx => tx.id !== pendingTxId));
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred("error");
       }
@@ -397,6 +480,7 @@ export default function Home() {
     isSendFormValid,
     isSendingTransaction,
     sendFormValues,
+    loadWalletTransactions,
     refreshWalletBalance
   ]);
 
@@ -752,6 +836,11 @@ export default function Home() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!walletAddress) return;
+    void loadWalletTransactions();
+  }, [walletAddress, loadWalletTransactions]);
 
   // Poll for balance updates while the page stays open so inbound funds appear without manual refresh
   useEffect(() => {
@@ -1140,12 +1229,15 @@ export default function Home() {
           {(() => {
             const hasNoTransactions =
               incomingTransactions.length === 0 &&
-              outgoingTransactions.length === 0;
+              walletTransactions.length === 0;
             const isEmptyWallet =
               (balance === null || balance === 0) && starsBalance === 0;
+            const isActivityLoading =
+              isLoading ||
+              (isFetchingTransactions && walletTransactions.length === 0);
 
             // Loading state - show skeleton transaction cards
-            if (isLoading) {
+            if (isActivityLoading) {
               return (
                 <div className="flex-1 px-4 pb-4">
                   <div className="flex flex-col gap-2">
@@ -1314,13 +1406,28 @@ export default function Home() {
                 );
               })}
 
-              {/* Outgoing Transactions */}
-              {outgoingTransactions.map(transaction => {
+              {/* On-chain wallet transactions */}
+              {walletTransactions.map(transaction => {
+                const isIncoming = transaction.type === "incoming";
                 const isPending = transaction.type === "pending";
+                const counterparty = isIncoming
+                  ? transaction.sender || "Unknown sender"
+                  : transaction.recipient || "Unknown recipient";
+                const formattedCounterparty = counterparty.startsWith("@")
+                  ? counterparty
+                  : formatSenderAddress(counterparty);
+                const amountPrefix = isIncoming ? "+" : "−";
+                const amountColor = isIncoming
+                  ? "#32e55e"
+                  : isPending
+                    ? "#00b1fb"
+                    : "white";
+                const timestamp = new Date(transaction.timestamp);
+
                 return (
                   <button
                     key={transaction.id}
-                    onClick={() => handleOpenOutgoingTransactionDetails(transaction)}
+                    onClick={() => handleOpenWalletTransactionDetails(transaction)}
                     className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
                     style={{
                       background: "rgba(255, 255, 255, 0.06)",
@@ -1332,13 +1439,22 @@ export default function Home() {
                       <div
                         className="w-12 h-12 rounded-full flex items-center justify-center"
                         style={{
-                          background: isPending
-                            ? "rgba(0, 177, 251, 0.15)"
-                            : "rgba(255, 255, 255, 0.06)",
-                          mixBlendMode: isPending ? "normal" : "lighten"
+                          background: isIncoming
+                            ? "rgba(50, 229, 94, 0.15)"
+                            : isPending
+                              ? "rgba(0, 177, 251, 0.15)"
+                              : "rgba(255, 255, 255, 0.06)",
+                          mixBlendMode:
+                            isIncoming || isPending ? "normal" : "lighten"
                         }}
                       >
-                        {isPending ? (
+                        {isIncoming ? (
+                          <ArrowDown
+                            className="w-7 h-7"
+                            strokeWidth={1.5}
+                            style={{ color: "#32e55e" }}
+                          />
+                        ) : isPending ? (
                           <Clock
                             className="w-7 h-7"
                             strokeWidth={1.5}
@@ -1356,13 +1472,15 @@ export default function Home() {
                     {/* Middle - Text */}
                     <div className="flex-1 py-2.5 flex flex-col gap-0.5">
                       <p className="text-base text-white leading-5">
-                        {isPending ? "To be claimed" : "Sent"}
+                        {isIncoming
+                          ? "Received"
+                          : isPending
+                            ? "To be claimed"
+                            : "Sent"}
                       </p>
                       <p className="text-[13px] text-white/60 leading-4">
-                        {isPending ? "by" : "to"}{" "}
-                        {transaction.recipient?.startsWith("@")
-                          ? transaction.recipient
-                          : formatSenderAddress(transaction.recipient || "")}
+                        {isIncoming ? "from" : isPending ? "by" : "to"}{" "}
+                        {formattedCounterparty}
                       </p>
                     </div>
 
@@ -1370,21 +1488,22 @@ export default function Home() {
                     <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
                       <p
                         className="text-base leading-5"
-                        style={{ color: isPending ? "#00b1fb" : "white" }}
+                        style={{ color: amountColor }}
                       >
-                        −{formatTransactionAmount(transaction.amountLamports)}{" "}
+                        {amountPrefix}
+                        {formatTransactionAmount(transaction.amountLamports)}{" "}
                         SOL
                       </p>
                       <p className="text-[13px] text-white/60 leading-4">
-                        {new Date(transaction.timestamp).toLocaleDateString(
-                          "en-US",
-                          { month: "short", day: "numeric" }
-                        )}
+                        {timestamp.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric"
+                        })}
                         ,{" "}
-                        {new Date(transaction.timestamp).toLocaleTimeString(
-                          [],
-                          { hour: "numeric", minute: "2-digit" }
-                        )}
+                        {timestamp.toLocaleTimeString([], {
+                          hour: "numeric",
+                          minute: "2-digit"
+                        })}
                       </p>
                     </div>
                   </button>

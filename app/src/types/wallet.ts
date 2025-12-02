@@ -6,6 +6,9 @@ export type Transaction = {
   id: string;
   type: TransactionType;
   amountLamports: number;
+  status?: TransactionStatus;
+  networkFeeLamports?: number;
+  signature?: string;
   // For incoming transactions
   sender?: string;
   username?: string;
