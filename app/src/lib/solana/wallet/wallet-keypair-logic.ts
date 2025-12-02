@@ -10,7 +10,7 @@ import {
   deleteCloudValue,
   getCloudValue,
   setCloudValue,
-} from "../../telegram/cloud-storage";
+} from "../../telegram/mini-app/cloud-storage";
 
 const serializeSecretKey = (secretKey: Uint8Array): string =>
   JSON.stringify(Array.from(secretKey));

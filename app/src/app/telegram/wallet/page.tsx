@@ -15,10 +15,11 @@ import {
 } from "@telegram-apps/sdk-react";
 import { ArrowDown, ArrowUp, ChevronRight, Clock, Copy } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ScanIcon } from "@/components/ui/icons/ScanIcon";
 import { ActionButton } from "@/components/wallet/ActionButton";
+import ActivitySheet from "@/components/wallet/ActivitySheet";
 import ReceiveSheet from "@/components/wallet/ReceiveSheet";
 import SendSheet, {
   isValidSolanaAddress,
@@ -84,6 +85,7 @@ export default function Home() {
   const [sentAmountSol, setSentAmountSol] = useState<number | undefined>(undefined);
   const [sendError, setSendError] = useState<string | null>(null);
   const [isReceiveSheetOpen, setReceiveSheetOpen] = useState(false);
+  const [isActivitySheetOpen, setActivitySheetOpen] = useState(false);
   const [
     isTransactionDetailsSheetOpen,
     setTransactionDetailsSheetOpen
@@ -489,6 +491,20 @@ export default function Home() {
       hapticFeedback.impactOccurred("light");
     }
     setReceiveSheetOpen(open);
+  }, []);
+
+  const handleOpenActivitySheet = useCallback(() => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    setActivitySheetOpen(true);
+  }, []);
+
+  const handleActivitySheetChange = useCallback((open: boolean) => {
+    if (!open && hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    setActivitySheetOpen(open);
   }, []);
 
   const handleTransactionDetailsSheetChange = useCallback((open: boolean) => {
@@ -1035,6 +1051,30 @@ export default function Home() {
   const showSecondarySkeleton =
     isLoading || (displayCurrency === "SOL" && isSolPriceLoading);
 
+  // Combine and limit transactions for main Activity section (max 10)
+  const limitedActivityItems = useMemo(() => {
+    const items: Array<
+      | { type: "incoming"; transaction: IncomingTransaction }
+      | { type: "wallet"; transaction: Transaction }
+    > = [];
+
+    // Add incoming (claimable) transactions first - they have priority
+    for (const tx of incomingTransactions) {
+      items.push({ type: "incoming", transaction: tx });
+    }
+
+    // Add wallet transactions sorted by timestamp
+    const sortedWallet = [...walletTransactions].sort(
+      (a, b) => b.timestamp - a.timestamp
+    );
+    for (const tx of sortedWallet) {
+      items.push({ type: "wallet", transaction: tx });
+    }
+
+    // Limit to 10
+    return items.slice(0, 10);
+  }, [incomingTransactions, walletTransactions]);
+
   return (
     <>
       <main
@@ -1339,175 +1379,182 @@ export default function Home() {
             // Normal state with transactions
             return (
               <>
-                <div className="px-4 pt-3 pb-2">
+                <div className="px-4 pt-3 pb-2 flex items-center justify-between">
                   <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
                     Activity
                   </p>
+                  <button
+                    onClick={handleOpenActivitySheet}
+                    className="flex items-center gap-0.5 text-[13px] text-white/60 leading-4 active:opacity-70 transition-opacity"
+                  >
+                    All
+                    <ChevronRight size={14} strokeWidth={1.5} />
+                  </button>
                 </div>
                 <div className="flex-1 px-4 pb-4">
                   <div className="flex flex-col gap-2 pb-36">
+                    {limitedActivityItems.map(item => {
+                      if (item.type === "incoming") {
+                        const transaction = item.transaction;
+                        const isClaiming = claimingTransactionId === transaction.id;
+                        return (
+                          <button
+                            key={transaction.id}
+                            onClick={() =>
+                              !isClaiming && handleOpenTransactionDetails(transaction)
+                            }
+                            disabled={isClaiming}
+                            className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity ${
+                              isClaiming ? "opacity-60" : ""
+                            }`}
+                            style={{
+                              background: "rgba(255, 255, 255, 0.06)",
+                              mixBlendMode: "lighten"
+                            }}
+                          >
+                            {/* Left - Icon */}
+                            <div className="py-1.5 pr-3">
+                              <div
+                                className="w-12 h-12 rounded-full flex items-center justify-center"
+                                style={{ background: "rgba(50, 229, 94, 0.15)" }}
+                              >
+                                <ArrowDown
+                                  className="w-7 h-7"
+                                  strokeWidth={1.5}
+                                  style={{ color: "#32e55e" }}
+                                />
+                              </div>
+                            </div>
 
-              {/* Incoming Transactions (Claimable) */}
-              {incomingTransactions.map(transaction => {
-                const isClaiming = claimingTransactionId === transaction.id;
-                return (
-                  <button
-                    key={transaction.id}
-                    onClick={() =>
-                      !isClaiming && handleOpenTransactionDetails(transaction)
-                    }
-                    disabled={isClaiming}
-                    className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity ${
-                      isClaiming ? "opacity-60" : ""
-                    }`}
-                    style={{
-                      background: "rgba(255, 255, 255, 0.06)",
-                      mixBlendMode: "lighten"
-                    }}
-                  >
-                    {/* Left - Icon */}
-                    <div className="py-1.5 pr-3">
-                      <div
-                        className="w-12 h-12 rounded-full flex items-center justify-center"
-                        style={{ background: "rgba(50, 229, 94, 0.15)" }}
-                      >
-                        <ArrowDown
-                          className="w-7 h-7"
-                          strokeWidth={1.5}
-                          style={{ color: "#32e55e" }}
-                        />
-                      </div>
-                    </div>
+                            {/* Middle - Text */}
+                            <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                              <p className="text-base text-white leading-5">Received</p>
+                              <p className="text-[13px] text-white/60 leading-4">
+                                from {formatSenderAddress(transaction.sender)}
+                              </p>
+                            </div>
 
-                    {/* Middle - Text */}
-                    <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                      <p className="text-base text-white leading-5">Received</p>
-                      <p className="text-[13px] text-white/60 leading-4">
-                        from {formatSenderAddress(transaction.sender)}
-                      </p>
-                    </div>
+                            {/* Right - Claim Badge */}
+                            <div className="py-2.5 pl-3">
+                              <div
+                                className="px-4 py-2 rounded-full text-sm text-white leading-5"
+                                style={{
+                                  background:
+                                    "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
+                                }}
+                              >
+                                {isClaiming
+                                  ? "Claiming..."
+                                  : `Claim ${formatTransactionAmount(transaction.amountLamports)} SOL`}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      }
 
-                    {/* Right - Claim Badge */}
-                    <div className="py-2.5 pl-3">
-                      <div
-                        className="px-4 py-2 rounded-full text-sm text-white leading-5"
-                        style={{
-                          background:
-                            "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
-                        }}
-                      >
-                        {isClaiming
-                          ? "Claiming..."
-                          : `Claim ${formatTransactionAmount(transaction.amountLamports)} SOL`}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+                      // Wallet transaction
+                      const transaction = item.transaction;
+                      const isIncoming = transaction.type === "incoming";
+                      const isPending = transaction.type === "pending";
+                      const counterparty = isIncoming
+                        ? transaction.sender || "Unknown sender"
+                        : transaction.recipient || "Unknown recipient";
+                      const formattedCounterparty = counterparty.startsWith("@")
+                        ? counterparty
+                        : formatSenderAddress(counterparty);
+                      const amountPrefix = isIncoming ? "+" : "−";
+                      const amountColor = isIncoming
+                        ? "#32e55e"
+                        : isPending
+                          ? "#00b1fb"
+                          : "white";
+                      const timestamp = new Date(transaction.timestamp);
 
-              {/* On-chain wallet transactions */}
-              {walletTransactions.map(transaction => {
-                const isIncoming = transaction.type === "incoming";
-                const isPending = transaction.type === "pending";
-                const counterparty = isIncoming
-                  ? transaction.sender || "Unknown sender"
-                  : transaction.recipient || "Unknown recipient";
-                const formattedCounterparty = counterparty.startsWith("@")
-                  ? counterparty
-                  : formatSenderAddress(counterparty);
-                const amountPrefix = isIncoming ? "+" : "−";
-                const amountColor = isIncoming
-                  ? "#32e55e"
-                  : isPending
-                    ? "#00b1fb"
-                    : "white";
-                const timestamp = new Date(transaction.timestamp);
+                      return (
+                        <button
+                          key={transaction.id}
+                          onClick={() => handleOpenWalletTransactionDetails(transaction)}
+                          className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
+                          style={{
+                            background: "rgba(255, 255, 255, 0.06)",
+                            mixBlendMode: "lighten"
+                          }}
+                        >
+                          {/* Left - Icon */}
+                          <div className="py-1.5 pr-3">
+                            <div
+                              className="w-12 h-12 rounded-full flex items-center justify-center"
+                              style={{
+                                background: isIncoming
+                                  ? "rgba(50, 229, 94, 0.15)"
+                                  : isPending
+                                    ? "rgba(0, 177, 251, 0.15)"
+                                    : "rgba(255, 255, 255, 0.06)",
+                                mixBlendMode:
+                                  isIncoming || isPending ? "normal" : "lighten"
+                              }}
+                            >
+                              {isIncoming ? (
+                                <ArrowDown
+                                  className="w-7 h-7"
+                                  strokeWidth={1.5}
+                                  style={{ color: "#32e55e" }}
+                                />
+                              ) : isPending ? (
+                                <Clock
+                                  className="w-7 h-7"
+                                  strokeWidth={1.5}
+                                  style={{ color: "#00b1fb" }}
+                                />
+                              ) : (
+                                <ArrowUp
+                                  className="w-7 h-7 text-white/60"
+                                  strokeWidth={1.5}
+                                />
+                              )}
+                            </div>
+                          </div>
 
-                return (
-                  <button
-                    key={transaction.id}
-                    onClick={() => handleOpenWalletTransactionDetails(transaction)}
-                    className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                    style={{
-                      background: "rgba(255, 255, 255, 0.06)",
-                      mixBlendMode: "lighten"
-                    }}
-                  >
-                    {/* Left - Icon */}
-                    <div className="py-1.5 pr-3">
-                      <div
-                        className="w-12 h-12 rounded-full flex items-center justify-center"
-                        style={{
-                          background: isIncoming
-                            ? "rgba(50, 229, 94, 0.15)"
-                            : isPending
-                              ? "rgba(0, 177, 251, 0.15)"
-                              : "rgba(255, 255, 255, 0.06)",
-                          mixBlendMode:
-                            isIncoming || isPending ? "normal" : "lighten"
-                        }}
-                      >
-                        {isIncoming ? (
-                          <ArrowDown
-                            className="w-7 h-7"
-                            strokeWidth={1.5}
-                            style={{ color: "#32e55e" }}
-                          />
-                        ) : isPending ? (
-                          <Clock
-                            className="w-7 h-7"
-                            strokeWidth={1.5}
-                            style={{ color: "#00b1fb" }}
-                          />
-                        ) : (
-                          <ArrowUp
-                            className="w-7 h-7 text-white/60"
-                            strokeWidth={1.5}
-                          />
-                        )}
-                      </div>
-                    </div>
+                          {/* Middle - Text */}
+                          <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                            <p className="text-base text-white leading-5">
+                              {isIncoming
+                                ? "Received"
+                                : isPending
+                                  ? "To be claimed"
+                                  : "Sent"}
+                            </p>
+                            <p className="text-[13px] text-white/60 leading-4">
+                              {isIncoming ? "from" : isPending ? "by" : "to"}{" "}
+                              {formattedCounterparty}
+                            </p>
+                          </div>
 
-                    {/* Middle - Text */}
-                    <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                      <p className="text-base text-white leading-5">
-                        {isIncoming
-                          ? "Received"
-                          : isPending
-                            ? "To be claimed"
-                            : "Sent"}
-                      </p>
-                      <p className="text-[13px] text-white/60 leading-4">
-                        {isIncoming ? "from" : isPending ? "by" : "to"}{" "}
-                        {formattedCounterparty}
-                      </p>
-                    </div>
-
-                    {/* Right - Value */}
-                    <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
-                      <p
-                        className="text-base leading-5"
-                        style={{ color: amountColor }}
-                      >
-                        {amountPrefix}
-                        {formatTransactionAmount(transaction.amountLamports)}{" "}
-                        SOL
-                      </p>
-                      <p className="text-[13px] text-white/60 leading-4">
-                        {timestamp.toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric"
-                        })}
-                        ,{" "}
-                        {timestamp.toLocaleTimeString([], {
-                          hour: "numeric",
-                          minute: "2-digit"
-                        })}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
+                          {/* Right - Value */}
+                          <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
+                            <p
+                              className="text-base leading-5"
+                              style={{ color: amountColor }}
+                            >
+                              {amountPrefix}
+                              {formatTransactionAmount(transaction.amountLamports)}{" "}
+                              SOL
+                            </p>
+                            <p className="text-[13px] text-white/60 leading-4">
+                              {timestamp.toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric"
+                              })}
+                              ,{" "}
+                              {timestamp.toLocaleTimeString([], {
+                                hour: "numeric",
+                                minute: "2-digit"
+                              })}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </>
@@ -1557,6 +1604,16 @@ export default function Home() {
         showSuccess={showClaimSuccess}
         showError={claimError}
         solPriceUsd={solPriceUsd}
+      />
+      <ActivitySheet
+        open={isActivitySheetOpen}
+        onOpenChange={handleActivitySheetChange}
+        trigger={null}
+        walletTransactions={walletTransactions}
+        incomingTransactions={incomingTransactions}
+        onTransactionClick={handleOpenWalletTransactionDetails}
+        onIncomingTransactionClick={handleOpenTransactionDetails}
+        claimingTransactionId={claimingTransactionId}
       />
     </>
   );
