@@ -2,21 +2,22 @@
 
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 // Mock chat data - placeholder for now
 const MOCK_CHATS = [
-  { id: "1", title: "Telegram Developers Community" },
-  { id: "2", title: "X Live 🎻 classic" },
-  { id: "3", title: "Gift Concepts" },
-  { id: "4", title: "TON Community" },
-  { id: "5", title: "Solana Developers" },
-  { id: "6", title: "UX Live 🎻 classic" },
-  { id: "7", title: "Crypto Trading" },
-  { id: "8", title: "Web3 Builders" },
-  { id: "9", title: "DeFi Discussion" },
-  { id: "10", title: "NFT Collectors" },
-  { id: "11", title: "Blockchain News" },
-  { id: "12", title: "Smart Contracts" },
+  { id: "1", title: "Telegram Developers Community", messageCount: 2986 },
+  { id: "2", title: "X Live 🎻 classic", messageCount: 1523 },
+  { id: "3", title: "Gift Concepts", messageCount: 847 },
+  { id: "4", title: "TON Community", messageCount: 4521 },
+  { id: "5", title: "Solana Developers", messageCount: 3298 },
+  { id: "6", title: "UX Live 🎻 classic", messageCount: 912 },
+  { id: "7", title: "Crypto Trading", messageCount: 7834 },
+  { id: "8", title: "Web3 Builders", messageCount: 2156 },
+  { id: "9", title: "DeFi Discussion", messageCount: 1847 },
+  { id: "10", title: "NFT Collectors", messageCount: 956 },
+  { id: "11", title: "Blockchain News", messageCount: 3412 },
+  { id: "12", title: "Smart Contracts", messageCount: 1289 },
 ];
 
 // Generate a consistent color based on the chat title
@@ -50,7 +51,7 @@ function getFirstLetter(title: string): string {
 }
 
 interface ChatItemProps {
-  chat: { id: string; title: string };
+  chat: { id: string; title: string; messageCount?: number };
   onClick: () => void;
 }
 
@@ -87,12 +88,13 @@ function ChatItem({ chat, onClick }: ChatItemProps) {
 }
 
 export default function SummariesPage() {
-  const handleChatClick = (chatId: string) => {
+  const router = useRouter();
+
+  const handleChatClick = (chat: typeof MOCK_CHATS[0]) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
-    // TODO: Navigate to chat summary details
-    console.log("Chat clicked:", chatId);
+    router.push(`/telegram/summaries/feed?chatId=${chat.id}`);
   };
 
   return (
@@ -121,7 +123,7 @@ export default function SummariesPage() {
             <ChatItem
               key={chat.id}
               chat={chat}
-              onClick={() => handleChatClick(chat.id)}
+              onClick={() => handleChatClick(chat)}
             />
           ))}
 
