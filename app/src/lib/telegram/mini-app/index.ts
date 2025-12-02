@@ -46,12 +46,15 @@ declare global {
  * Get safe area values from native WebApp API (most reliable)
  */
 const getNativeInsets = () => {
-  const webApp = typeof window !== "undefined" ? window.Telegram?.WebApp : undefined;
+  const webApp =
+    typeof window !== "undefined" ? window.Telegram?.WebApp : undefined;
 
   // contentSafeAreaInset is available in WebApp 8.0+
   const hasContentSafe = webApp?.isVersionAtLeast?.("8.0") ?? false;
 
-  const contentInsets = hasContentSafe ? webApp?.contentSafeAreaInset : undefined;
+  const contentInsets = hasContentSafe
+    ? webApp?.contentSafeAreaInset
+    : undefined;
   const deviceInsets = webApp?.safeAreaInset;
 
   return {
@@ -101,12 +104,30 @@ const applySafeAreaInsets = () => {
     const totalBottom = contentBottom + deviceBottom;
 
     // Set CSS custom properties
-    document.documentElement.style.setProperty("--app-safe-top", `${totalTop}px`);
-    document.documentElement.style.setProperty("--app-safe-bottom", `${totalBottom}px`);
-    document.documentElement.style.setProperty("--app-content-safe-top", `${contentTop}px`);
-    document.documentElement.style.setProperty("--app-content-safe-bottom", `${contentBottom}px`);
-    document.documentElement.style.setProperty("--app-device-safe-top", `${deviceTop}px`);
-    document.documentElement.style.setProperty("--app-device-safe-bottom", `${deviceBottom}px`);
+    document.documentElement.style.setProperty(
+      "--app-safe-top",
+      `${totalTop}px`
+    );
+    document.documentElement.style.setProperty(
+      "--app-safe-bottom",
+      `${totalBottom}px`
+    );
+    document.documentElement.style.setProperty(
+      "--app-content-safe-top",
+      `${contentTop}px`
+    );
+    document.documentElement.style.setProperty(
+      "--app-content-safe-bottom",
+      `${contentBottom}px`
+    );
+    document.documentElement.style.setProperty(
+      "--app-device-safe-top",
+      `${deviceTop}px`
+    );
+    document.documentElement.style.setProperty(
+      "--app-device-safe-bottom",
+      `${deviceBottom}px`
+    );
 
     console.debug("Safe area insets applied:", {
       contentTop,
@@ -145,14 +166,20 @@ const mountViewport = async () => {
     applySafeAreaInsets();
 
     // Subscribe to safe area changes using signal's .sub() method
-    const unsubContentTop = viewport.contentSafeAreaInsetTop?.sub?.(applySafeAreaInsets);
-    const unsubContentBottom = viewport.contentSafeAreaInsetBottom?.sub?.(applySafeAreaInsets);
-    const unsubDeviceTop = viewport.safeAreaInsetTop?.sub?.(applySafeAreaInsets);
-    const unsubDeviceBottom = viewport.safeAreaInsetBottom?.sub?.(applySafeAreaInsets);
+    const unsubContentTop =
+      viewport.contentSafeAreaInsetTop?.sub?.(applySafeAreaInsets);
+    const unsubContentBottom =
+      viewport.contentSafeAreaInsetBottom?.sub?.(applySafeAreaInsets);
+    const unsubDeviceTop =
+      viewport.safeAreaInsetTop?.sub?.(applySafeAreaInsets);
+    const unsubDeviceBottom =
+      viewport.safeAreaInsetBottom?.sub?.(applySafeAreaInsets);
 
     // Store cleanup functions if needed
     if (typeof window !== "undefined") {
-      (window as unknown as { __cleanupSafeArea?: () => void }).__cleanupSafeArea = () => {
+      (
+        window as unknown as { __cleanupSafeArea?: () => void }
+      ).__cleanupSafeArea = () => {
         unsubContentTop?.();
         unsubContentBottom?.();
         unsubDeviceTop?.();
@@ -168,7 +195,8 @@ const mountViewport = async () => {
  * Subscribe to native WebApp safe area events
  */
 const subscribeToNativeEvents = () => {
-  const webApp = typeof window !== "undefined" ? window.Telegram?.WebApp : undefined;
+  const webApp =
+    typeof window !== "undefined" ? window.Telegram?.WebApp : undefined;
   if (!webApp) return;
 
   // Subscribe to safe area change events
@@ -206,10 +234,22 @@ export const initTelegram = () => {
       if (typeof document !== "undefined") {
         document.documentElement.style.setProperty("--app-safe-top", "0px");
         document.documentElement.style.setProperty("--app-safe-bottom", "0px");
-        document.documentElement.style.setProperty("--app-content-safe-top", "0px");
-        document.documentElement.style.setProperty("--app-content-safe-bottom", "0px");
-        document.documentElement.style.setProperty("--app-device-safe-top", "0px");
-        document.documentElement.style.setProperty("--app-device-safe-bottom", "0px");
+        document.documentElement.style.setProperty(
+          "--app-content-safe-top",
+          "0px"
+        );
+        document.documentElement.style.setProperty(
+          "--app-content-safe-bottom",
+          "0px"
+        );
+        document.documentElement.style.setProperty(
+          "--app-device-safe-top",
+          "0px"
+        );
+        document.documentElement.style.setProperty(
+          "--app-device-safe-bottom",
+          "0px"
+        );
       }
     }
   } catch (e) {
