@@ -64,3 +64,5 @@ test-ledger
 .yarn
 my-ledger-1/
 test-ledger-magicblock/
+
+/app/testing.ts
