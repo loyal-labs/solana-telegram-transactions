@@ -1,5 +1,6 @@
 "use client";
 
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { hapticFeedback, retrieveLaunchParams, themeParams } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
@@ -15,6 +16,8 @@ import Image from "next/image";
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+import { LAST_AMOUNT_KEY, SOLANA_FEE_SOL, STARS_FEE_AMOUNT, STARS_TO_USD } from "@/lib/constants";
+import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 
 export type SendSheetProps = {
   trigger?: ReactNode | null;
@@ -54,16 +57,6 @@ const MOCK_CONTACTS = [
   { name: "Carol", username: "@carol_danvers", avatar: null },
 ];
 
-const SOL_PRICE_USD = 180;
-const LAST_AMOUNT_KEY = 'lastSendAmount';
-const LAMPORTS_PER_SOL = 1_000_000_000;
-
-// Fee constants
-const SOLANA_FEE_SOL = 0.000005;
-const SOLANA_FEE_USD = SOLANA_FEE_SOL * SOL_PRICE_USD;
-const STARS_FEE_AMOUNT = 2000; // TODO: Change back to 1 Star for fee (hardcoded for testing)
-const STARS_TO_USD = 0.02; // 1 Star = $0.02
-
 // Truncate (floor) to specific decimal places - never rounds up
 const truncateDecimals = (num: number, decimals: number): string => {
   const factor = Math.pow(10, decimals);
@@ -85,12 +78,12 @@ const getLastAmount = (): LastAmount | null => {
   return null;
 };
 
-const saveLastAmount = (solAmount: number) => {
+const saveLastAmount = (solAmount: number, solPriceUsd: number | null) => {
   if (typeof window === 'undefined') return;
   try {
     const lastAmount: LastAmount = {
       sol: solAmount,
-      usd: parseFloat((solAmount * SOL_PRICE_USD).toFixed(2)),
+      usd: solPriceUsd ? parseFloat((solAmount * solPriceUsd).toFixed(2)) : solAmount,
     };
     localStorage.setItem(LAST_AMOUNT_KEY, JSON.stringify(lastAmount));
   } catch {}
@@ -154,10 +147,6 @@ export default function SendSheet({
     }
   });
 
-  // Convert balance from lamports to SOL
-  const balanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
-  const balanceInUsd = balanceInSol * SOL_PRICE_USD;
-
   // Abbreviate wallet address for display
   const abbreviatedAddress = walletAddress
     ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
@@ -167,10 +156,44 @@ export default function SendSheet({
   const [currency, setCurrency] = useState<'SOL' | 'USD'>('SOL');
   const [lastAmount, setLastAmount] = useState<LastAmount | null>(null);
   const [feePaymentMethod, setFeePaymentMethod] = useState<'solana' | 'stars'>('solana');
+  const [solPriceUsd, setSolPriceUsd] = useState<number | null>(null);
+  const [isSolPriceLoading, setIsSolPriceLoading] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const amountInputRef = useRef<HTMLInputElement>(null);
   const amountTextRef = useRef<HTMLParagraphElement>(null);
   const [caretLeft, setCaretLeft] = useState(0);
+
+  // Convert balance from lamports to SOL
+  const balanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
+  const balanceInUsd = solPriceUsd ? balanceInSol * solPriceUsd : null;
+  const solanaFeeUsd = solPriceUsd ? SOLANA_FEE_SOL * solPriceUsd : null;
+
+  // Load SOL price for USD conversions
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadPrice = async () => {
+      try {
+        const price = await fetchSolUsdPrice();
+        if (!isMounted) return;
+        setSolPriceUsd(price);
+      } catch (error) {
+        console.error("Failed to fetch SOL price", error);
+        if (!isMounted) return;
+        setSolPriceUsd(null);
+      } finally {
+        if (isMounted) {
+          setIsSolPriceLoading(false);
+        }
+      }
+    };
+
+    void loadPrice();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Reset state when opening
   useEffect(() => {
@@ -249,11 +272,18 @@ export default function SendSheet({
       const amount = parseFloat(amountStr);
       if (!isNaN(amount) && amount > 0) {
         // Convert to SOL if currently in USD
-        const solAmount = currency === 'USD' ? amount / SOL_PRICE_USD : amount;
-        saveLastAmount(solAmount);
+        const solAmount =
+          currency === 'USD'
+            ? solPriceUsd
+              ? amount / solPriceUsd
+              : NaN
+            : amount;
+        if (!isNaN(solAmount) && solAmount > 0) {
+          saveLastAmount(solAmount, solPriceUsd);
+        }
       }
     }
-  }, [step, amountStr, currency]);
+  }, [step, amountStr, currency, solPriceUsd]);
 
   // Handle value reporting to parent
   useEffect(() => {
@@ -263,12 +293,14 @@ export default function SendSheet({
       if (currency === 'USD' && amountStr) {
         const usdVal = parseFloat(amountStr);
         if (!isNaN(usdVal)) {
-          finalAmount = (usdVal / SOL_PRICE_USD).toFixed(6); // approx conversion
+          finalAmount = solPriceUsd
+            ? (usdVal / solPriceUsd).toFixed(6) // approx conversion
+            : "";
         }
       }
       onFormValuesChange({ amount: finalAmount, recipient });
     }
-  }, [amountStr, recipient, currency, onFormValuesChange]);
+  }, [amountStr, recipient, currency, onFormValuesChange, solPriceUsd]);
 
   // Validation Logic
   useEffect(() => {
@@ -290,12 +322,22 @@ export default function SendSheet({
     const isAmountValid = !isNaN(amount) && amount > 0 && isFinite(amount);
 
     // Check if amount exceeds balance
-    const amountInSol = currency === 'SOL' ? amount : amount / SOL_PRICE_USD;
-    const hasEnoughBalance = !isNaN(amountInSol) && amountInSol <= balanceInSol;
+    const amountInSol =
+      currency === 'SOL'
+        ? amount
+        : solPriceUsd
+          ? amount / solPriceUsd
+          : NaN;
+    const hasEnoughBalance =
+      !isNaN(amountInSol) && amountInSol <= balanceInSol;
 
     // For step 2, don't check fee method yet
     if (step === 2) {
-      const isValid = isAmountValid && isRecipientValid && hasEnoughBalance;
+      const isValid =
+        isAmountValid &&
+        isRecipientValid &&
+        hasEnoughBalance &&
+        (currency === 'SOL' || !!solPriceUsd);
       onValidationChange?.(isValid);
       return;
     }
@@ -309,14 +351,19 @@ export default function SendSheet({
         ? hasEnoughSolForFee
         : hasEnoughStarsForFee;
 
-      const isValid = isAmountValid && isRecipientValid && hasEnoughBalance && hasSufficientFeeBalance;
+      const isValid =
+        isAmountValid &&
+        isRecipientValid &&
+        hasEnoughBalance &&
+        hasSufficientFeeBalance &&
+        (currency === 'SOL' || !!solPriceUsd);
       onValidationChange?.(isValid);
       return;
     }
 
     // Default to invalid for any other state
     onValidationChange?.(false);
-  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, feePaymentMethod, starsBalance]);
+  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, feePaymentMethod, starsBalance, solPriceUsd]);
 
 
   const handleRecipientSelect = (selected: string) => {
@@ -361,12 +408,16 @@ export default function SendSheet({
     const val = parseFloat(amountStr);
     if (isNaN(val)) return currency === 'SOL' ? '≈ $0.00' : '≈ 0.00 SOL';
 
-    if (currency === 'SOL') {
-      return `≈ $${(val * SOL_PRICE_USD).toFixed(2)}`;
-    } else {
-      return `≈ ${(val / SOL_PRICE_USD).toFixed(4)} SOL`;
+    if (!solPriceUsd) {
+      return currency === 'SOL' ? '≈ $—' : '≈ — SOL';
     }
-  }, [amountStr, currency]);
+
+    if (currency === 'SOL') {
+      return `≈ $${(val * solPriceUsd).toFixed(2)}`;
+    } else {
+      return `≈ ${(val / solPriceUsd).toFixed(4)} SOL`;
+    }
+  }, [amountStr, currency, solPriceUsd]);
 
   // Chevron icon component
   const ChevronIcon = () => (
@@ -723,6 +774,7 @@ export default function SendSheet({
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (!solPriceUsd) return;
                       if (hapticFeedback.selectionChanged.isAvailable()) {
                         hapticFeedback.selectionChanged();
                       }
@@ -731,15 +783,16 @@ export default function SendSheet({
                         const val = parseFloat(amountStr);
                         if (!isNaN(val)) {
                           if (currency === 'SOL') {
-                            setAmountStr((val * SOL_PRICE_USD).toFixed(2));
+                            setAmountStr((val * solPriceUsd).toFixed(2));
                           } else {
-                            setAmountStr((val / SOL_PRICE_USD).toFixed(4));
+                            setAmountStr((val / solPriceUsd).toFixed(4));
                           }
                         }
                       }
                       setCurrency(currency === 'SOL' ? 'USD' : 'SOL');
                     }}
-                    className="z-20 opacity-40 hover:opacity-60 transition-opacity text-white shrink-0 mb-1"
+                    disabled={isSolPriceLoading || !solPriceUsd}
+                    className="z-20 opacity-40 hover:opacity-60 transition-opacity text-white shrink-0 mb-1 disabled:opacity-20 disabled:pointer-events-none"
                   >
                     <ArrowUpDownIcon />
                   </button>
@@ -752,7 +805,12 @@ export default function SendSheet({
                 {(() => {
                   const val = parseFloat(amountStr);
                   if (isNaN(val) || val <= 0) return null;
-                  const amountInSol = currency === 'SOL' ? val : val / SOL_PRICE_USD;
+                  const amountInSol =
+                    currency === 'SOL'
+                      ? val
+                      : solPriceUsd
+                        ? val / solPriceUsd
+                        : NaN;
                   if (amountInSol > balanceInSol) {
                     return <p className="text-[13px] text-red-400 leading-4 px-1">Insufficient balance</p>;
                   }
@@ -805,7 +863,9 @@ export default function SendSheet({
                       const maxVal = truncateDecimals(balanceInSol, 4).replace(/\.?0+$/, '');
                       handlePresetAmount(maxVal || '0');
                     } else {
-                      const maxVal = truncateDecimals(balanceInUsd, 2).replace(/\.?0+$/, '');
+                      const maxVal = balanceInUsd !== null
+                        ? truncateDecimals(balanceInUsd, 2).replace(/\.?0+$/, '')
+                        : '0';
                       handlePresetAmount(maxVal || '0');
                     }
                   }}
@@ -846,7 +906,9 @@ export default function SendSheet({
                 {/* Right: Balance amount + USD */}
                 <div className="flex flex-col gap-0.5 items-end py-2.5 pl-3">
                   <p className="text-base leading-5 text-white text-right">{truncateDecimals(balanceInSol, 4)} SOL</p>
-                  <p className="text-[13px] leading-4 text-white/60 text-right">~${truncateDecimals(balanceInUsd, 2)}</p>
+                  <p className="text-[13px] leading-4 text-white/60 text-right">
+                    ~{balanceInUsd !== null ? `$${truncateDecimals(balanceInUsd, 2)}` : "—"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -873,7 +935,8 @@ export default function SendSheet({
                       const val = parseFloat(amountStr);
                       if (isNaN(val)) return '0';
                       if (currency === 'USD') {
-                        return (val / SOL_PRICE_USD).toFixed(4).replace(/\.?0+$/, '') || '0';
+                        if (!solPriceUsd) return '0';
+                        return (val / solPriceUsd).toFixed(4).replace(/\.?0+$/, '') || '0';
                       }
                       return amountStr || '0';
                     })()}
@@ -887,7 +950,13 @@ export default function SendSheet({
                   {(() => {
                     const val = parseFloat(amountStr);
                     if (isNaN(val)) return '≈$0.00';
-                    const usdVal = currency === 'SOL' ? val * SOL_PRICE_USD : val;
+                    const usdVal =
+                      currency === 'SOL'
+                        ? solPriceUsd
+                          ? val * solPriceUsd
+                          : null
+                        : val;
+                    if (usdVal === null) return '≈$—';
                     return `≈$${usdVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                   })()}
                 </p>
@@ -907,7 +976,13 @@ export default function SendSheet({
                 {(() => {
                   // Calculate if user has enough balance for selected fee method
                   const amountVal = parseFloat(amountStr);
-                  const amountInSol = isNaN(amountVal) ? 0 : (currency === 'SOL' ? amountVal : amountVal / SOL_PRICE_USD);
+                  const amountInSol = isNaN(amountVal)
+                    ? 0
+                    : currency === 'SOL'
+                      ? amountVal
+                      : solPriceUsd
+                        ? amountVal / solPriceUsd
+                        : NaN;
                   const _hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
                   const hasEnoughStarsForFee = starsBalance >= STARS_FEE_AMOUNT;
 
@@ -1016,7 +1091,9 @@ export default function SendSheet({
                         {/* Text */}
                         <div className="flex-1 flex flex-col gap-0.5 py-2.5 text-left">
                           <p className="text-base leading-5 text-white">{SOLANA_FEE_SOL} SOL</p>
-                          <p className="text-[13px] leading-4 text-white/60">≈ ${SOLANA_FEE_USD.toFixed(2)}</p>
+                          <p className="text-[13px] leading-4 text-white/60">
+                            ≈ {solanaFeeUsd !== null ? `$${solanaFeeUsd.toFixed(2)}` : "—"}
+                          </p>
                         </div>
                         {/* Check */}
                         <div className="pl-4 py-1.5 shrink-0">
@@ -1044,9 +1121,15 @@ export default function SendSheet({
                           if (isNaN(val)) {
                             return feePaymentMethod === 'solana' ? `${SOLANA_FEE_SOL} SOL` : '0 SOL';
                           }
-                          const solVal = currency === 'SOL' ? val : val / SOL_PRICE_USD;
+                          const solVal =
+                            currency === 'SOL'
+                              ? val
+                              : solPriceUsd
+                                ? val / solPriceUsd
+                                : NaN;
                           // Only add SOL fee if paying with Solana
                           const total = feePaymentMethod === 'solana' ? solVal + SOLANA_FEE_SOL : solVal;
+                          if (isNaN(total)) return feePaymentMethod === 'solana' ? `${SOLANA_FEE_SOL} SOL` : '0 SOL';
                           return `${total.toFixed(6).replace(/\.?0+$/, '')} SOL`;
                         })()}
                       </span>
@@ -1054,11 +1137,24 @@ export default function SendSheet({
                         {(() => {
                           const val = parseFloat(amountStr);
                           if (isNaN(val)) {
-                            return feePaymentMethod === 'solana' ? ` ≈ $${SOLANA_FEE_USD.toFixed(2)}` : ' ≈ $0.00';
+                            return feePaymentMethod === 'solana'
+                              ? ` ≈ ${solanaFeeUsd !== null ? `$${solanaFeeUsd.toFixed(2)}` : "$—"}`
+                              : ' ≈ $0.00';
                           }
-                          const usdVal = currency === 'SOL' ? val * SOL_PRICE_USD : val;
+                          const usdVal =
+                            currency === 'SOL'
+                              ? solPriceUsd
+                                ? val * solPriceUsd
+                                : null
+                              : val;
+                          if (usdVal === null) {
+                            return ' ≈ $—';
+                          }
                           // Only add USD fee equivalent if paying with Solana
-                          const totalUsd = feePaymentMethod === 'solana' ? usdVal + SOLANA_FEE_USD : usdVal;
+                          const totalUsd =
+                            feePaymentMethod === 'solana' && solanaFeeUsd !== null
+                              ? usdVal + solanaFeeUsd
+                              : usdVal;
                           return ` ≈ $${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                         })()}
                       </span>

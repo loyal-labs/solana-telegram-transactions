@@ -1,7 +1,7 @@
 const SOL_PRICE_ENDPOINT =
   "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd";
 
-export const fetchSolPriceUsd = async (): Promise<number> => {
+export const fetchSolUsdPrice = async (): Promise<number> => {
   const response = await fetch(SOL_PRICE_ENDPOINT);
 
   if (!response.ok) {
@@ -20,3 +20,6 @@ export const fetchSolPriceUsd = async (): Promise<number> => {
 
   return usdPrice;
 };
+
+// Temporary backwards-compatibility export; prefer fetchSolUsdPrice going forward.
+export const fetchSolPriceUsd = fetchSolUsdPrice;

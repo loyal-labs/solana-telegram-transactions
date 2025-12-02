@@ -32,6 +32,7 @@ import {
 } from "@/lib/constants";
 import { topUpDeposit } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
+import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import { verifyAndClaimDeposit } from "@/lib/solana/verify-and-claim-deposit";
 import {
@@ -125,6 +126,8 @@ export default function Home() {
   const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">("USD");
   const [addressCopied, setAddressCopied] = useState(false);
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
+  const [solPriceUsd, setSolPriceUsd] = useState<number | null>(null);
+  const [isSolPriceLoading, setIsSolPriceLoading] = useState(true);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(
@@ -253,6 +256,13 @@ export default function Home() {
     try {
       // Refresh wallet balance
       await refreshWalletBalance();
+
+      try {
+        const latestPrice = await fetchSolUsdPrice();
+        setSolPriceUsd(latestPrice);
+      } catch (priceError) {
+        console.error("Failed to refresh SOL price", priceError);
+      }
 
       // Refresh incoming transactions
       if (rawInitData) {
@@ -568,6 +578,32 @@ export default function Home() {
       console.log("Signature is valid: ", isValid);
     }
   }, [rawInitData]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadPrice = async () => {
+      try {
+        const price = await fetchSolUsdPrice();
+        if (!isMounted) return;
+        setSolPriceUsd(price);
+      } catch (error) {
+        console.error("Failed to fetch SOL price", error);
+        if (!isMounted) return;
+        setSolPriceUsd(null);
+      } finally {
+        if (isMounted) {
+          setIsSolPriceLoading(false);
+        }
+      }
+    };
+
+    void loadPrice();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!rawInitData) return;
@@ -904,6 +940,13 @@ export default function Home() {
     sendError
   ]);
 
+  const formattedUsdBalance = formatUsdValue(balance, solPriceUsd);
+  const formattedSolBalance = formatBalance(balance);
+  const showBalanceSkeleton =
+    isLoading || (displayCurrency === "USD" && isSolPriceLoading);
+  const showSecondarySkeleton =
+    isLoading || (displayCurrency === "SOL" && isSolPriceLoading);
+
   return (
     <>
       <main
@@ -961,7 +1004,7 @@ export default function Home() {
                 }}
                 className="active:scale-[0.98] transition-transform"
               >
-                {isLoading ? (
+                {showBalanceSkeleton ? (
                   <div className="h-12 w-48 bg-white/5 animate-pulse rounded-xl mx-auto" />
                 ) : displayCurrency === "USD" ? (
                   <div className="flex items-center leading-[48px]">
@@ -969,13 +1012,13 @@ export default function Home() {
                       $
                     </span>
                     <span className="text-[40px] font-semibold text-white">
-                      {formatUsdValue(balance)}
+                      {formattedUsdBalance}
                     </span>
                   </div>
                 ) : (
                   <div className="flex items-center leading-[48px] gap-2">
                     <span className="text-[40px] font-semibold text-white">
-                      {formatBalance(balance)}
+                      {formattedSolBalance}
                     </span>
                     <span className="text-[40px] font-semibold text-white/60">
                       SOL
@@ -985,13 +1028,13 @@ export default function Home() {
               </button>
 
               {/* Secondary Amount */}
-              {isLoading ? (
+              {showSecondarySkeleton ? (
                 <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
               ) : (
                 <p className="text-base text-white/60 leading-5">
                   {displayCurrency === "USD"
-                    ? `${formatBalance(balance)} SOL`
-                    : `$${formatUsdValue(balance)}`}
+                    ? `${formattedSolBalance} SOL`
+                    : `$${formattedUsdBalance}`}
                 </p>
               )}
             </div>
@@ -1395,6 +1438,7 @@ export default function Home() {
         transaction={selectedTransaction}
         showSuccess={showClaimSuccess}
         showError={claimError}
+        solPriceUsd={solPriceUsd}
       />
     </>
   );

@@ -1,6 +1,5 @@
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-import { SOL_PRICE_USD } from "@/lib/constants";
 import type { TransactionStatus } from "@/types/wallet";
 
 /**
@@ -22,12 +21,16 @@ export function formatBalance(lamports: number | null): string {
 }
 
 /**
- * Format lamports to USD value string with 2 decimal places
+ * Format lamports to USD value string with 2 decimal places.
+ * Returns "—" if price data is unavailable.
  */
-export function formatUsdValue(lamports: number | null): string {
-  if (lamports === null) return "0.00";
+export function formatUsdValue(
+  lamports: number | null,
+  solPriceUsd: number | null,
+): string {
+  if (lamports === null || solPriceUsd === null) return "—";
   const sol = lamports / LAMPORTS_PER_SOL;
-  const usd = sol * SOL_PRICE_USD;
+  const usd = sol * solPriceUsd;
   return truncateDecimals(usd, 2);
 }
 

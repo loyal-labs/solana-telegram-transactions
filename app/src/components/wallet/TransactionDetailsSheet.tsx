@@ -14,7 +14,7 @@ import {
 } from "react";
 
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
-import { SOL_PRICE_USD, SOLANA_FEE_SOL } from "@/lib/constants";
+import { SOLANA_FEE_SOL } from "@/lib/constants";
 import { formatTransactionDate, getStatusText } from "@/lib/wallet/formatters";
 import type { TransactionDetailsData, TransactionStatus } from "@/types/wallet";
 
@@ -27,6 +27,7 @@ export type TransactionDetailsSheetProps = {
   transaction: TransactionDetailsData | null;
   showSuccess?: boolean; // Show success state after claiming
   showError?: string | null; // Show error state with message after failed claim
+  solPriceUsd?: number | null;
 };
 
 // Wallet icon SVG component
@@ -46,6 +47,7 @@ export default function TransactionDetailsSheet({
   transaction,
   showSuccess = false,
   showError = null,
+  solPriceUsd = null,
 }: TransactionDetailsSheetProps) {
   // Safe area handling - must be before early return
   const snapPoint = useModalSnapPoint();
@@ -75,11 +77,12 @@ export default function TransactionDetailsSheet({
 
   const isIncoming = transaction.type === "incoming";
   const amountSol = transaction.amountLamports / LAMPORTS_PER_SOL;
-  const amountUsd = amountSol * SOL_PRICE_USD;
+  const usdPrice = solPriceUsd ?? null;
+  const amountUsd = usdPrice === null ? null : amountSol * usdPrice;
   const networkFeeSol = transaction.networkFeeLamports
     ? transaction.networkFeeLamports / LAMPORTS_PER_SOL
     : SOLANA_FEE_SOL;
-  const networkFeeUsd = networkFeeSol * SOL_PRICE_USD;
+  const networkFeeUsd = usdPrice === null ? null : networkFeeSol * usdPrice;
 
   // Format amount for display
   const formattedAmount = amountSol.toFixed(4).replace(/\.?0+$/, '');
@@ -355,7 +358,9 @@ export default function TransactionDetailsSheet({
                 </div>
                 {/* USD Value */}
                 <p className="text-base leading-[22px] text-white/40 text-center">
-                  ≈${amountUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ≈{amountUsd !== null
+                    ? `$${amountUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : "—"}
                 </p>
                 {/* Date */}
                 <p className="text-base leading-[22px] text-white/40 text-center">
@@ -393,7 +398,10 @@ export default function TransactionDetailsSheet({
                     <p className="text-[13px] leading-4 text-white/60">Network fee</p>
                     <p className="text-base leading-5">
                       <span className="text-white">{networkFeeSol} SOL</span>
-                      <span className="text-white/60"> ≈ ${networkFeeUsd.toFixed(2)}</span>
+                      <span className="text-white/60">
+                        {" "}
+                        ≈ {networkFeeUsd !== null ? `$${networkFeeUsd.toFixed(2)}` : "—"}
+                      </span>
                     </p>
                   </div>
                 )}

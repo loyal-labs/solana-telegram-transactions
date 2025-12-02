@@ -17,7 +17,7 @@ export const TELEGRAM_PUBLIC_KEYS = [
   // Test environment key
   "40055058a4ee38156a06562e52eece92a771bcd8346a8c4615cb7376eddf72ec",
   // Production key
-  TELEGRAM_PUBLIC_KEY_PROD
+  TELEGRAM_PUBLIC_KEY_PROD,
 ];
 
 export const DEPOSIT_SEED = "deposit";
@@ -34,3 +34,8 @@ export const SOL_PRICE_USD = 180;
 
 // Solana network fee
 export const SOLANA_FEE_SOL = 0.000005;
+
+// Fee constants
+export const STARS_FEE_AMOUNT = 2000; // TODO: Change back to 1 Star for fee (hardcoded for testing)
+export const STARS_TO_USD = 0.013;
+export const LAST_AMOUNT_KEY = "lastSendAmount";

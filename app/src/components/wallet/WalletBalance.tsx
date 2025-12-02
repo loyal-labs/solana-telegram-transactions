@@ -4,7 +4,7 @@ import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Badge, Cell, Info } from "@telegram-apps/telegram-ui";
 import { useEffect, useState } from "react";
 
-import { fetchSolPriceUsd } from "@/lib/solana/fetch-sol-price";
+import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import {
   getWalletBalance,
   getWalletPublicKey,
@@ -83,7 +83,7 @@ export default function WalletBalance() {
 
     const loadPrice = async () => {
       try {
-        const price = await fetchSolPriceUsd();
+        const price = await fetchSolUsdPrice();
         if (!isMounted) return;
         setSolPriceUsd(price);
       } catch (error) {
