@@ -48,6 +48,7 @@ import {
   getWalletKeypair,
   getWalletProvider,
   getWalletPublicKey,
+  subscribeToWalletBalance,
   sendSolTransaction
 } from "@/lib/solana/wallet/wallet-details";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
@@ -842,30 +843,29 @@ export default function Home() {
     void loadWalletTransactions();
   }, [walletAddress, loadWalletTransactions]);
 
-  // Poll for balance updates while the page stays open so inbound funds appear without manual refresh
+  // Subscribe to websocket balance updates so inbound funds appear in real time
   useEffect(() => {
     if (!walletAddress) return;
 
     let isCancelled = false;
+    let unsubscribe: (() => Promise<void>) | null = null;
 
-    const pollBalance = async () => {
+    void (async () => {
       try {
-        const lamports = await getWalletBalance(true /* force refresh */);
-        if (!isCancelled) {
-          setBalance(lamports);
-        }
+        unsubscribe = await subscribeToWalletBalance(lamports => {
+          if (isCancelled) return;
+          setBalance(prev => (prev === lamports ? prev : lamports));
+        });
       } catch (error) {
-        console.error("Failed to poll wallet balance", error);
+        console.error("Failed to subscribe to wallet balance", error);
       }
-    };
-
-    // Start immediately, then poll on interval
-    void pollBalance();
-    const intervalId = setInterval(pollBalance, 15_000);
+    })();
 
     return () => {
       isCancelled = true;
-      clearInterval(intervalId);
+      if (unsubscribe) {
+        void unsubscribe();
+      }
     };
   }, [walletAddress]);
 

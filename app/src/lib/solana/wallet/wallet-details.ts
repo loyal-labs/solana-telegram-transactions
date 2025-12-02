@@ -125,6 +125,38 @@ const invalidateBalanceCache = () => {
   balancePromise = null;
 };
 
+export const subscribeToWalletBalance = async (
+  onChange: (lamports: number) => void
+): Promise<() => Promise<void>> => {
+  const connection = getConnection();
+  const keypair = await getWalletKeypair();
+
+  let lastLamports = balanceCache?.lamports;
+
+  const subscriptionId = await connection.onAccountChange(
+    keypair.publicKey,
+    accountInfo => {
+      const lamports = accountInfo.lamports;
+      if (typeof lastLamports === "number" && lamports === lastLamports) {
+        return;
+      }
+
+      lastLamports = lamports;
+      setCachedBalance(lamports);
+      onChange(lamports);
+    },
+    "confirmed"
+  );
+
+  return async () => {
+    try {
+      await connection.removeAccountChangeListener(subscriptionId);
+    } catch (error) {
+      console.error("Failed to remove balance subscription", error);
+    }
+  };
+};
+
 export const sendSolTransaction = async (
   destination: string | PublicKey,
   lamports: number
