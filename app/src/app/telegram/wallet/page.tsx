@@ -48,26 +48,25 @@ import {
   getWalletKeypair,
   getWalletProvider,
   getWalletPublicKey,
-  subscribeToWalletBalance,
-  sendSolTransaction
-} from "@/lib/solana/wallet/wallet-details";
+  sendSolTransaction,
+  subscribeToWalletBalance} from "@/lib/solana/wallet/wallet-details";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
 import { ensureWalletKeypair } from "@/lib/solana/wallet/wallet-keypair-logic";
-import { initTelegram, sendString } from "@/lib/telegram";
+import { initTelegram, sendString } from "@/lib/telegram/mini-app";
 import {
   hideMainButton,
   hideSecondaryButton,
   showMainButton,
   showReceiveShareButton
-} from "@/lib/telegram/buttons";
+} from "@/lib/telegram/mini-app/buttons";
 import {
   cleanInitData,
   createValidationBytesFromRawInitData,
   createValidationString,
   validateInitData
-} from "@/lib/telegram/init-data-transform";
-import { parseUsernameFromInitData } from "@/lib/telegram/init-data-transform";
-import { ensureTelegramTheme } from "@/lib/telegram/theme";
+} from "@/lib/telegram/mini-app/init-data-transform";
+import { parseUsernameFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
+import { ensureTelegramTheme } from "@/lib/telegram/mini-app/theme";
 import type {
   IncomingTransaction,
   Transaction,
