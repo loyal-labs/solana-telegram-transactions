@@ -39,3 +39,5 @@ export const SOLANA_FEE_SOL = 0.000005;
 export const STARS_FEE_AMOUNT = 2000; // TODO: Change back to 1 Star for fee (hardcoded for testing)
 export const STARS_TO_USD = 0.013;
 export const LAST_AMOUNT_KEY = "lastSendAmount";
+export const RECENT_RECIPIENTS_KEY = "recentRecipients";
+export const MAX_RECENT_RECIPIENTS = 10;

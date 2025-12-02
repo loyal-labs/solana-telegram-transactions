@@ -2,6 +2,7 @@
 
 import { hashes } from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha512";
+import NumberFlow from "@number-flow/react";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import {
   closingBehavior,
@@ -22,12 +23,14 @@ import { ActionButton } from "@/components/wallet/ActionButton";
 import ActivitySheet from "@/components/wallet/ActivitySheet";
 import ReceiveSheet from "@/components/wallet/ReceiveSheet";
 import SendSheet, {
+  addRecentRecipient,
   isValidSolanaAddress,
   isValidTelegramUsername
 } from "@/components/wallet/SendSheet";
 import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
+  SOL_PRICE_USD,
   TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
 } from "@/lib/constants";
@@ -457,6 +460,9 @@ export default function Home() {
         hapticFeedback.notificationOccurred("success");
       }
 
+      // Save recipient to recent list
+      addRecentRecipient(trimmedRecipient);
+
       // Calculate and save the sent amount in SOL for the success screen
       const sentSolAmount = lamports / LAMPORTS_PER_SOL;
       setSentAmountSol(sentSolAmount);
@@ -681,20 +687,31 @@ export default function Home() {
 
   useEffect(() => {
     let isMounted = true;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 1000;
 
     const loadPrice = async () => {
-      try {
-        const price = await fetchSolUsdPrice();
-        if (!isMounted) return;
-        setSolPriceUsd(price);
-      } catch (error) {
-        console.error("Failed to fetch SOL price", error);
-        if (!isMounted) return;
-        setSolPriceUsd(null);
-      } finally {
-        if (isMounted) {
+      while (retryCount < MAX_RETRIES && isMounted) {
+        try {
+          const price = await fetchSolUsdPrice();
+          if (!isMounted) return;
+          setSolPriceUsd(price);
           setIsSolPriceLoading(false);
+          return; // Success, exit
+        } catch (error) {
+          retryCount++;
+          console.error(`Failed to fetch SOL price (attempt ${retryCount}/${MAX_RETRIES})`, error);
+          if (retryCount < MAX_RETRIES && isMounted) {
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+          }
         }
+      }
+      // All retries failed, use fallback price
+      if (isMounted) {
+        console.warn("Using fallback SOL price after all retries failed");
+        setSolPriceUsd(SOL_PRICE_USD);
+        setIsSolPriceLoading(false);
       }
     };
 
@@ -1051,6 +1068,22 @@ export default function Home() {
   const showSecondarySkeleton =
     isLoading || (displayCurrency === "SOL" && isSolPriceLoading);
 
+  // Computed numeric values for NumberFlow animations
+  const solBalanceNumeric = useMemo(() => {
+    if (balance === null) return 0;
+    // Truncate to 4 decimal places (floor, no rounding)
+    const sol = balance / LAMPORTS_PER_SOL;
+    return Math.floor(sol * 10000) / 10000;
+  }, [balance]);
+
+  const usdBalanceNumeric = useMemo(() => {
+    if (balance === null || solPriceUsd === null) return 0;
+    const sol = balance / LAMPORTS_PER_SOL;
+    const usd = sol * solPriceUsd;
+    // Truncate to 2 decimal places (floor, no rounding)
+    return Math.floor(usd * 100) / 100;
+  }, [balance, solPriceUsd]);
+
   // Combine and limit transactions for main Activity section (max 10)
   const limitedActivityItems = useMemo(() => {
     const items: Array<
@@ -1132,39 +1165,38 @@ export default function Home() {
                 }}
                 className="active:scale-[0.98] transition-transform"
               >
-                {showBalanceSkeleton ? (
-                  <div className="h-12 w-48 bg-white/5 animate-pulse rounded-xl mx-auto" />
-                ) : displayCurrency === "USD" ? (
-                  <div className="flex items-center leading-[48px]">
-                    <span className="text-[40px] font-semibold text-white/60">
-                      $
-                    </span>
-                    <span className="text-[40px] font-semibold text-white">
-                      {formattedUsdBalance}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center leading-[48px] gap-2">
-                    <span className="text-[40px] font-semibold text-white">
-                      {formattedSolBalance}
-                    </span>
-                    <span className="text-[40px] font-semibold text-white/60">
-                      SOL
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center leading-[48px] gap-2">
+                  <NumberFlow
+                    value={displayCurrency === "USD" ? usdBalanceNumeric : solBalanceNumeric}
+                    format={{
+                      minimumFractionDigits: displayCurrency === "USD" ? 2 : 4,
+                      maximumFractionDigits: displayCurrency === "USD" ? 2 : 4
+                    }}
+                    prefix={displayCurrency === "USD" ? "$" : undefined}
+                    suffix={displayCurrency === "SOL" ? " SOL" : undefined}
+                    className="text-[40px] font-semibold text-white [&::part(prefix)]:text-white/60 [&::part(suffix)]:text-white/60"
+                    style={{ fontVariantNumeric: "tabular-nums" }}
+                    transformTiming={{ duration: 500, easing: "ease-out" }}
+                    opacityTiming={{ duration: 300, easing: "ease-out" }}
+                  />
+                </div>
               </button>
 
               {/* Secondary Amount */}
-              {showSecondarySkeleton ? (
-                <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
-              ) : (
-                <p className="text-base text-white/60 leading-5">
-                  {displayCurrency === "USD"
-                    ? `${formattedSolBalance} SOL`
-                    : `$${formattedUsdBalance}`}
-                </p>
-              )}
+              <div className="text-base text-white/60 leading-5">
+                <NumberFlow
+                  value={displayCurrency === "USD" ? solBalanceNumeric : usdBalanceNumeric}
+                  format={{
+                    minimumFractionDigits: displayCurrency === "USD" ? 4 : 2,
+                    maximumFractionDigits: displayCurrency === "USD" ? 4 : 2
+                  }}
+                  prefix={displayCurrency === "SOL" ? "$" : undefined}
+                  suffix={displayCurrency === "USD" ? " SOL" : undefined}
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                  transformTiming={{ duration: 500, easing: "ease-out" }}
+                  opacityTiming={{ duration: 300, easing: "ease-out" }}
+                />
+              </div>
             </div>
 
             {/* Action Buttons */}

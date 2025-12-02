@@ -16,7 +16,14 @@ import Image from "next/image";
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
-import { LAST_AMOUNT_KEY, SOLANA_FEE_SOL, STARS_FEE_AMOUNT, STARS_TO_USD } from "@/lib/constants";
+import {
+  LAST_AMOUNT_KEY,
+  MAX_RECENT_RECIPIENTS,
+  RECENT_RECIPIENTS_KEY,
+  SOLANA_FEE_SOL,
+  STARS_FEE_AMOUNT,
+  STARS_TO_USD,
+} from "@/lib/constants";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 
 export type SendSheetProps = {
@@ -50,12 +57,44 @@ export const isValidTelegramUsername = (username: string): boolean => {
   return usernameWithoutAt.length >= 5 && usernameWithoutAt.length <= 32;
 };
 
-const MOCK_CONTACTS = [
-  { name: "Vlad", username: "@vlad_arbatov", avatar: "https://avatars.githubusercontent.com/u/537414?v=4" },
-  { name: "Candy", username: "@candyflipline", avatar: "https://avatars.githubusercontent.com/u/537414?v=4" },
-  { name: "Bob", username: "@bob_builder", avatar: null },
-  { name: "Carol", username: "@carol_danvers", avatar: null },
-];
+// Recent recipient type
+export type RecentRecipient = {
+  address: string; // wallet address or @username
+  timestamp: number;
+};
+
+// Get recent recipients from localStorage
+export const getRecentRecipients = (): RecentRecipient[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(RECENT_RECIPIENTS_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+};
+
+// Add a recipient to recent list (moves to top if already exists)
+export const addRecentRecipient = (address: string): void => {
+  if (typeof window === "undefined") return;
+  try {
+    const trimmed = address.trim();
+    if (!trimmed) return;
+
+    const existing = getRecentRecipients();
+    // Remove if already exists (will be added to top)
+    const filtered = existing.filter((r) => r.address !== trimmed);
+    // Add to top
+    const updated: RecentRecipient[] = [
+      { address: trimmed, timestamp: Date.now() },
+      ...filtered,
+    ].slice(0, MAX_RECENT_RECIPIENTS);
+
+    localStorage.setItem(RECENT_RECIPIENTS_KEY, JSON.stringify(updated));
+  } catch {}
+};
 
 // Truncate (floor) to specific decimal places - never rounds up
 const truncateDecimals = (num: number, decimals: number): string => {
@@ -155,6 +194,7 @@ export default function SendSheet({
   const [recipient, setRecipient] = useState("");
   const [currency, setCurrency] = useState<'SOL' | 'USD'>('SOL');
   const [lastAmount, setLastAmount] = useState<LastAmount | null>(null);
+  const [recentRecipients, setRecentRecipients] = useState<RecentRecipient[]>([]);
   const [feePaymentMethod, setFeePaymentMethod] = useState<'solana' | 'stars'>('solana');
   const [solPriceUsd, setSolPriceUsd] = useState<number | null>(null);
   const [isSolPriceLoading, setIsSolPriceLoading] = useState(true);
@@ -202,6 +242,7 @@ export default function SendSheet({
       setRecipient(initialRecipient || "");
       setCurrency('SOL');
       setLastAmount(getLastAmount());
+      setRecentRecipients(getRecentRecipients());
     }
   }, [open, initialRecipient]);
 
@@ -620,48 +661,51 @@ export default function SendSheet({
               </div>
             </div>
 
-            {/* Recent Section Header */}
-            <div className="px-4 pt-3 pb-2">
-              <p className="text-base font-medium text-white tracking-[-0.176px]">Recent</p>
-            </div>
+            {/* Recent Section Header - only show if there are recent recipients */}
+            {recentRecipients.length > 0 && (
+              <div className="px-4 pt-3 pb-2">
+                <p className="text-base font-medium text-white tracking-[-0.176px]">Recent</p>
+              </div>
+            )}
 
-            {/* Contact List */}
+            {/* Recent Recipients List */}
             <div className="pb-4">
-              {/* Contact Items */}
-              {MOCK_CONTACTS.map((contact) => (
-                <button
-                  key={contact.username}
-                  onClick={() => handleRecipientSelect(contact.username)}
-                  className="w-full flex items-center px-3 py-1 rounded-2xl active:bg-white/[0.03] transition-colors"
-                >
-                  <div className="py-1.5 pr-3">
-                    {contact.avatar ? (
-                      <div className="w-12 h-12 rounded-full overflow-hidden relative">
-                        <Image
-                          src={contact.avatar}
-                          alt={contact.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    ) : (
+              {/* Recent Recipient Items */}
+              {recentRecipients.map((recentItem) => {
+                const isUsername = recentItem.address.startsWith("@");
+                const displayName = isUsername
+                  ? recentItem.address
+                  : `${recentItem.address.slice(0, 4)}...${recentItem.address.slice(-4)}`;
+                const avatarChar = isUsername
+                  ? recentItem.address.slice(1, 2).toUpperCase()
+                  : recentItem.address.slice(0, 1).toUpperCase();
+
+                return (
+                  <button
+                    key={recentItem.address}
+                    onClick={() => handleRecipientSelect(recentItem.address)}
+                    className="w-full flex items-center px-3 py-1 rounded-2xl active:bg-white/[0.03] transition-colors"
+                  >
+                    <div className="py-1.5 pr-3">
                       <div
                         className="w-12 h-12 rounded-full flex items-center justify-center text-white font-medium text-lg"
-                        style={{ background: getAvatarColor(contact.name) }}
+                        style={{ background: getAvatarColor(recentItem.address) }}
                       >
-                        {getInitials(contact.name)}
+                        {avatarChar}
                       </div>
-                    )}
-                  </div>
-                  <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                    <p className="text-base text-white text-left leading-5">{contact.name}</p>
-                    <p className="text-[13px] text-white/60 text-left leading-4">{contact.username}</p>
-                  </div>
-                  <div className="pl-3 py-2 flex items-center justify-center h-10">
-                    <ChevronIcon />
-                  </div>
-                </button>
-              ))}
+                    </div>
+                    <div className="flex-1 flex flex-col gap-0.5 py-2.5">
+                      <p className="text-base text-white text-left leading-5">{displayName}</p>
+                      <p className="text-[13px] text-white/60 text-left leading-4">
+                        {isUsername ? "Telegram" : "Wallet address"}
+                      </p>
+                    </div>
+                    <div className="pl-3 py-2 flex items-center justify-center h-10">
+                      <ChevronIcon />
+                    </div>
+                  </button>
+                );
+              })}
 
               {/* Manual Entry - Show when typing a valid address/username */}
               {recipient.trim().length > 0 && (isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient)) && (
