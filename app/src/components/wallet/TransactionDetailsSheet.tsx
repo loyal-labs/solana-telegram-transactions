@@ -15,7 +15,7 @@ import {
 
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import { SOLANA_FEE_SOL } from "@/lib/constants";
-import { formatTransactionDate, getStatusText } from "@/lib/wallet/formatters";
+import { formatTransactionDate, getStatusText } from "@/lib/solana/wallet/formatters";
 import type { TransactionDetailsData, TransactionStatus } from "@/types/wallet";
 
 export type { TransactionDetailsData, TransactionStatus };

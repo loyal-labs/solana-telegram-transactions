@@ -65,7 +65,7 @@ import {
   formatSenderAddress,
   formatTransactionAmount,
   formatUsdValue
-} from "@/lib/wallet/formatters";
+} from "@/lib/solana/wallet/formatters";
 import type {
   IncomingTransaction,
   Transaction,
