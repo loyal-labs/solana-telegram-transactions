@@ -26,7 +26,7 @@ export function formatBalance(lamports: number | null): string {
  */
 export function formatUsdValue(
   lamports: number | null,
-  solPriceUsd: number | null,
+  solPriceUsd: number | null
 ): string {
   if (lamports === null || solPriceUsd === null) return "—";
   const sol = lamports / LAMPORTS_PER_SOL;
