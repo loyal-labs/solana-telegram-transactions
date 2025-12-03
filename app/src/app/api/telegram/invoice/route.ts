@@ -1,4 +1,7 @@
-import { verify } from "@noble/ed25519";
+"use server";
+
+import { hashes, verify } from "@noble/ed25519";
+import { sha512 } from "@noble/hashes/sha512";
 import { NextResponse } from "next/server";
 
 import { TELEGRAM_PUBLIC_KEYS } from "@/lib/constants";
@@ -6,6 +9,7 @@ import { createInvoiceLink } from "@/lib/telegram/bot-api/create-invoice-link";
 import { createValidationBytesFromRawInitData } from "@/lib/telegram/mini-app/init-data-transform";
 
 const textDecoder = new TextDecoder();
+hashes.sha512 = sha512; // Noble requires the hash implementation to be registered manually
 
 const verifyInitData = async (
   validationBytes: Uint8Array,

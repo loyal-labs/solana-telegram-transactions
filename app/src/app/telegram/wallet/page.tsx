@@ -71,6 +71,7 @@ import {
   validateInitData
 } from "@/lib/telegram/mini-app/init-data-transform";
 import { parseUsernameFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
+import { openInvoice } from "@/lib/telegram/mini-app/invoice";
 import { openQrScanner } from "@/lib/telegram/mini-app/qr-code";
 import { ensureTelegramTheme } from "@/lib/telegram/mini-app/theme";
 import type {
@@ -101,6 +102,7 @@ export default function Home() {
   const [balance, setBalance] = useState<number | null>(null);
   const [starsBalance, setStarsBalance] = useState<number>(0);
   const [isStarsLoading, setIsStarsLoading] = useState(false);
+  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
@@ -167,13 +169,70 @@ export default function Home() {
     setReceiveSheetOpen(true);
   }, []);
 
-  const handleTopUpStars = useCallback(() => {
+  const handleTopUpStars = useCallback(async () => {
+    if (isCreatingInvoice) return;
+
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
-    // TODO: Implement Stars top-up flow (e.g., open Telegram Stars purchase)
-    console.log("Top up stars clicked");
-  }, []);
+
+    if (!rawInitData) {
+      console.error("Cannot create invoice: init data is missing");
+      return;
+    }
+
+    setIsCreatingInvoice(true);
+    try {
+      const serverHost = process.env.NEXT_PUBLIC_SERVER_HOST;
+      const endpoint = (() => {
+        // prefer same-origin to avoid CORS
+        if (typeof window !== "undefined") {
+          if (!serverHost) return "/api/telegram/invoice";
+          try {
+            const configured = new URL(serverHost);
+            const current = new URL(window.location.origin);
+            const hostsMatch =
+              configured.protocol === current.protocol &&
+              configured.host === current.host;
+            return hostsMatch
+              ? new URL("/api/telegram/invoice", configured).toString()
+              : "/api/telegram/invoice";
+          } catch {
+            return "/api/telegram/invoice";
+          }
+        }
+        // fall back to configured host if provided
+        return serverHost
+          ? new URL("/api/telegram/invoice", serverHost).toString()
+          : "/api/telegram/invoice";
+      })();
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        body: new TextEncoder().encode(rawInitData)
+      });
+
+      if (!response.ok) {
+        console.error(
+          "Failed to create invoice",
+          await response.text().catch(() => response.statusText)
+        );
+        return;
+      }
+
+      const data = (await response.json()) as { invoiceLink?: string };
+      if (!data.invoiceLink) {
+        console.error("Invoice link missing from response");
+        return;
+      }
+
+      await openInvoice(data.invoiceLink);
+    } catch (error) {
+      console.error("Failed to open invoice", error);
+    } finally {
+      setIsCreatingInvoice(false);
+    }
+  }, [isCreatingInvoice, rawInitData]);
 
   const handleOpenTransactionDetails = useCallback(
     (transaction: IncomingTransaction) => {
@@ -1287,6 +1346,7 @@ export default function Home() {
             ) : (
               <button
                 onClick={handleTopUpStars}
+                disabled={isCreatingInvoice}
                 className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
                 style={{
                   background: "rgba(255, 255, 255, 0.06)",
@@ -1417,6 +1477,7 @@ export default function Home() {
                     </p>
                     <button
                       onClick={handleTopUpStars}
+                      disabled={isCreatingInvoice}
                       className="px-4 py-2 rounded-[40px] text-sm text-white leading-5"
                       style={{
                         backgroundImage:
