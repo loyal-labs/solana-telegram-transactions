@@ -76,6 +76,9 @@ export default function TransactionDetailsSheet({
   }
 
   const isIncoming = transaction.type === "incoming";
+  const isStoreTransaction = transaction.transferType === "store";
+  const isVerifyTransaction = transaction.transferType === "verify_telegram_init_data";
+  const isSpecialTransaction = isStoreTransaction || isVerifyTransaction;
   const amountSol = transaction.amountLamports / LAMPORTS_PER_SOL;
   const usdPrice = solPriceUsd ?? null;
   const amountUsd = usdPrice === null ? null : amountSol * usdPrice;
@@ -167,38 +170,53 @@ export default function TransactionDetailsSheet({
 
         {/* Custom Header */}
         <div className="relative h-[52px] flex items-center justify-center shrink-0">
-          {/* Header Pill */}
-          <div
-            className="flex items-center pl-1 pr-3 py-1 rounded-[54px]"
-            style={{
-              background: "rgba(255, 255, 255, 0.06)",
-              mixBlendMode: "lighten",
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
-            }}
-          >
-            <div className="pr-1.5">
-              {hasAvatar && avatarUrl ? (
-                <div className="w-7 h-7 rounded-full overflow-hidden relative">
-                  <Image
-                    src={avatarUrl}
-                    alt="Avatar"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="w-7 h-7 rounded-[16.8px] flex items-center justify-center text-white">
-                  <WalletIcon className="opacity-60" />
-                </div>
-              )}
-            </div>
-            <span className="text-sm leading-5">
-              <span className="text-white/60">
-                {showSuccess ? "Claimed from " : showError ? "Claim from " : (isIncoming ? "Sent from " : "Sent to ")}
+          {/* Header Pill - Different for special transactions */}
+          {isSpecialTransaction ? (
+            <div
+              className="flex items-center px-3 py-1.5 rounded-[54px]"
+              style={{
+                background: "rgba(255, 255, 255, 0.06)",
+                mixBlendMode: "lighten",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+              }}
+            >
+              <span className="text-sm leading-5 text-white">
+                {isStoreTransaction ? "Store data" : "Verify data"}
               </span>
-              <span className="text-white">{abbreviatedAddress}</span>
-            </span>
-          </div>
+            </div>
+          ) : (
+            <div
+              className="flex items-center pl-1 pr-3 py-1 rounded-[54px]"
+              style={{
+                background: "rgba(255, 255, 255, 0.06)",
+                mixBlendMode: "lighten",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+              }}
+            >
+              <div className="pr-1.5">
+                {hasAvatar && avatarUrl ? (
+                  <div className="w-7 h-7 rounded-full overflow-hidden relative">
+                    <Image
+                      src={avatarUrl}
+                      alt="Avatar"
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-7 h-7 rounded-[16.8px] flex items-center justify-center text-white">
+                    <WalletIcon className="opacity-60" />
+                  </div>
+                )}
+              </div>
+              <span className="text-sm leading-5">
+                <span className="text-white/60">
+                  {showSuccess ? "Claimed from " : showError ? "Claim from " : (isIncoming ? "Sent from " : "Sent to ")}
+                </span>
+                <span className="text-white">{abbreviatedAddress}</span>
+              </span>
+            </div>
+          )}
 
           {/* Close Button */}
           <Modal.Close>
@@ -341,8 +359,94 @@ export default function TransactionDetailsSheet({
               }
             `}</style>
           </div>
+        ) : isSpecialTransaction ? (
+          /* Special Transaction Details View (Store/Verify) */
+          <>
+            {/* Date Section */}
+            <div className="flex flex-col items-center justify-center px-4 pt-8 pb-6">
+              <p className="text-base leading-[22px] text-white/40 text-center">
+                {formatTransactionDate(transaction.timestamp)}
+              </p>
+            </div>
+
+            {/* Details Card */}
+            <div className="px-4">
+              <div
+                className="flex flex-col rounded-2xl overflow-hidden"
+                style={{
+                  background: "rgba(255, 255, 255, 0.06)",
+                  mixBlendMode: "lighten",
+                }}
+              >
+                {/* Status */}
+                <div className="flex flex-col gap-0.5 px-4 py-2.5">
+                  <p className="text-[13px] leading-4 text-white/60">Status</p>
+                  <p className="text-base leading-5 text-white">{getStatusText(transaction.status, isIncoming)}</p>
+                </div>
+
+                {/* Info */}
+                <div className="flex flex-col gap-0.5 px-4 py-2.5">
+                  <p className="text-[13px] leading-4 text-white/60">Info</p>
+                  <p className="text-base leading-5 text-white">
+                    {isStoreTransaction
+                      ? "Data stored on-chain for app usage"
+                      : "Telegram user identity verified on-chain"}
+                  </p>
+                </div>
+
+                {/* Network Fee */}
+                <div className="flex flex-col gap-0.5 px-4 py-2.5">
+                  <p className="text-[13px] leading-4 text-white/60">Network fee</p>
+                  <p className="text-base leading-5">
+                    <span className="text-white">{networkFeeSol} SOL</span>
+                    <span className="text-white/60">
+                      {" "}
+                      ≈ {networkFeeUsd !== null ? `$${networkFeeUsd.toFixed(2)}` : "—"}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-center gap-2 px-6 pt-8 pb-4">
+              {/* View in Explorer */}
+              <button
+                onClick={handleViewInExplorer}
+                className="flex-1 flex flex-col items-center gap-2 rounded-2xl overflow-hidden group"
+              >
+                <div
+                  className="w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-150 group-active:scale-95 group-active:bg-white/10"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    mixBlendMode: "lighten"
+                  }}
+                >
+                  <Globe className="w-7 h-7 text-white" strokeWidth={1.5} />
+                </div>
+                <span className="text-[13px] text-white/60 leading-4">View in explorer</span>
+              </button>
+
+              {/* Share */}
+              <button
+                onClick={handleShare}
+                className="flex-1 flex flex-col items-center gap-2 rounded-2xl overflow-hidden group"
+              >
+                <div
+                  className="w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all duration-150 group-active:scale-95 group-active:bg-white/10"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    mixBlendMode: "lighten"
+                  }}
+                >
+                  <Share className="w-7 h-7 text-white" strokeWidth={1.5} />
+                </div>
+                <span className="text-[13px] text-white/60 leading-4">Share</span>
+              </button>
+            </div>
+          </>
         ) : (
-          /* Details View */
+          /* Regular Transaction Details View */
           <>
             {/* Amount Section */}
             <div className="flex flex-col items-center justify-center px-4 pt-8 pb-6">

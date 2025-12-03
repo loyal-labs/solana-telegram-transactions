@@ -32,6 +32,7 @@ export type TransactionDetailsData = {
   id: string;
   type: "incoming" | "outgoing";
   amountLamports: number;
+  transferType?: WalletTransfer["type"];
   // For outgoing transactions
   recipient?: string;
   recipientUsername?: string;

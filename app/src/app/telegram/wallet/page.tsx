@@ -269,6 +269,7 @@ export default function Home() {
         id: transaction.id,
         type: transaction.type === "incoming" ? "incoming" : "outgoing",
         amountLamports: transaction.amountLamports,
+        transferType: transaction.transferType,
         recipient: transaction.recipient,
         recipientUsername: transaction.recipient?.startsWith("@") ? transaction.recipient : undefined,
         sender: transaction.sender,
@@ -1594,6 +1595,45 @@ export default function Home() {
                           : "white";
                       const timestamp = new Date(transaction.timestamp);
 
+                      // Compact view for store/verify transactions
+                      const isCompactTransaction = transferTypeLabel !== null;
+
+                      if (isCompactTransaction) {
+                        return (
+                          <button
+                            key={transaction.id}
+                            onClick={() => handleOpenWalletTransactionDetails(transaction)}
+                            className="flex items-center py-2 px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
+                            style={{
+                              background: "rgba(255, 255, 255, 0.06)",
+                              mixBlendMode: "lighten"
+                            }}
+                          >
+                            {/* Left - Text */}
+                            <div className="flex-1 flex items-center">
+                              <p className="text-sm text-white/60 leading-5">
+                                {transferTypeLabel}
+                              </p>
+                            </div>
+
+                            {/* Right - Date only */}
+                            <div className="pl-3">
+                              <p className="text-[13px] text-white/40 leading-4">
+                                {timestamp.toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric"
+                                })}
+                                ,{" "}
+                                {timestamp.toLocaleTimeString([], {
+                                  hour: "numeric",
+                                  minute: "2-digit"
+                                })}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      }
+
                       return (
                         <button
                           key={transaction.id}
@@ -1642,12 +1682,11 @@ export default function Home() {
                           {/* Middle - Text */}
                           <div className="flex-1 py-2.5 flex flex-col gap-0.5">
                             <p className="text-base text-white leading-5">
-                              {transferTypeLabel ??
-                                (isIncoming
-                                  ? "Received"
-                                  : isPending
-                                    ? "To be claimed"
-                                    : "Sent")}
+                              {isIncoming
+                                ? "Received"
+                                : isPending
+                                  ? "To be claimed"
+                                  : "Sent"}
                             </p>
                             {!(isPending === false && !isIncoming && isUnknownRecipient) && (
                               <p className="text-[13px] text-white/60 leading-4">

@@ -338,6 +338,12 @@ export default function ActivitySheet({
                     const transaction = item.transaction;
                     const isIncoming = transaction.type === "incoming";
                     const isPending = transaction.type === "pending";
+                    const transferTypeLabel =
+                      transaction.transferType === "store"
+                        ? "Store data"
+                        : transaction.transferType === "verify_telegram_init_data"
+                          ? "Verify data"
+                          : null;
                     const counterparty = isIncoming
                       ? transaction.sender || "Unknown sender"
                       : transaction.recipient || "Unknown recipient";
@@ -351,6 +357,45 @@ export default function ActivitySheet({
                         ? "#00b1fb"
                         : "white";
                     const timestamp = new Date(transaction.timestamp);
+
+                    // Compact view for store/verify transactions
+                    const isCompactTransaction = transferTypeLabel !== null;
+
+                    if (isCompactTransaction) {
+                      return (
+                        <button
+                          key={transaction.id}
+                          onClick={() => onTransactionClick(transaction)}
+                          className="flex items-center py-2 px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
+                          style={{
+                            background: "rgba(255, 255, 255, 0.06)",
+                            mixBlendMode: "lighten",
+                          }}
+                        >
+                          {/* Left - Text */}
+                          <div className="flex-1 flex items-center">
+                            <p className="text-sm text-white/60 leading-5">
+                              {transferTypeLabel}
+                            </p>
+                          </div>
+
+                          {/* Right - Date only */}
+                          <div className="pl-3">
+                            <p className="text-[13px] text-white/40 leading-4">
+                              {timestamp.toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                              ,{" "}
+                              {timestamp.toLocaleTimeString([], {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    }
 
                     return (
                       <button
