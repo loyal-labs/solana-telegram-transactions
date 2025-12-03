@@ -56,6 +56,7 @@ import {
   subscribeToWalletBalance} from "@/lib/solana/wallet/wallet-details";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
 import { ensureWalletKeypair } from "@/lib/solana/wallet/wallet-keypair-logic";
+import { fetchInvoiceState } from "@/lib/telegram/bot-api/fetch-invoice-state";
 import { initTelegram, sendString } from "@/lib/telegram/mini-app";
 import {
   hideMainButton,
@@ -98,7 +99,8 @@ export default function Home() {
   const [claimError, setClaimError] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
-  const [starsBalance] = useState<number>(1267); // Mock Stars balance
+  const [starsBalance, setStarsBalance] = useState<number>(0);
+  const [isStarsLoading, setIsStarsLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
@@ -876,6 +878,39 @@ export default function Home() {
     void loadWalletTransactions();
   }, [walletAddress, loadWalletTransactions]);
 
+  useEffect(() => {
+    if (!walletAddress) return;
+
+    let isCancelled = false;
+
+    const loadStarsBalance = async () => {
+      setIsStarsLoading(true);
+      try {
+        const invoice = await fetchInvoiceState(walletAddress);
+        if (isCancelled) return;
+        const remaining = Number.isFinite(invoice.remainingStars)
+          ? Number(invoice.remainingStars)
+          : 0;
+        setStarsBalance(remaining);
+      } catch (error) {
+        if (!isCancelled) {
+          console.error("Failed to fetch Stars balance", error);
+          setStarsBalance(0);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsStarsLoading(false);
+        }
+      }
+    };
+
+    void loadStarsBalance();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [walletAddress]);
+
   // Subscribe to websocket balance updates so inbound funds appear in real time
   useEffect(() => {
     if (!walletAddress) return;
@@ -1068,6 +1103,7 @@ export default function Home() {
     isLoading || (displayCurrency === "USD" && isSolPriceLoading);
   const showSecondarySkeleton =
     isLoading || (displayCurrency === "SOL" && isSolPriceLoading);
+  const showStarsSkeleton = isLoading || isStarsLoading;
 
   // Computed numeric values for NumberFlow animations
   const solBalanceNumeric = useMemo(() => {
@@ -1224,7 +1260,7 @@ export default function Home() {
 
           {/* Stars Card Section */}
           <div className="px-4 pb-4">
-            {isLoading ? (
+            {showStarsSkeleton ? (
               <div
                 className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full"
                 style={{
@@ -1303,9 +1339,12 @@ export default function Home() {
               incomingTransactions.length === 0 &&
               walletTransactions.length === 0;
             const isEmptyWallet =
-              (balance === null || balance === 0) && starsBalance === 0;
+              (balance === null || balance === 0) &&
+              starsBalance === 0 &&
+              !isStarsLoading;
             const isActivityLoading =
               isLoading ||
+              isStarsLoading ||
               (isFetchingTransactions && walletTransactions.length === 0);
 
             // Loading state - show skeleton transaction cards

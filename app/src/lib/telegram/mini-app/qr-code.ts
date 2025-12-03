@@ -29,7 +29,7 @@ export const openQrScanner = async (
       console.log("QR code captured:", qr);
       onCaptured?.(qr);
       qrScanner.close();
-    }
+    },
   });
 
   await promise;
