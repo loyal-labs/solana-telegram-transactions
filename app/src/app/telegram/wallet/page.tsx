@@ -1340,7 +1340,6 @@ export default function Home() {
                       alt="Stars"
                       width={28}
                       height={28}
-                      className="opacity-60"
                     />
                   </div>
                 </div>
