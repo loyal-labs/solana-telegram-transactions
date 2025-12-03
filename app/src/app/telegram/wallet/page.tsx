@@ -70,6 +70,7 @@ import {
   validateInitData
 } from "@/lib/telegram/mini-app/init-data-transform";
 import { parseUsernameFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
+import { openQrScanner } from "@/lib/telegram/mini-app/qr-code";
 import { ensureTelegramTheme } from "@/lib/telegram/mini-app/theme";
 import type {
   IncomingTransaction,
@@ -586,8 +587,7 @@ export default function Home() {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
-    // TODO: Implement QR code scanning
-    console.log("Scan QR clicked");
+    void openQrScanner();
   }, []);
 
   const handleApproveTransaction = useCallback(
@@ -679,6 +679,7 @@ export default function Home() {
         TELEGRAM_BOT_ID,
         cleanInitDataResult
       );
+      console.log("validationString:", validationString);
       const signature = cleanInitDataResult.signature as string;
       const isValid = validateInitData(validationString, signature);
       console.log("Signature is valid: ", isValid);
