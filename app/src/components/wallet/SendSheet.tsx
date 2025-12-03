@@ -24,11 +24,11 @@ import {
   STARS_FEE_AMOUNT,
   STARS_TO_USD,
 } from "@/lib/constants";
+import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import {
   getCloudValue,
   setCloudValue,
 } from "@/lib/telegram/mini-app/cloud-storage";
-import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 
 export type SendSheetProps = {
   trigger?: ReactNode | null;
@@ -134,11 +134,6 @@ const saveLastAmount = async (solAmount: number, solPriceUsd: number | null): Pr
     };
     await setCloudValue(LAST_AMOUNT_KEY, JSON.stringify(lastAmount));
   } catch {}
-};
-
-// Generate initials from name
-const getInitials = (name: string): string => {
-  return name.charAt(0).toUpperCase();
 };
 
 // Generate a consistent color based on name
