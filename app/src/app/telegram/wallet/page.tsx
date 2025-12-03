@@ -466,18 +466,7 @@ export default function Home() {
       return;
     }
 
-    // Create a pending transaction
-    const pendingTxId = `pending-${Date.now()}`;
-    const pendingTransaction: Transaction = {
-      id: pendingTxId,
-      type: "pending",
-      amountLamports: lamports,
-      recipient: trimmedRecipient,
-      timestamp: Date.now()
-    };
-
     setIsSendingTransaction(true);
-    setWalletTransactions(prev => [pendingTransaction, ...prev]);
 
     try {
       console.log("Sending transaction to:", trimmedRecipient);
@@ -500,20 +489,6 @@ export default function Home() {
         throw new Error("Invalid recipient");
       }
 
-      // Update pending transaction to confirmed
-      setWalletTransactions(prev =>
-        prev.map(tx =>
-          tx.id === pendingTxId
-            ? {
-                ...tx,
-                type: "outgoing" as TransactionType,
-                signature: signature ?? tx.signature,
-                status: "completed"
-              }
-            : tx
-        )
-      );
-
       await refreshWalletBalance();
       if (signature) {
         void loadWalletTransactions();
@@ -524,7 +499,7 @@ export default function Home() {
       }
 
       // Save recipient to recent list
-      addRecentRecipient(trimmedRecipient);
+      void addRecentRecipient(trimmedRecipient);
 
       // Calculate and save the sent amount in SOL for the success screen
       const sentSolAmount = lamports / LAMPORTS_PER_SOL;
@@ -534,8 +509,6 @@ export default function Home() {
       setSendStep(4);
     } catch (error) {
       console.error("Failed to send transaction", error);
-      // Remove failed pending transaction
-      setWalletTransactions(prev => prev.filter(tx => tx.id !== pendingTxId));
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred("error");
       }

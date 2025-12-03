@@ -24,6 +24,10 @@ import {
   STARS_FEE_AMOUNT,
   STARS_TO_USD,
 } from "@/lib/constants";
+import {
+  getCloudValue,
+  setCloudValue,
+} from "@/lib/telegram/mini-app/cloud-storage";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 
 export type SendSheetProps = {
@@ -63,12 +67,11 @@ export type RecentRecipient = {
   timestamp: number;
 };
 
-// Get recent recipients from localStorage
-export const getRecentRecipients = (): RecentRecipient[] => {
-  if (typeof window === "undefined") return [];
+// Get recent recipients from Telegram cloud storage
+export const getRecentRecipients = async (): Promise<RecentRecipient[]> => {
   try {
-    const stored = localStorage.getItem(RECENT_RECIPIENTS_KEY);
-    if (stored) {
+    const stored = await getCloudValue(RECENT_RECIPIENTS_KEY);
+    if (stored && typeof stored === "string") {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed)) return parsed;
     }
@@ -77,13 +80,12 @@ export const getRecentRecipients = (): RecentRecipient[] => {
 };
 
 // Add a recipient to recent list (moves to top if already exists)
-export const addRecentRecipient = (address: string): void => {
-  if (typeof window === "undefined") return;
+export const addRecentRecipient = async (address: string): Promise<void> => {
   try {
     const trimmed = address.trim();
     if (!trimmed) return;
 
-    const existing = getRecentRecipients();
+    const existing = await getRecentRecipients();
     // Remove if already exists (will be added to top)
     const filtered = existing.filter((r) => r.address !== trimmed);
     // Add to top
@@ -92,7 +94,7 @@ export const addRecentRecipient = (address: string): void => {
       ...filtered,
     ].slice(0, MAX_RECENT_RECIPIENTS);
 
-    localStorage.setItem(RECENT_RECIPIENTS_KEY, JSON.stringify(updated));
+    await setCloudValue(RECENT_RECIPIENTS_KEY, JSON.stringify(updated));
   } catch {}
 };
 
@@ -103,28 +105,34 @@ const truncateDecimals = (num: number, decimals: number): string => {
   return truncated.toFixed(decimals);
 };
 
+// Format number for display: truncate to max decimals, remove trailing zeros
+const formatForDisplay = (num: number, maxDecimals: number): string => {
+  const factor = Math.pow(10, maxDecimals);
+  const truncated = Math.floor(num * factor) / factor;
+  // Remove trailing zeros by converting to number and back to string
+  return String(Number(truncated.toFixed(maxDecimals)));
+};
+
 type LastAmount = {
   sol: number;
   usd: number;
 };
 
-const getLastAmount = (): LastAmount | null => {
-  if (typeof window === 'undefined') return null;
+const getLastAmount = async (): Promise<LastAmount | null> => {
   try {
-    const stored = localStorage.getItem(LAST_AMOUNT_KEY);
-    if (stored) return JSON.parse(stored);
+    const stored = await getCloudValue(LAST_AMOUNT_KEY);
+    if (stored && typeof stored === "string") return JSON.parse(stored);
   } catch {}
   return null;
 };
 
-const saveLastAmount = (solAmount: number, solPriceUsd: number | null) => {
-  if (typeof window === 'undefined') return;
+const saveLastAmount = async (solAmount: number, solPriceUsd: number | null): Promise<void> => {
   try {
     const lastAmount: LastAmount = {
       sol: solAmount,
       usd: solPriceUsd ? parseFloat((solAmount * solPriceUsd).toFixed(2)) : solAmount,
     };
-    localStorage.setItem(LAST_AMOUNT_KEY, JSON.stringify(lastAmount));
+    await setCloudValue(LAST_AMOUNT_KEY, JSON.stringify(lastAmount));
   } catch {}
 };
 
@@ -241,8 +249,9 @@ export default function SendSheet({
       setAmountStr("");
       setRecipient(initialRecipient || "");
       setCurrency('SOL');
-      setLastAmount(getLastAmount());
-      setRecentRecipients(getRecentRecipients());
+      // Load from cloud storage asynchronously
+      void getLastAmount().then(setLastAmount);
+      void getRecentRecipients().then(setRecentRecipients);
     }
   }, [open, initialRecipient]);
 
@@ -320,7 +329,7 @@ export default function SendSheet({
               : NaN
             : amount;
         if (!isNaN(solAmount) && solAmount > 0) {
-          saveLastAmount(solAmount, solPriceUsd);
+          void saveLastAmount(solAmount, solPriceUsd);
         }
       }
     }
@@ -535,14 +544,12 @@ export default function SendSheet({
             >
               <div className="pr-1.5">
                 {recipient.startsWith('@') ? (
-                  /* Avatar for username */
-                  <div className="w-7 h-7 rounded-full overflow-hidden relative">
-                    <Image
-                      src="https://avatars.githubusercontent.com/u/537414?v=4"
-                      alt="Recipient"
-                      fill
-                      className="object-cover"
-                    />
+                  /* Letter avatar for username */
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium uppercase"
+                    style={{ background: "rgba(255, 255, 255, 0.15)" }}
+                  >
+                    {recipient.charAt(1)}
                   </div>
                 ) : (
                   /* Wallet icon for address */
@@ -573,14 +580,12 @@ export default function SendSheet({
             >
               <div className="pr-1.5">
                 {recipient.startsWith('@') ? (
-                  /* Avatar for username */
-                  <div className="w-7 h-7 rounded-full overflow-hidden relative">
-                    <Image
-                      src="https://avatars.githubusercontent.com/u/537414?v=4"
-                      alt="Recipient"
-                      fill
-                      className="object-cover"
-                    />
+                  /* Letter avatar for username */
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium uppercase"
+                    style={{ background: "rgba(255, 255, 255, 0.15)" }}
+                  >
+                    {recipient.charAt(1)}
                   </div>
                 ) : (
                   /* Wallet icon for address */
@@ -882,7 +887,7 @@ export default function SendSheet({
                       mixBlendMode: "lighten",
                     }}
                   >
-                    {lastAmount.sol}
+                    {formatForDisplay(lastAmount.sol, 4)}
                   </button>
                 )}
                 {[0.1, 1].map(val => (
