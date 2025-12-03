@@ -1,3 +1,5 @@
+import type { WalletTransfer } from "../lib/solana/rpc/types";
+
 export type TransactionType = "incoming" | "outgoing" | "pending";
 
 export type TransactionStatus = "pending" | "completed" | "error";
@@ -9,6 +11,7 @@ export type Transaction = {
   status?: TransactionStatus;
   networkFeeLamports?: number;
   signature?: string;
+  transferType?: WalletTransfer["type"];
   // For incoming transactions
   sender?: string;
   username?: string;

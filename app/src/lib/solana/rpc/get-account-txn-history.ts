@@ -3,9 +3,14 @@ import {
   type ParsedInstruction,
   type ParsedMessage,
   type ParsedTransactionWithMeta,
+  PartiallyDecodedInstruction,
   PublicKey,
 } from "@solana/web3.js";
 
+import {
+  decodeTelegramTransferInstruction,
+  decodeTelegramVerificationInstruction,
+} from "../solana-helpers";
 import { getConnection } from "./connection";
 import { GetAccountTransactionHistoryOptions, WalletTransfer } from "./types";
 
@@ -102,11 +107,76 @@ const mapTransactionToTransfer = (
     }
   }
 
+  const allInstructionsWithData = [
+    ...(message.instructions as (
+      | ParsedInstruction
+      | PartiallyDecodedInstruction
+    )[]),
+    ...((innerInstructions ?? []) as ParsedInnerInstruction[]).flatMap(
+      (ix: ParsedInnerInstruction) =>
+        (ix.instructions ?? []) as (
+          | ParsedInstruction
+          | PartiallyDecodedInstruction
+        )[]
+    ),
+  ].filter(
+    (ix): ix is PartiallyDecodedInstruction =>
+      "data" in ix &&
+      typeof (ix as PartiallyDecodedInstruction).data === "string"
+  );
+
+  const knownInstructionTypes: WalletTransfer["type"][] = [
+    "verify_telegram_init_data",
+    "store",
+    "claim_deposit",
+    "deposit_for_username",
+  ];
+
+  const decodeInstructionData = (data: string) => {
+    const decoders = [
+      decodeTelegramTransferInstruction,
+      decodeTelegramVerificationInstruction,
+    ];
+
+    for (const decode of decoders) {
+      try {
+        const decoded = decode(data);
+        if (decoded) return decoded;
+      } catch (err) {
+        continue;
+      }
+    }
+
+    return null;
+  };
+
+  const decodedInstruction = allInstructionsWithData
+    .map((ix) => decodeInstructionData(ix.data))
+    .find((decoded) => decoded !== null);
+
+  const decodedType = decodedInstruction?.name;
+
+  const type: WalletTransfer["type"] =
+    decodedType &&
+    knownInstructionTypes.includes(decodedType as WalletTransfer["type"])
+      ? (decodedType as WalletTransfer["type"])
+      : "transfer";
+
+  if (type === "deposit_for_username") {
+    const usernameFromInstruction = (
+      decodedInstruction?.data as { username?: string }
+    )?.username;
+    if (usernameFromInstruction) {
+      counterparty = usernameFromInstruction;
+    }
+  }
+
   const returnObject = {
     signature,
     slot: tx.slot,
     timestamp: tx.blockTime ? tx.blockTime * 1000 : null,
     direction,
+    type,
     amountLamports,
     netChangeLamports,
     feeLamports: safeMeta.fee ?? 0,

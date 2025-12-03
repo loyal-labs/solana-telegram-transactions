@@ -1,4 +1,10 @@
-import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
+import {
+  AnchorProvider,
+  BN,
+  BorshInstructionCoder,
+  Idl,
+  Program,
+} from "@coral-xyz/anchor";
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import { PublicKey } from "@solana/web3.js";
 
@@ -72,3 +78,20 @@ export function encodeAnchorStringFilter(value: string): string {
   valueBytes.copy(filterBuf, 4);
   return bs58.encode(filterBuf);
 }
+
+export function decodeTelegramTransferInstruction(data: string) {
+  const coder = new BorshInstructionCoder(telegramTransferIdl as Idl);
+  const decoded = coder.decode(data, "base58");
+  return decoded;
+}
+
+export function decodeTelegramVerificationInstruction(data: string) {
+  const coder = new BorshInstructionCoder(telegramVerificationIdl as Idl);
+  const decoded = coder.decode(data, "base58");
+  return decoded;
+}
+
+//verify_telegram_init_data
+//store
+//claim_deposit
+//deposit_for_username

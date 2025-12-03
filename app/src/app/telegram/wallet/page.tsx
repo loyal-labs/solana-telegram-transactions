@@ -283,6 +283,7 @@ export default function Home() {
         return {
           id: transfer.signature,
           type: isIncoming ? "incoming" : "outgoing",
+          transferType: transfer.type,
           amountLamports: transfer.amountLamports,
           sender: isIncoming ? counterparty : undefined,
           recipient: !isIncoming ? counterparty : undefined,
@@ -1528,13 +1529,31 @@ export default function Home() {
                       const transaction = item.transaction;
                       const isIncoming = transaction.type === "incoming";
                       const isPending = transaction.type === "pending";
+                      const transferTypeLabel =
+                        transaction.transferType === "store"
+                          ? "Store data"
+                          : transaction.transferType === "verify_telegram_init_data"
+                            ? "Verify data"
+                          : null;
                       const counterparty = isIncoming
                         ? transaction.sender || "Unknown sender"
                         : transaction.recipient || "Unknown recipient";
-                      const formattedCounterparty = counterparty.startsWith("@")
+                      const isUnknownRecipient = counterparty
+                        .toLowerCase()
+                        .startsWith("unknown recipient");
+                      const formattedCounterparty = isUnknownRecipient
                         ? counterparty
-                        : formatSenderAddress(counterparty);
-                      const amountPrefix = isIncoming ? "+" : "−";
+                        : counterparty.startsWith("@")
+                          ? counterparty
+                          : formatSenderAddress(counterparty);
+                      const isEffectivelyZero =
+                        Math.abs(transaction.amountLamports) <
+                        LAMPORTS_PER_SOL / 10000; // below 0.0001 SOL displays as 0
+                      const amountPrefix = isEffectivelyZero
+                        ? ""
+                        : isIncoming
+                          ? "+"
+                          : "−";
                       const amountColor = isIncoming
                         ? "#32e55e"
                         : isPending
@@ -1590,16 +1609,19 @@ export default function Home() {
                           {/* Middle - Text */}
                           <div className="flex-1 py-2.5 flex flex-col gap-0.5">
                             <p className="text-base text-white leading-5">
-                              {isIncoming
-                                ? "Received"
-                                : isPending
-                                  ? "To be claimed"
-                                  : "Sent"}
+                              {transferTypeLabel ??
+                                (isIncoming
+                                  ? "Received"
+                                  : isPending
+                                    ? "To be claimed"
+                                    : "Sent")}
                             </p>
-                            <p className="text-[13px] text-white/60 leading-4">
-                              {isIncoming ? "from" : isPending ? "by" : "to"}{" "}
-                              {formattedCounterparty}
-                            </p>
+                            {!(isPending === false && !isIncoming && isUnknownRecipient) && (
+                              <p className="text-[13px] text-white/60 leading-4">
+                                {isIncoming ? "from" : isPending ? "by" : "to"}{" "}
+                                {formattedCounterparty}
+                              </p>
+                            )}
                           </div>
 
                           {/* Right - Value */}
@@ -1609,7 +1631,9 @@ export default function Home() {
                               style={{ color: amountColor }}
                             >
                               {amountPrefix}
-                              {formatTransactionAmount(transaction.amountLamports)}{" "}
+                              {isEffectivelyZero
+                                ? "0"
+                                : formatTransactionAmount(transaction.amountLamports)}{" "}
                               SOL
                             </p>
                             <p className="text-[13px] text-white/60 leading-4">
