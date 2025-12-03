@@ -1,5 +1,9 @@
 import { Tag } from "@irys/upload-core";
 
+export type GaslessInvoice = {
+  remainingStars: number;
+};
+
 export interface IrysTransaction {
   id: string;
   address?: string | null;

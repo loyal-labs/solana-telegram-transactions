@@ -34,6 +34,7 @@ import {
   TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
 } from "@/lib/constants";
+import { fetchInvoiceState } from "@/lib/irys/fetch-invoice-state";
 import { topUpDeposit } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
@@ -56,7 +57,6 @@ import {
   subscribeToWalletBalance} from "@/lib/solana/wallet/wallet-details";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
 import { ensureWalletKeypair } from "@/lib/solana/wallet/wallet-keypair-logic";
-import { fetchInvoiceState } from "@/lib/telegram/bot-api/fetch-invoice-state";
 import { initTelegram, sendString } from "@/lib/telegram/mini-app";
 import {
   hideMainButton,
