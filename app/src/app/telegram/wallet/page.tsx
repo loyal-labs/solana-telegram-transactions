@@ -1421,19 +1421,41 @@ export default function Home() {
                   mixBlendMode: "lighten"
                 }}
               >
-                {/* Skeleton Icon */}
+                {/* Left - Icon */}
                 <div className="py-1.5 pr-3">
-                  <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.06)",
+                      mixBlendMode: "lighten"
+                    }}
+                  >
+                    <Image
+                      src="/icons/telegram-stars.svg"
+                      alt="Stars"
+                      width={28}
+                      height={28}
+                    />
+                  </div>
                 </div>
-                {/* Skeleton Text */}
-                <div className="flex-1 py-2.5 flex flex-col gap-1.5">
-                  <div className="w-12 h-5 bg-white/5 animate-pulse rounded" />
-                  <div className="w-16 h-4 bg-white/5 animate-pulse rounded" />
+
+                {/* Middle - Text */}
+                <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                  <p className="text-base text-white leading-5">Stars</p>
+                  <p className="text-[13px] text-white/60 leading-4">
+                    for free gas
+                  </p>
                 </div>
-                {/* Skeleton Value */}
+
+                {/* Right - Skeleton Value */}
                 <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
-                  <div className="w-12 h-5 bg-white/5 animate-pulse rounded" />
-                  <div className="w-10 h-4 bg-white/5 animate-pulse rounded" />
+                  <div className="w-10 h-5 bg-white/5 animate-pulse rounded" />
+                  <div className="w-8 h-4 bg-white/5 animate-pulse rounded" />
+                </div>
+
+                {/* Chevron */}
+                <div className="pl-3 py-2 flex items-center justify-center">
+                  <ChevronRight size={16} strokeWidth={1.5} className="text-white/60" />
                 </div>
               </div>
             ) : (
@@ -1503,9 +1525,15 @@ export default function Home() {
             // Loading state - show skeleton transaction cards
             if (isActivityLoading) {
               return (
-                <div className="flex-1 px-4 pb-4">
-                  <div className="flex flex-col gap-2">
-                    {/* Skeleton Transaction Card 1 */}
+                <>
+                  <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+                    <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
+                      Activity
+                    </p>
+                  </div>
+                  <div className="flex-1 px-4 pb-4">
+                    <div className="flex flex-col gap-2">
+                      {/* Skeleton Transaction Card 1 */}
                     <div
                       className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
                       style={{
@@ -1547,6 +1575,7 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
+                </>
               );
             }
 
