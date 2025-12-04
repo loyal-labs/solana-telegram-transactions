@@ -14,6 +14,7 @@ import {
   useSignal,
   viewport
 } from "@telegram-apps/sdk-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, ChevronRight, Clock, Copy } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -30,6 +31,7 @@ import SendSheet, {
 import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
+  DISPLAY_CURRENCY_KEY,
   SOL_PRICE_USD,
   TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
@@ -68,6 +70,10 @@ import {
   showMainButton,
   showReceiveShareButton
 } from "@/lib/telegram/mini-app/buttons";
+import {
+  getCloudValue,
+  setCloudValue
+} from "@/lib/telegram/mini-app/cloud-storage";
 import {
   cleanInitData,
   createValidationBytesFromRawInitData,
@@ -174,6 +180,9 @@ const setCachedIncomingTransactions = (username: string | null, txns: IncomingTr
 // Track wallet address at module level for cache lookups on remount
 let cachedWalletAddress: string | null = null;
 
+// Display currency preference cache
+let cachedDisplayCurrency: "USD" | "SOL" | null = null;
+
 // Check if we have enough cached data to skip loading
 const hasCachedWalletData = (): boolean => {
   if (!cachedWalletAddress) return false;
@@ -240,7 +249,9 @@ export default function Home() {
     recipient: ""
   });
   const [isSendingTransaction, setIsSendingTransaction] = useState(false);
-  const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">("USD");
+  const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">(
+    () => cachedDisplayCurrency ?? "USD"
+  );
   const [addressCopied, setAddressCopied] = useState(false);
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number | null>(() => getCachedSolPrice());
@@ -251,6 +262,10 @@ export default function Home() {
     secondaryButton.setParams.isAvailable
   );
   const ensuredWalletRef = useRef(false);
+
+  // Track seen transaction IDs to detect new ones for animation
+  const seenTransactionIdsRef = useRef<Set<string>>(new Set());
+  const [newTransactionIds, setNewTransactionIds] = useState<Set<string>>(new Set());
 
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -1036,6 +1051,23 @@ export default function Home() {
     };
   }, []);
 
+  // Load display currency preference from cloud storage
+  useEffect(() => {
+    if (cachedDisplayCurrency !== null) return; // Already loaded from cache
+
+    void (async () => {
+      try {
+        const stored = await getCloudValue(DISPLAY_CURRENCY_KEY);
+        if (stored === "USD" || stored === "SOL") {
+          cachedDisplayCurrency = stored;
+          setDisplayCurrency(stored);
+        }
+      } catch (error) {
+        console.error("Failed to load display currency preference", error);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     if (ensuredWalletRef.current) return;
     ensuredWalletRef.current = true;
@@ -1412,6 +1444,35 @@ export default function Home() {
     return items.slice(0, 10);
   }, [incomingTransactions, walletTransactions]);
 
+  // Detect new transactions for animation
+  useEffect(() => {
+    const currentIds = new Set(limitedActivityItems.map(item => item.transaction.id));
+    const previousIds = seenTransactionIdsRef.current;
+
+    // Find newly added transactions
+    const newIds = new Set<string>();
+    for (const id of currentIds) {
+      if (!previousIds.has(id)) {
+        newIds.add(id);
+      }
+    }
+
+    // Update seen transactions
+    seenTransactionIdsRef.current = currentIds;
+
+    // If we have new transactions, mark them for animation
+    if (newIds.size > 0) {
+      setNewTransactionIds(newIds);
+
+      // Clear the new status after animation completes (500ms)
+      const timer = setTimeout(() => {
+        setNewTransactionIds(new Set());
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [limitedActivityItems]);
+
   return (
     <>
       <main
@@ -1465,7 +1526,12 @@ export default function Home() {
                   if (hapticFeedback.selectionChanged.isAvailable()) {
                     hapticFeedback.selectionChanged();
                   }
-                  setDisplayCurrency(prev => (prev === "USD" ? "SOL" : "USD"));
+                  setDisplayCurrency(prev => {
+                    const newCurrency = prev === "USD" ? "SOL" : "USD";
+                    cachedDisplayCurrency = newCurrency;
+                    void setCloudValue(DISPLAY_CURRENCY_KEY, newCurrency);
+                    return newCurrency;
+                  });
                 }}
                 className="active:scale-[0.98] transition-transform"
               >
@@ -1762,20 +1828,175 @@ export default function Home() {
                 </div>
                 <div className="flex-1 px-4 pb-4">
                   <div className="flex flex-col gap-2 pb-36">
-                    {limitedActivityItems.map(item => {
-                      if (item.type === "incoming") {
+                    <AnimatePresence initial={false} mode="popLayout">
+                      {limitedActivityItems.map(item => {
+                        const isNewTransaction = newTransactionIds.has(item.transaction.id);
+
+                        if (item.type === "incoming") {
+                          const transaction = item.transaction;
+                          const isClaiming = claimingTransactionId === transaction.id;
+                          return (
+                            <motion.button
+                              key={transaction.id}
+                              layout
+                              initial={isNewTransaction ? { opacity: 0, scale: 0.85, y: -10 } : false}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.85 }}
+                              transition={{
+                                layout: { type: "spring", stiffness: 500, damping: 35 },
+                                opacity: { duration: 0.25 },
+                                scale: { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }
+                              }}
+                              onClick={() =>
+                                !isClaiming && handleOpenTransactionDetails(transaction)
+                              }
+                              disabled={isClaiming}
+                              className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity ${
+                                isClaiming ? "opacity-60" : ""
+                              }`}
+                              style={{
+                                background: "rgba(255, 255, 255, 0.06)",
+                                mixBlendMode: "lighten"
+                              }}
+                            >
+                              {/* Left - Icon */}
+                              <div className="py-1.5 pr-3">
+                                <div
+                                  className="w-12 h-12 rounded-full flex items-center justify-center"
+                                  style={{ background: "rgba(50, 229, 94, 0.15)" }}
+                                >
+                                  <ArrowDown
+                                    className="w-7 h-7"
+                                    strokeWidth={1.5}
+                                    style={{ color: "#32e55e" }}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Middle - Text */}
+                              <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                                <p className="text-base text-white leading-5">Received</p>
+                                <p className="text-[13px] text-white/60 leading-4">
+                                  from {formatSenderAddress(transaction.sender)}
+                                </p>
+                              </div>
+
+                              {/* Right - Claim Badge */}
+                              <div className="py-2.5 pl-3">
+                                <div
+                                  className="px-4 py-2 rounded-full text-sm text-white leading-5"
+                                  style={{
+                                    background:
+                                      "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
+                                  }}
+                                >
+                                  {isClaiming
+                                    ? "Claiming..."
+                                    : `Claim ${formatTransactionAmount(transaction.amountLamports)} SOL`}
+                                </div>
+                              </div>
+                            </motion.button>
+                          );
+                        }
+
+                        // Wallet transaction
                         const transaction = item.transaction;
-                        const isClaiming = claimingTransactionId === transaction.id;
+                        const isIncoming = transaction.type === "incoming";
+                        const isPending = transaction.type === "pending";
+                        const transferTypeLabel =
+                          transaction.transferType === "store"
+                            ? "Store data"
+                            : transaction.transferType === "verify_telegram_init_data"
+                              ? "Verify data"
+                            : null;
+                        const counterparty = isIncoming
+                          ? transaction.sender || "Unknown sender"
+                          : transaction.recipient || "Unknown recipient";
+                        const isUnknownRecipient = counterparty
+                          .toLowerCase()
+                          .startsWith("unknown recipient");
+                        const formattedCounterparty = isUnknownRecipient
+                          ? counterparty
+                          : counterparty.startsWith("@")
+                            ? counterparty
+                            : formatSenderAddress(counterparty);
+                        const isEffectivelyZero =
+                          Math.abs(transaction.amountLamports) <
+                          LAMPORTS_PER_SOL / 10000; // below 0.0001 SOL displays as 0
+                        const amountPrefix = isEffectivelyZero
+                          ? ""
+                          : isIncoming
+                            ? "+"
+                            : "−";
+                        const amountColor = isIncoming
+                          ? "#32e55e"
+                          : isPending
+                            ? "#00b1fb"
+                            : "white";
+                        const timestamp = new Date(transaction.timestamp);
+
+                        // Compact view for store/verify transactions
+                        const isCompactTransaction = transferTypeLabel !== null;
+
+                        if (isCompactTransaction) {
+                          return (
+                            <motion.button
+                              key={transaction.id}
+                              layout
+                              initial={isNewTransaction ? { opacity: 0, scale: 0.85, y: -10 } : false}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.85 }}
+                              transition={{
+                                layout: { type: "spring", stiffness: 500, damping: 35 },
+                                opacity: { duration: 0.25 },
+                                scale: { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }
+                              }}
+                              onClick={() => handleOpenWalletTransactionDetails(transaction)}
+                              className="flex items-center py-2 px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
+                              style={{
+                                background: "rgba(255, 255, 255, 0.06)",
+                                mixBlendMode: "lighten"
+                              }}
+                            >
+                              {/* Left - Text */}
+                              <div className="flex-1 flex items-center">
+                                <p className="text-sm text-white/60 leading-5">
+                                  {transferTypeLabel}
+                                </p>
+                              </div>
+
+                              {/* Right - Date only */}
+                              <div className="pl-3">
+                                <p className="text-[13px] text-white/40 leading-4">
+                                  {timestamp.toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric"
+                                  })}
+                                  ,{" "}
+                                  {timestamp.toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit"
+                                  })}
+                                </p>
+                              </div>
+                            </motion.button>
+                          );
+                        }
+
                         return (
-                          <button
+                          <motion.button
                             key={transaction.id}
-                            onClick={() =>
-                              !isClaiming && handleOpenTransactionDetails(transaction)
-                            }
-                            disabled={isClaiming}
-                            className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity ${
-                              isClaiming ? "opacity-60" : ""
-                            }`}
+                            layout
+                            initial={isNewTransaction ? { opacity: 0, scale: 0.85, y: -10 } : false}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.85 }}
+                            transition={{
+                              layout: { type: "spring", stiffness: 500, damping: 35 },
+                              opacity: { duration: 0.25 },
+                              scale: { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }
+                            }}
+                            onClick={() => handleOpenWalletTransactionDetails(transaction)}
+                            className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
                             style={{
                               background: "rgba(255, 255, 255, 0.06)",
                               mixBlendMode: "lighten"
@@ -1785,102 +2006,67 @@ export default function Home() {
                             <div className="py-1.5 pr-3">
                               <div
                                 className="w-12 h-12 rounded-full flex items-center justify-center"
-                                style={{ background: "rgba(50, 229, 94, 0.15)" }}
+                                style={{
+                                  background: isIncoming
+                                    ? "rgba(50, 229, 94, 0.15)"
+                                    : isPending
+                                      ? "rgba(0, 177, 251, 0.15)"
+                                      : "rgba(255, 255, 255, 0.06)",
+                                  mixBlendMode:
+                                    isIncoming || isPending ? "normal" : "lighten"
+                                }}
                               >
-                                <ArrowDown
-                                  className="w-7 h-7"
-                                  strokeWidth={1.5}
-                                  style={{ color: "#32e55e" }}
-                                />
+                                {isIncoming ? (
+                                  <ArrowDown
+                                    className="w-7 h-7"
+                                    strokeWidth={1.5}
+                                    style={{ color: "#32e55e" }}
+                                  />
+                                ) : isPending ? (
+                                  <Clock
+                                    className="w-7 h-7"
+                                    strokeWidth={1.5}
+                                    style={{ color: "#00b1fb" }}
+                                  />
+                                ) : (
+                                  <ArrowUp
+                                    className="w-7 h-7 text-white/60"
+                                    strokeWidth={1.5}
+                                  />
+                                )}
                               </div>
                             </div>
 
                             {/* Middle - Text */}
                             <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                              <p className="text-base text-white leading-5">Received</p>
-                              <p className="text-[13px] text-white/60 leading-4">
-                                from {formatSenderAddress(transaction.sender)}
+                              <p className="text-base text-white leading-5">
+                                {isIncoming
+                                  ? "Received"
+                                  : isPending
+                                    ? "To be claimed"
+                                    : "Sent"}
                               </p>
+                              {!(isPending === false && !isIncoming && isUnknownRecipient) && (
+                                <p className="text-[13px] text-white/60 leading-4">
+                                  {isIncoming ? "from" : isPending ? "by" : "to"}{" "}
+                                  {formattedCounterparty}
+                                </p>
+                              )}
                             </div>
 
-                            {/* Right - Claim Badge */}
-                            <div className="py-2.5 pl-3">
-                              <div
-                                className="px-4 py-2 rounded-full text-sm text-white leading-5"
-                                style={{
-                                  background:
-                                    "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
-                                }}
+                            {/* Right - Value */}
+                            <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
+                              <p
+                                className="text-base leading-5"
+                                style={{ color: amountColor }}
                               >
-                                {isClaiming
-                                  ? "Claiming..."
-                                  : `Claim ${formatTransactionAmount(transaction.amountLamports)} SOL`}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      }
-
-                      // Wallet transaction
-                      const transaction = item.transaction;
-                      const isIncoming = transaction.type === "incoming";
-                      const isPending = transaction.type === "pending";
-                      const transferTypeLabel =
-                        transaction.transferType === "store"
-                          ? "Store data"
-                          : transaction.transferType === "verify_telegram_init_data"
-                            ? "Verify data"
-                          : null;
-                      const counterparty = isIncoming
-                        ? transaction.sender || "Unknown sender"
-                        : transaction.recipient || "Unknown recipient";
-                      const isUnknownRecipient = counterparty
-                        .toLowerCase()
-                        .startsWith("unknown recipient");
-                      const formattedCounterparty = isUnknownRecipient
-                        ? counterparty
-                        : counterparty.startsWith("@")
-                          ? counterparty
-                          : formatSenderAddress(counterparty);
-                      const isEffectivelyZero =
-                        Math.abs(transaction.amountLamports) <
-                        LAMPORTS_PER_SOL / 10000; // below 0.0001 SOL displays as 0
-                      const amountPrefix = isEffectivelyZero
-                        ? ""
-                        : isIncoming
-                          ? "+"
-                          : "−";
-                      const amountColor = isIncoming
-                        ? "#32e55e"
-                        : isPending
-                          ? "#00b1fb"
-                          : "white";
-                      const timestamp = new Date(transaction.timestamp);
-
-                      // Compact view for store/verify transactions
-                      const isCompactTransaction = transferTypeLabel !== null;
-
-                      if (isCompactTransaction) {
-                        return (
-                          <button
-                            key={transaction.id}
-                            onClick={() => handleOpenWalletTransactionDetails(transaction)}
-                            className="flex items-center py-2 px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                            style={{
-                              background: "rgba(255, 255, 255, 0.06)",
-                              mixBlendMode: "lighten"
-                            }}
-                          >
-                            {/* Left - Text */}
-                            <div className="flex-1 flex items-center">
-                              <p className="text-sm text-white/60 leading-5">
-                                {transferTypeLabel}
+                                {amountPrefix}
+                                {isEffectivelyZero
+                                  ? "0"
+                                  : formatTransactionAmount(transaction.amountLamports)}{" "}
+                                SOL
                               </p>
-                            </div>
-
-                            {/* Right - Date only */}
-                            <div className="pl-3">
-                              <p className="text-[13px] text-white/40 leading-4">
+                              <p className="text-[13px] text-white/60 leading-4">
                                 {timestamp.toLocaleDateString("en-US", {
                                   month: "short",
                                   day: "numeric"
@@ -1892,99 +2078,10 @@ export default function Home() {
                                 })}
                               </p>
                             </div>
-                          </button>
+                          </motion.button>
                         );
-                      }
-
-                      return (
-                        <button
-                          key={transaction.id}
-                          onClick={() => handleOpenWalletTransactionDetails(transaction)}
-                          className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                          style={{
-                            background: "rgba(255, 255, 255, 0.06)",
-                            mixBlendMode: "lighten"
-                          }}
-                        >
-                          {/* Left - Icon */}
-                          <div className="py-1.5 pr-3">
-                            <div
-                              className="w-12 h-12 rounded-full flex items-center justify-center"
-                              style={{
-                                background: isIncoming
-                                  ? "rgba(50, 229, 94, 0.15)"
-                                  : isPending
-                                    ? "rgba(0, 177, 251, 0.15)"
-                                    : "rgba(255, 255, 255, 0.06)",
-                                mixBlendMode:
-                                  isIncoming || isPending ? "normal" : "lighten"
-                              }}
-                            >
-                              {isIncoming ? (
-                                <ArrowDown
-                                  className="w-7 h-7"
-                                  strokeWidth={1.5}
-                                  style={{ color: "#32e55e" }}
-                                />
-                              ) : isPending ? (
-                                <Clock
-                                  className="w-7 h-7"
-                                  strokeWidth={1.5}
-                                  style={{ color: "#00b1fb" }}
-                                />
-                              ) : (
-                                <ArrowUp
-                                  className="w-7 h-7 text-white/60"
-                                  strokeWidth={1.5}
-                                />
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Middle - Text */}
-                          <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                            <p className="text-base text-white leading-5">
-                              {isIncoming
-                                ? "Received"
-                                : isPending
-                                  ? "To be claimed"
-                                  : "Sent"}
-                            </p>
-                            {!(isPending === false && !isIncoming && isUnknownRecipient) && (
-                              <p className="text-[13px] text-white/60 leading-4">
-                                {isIncoming ? "from" : isPending ? "by" : "to"}{" "}
-                                {formattedCounterparty}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Right - Value */}
-                          <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
-                            <p
-                              className="text-base leading-5"
-                              style={{ color: amountColor }}
-                            >
-                              {amountPrefix}
-                              {isEffectivelyZero
-                                ? "0"
-                                : formatTransactionAmount(transaction.amountLamports)}{" "}
-                              SOL
-                            </p>
-                            <p className="text-[13px] text-white/60 leading-4">
-                              {timestamp.toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric"
-                              })}
-                              ,{" "}
-                              {timestamp.toLocaleTimeString([], {
-                                hour: "numeric",
-                                minute: "2-digit"
-                              })}
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })}
+                      })}
+                    </AnimatePresence>
                   </div>
                 </div>
               </>
