@@ -1,3 +1,4 @@
+import { on } from "@telegram-apps/bridge";
 import { invoice } from "@telegram-apps/sdk";
 
 import { isInMiniApp } from "./index";
@@ -20,6 +21,14 @@ export const openInvoice = async (invoiceUrl: string): Promise<void> => {
     console.warn("Invoice is not available in this environment");
     return;
   }
+
+  on(
+    "invoice_closed",
+    (payload) => {
+      console.log("Invoice closed event:", payload);
+    },
+    true
+  );
 
   await invoice.open(invoiceUrl, "url");
 };

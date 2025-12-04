@@ -389,8 +389,8 @@ export default function TransactionDetailsSheet({
                   <p className="text-[13px] leading-4 text-white/60">Info</p>
                   <p className="text-base leading-5 text-white">
                     {isStoreTransaction
-                      ? "Data stored on-chain for app usage"
-                      : "Telegram user identity verified on-chain"}
+                      ? "Store signed Telegram user identity"
+                      : "Verify Telegram signature on user identity"}
                   </p>
                 </div>
 
