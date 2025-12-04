@@ -123,6 +123,65 @@ const ensureWalletBalanceSubscription = async (walletAddress: string) => {
   return walletBalanceSubscriptionPromise;
 };
 
+// SOL price cache (shared across page visits)
+let cachedSolPriceUsd: number | null = null;
+let solPriceFetchedAt: number | null = null;
+const SOL_PRICE_CACHE_TTL = 60_000; // 1 minute
+
+const getCachedSolPrice = (): number | null => {
+  if (cachedSolPriceUsd === null || solPriceFetchedAt === null) return null;
+  // Return cached price if within TTL
+  if (Date.now() - solPriceFetchedAt < SOL_PRICE_CACHE_TTL) {
+    return cachedSolPriceUsd;
+  }
+  return cachedSolPriceUsd; // Still return stale price, but allow refresh
+};
+
+const setCachedSolPrice = (price: number): void => {
+  cachedSolPriceUsd = price;
+  solPriceFetchedAt = Date.now();
+};
+
+// Stars balance cache (keyed by wallet address)
+const starsBalanceCache = new Map<string, number>();
+
+const getCachedStarsBalance = (walletAddress: string | null): number | null => {
+  if (!walletAddress) return null;
+  const cached = starsBalanceCache.get(walletAddress);
+  return typeof cached === "number" ? cached : null;
+};
+
+const setCachedStarsBalance = (walletAddress: string | null, stars: number): void => {
+  if (!walletAddress) return;
+  starsBalanceCache.set(walletAddress, stars);
+};
+
+// Incoming transactions cache (keyed by username)
+let cachedUsername: string | null = null;
+const incomingTransactionsCache = new Map<string, IncomingTransaction[]>();
+
+const getCachedIncomingTransactions = (username: string | null): IncomingTransaction[] | null => {
+  if (!username) return null;
+  return incomingTransactionsCache.get(username) ?? null;
+};
+
+const setCachedIncomingTransactions = (username: string | null, txns: IncomingTransaction[]): void => {
+  if (!username) return;
+  cachedUsername = username;
+  incomingTransactionsCache.set(username, txns);
+};
+
+// Track wallet address at module level for cache lookups on remount
+let cachedWalletAddress: string | null = null;
+
+// Check if we have enough cached data to skip loading
+const hasCachedWalletData = (): boolean => {
+  if (!cachedWalletAddress) return false;
+  const hasBalance = getCachedWalletBalance(cachedWalletAddress) !== null;
+  const hasPrice = getCachedSolPrice() !== null;
+  return hasBalance && hasPrice;
+};
+
 export default function Home() {
   const rawInitData = useRawInitData();
   const { bottom: _safeBottom } = useTelegramSafeArea();
@@ -138,19 +197,25 @@ export default function Home() {
   ] = useState(false);
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [balance, setBalance] = useState<number | null>(null);
-  const [starsBalance, setStarsBalance] = useState<number>(0);
-  const [isStarsLoading, setIsStarsLoading] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(() => cachedWalletAddress);
+  const [balance, setBalance] = useState<number | null>(() =>
+    cachedWalletAddress ? getCachedWalletBalance(cachedWalletAddress) : null
+  );
+  const [starsBalance, setStarsBalance] = useState<number>(() =>
+    cachedWalletAddress ? (getCachedStarsBalance(cachedWalletAddress) ?? 0) : 0
+  );
+  const [isStarsLoading, setIsStarsLoading] = useState(() =>
+    !cachedWalletAddress || getCachedStarsBalance(cachedWalletAddress) === null
+  );
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !hasCachedWalletData());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
   const [incomingTransactions, setIncomingTransactions] = useState<
     IncomingTransaction[]
-  >([]);
+  >(() => (cachedUsername ? getCachedIncomingTransactions(cachedUsername) ?? [] : []));
   const [walletTransactions, setWalletTransactions] = useState<Transaction[]>(
-    []
+    () => (cachedWalletAddress ? walletTransactionsCache.get(cachedWalletAddress) ?? [] : [])
   );
   const [isFetchingTransactions, setIsFetchingTransactions] = useState(false);
   const [
@@ -178,8 +243,8 @@ export default function Home() {
   const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">("USD");
   const [addressCopied, setAddressCopied] = useState(false);
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
-  const [solPriceUsd, setSolPriceUsd] = useState<number | null>(null);
-  const [isSolPriceLoading, setIsSolPriceLoading] = useState(true);
+  const [solPriceUsd, setSolPriceUsd] = useState<number | null>(() => getCachedSolPrice());
+  const [isSolPriceLoading, setIsSolPriceLoading] = useState(() => getCachedSolPrice() === null);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(
@@ -392,15 +457,18 @@ export default function Home() {
     async ({ force = false }: { force?: boolean } = {}) => {
       if (!walletAddress) return;
 
-      if (!force) {
-        const cached = walletTransactionsCache.get(walletAddress);
-        if (cached) {
-          setWalletTransactions(cached);
-          return;
-        }
+      const cached = walletTransactionsCache.get(walletAddress);
+
+      if (!force && cached) {
+        // Use cached data immediately, no loading state
+        setWalletTransactions(cached);
+        return;
       }
 
-      setIsFetchingTransactions(true);
+      // Only show loading if we don't have cached data to display
+      if (!cached) {
+        setIsFetchingTransactions(true);
+      }
       try {
         const { transfers } = await getAccountTransactionHistory(
           new PublicKey(walletAddress),
@@ -796,11 +864,19 @@ export default function Home() {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = 1000;
 
+    // Check cache first - if we have a cached price, use it immediately
+    const cached = getCachedSolPrice();
+    if (cached !== null) {
+      setSolPriceUsd(cached);
+      setIsSolPriceLoading(false);
+    }
+
     const loadPrice = async () => {
       while (retryCount < MAX_RETRIES && isMounted) {
         try {
           const price = await fetchSolUsdPrice();
           if (!isMounted) return;
+          setCachedSolPrice(price);
           setSolPriceUsd(price);
           setIsSolPriceLoading(false);
           return; // Success, exit
@@ -815,6 +891,7 @@ export default function Home() {
       // All retries failed, use fallback price
       if (isMounted) {
         console.warn("Using fallback SOL price after all retries failed");
+        setCachedSolPrice(SOL_PRICE_USD);
         setSolPriceUsd(SOL_PRICE_USD);
         setIsSolPriceLoading(false);
       }
@@ -840,6 +917,13 @@ export default function Home() {
         if (!username) {
           setIncomingTransactions([]);
           return;
+        }
+
+        // Check cache first - state may have been initialized from it
+        const cached = getCachedIncomingTransactions(username);
+        if (cached !== null) {
+          // Use cached data, refresh in background
+          setIncomingTransactions(cached);
         }
 
         const provider = await getWalletProvider();
@@ -872,6 +956,7 @@ export default function Home() {
           mappedTransactions.length,
           mappedTransactions
         );
+        setCachedIncomingTransactions(username, mappedTransactions);
         setIncomingTransactions(mappedTransactions);
       } catch (error) {
         console.error("Failed to fetch deposits", error);
@@ -963,14 +1048,29 @@ export default function Home() {
           isNew,
           publicKey: publicKeyBase58
         });
+
+        // Store wallet address in module-level cache for future mounts
+        cachedWalletAddress = publicKeyBase58;
         setWalletAddress(publicKeyBase58);
 
+        // Check if we already have cached balance (from previous visit)
         const cachedBalance = getCachedWalletBalance(publicKeyBase58);
-        const balanceLamports =
-          cachedBalance !== null ? cachedBalance : await getWalletBalance();
-        setCachedWalletBalance(publicKeyBase58, balanceLamports);
-        setBalance(balanceLamports);
-        setIsLoading(false);
+
+        if (cachedBalance !== null) {
+          // We have cache - state was already initialized from it
+          // Just refresh in background without loading state
+          setIsLoading(false);
+          void getWalletBalance().then(freshBalance => {
+            setCachedWalletBalance(publicKeyBase58, freshBalance);
+            setBalance(freshBalance);
+          });
+        } else {
+          // First load - need to fetch balance
+          const balanceLamports = await getWalletBalance();
+          setCachedWalletBalance(publicKeyBase58, balanceLamports);
+          setBalance(balanceLamports);
+          setIsLoading(false);
+        }
       } catch (error) {
         console.error("Failed to ensure wallet keypair", error);
         setIsLoading(false);
@@ -988,19 +1088,33 @@ export default function Home() {
 
     let isCancelled = false;
 
-    const loadStarsBalance = async () => {
+    // Check if we have cached stars (state may have been initialized from it)
+    const hasCache = getCachedStarsBalance(walletAddress) !== null;
+
+    // Only show loading if we don't have cache
+    if (!hasCache) {
       setIsStarsLoading(true);
+    } else {
+      // Ensure loading is false if we have cache
+      setIsStarsLoading(false);
+    }
+
+    const loadStarsBalance = async () => {
       try {
         const invoice = await fetchInvoiceState(walletAddress);
         if (isCancelled) return;
         const remaining = Number.isFinite(invoice.remainingStars)
           ? Number(invoice.remainingStars)
           : 0;
+        setCachedStarsBalance(walletAddress, remaining);
         setStarsBalance(remaining);
       } catch (error) {
         if (!isCancelled) {
           console.error("Failed to fetch Stars balance", error);
-          setStarsBalance(0);
+          // Only reset to 0 if we don't have cached data
+          if (!hasCache) {
+            setStarsBalance(0);
+          }
         }
       } finally {
         if (!isCancelled) {

@@ -6,7 +6,8 @@
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.32.1"
+    "@coral-xyz/anchor": "^0.32.1",
+    "lightningcss": "^1.30.2"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",
