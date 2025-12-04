@@ -142,6 +142,9 @@ export const validateInitData = (
 export const createValidationBytesFromRawInitData = (
   rawInitData: string
 ): { validationBytes: Uint8Array; signatureBytes: Uint8Array } => {
+  if (!TELEGRAM_BOT_ID) {
+    throw new Error("NEXT_PUBLIC_TELEGRAM_BOT_ID is not set in .env");
+  }
   const cleanData = cleanInitData(rawInitData);
   const validationString = createValidationString(TELEGRAM_BOT_ID, cleanData);
   const validationBytes = new TextEncoder().encode(validationString);

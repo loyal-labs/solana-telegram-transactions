@@ -38,7 +38,11 @@ import { fetchInvoiceState } from "@/lib/irys/fetch-invoice-state";
 import { topUpDeposit } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
-import { getAccountTransactionHistory } from "@/lib/solana/rpc/get-account-txn-history";
+import {
+  getAccountTransactionHistory,
+  listenForAccountTransactions
+} from "@/lib/solana/rpc/get-account-txn-history";
+import type { WalletTransfer } from "@/lib/solana/rpc/types";
 import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import { verifyAndClaimDeposit } from "@/lib/solana/verify-and-claim-deposit";
 import {
@@ -82,6 +86,42 @@ import type {
 } from "@/types/wallet";
 
 hashes.sha512 = sha512;
+
+const walletTransactionsCache = new Map<string, Transaction[]>();
+const walletBalanceCache = new Map<string, number>();
+const walletBalanceListeners = new Set<(lamports: number) => void>();
+let walletBalanceSubscriptionPromise: Promise<() => Promise<void>> | null =
+  null;
+
+const getCachedWalletBalance = (walletAddress: string | null): number | null => {
+  if (!walletAddress) return null;
+  const cached = walletBalanceCache.get(walletAddress);
+  return typeof cached === "number" ? cached : null;
+};
+
+const setCachedWalletBalance = (
+  walletAddress: string | null,
+  lamports: number
+): void => {
+  if (!walletAddress) return;
+  walletBalanceCache.set(walletAddress, lamports);
+};
+
+const ensureWalletBalanceSubscription = async (walletAddress: string) => {
+  if (walletBalanceSubscriptionPromise) {
+    return walletBalanceSubscriptionPromise;
+  }
+
+  walletBalanceSubscriptionPromise = subscribeToWalletBalance(lamports => {
+    setCachedWalletBalance(walletAddress, lamports);
+    walletBalanceListeners.forEach(listener => listener(lamports));
+  }).catch(error => {
+    walletBalanceSubscriptionPromise = null;
+    throw error;
+  });
+
+  return walletBalanceSubscriptionPromise;
+};
 
 export default function Home() {
   const rawInitData = useRawInitData();
@@ -312,74 +352,98 @@ export default function Home() {
     }
   }, []);
 
-  const refreshWalletBalance = useCallback(async () => {
-    try {
-      const balanceLamports = await getWalletBalance();
-      setBalance(balanceLamports);
-    } catch (error) {
-      console.error("Failed to refresh wallet balance", error);
-    }
-  }, []);
+  const refreshWalletBalance = useCallback(
+    async (forceRefresh = false) => {
+      try {
+        const balanceLamports = await getWalletBalance(forceRefresh);
+        setCachedWalletBalance(walletAddress, balanceLamports);
+        setBalance(balanceLamports);
+      } catch (error) {
+        console.error("Failed to refresh wallet balance", error);
+      }
+    },
+    [walletAddress]
+  );
 
-  const loadWalletTransactions = useCallback(async () => {
-    if (!walletAddress) return;
+  const mapTransferToTransaction = useCallback(
+    (transfer: WalletTransfer): Transaction => {
+      const isIncoming = transfer.direction === "in";
+      const counterparty =
+        transfer.counterparty ||
+        (isIncoming ? "Unknown sender" : "Unknown recipient");
 
-    setIsFetchingTransactions(true);
-    try {
-      const { transfers } = await getAccountTransactionHistory(
-        new PublicKey(walletAddress),
-        {
-          limit: 10,
-          onlySystemTransfers: false
+      return {
+        id: transfer.signature,
+        type: isIncoming ? "incoming" : "outgoing",
+        transferType: transfer.type,
+        amountLamports: transfer.amountLamports,
+        sender: isIncoming ? counterparty : undefined,
+        recipient: !isIncoming ? counterparty : undefined,
+        timestamp: transfer.timestamp ?? Date.now(),
+        networkFeeLamports: transfer.feeLamports,
+        signature: transfer.signature,
+        status: transfer.status === "failed" ? "error" : "completed"
+      };
+    },
+    []
+  );
+
+  const loadWalletTransactions = useCallback(
+    async ({ force = false }: { force?: boolean } = {}) => {
+      if (!walletAddress) return;
+
+      if (!force) {
+        const cached = walletTransactionsCache.get(walletAddress);
+        if (cached) {
+          setWalletTransactions(cached);
+          return;
         }
-      );
+      }
 
-      const mappedTransactions: Transaction[] = transfers.map(transfer => {
-        const isIncoming = transfer.direction === "in";
-        const counterparty =
-          transfer.counterparty ||
-          (isIncoming ? "Unknown sender" : "Unknown recipient");
-
-        return {
-          id: transfer.signature,
-          type: isIncoming ? "incoming" : "outgoing",
-          transferType: transfer.type,
-          amountLamports: transfer.amountLamports,
-          sender: isIncoming ? counterparty : undefined,
-          recipient: !isIncoming ? counterparty : undefined,
-          timestamp: transfer.timestamp ?? Date.now(),
-          networkFeeLamports: transfer.feeLamports,
-          signature: transfer.signature,
-          status: transfer.status === "failed" ? "error" : "completed"
-        };
-      });
-
-      setWalletTransactions(prev => {
-        const pending = prev.filter(
-          tx => tx.type === "pending" && !tx.signature
-        );
-        const existingBySignature = new Map(
-          prev
-            .filter(tx => tx.signature)
-            .map(tx => [tx.signature as string, tx])
+      setIsFetchingTransactions(true);
+      try {
+        const { transfers } = await getAccountTransactionHistory(
+          new PublicKey(walletAddress),
+          {
+            limit: 10,
+            onlySystemTransfers: false
+          }
         );
 
-        const merged = mappedTransactions.map(tx => {
-          if (!tx.signature) return tx;
-          const existing = existingBySignature.get(tx.signature);
-          return existing ? { ...existing, ...tx } : tx;
+        const mappedTransactions: Transaction[] = transfers.map(
+          mapTransferToTransaction
+        );
+
+        setWalletTransactions(prev => {
+          const pending = prev.filter(
+            tx => tx.type === "pending" && !tx.signature
+          );
+          const existingBySignature = new Map(
+            prev
+              .filter(tx => tx.signature)
+              .map(tx => [tx.signature as string, tx])
+          );
+
+          const merged = mappedTransactions.map(tx => {
+            if (!tx.signature) return tx;
+            const existing = existingBySignature.get(tx.signature);
+            return existing ? { ...existing, ...tx } : tx;
+          });
+
+          const combined = [...pending, ...merged].sort(
+            (a, b) => b.timestamp - a.timestamp
+          );
+          walletTransactionsCache.set(walletAddress, combined);
+          return combined;
         });
-
-        const combined = [...pending, ...merged];
-        return combined.sort((a, b) => b.timestamp - a.timestamp);
-      });
-
-    } catch (error) {
-      console.error("Failed to fetch wallet transactions", error);
-    } finally {
-      setIsFetchingTransactions(false);
-    }
-  }, [walletAddress]);
+      } catch (error) {
+        console.error("Failed to fetch wallet transactions", error);
+      } finally {
+        setIsFetchingTransactions(false);
+      }
+    },
+    [mapTransferToTransaction, walletAddress]
+  );
 
   const _handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
@@ -391,7 +455,7 @@ export default function Home() {
     setIsRefreshing(true);
     try {
       // Refresh wallet balance
-      await refreshWalletBalance();
+      await refreshWalletBalance(true);
 
       try {
         const latestPrice = await fetchSolUsdPrice();
@@ -401,7 +465,7 @@ export default function Home() {
       }
 
       try {
-        await loadWalletTransactions();
+        await loadWalletTransactions({ force: true });
       } catch (txError) {
         console.error("Failed to refresh wallet transactions", txError);
       }
@@ -490,9 +554,9 @@ export default function Home() {
         throw new Error("Invalid recipient");
       }
 
-      await refreshWalletBalance();
+      await refreshWalletBalance(true);
       if (signature) {
-        void loadWalletTransactions();
+        void loadWalletTransactions({ force: true });
       }
 
       if (hapticFeedback.notificationOccurred.isAvailable()) {
@@ -683,7 +747,7 @@ export default function Home() {
           prev.filter(tx => tx.id !== transactionId)
         );
 
-        await refreshWalletBalance();
+        await refreshWalletBalance(true);
 
         if (hapticFeedback.notificationOccurred.isAvailable()) {
           hapticFeedback.notificationOccurred("success");
@@ -710,6 +774,10 @@ export default function Home() {
 
   useEffect(() => {
     if (rawInitData) {
+      if (!TELEGRAM_BOT_ID) {
+        console.error("TELEGRAM_BOT_ID is not set in .env");
+        return;
+      }
       const cleanInitDataResult = cleanInitData(rawInitData);
       const validationString = createValidationString(
         TELEGRAM_BOT_ID,
@@ -897,7 +965,10 @@ export default function Home() {
         });
         setWalletAddress(publicKeyBase58);
 
-        const balanceLamports = await getWalletBalance();
+        const cachedBalance = getCachedWalletBalance(publicKeyBase58);
+        const balanceLamports =
+          cachedBalance !== null ? cachedBalance : await getWalletBalance();
+        setCachedWalletBalance(publicKeyBase58, balanceLamports);
         setBalance(balanceLamports);
         setIsLoading(false);
       } catch (error) {
@@ -950,16 +1021,64 @@ export default function Home() {
     if (!walletAddress) return;
 
     let isCancelled = false;
+
+    const handleBalanceUpdate = (lamports: number) => {
+      if (isCancelled) return;
+      setBalance(prev => (prev === lamports ? prev : lamports));
+    };
+
+    const cachedBalance = getCachedWalletBalance(walletAddress);
+    if (cachedBalance !== null) {
+      setBalance(prev => (prev === cachedBalance ? prev : cachedBalance));
+    }
+
+    walletBalanceListeners.add(handleBalanceUpdate);
+
+    void ensureWalletBalanceSubscription(walletAddress).catch(error => {
+      console.error("Failed to subscribe to wallet balance", error);
+    });
+
+    return () => {
+      isCancelled = true;
+      walletBalanceListeners.delete(handleBalanceUpdate);
+    };
+  }, [walletAddress]);
+
+  useEffect(() => {
+    if (!walletAddress) return;
+
+    let isCancelled = false;
     let unsubscribe: (() => Promise<void>) | null = null;
 
     void (async () => {
       try {
-        unsubscribe = await subscribeToWalletBalance(lamports => {
-          if (isCancelled) return;
-          setBalance(prev => (prev === lamports ? prev : lamports));
-        });
+        unsubscribe = await listenForAccountTransactions(
+          new PublicKey(walletAddress),
+          transfer => {
+            if (isCancelled) return;
+            const mapped = mapTransferToTransaction(transfer);
+            setWalletTransactions(prev => {
+              const next = [...prev];
+
+              const matchIndex = mapped.signature
+                ? next.findIndex(tx => tx.signature === mapped.signature)
+                : next.findIndex(tx => tx.id === mapped.id);
+
+              if (matchIndex >= 0) {
+                next[matchIndex] = { ...next[matchIndex], ...mapped };
+              } else {
+                next.unshift(mapped);
+              }
+
+              const sorted = next.sort((a, b) => b.timestamp - a.timestamp);
+              walletTransactionsCache.set(walletAddress, sorted);
+              return sorted;
+            });
+          },
+          { onlySystemTransfers: false }
+        );
       } catch (error) {
-        console.error("Failed to subscribe to wallet balance", error);
+        console.error("Failed to subscribe to transaction updates", error);
       }
     })();
 
@@ -969,7 +1088,7 @@ export default function Home() {
         void unsubscribe();
       }
     };
-  }, [walletAddress]);
+  }, [mapTransferToTransaction, walletAddress]);
 
   useEffect(() => {
     if (!mainButtonAvailable) {

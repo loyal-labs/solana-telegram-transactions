@@ -1,11 +1,9 @@
-import { web3 } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 
 import { getEphemeralConnection } from "./connection";
 import {
   PRICE_PROGRAM_ID,
   SOLANA_FEED,
-  SOLANA_PYTH_LAZER_ID,
   SOLANA_PYTH_LAZER_PRICE_OFFSET,
 } from "./constants";
 
