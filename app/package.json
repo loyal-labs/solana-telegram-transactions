@@ -38,6 +38,9 @@
     "tailwind-merge": "^3.3.1",
     "urql": "^5.0.1"
   },
+  "optionalDependencies": {
+    "@tailwindcss/oxide-linux-x64-gnu": "^4"
+  },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
