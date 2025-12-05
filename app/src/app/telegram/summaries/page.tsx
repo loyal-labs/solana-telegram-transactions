@@ -5,7 +5,7 @@ import { ChevronRight, CircleHelp, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-// Mock chat data - placeholder for now
+// Mock chat data - matches the summaries in SummaryFeed.tsx
 const MOCK_CHATS = [
   {
     id: "1",
@@ -15,7 +15,7 @@ const MOCK_CHATS = [
   },
   {
     id: "2",
-    title: "X Live 🎻 classic",
+    title: "X Live classic",
     subtitle: "Latest updates and discussions about live performances",
   },
   {
@@ -32,41 +32,6 @@ const MOCK_CHATS = [
     id: "5",
     title: "Solana Developers",
     subtitle: "Building on Solana blockchain",
-  },
-  {
-    id: "6",
-    title: "UX Live 🎻 classic",
-    subtitle: "User experience design discussions",
-  },
-  {
-    id: "7",
-    title: "Crypto Trading",
-    subtitle: "Market analysis and trading strategies",
-  },
-  {
-    id: "8",
-    title: "Web3 Builders",
-    subtitle: "Decentralized application development",
-  },
-  {
-    id: "9",
-    title: "DeFi Discussion",
-    subtitle: "Decentralized finance protocols and strategies",
-  },
-  {
-    id: "10",
-    title: "NFT Collectors",
-    subtitle: "Digital art and collectibles marketplace",
-  },
-  {
-    id: "11",
-    title: "Blockchain News",
-    subtitle: "Latest news from the blockchain ecosystem",
-  },
-  {
-    id: "12",
-    title: "Smart Contracts",
-    subtitle: "Smart contract development and security",
   },
 ];
 

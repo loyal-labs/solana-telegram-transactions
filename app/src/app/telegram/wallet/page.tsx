@@ -12,7 +12,7 @@ import {
   secondaryButton,
   useRawInitData,
   useSignal,
-  viewport
+  viewport,
 } from "@telegram-apps/sdk-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, ChevronRight, Clock, Copy } from "lucide-react";
@@ -26,7 +26,7 @@ import ReceiveSheet from "@/components/wallet/ReceiveSheet";
 import SendSheet, {
   addRecentRecipient,
   isValidSolanaAddress,
-  isValidTelegramUsername
+  isValidTelegramUsername,
 } from "@/components/wallet/SendSheet";
 import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
@@ -34,7 +34,7 @@ import {
   DISPLAY_CURRENCY_KEY,
   SOL_PRICE_USD,
   TELEGRAM_BOT_ID,
-  TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
+  TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
 } from "@/lib/constants";
 import { fetchInvoiceState } from "@/lib/irys/fetch-invoice-state";
 import { topUpDeposit } from "@/lib/solana/deposits";
@@ -42,7 +42,7 @@ import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import {
   getAccountTransactionHistory,
-  listenForAccountTransactions
+  listenForAccountTransactions,
 } from "@/lib/solana/rpc/get-account-txn-history";
 import type { WalletTransfer } from "@/lib/solana/rpc/types";
 import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
@@ -52,7 +52,7 @@ import {
   formatBalance,
   formatSenderAddress,
   formatTransactionAmount,
-  formatUsdValue
+  formatUsdValue,
 } from "@/lib/solana/wallet/formatters";
 import {
   getWalletBalance,
@@ -60,7 +60,8 @@ import {
   getWalletProvider,
   getWalletPublicKey,
   sendSolTransaction,
-  subscribeToWalletBalance} from "@/lib/solana/wallet/wallet-details";
+  subscribeToWalletBalance,
+} from "@/lib/solana/wallet/wallet-details";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
 import { ensureWalletKeypair } from "@/lib/solana/wallet/wallet-keypair-logic";
 import { initTelegram, sendString } from "@/lib/telegram/mini-app";
@@ -68,17 +69,17 @@ import {
   hideMainButton,
   hideSecondaryButton,
   showMainButton,
-  showReceiveShareButton
+  showReceiveShareButton,
 } from "@/lib/telegram/mini-app/buttons";
 import {
   getCloudValue,
-  setCloudValue
+  setCloudValue,
 } from "@/lib/telegram/mini-app/cloud-storage";
 import {
   cleanInitData,
   createValidationBytesFromRawInitData,
   createValidationString,
-  validateInitData
+  validateInitData,
 } from "@/lib/telegram/mini-app/init-data-transform";
 import { parseUsernameFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
 import { openInvoice } from "@/lib/telegram/mini-app/invoice";
@@ -88,7 +89,7 @@ import type {
   IncomingTransaction,
   Transaction,
   TransactionDetailsData,
-  TransactionType
+  TransactionType,
 } from "@/types/wallet";
 
 hashes.sha512 = sha512;
@@ -99,7 +100,9 @@ const walletBalanceListeners = new Set<(lamports: number) => void>();
 let walletBalanceSubscriptionPromise: Promise<() => Promise<void>> | null =
   null;
 
-const getCachedWalletBalance = (walletAddress: string | null): number | null => {
+const getCachedWalletBalance = (
+  walletAddress: string | null
+): number | null => {
   if (!walletAddress) return null;
   const cached = walletBalanceCache.get(walletAddress);
   return typeof cached === "number" ? cached : null;
@@ -118,10 +121,10 @@ const ensureWalletBalanceSubscription = async (walletAddress: string) => {
     return walletBalanceSubscriptionPromise;
   }
 
-  walletBalanceSubscriptionPromise = subscribeToWalletBalance(lamports => {
+  walletBalanceSubscriptionPromise = subscribeToWalletBalance((lamports) => {
     setCachedWalletBalance(walletAddress, lamports);
-    walletBalanceListeners.forEach(listener => listener(lamports));
-  }).catch(error => {
+    walletBalanceListeners.forEach((listener) => listener(lamports));
+  }).catch((error) => {
     walletBalanceSubscriptionPromise = null;
     throw error;
   });
@@ -157,7 +160,10 @@ const getCachedStarsBalance = (walletAddress: string | null): number | null => {
   return typeof cached === "number" ? cached : null;
 };
 
-const setCachedStarsBalance = (walletAddress: string | null, stars: number): void => {
+const setCachedStarsBalance = (
+  walletAddress: string | null,
+  stars: number
+): void => {
   if (!walletAddress) return;
   starsBalanceCache.set(walletAddress, stars);
 };
@@ -166,12 +172,17 @@ const setCachedStarsBalance = (walletAddress: string | null, stars: number): voi
 let cachedUsername: string | null = null;
 const incomingTransactionsCache = new Map<string, IncomingTransaction[]>();
 
-const getCachedIncomingTransactions = (username: string | null): IncomingTransaction[] | null => {
+const getCachedIncomingTransactions = (
+  username: string | null
+): IncomingTransaction[] | null => {
   if (!username) return null;
   return incomingTransactionsCache.get(username) ?? null;
 };
 
-const setCachedIncomingTransactions = (username: string | null, txns: IncomingTransaction[]): void => {
+const setCachedIncomingTransactions = (
+  username: string | null,
+  txns: IncomingTransaction[]
+): void => {
   if (!username) return;
   cachedUsername = username;
   incomingTransactionsCache.set(username, txns);
@@ -194,27 +205,33 @@ const hasCachedWalletData = (): boolean => {
 export default function Home() {
   const rawInitData = useRawInitData();
   const { bottom: _safeBottom } = useTelegramSafeArea();
+  // Get device safe area only (not content safe area) to align with native header buttons
+  const safeAreaInsetTop = useSignal(viewport.safeAreaInsetTop);
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
   const [sendStep, setSendStep] = useState<1 | 2 | 3 | 4>(1);
-  const [sentAmountSol, setSentAmountSol] = useState<number | undefined>(undefined);
+  const [sentAmountSol, setSentAmountSol] = useState<number | undefined>(
+    undefined
+  );
   const [sendError, setSendError] = useState<string | null>(null);
   const [isReceiveSheetOpen, setReceiveSheetOpen] = useState(false);
   const [isActivitySheetOpen, setActivitySheetOpen] = useState(false);
-  const [
-    isTransactionDetailsSheetOpen,
-    setTransactionDetailsSheetOpen
-  ] = useState(false);
+  const [isTransactionDetailsSheetOpen, setTransactionDetailsSheetOpen] =
+    useState(false);
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string | null>(() => cachedWalletAddress);
+  const [walletAddress, setWalletAddress] = useState<string | null>(
+    () => cachedWalletAddress
+  );
   const [balance, setBalance] = useState<number | null>(() =>
     cachedWalletAddress ? getCachedWalletBalance(cachedWalletAddress) : null
   );
   const [starsBalance, setStarsBalance] = useState<number>(() =>
-    cachedWalletAddress ? (getCachedStarsBalance(cachedWalletAddress) ?? 0) : 0
+    cachedWalletAddress ? getCachedStarsBalance(cachedWalletAddress) ?? 0 : 0
   );
-  const [isStarsLoading, setIsStarsLoading] = useState(() =>
-    !cachedWalletAddress || getCachedStarsBalance(cachedWalletAddress) === null
+  const [isStarsLoading, setIsStarsLoading] = useState(
+    () =>
+      !cachedWalletAddress ||
+      getCachedStarsBalance(cachedWalletAddress) === null
   );
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   const [isLoading, setIsLoading] = useState(() => !hasCachedWalletData());
@@ -222,20 +239,21 @@ export default function Home() {
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
   const [incomingTransactions, setIncomingTransactions] = useState<
     IncomingTransaction[]
-  >(() => (cachedUsername ? getCachedIncomingTransactions(cachedUsername) ?? [] : []));
+  >(() =>
+    cachedUsername ? getCachedIncomingTransactions(cachedUsername) ?? [] : []
+  );
   const [walletTransactions, setWalletTransactions] = useState<Transaction[]>(
-    () => (cachedWalletAddress ? walletTransactionsCache.get(cachedWalletAddress) ?? [] : [])
+    () =>
+      cachedWalletAddress
+        ? walletTransactionsCache.get(cachedWalletAddress) ?? []
+        : []
   );
   const [isFetchingTransactions, setIsFetchingTransactions] = useState(false);
-  const [
-    selectedTransaction,
-    setSelectedTransaction
-  ] = useState<TransactionDetailsData | null>(null);
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<TransactionDetailsData | null>(null);
   // Keep original incoming transaction for claim functionality
-  const [
-    selectedIncomingTransaction,
-    setSelectedIncomingTransaction
-  ] = useState<IncomingTransaction | null>(null);
+  const [selectedIncomingTransaction, setSelectedIncomingTransaction] =
+    useState<IncomingTransaction | null>(null);
   const [isSendFormValid, setIsSendFormValid] = useState(false);
   const [isClaimingTransaction, setIsClaimingTransaction] = useState(false);
   const [claimingTransactionId, setClaimingTransactionId] = useState<
@@ -246,7 +264,7 @@ export default function Home() {
     recipient: string;
   }>({
     amount: "",
-    recipient: ""
+    recipient: "",
   });
   const [isSendingTransaction, setIsSendingTransaction] = useState(false);
   const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">(
@@ -254,8 +272,12 @@ export default function Home() {
   );
   const [addressCopied, setAddressCopied] = useState(false);
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
-  const [solPriceUsd, setSolPriceUsd] = useState<number | null>(() => getCachedSolPrice());
-  const [isSolPriceLoading, setIsSolPriceLoading] = useState(() => getCachedSolPrice() === null);
+  const [solPriceUsd, setSolPriceUsd] = useState<number | null>(() =>
+    getCachedSolPrice()
+  );
+  const [isSolPriceLoading, setIsSolPriceLoading] = useState(
+    () => getCachedSolPrice() === null
+  );
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(
@@ -265,7 +287,9 @@ export default function Home() {
 
   // Track seen transaction IDs to detect new ones for animation
   const seenTransactionIdsRef = useRef<Set<string>>(new Set());
-  const [newTransactionIds, setNewTransactionIds] = useState<Set<string>>(new Set());
+  const [newTransactionIds, setNewTransactionIds] = useState<Set<string>>(
+    new Set()
+  );
 
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -329,7 +353,7 @@ export default function Home() {
 
       const response = await fetch(endpoint, {
         method: "POST",
-        body: new TextEncoder().encode(rawInitData)
+        body: new TextEncoder().encode(rawInitData),
       });
 
       if (!response.ok) {
@@ -367,7 +391,9 @@ export default function Home() {
         type: "incoming",
         amountLamports: transaction.amountLamports,
         sender: transaction.sender,
-        senderUsername: transaction.username ? `@${transaction.username}` : undefined,
+        senderUsername: transaction.username
+          ? `@${transaction.username}`
+          : undefined,
         status: "pending", // Incoming claimable transactions are pending
         timestamp: Date.now(), // TODO: Get actual timestamp from transaction
       };
@@ -391,15 +417,19 @@ export default function Home() {
         amountLamports: transaction.amountLamports,
         transferType: transaction.transferType,
         recipient: transaction.recipient,
-        recipientUsername: transaction.recipient?.startsWith("@") ? transaction.recipient : undefined,
+        recipientUsername: transaction.recipient?.startsWith("@")
+          ? transaction.recipient
+          : undefined,
         sender: transaction.sender,
-        senderUsername: transaction.sender?.startsWith("@") ? transaction.sender : undefined,
+        senderUsername: transaction.sender?.startsWith("@")
+          ? transaction.sender
+          : undefined,
         status:
           transaction.status ??
           (transaction.type === "pending" ? "pending" : "completed"),
         timestamp: transaction.timestamp,
         networkFeeLamports: transaction.networkFeeLamports,
-        signature: transaction.signature
+        signature: transaction.signature,
       };
       setSelectedTransaction(detailsData);
       setTransactionDetailsSheetOpen(true);
@@ -462,7 +492,7 @@ export default function Home() {
         timestamp: transfer.timestamp ?? Date.now(),
         networkFeeLamports: transfer.feeLamports,
         signature: transfer.signature,
-        status: transfer.status === "failed" ? "error" : "completed"
+        status: transfer.status === "failed" ? "error" : "completed",
       };
     },
     []
@@ -489,7 +519,7 @@ export default function Home() {
           new PublicKey(walletAddress),
           {
             limit: 10,
-            onlySystemTransfers: false
+            onlySystemTransfers: false,
           }
         );
 
@@ -497,17 +527,17 @@ export default function Home() {
           mapTransferToTransaction
         );
 
-        setWalletTransactions(prev => {
+        setWalletTransactions((prev) => {
           const pending = prev.filter(
-            tx => tx.type === "pending" && !tx.signature
+            (tx) => tx.type === "pending" && !tx.signature
           );
           const existingBySignature = new Map(
             prev
-              .filter(tx => tx.signature)
-              .map(tx => [tx.signature as string, tx])
+              .filter((tx) => tx.signature)
+              .map((tx) => [tx.signature as string, tx])
           );
 
-          const merged = mappedTransactions.map(tx => {
+          const merged = mappedTransactions.map((tx) => {
             if (!tx.signature) return tx;
             const existing = existingBySignature.get(tx.signature);
             return existing ? { ...existing, ...tx } : tx;
@@ -563,7 +593,7 @@ export default function Home() {
           const deposits = await fetchDeposits(provider, username);
 
           const mappedTransactions: IncomingTransaction[] = deposits.map(
-            deposit => {
+            (deposit) => {
               const senderBase58 =
                 typeof (deposit.user as { toBase58?: () => string })
                   .toBase58 === "function"
@@ -574,7 +604,7 @@ export default function Home() {
                 id: `${senderBase58}-${deposit.lastNonce}`,
                 amountLamports: deposit.amount,
                 sender: senderBase58,
-                username: username
+                username: username,
               };
             }
           );
@@ -662,7 +692,10 @@ export default function Home() {
       }
 
       // Set error message and transition to step 4
-      const errorMessage = error instanceof Error ? error.message : "Something went wrong. Please try again.";
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again.";
       setSendError(errorMessage);
       setSendStep(4);
     } finally {
@@ -673,7 +706,7 @@ export default function Home() {
     isSendingTransaction,
     sendFormValues,
     loadWalletTransactions,
-    refreshWalletBalance
+    refreshWalletBalance,
   ]);
 
   const handleReceiveSheetChange = useCallback((open: boolean) => {
@@ -714,9 +747,9 @@ export default function Home() {
     try {
       const address =
         walletAddress ??
-        (await getWalletPublicKey().then(publicKey => {
+        (await getWalletPublicKey().then((publicKey) => {
           const base58 = publicKey.toBase58();
-          setWalletAddress(prev => prev ?? base58);
+          setWalletAddress((prev) => prev ?? base58);
           return base58;
         }));
 
@@ -734,7 +767,7 @@ export default function Home() {
         try {
           await navigator.share({
             title: "My Solana address",
-            text: address
+            text: address,
           });
           return;
         } catch (shareError) {
@@ -781,7 +814,7 @@ export default function Home() {
       }
 
       const transaction = incomingTransactions.find(
-        tx => tx.id === transactionId
+        (tx) => tx.id === transactionId
       );
       if (!transaction) {
         console.warn("Transaction not found for approval:", transactionId);
@@ -799,10 +832,8 @@ export default function Home() {
         const wallet = new SimpleWallet(keypair);
         const recipientPublicKey = provider.publicKey;
 
-        const {
-          validationBytes,
-          signatureBytes
-        } = createValidationBytesFromRawInitData(rawInitData);
+        const { validationBytes, signatureBytes } =
+          createValidationBytesFromRawInitData(rawInitData);
         const senderPublicKey = new PublicKey(transaction.sender);
 
         const username = transaction.username;
@@ -826,8 +857,8 @@ export default function Home() {
           TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
         );
 
-        setIncomingTransactions(prev =>
-          prev.filter(tx => tx.id !== transactionId)
+        setIncomingTransactions((prev) =>
+          prev.filter((tx) => tx.id !== transactionId)
         );
 
         await refreshWalletBalance(true);
@@ -845,7 +876,10 @@ export default function Home() {
         }
 
         // Set error message and show error state
-        const errorMessage = error instanceof Error ? error.message : "Something went wrong. Please try again.";
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Something went wrong. Please try again.";
         setClaimError(errorMessage);
       } finally {
         setIsClaimingTransaction(false);
@@ -897,9 +931,12 @@ export default function Home() {
           return; // Success, exit
         } catch (error) {
           retryCount++;
-          console.error(`Failed to fetch SOL price (attempt ${retryCount}/${MAX_RETRIES})`, error);
+          console.error(
+            `Failed to fetch SOL price (attempt ${retryCount}/${MAX_RETRIES})`,
+            error
+          );
           if (retryCount < MAX_RETRIES && isMounted) {
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
           }
         }
       }
@@ -950,7 +987,7 @@ export default function Home() {
         }
 
         const mappedTransactions: IncomingTransaction[] = deposits.map(
-          deposit => {
+          (deposit) => {
             const senderBase58 =
               typeof (deposit.user as { toBase58?: () => string }).toBase58 ===
               "function"
@@ -961,7 +998,7 @@ export default function Home() {
               id: `${senderBase58}-${deposit.lastNonce}`,
               amountLamports: deposit.amount,
               sender: senderBase58,
-              username: deposit.username
+              username: deposit.username,
             };
           }
         );
@@ -1024,7 +1061,7 @@ export default function Home() {
 
     if (isMobile) {
       if (viewport.requestFullscreen.isAvailable()) {
-        void viewport.requestFullscreen().catch(error => {
+        void viewport.requestFullscreen().catch((error) => {
           console.warn("Failed to enable fullscreen:", error);
         });
       }
@@ -1078,7 +1115,7 @@ export default function Home() {
         const publicKeyBase58 = keypair.publicKey.toBase58();
         console.log("Wallet keypair ready", {
           isNew,
-          publicKey: publicKeyBase58
+          publicKey: publicKeyBase58,
         });
 
         // Store wallet address in module-level cache for future mounts
@@ -1092,7 +1129,7 @@ export default function Home() {
           // We have cache - state was already initialized from it
           // Just refresh in background without loading state
           setIsLoading(false);
-          void getWalletBalance().then(freshBalance => {
+          void getWalletBalance().then((freshBalance) => {
             setCachedWalletBalance(publicKeyBase58, freshBalance);
             setBalance(freshBalance);
           });
@@ -1170,17 +1207,17 @@ export default function Home() {
 
     const handleBalanceUpdate = (lamports: number) => {
       if (isCancelled) return;
-      setBalance(prev => (prev === lamports ? prev : lamports));
+      setBalance((prev) => (prev === lamports ? prev : lamports));
     };
 
     const cachedBalance = getCachedWalletBalance(walletAddress);
     if (cachedBalance !== null) {
-      setBalance(prev => (prev === cachedBalance ? prev : cachedBalance));
+      setBalance((prev) => (prev === cachedBalance ? prev : cachedBalance));
     }
 
     walletBalanceListeners.add(handleBalanceUpdate);
 
-    void ensureWalletBalanceSubscription(walletAddress).catch(error => {
+    void ensureWalletBalanceSubscription(walletAddress).catch((error) => {
       console.error("Failed to subscribe to wallet balance", error);
     });
 
@@ -1200,15 +1237,15 @@ export default function Home() {
       try {
         unsubscribe = await listenForAccountTransactions(
           new PublicKey(walletAddress),
-          transfer => {
+          (transfer) => {
             if (isCancelled) return;
             const mapped = mapTransferToTransaction(transfer);
-            setWalletTransactions(prev => {
+            setWalletTransactions((prev) => {
               const next = [...prev];
 
               const matchIndex = mapped.signature
-                ? next.findIndex(tx => tx.signature === mapped.signature)
-                : next.findIndex(tx => tx.id === mapped.id);
+                ? next.findIndex((tx) => tx.signature === mapped.signature)
+                : next.findIndex((tx) => tx.id === mapped.id);
 
               if (matchIndex >= 0) {
                 next[matchIndex] = { ...next[matchIndex], ...mapped };
@@ -1269,7 +1306,7 @@ export default function Home() {
             setClaimError(null);
           },
           isEnabled: true,
-          showLoader: false
+          showLoader: false,
         });
       } else if (selectedIncomingTransaction) {
         // Only show Claim button for incoming (claimable) transactions
@@ -1279,13 +1316,14 @@ export default function Home() {
             text: "Claim",
             onClick: () => {}, // No-op during loading
             isEnabled: false,
-            showLoader: true
+            showLoader: true,
           });
         } else {
           // Show only Claim button (no Ignore)
           showMainButton({
             text: "Claim",
-            onClick: () => handleApproveTransaction(selectedIncomingTransaction.id)
+            onClick: () =>
+              handleApproveTransaction(selectedIncomingTransaction.id),
           });
         }
       } else {
@@ -1302,7 +1340,7 @@ export default function Home() {
             if (isSendFormValid) setSendStep(2);
           },
           isEnabled: isSendFormValid,
-          showLoader: false
+          showLoader: false,
         });
       } else if (sendStep === 2) {
         showMainButton({
@@ -1311,14 +1349,14 @@ export default function Home() {
             if (isSendFormValid) setSendStep(3);
           },
           isEnabled: isSendFormValid,
-          showLoader: false
+          showLoader: false,
         });
       } else if (sendStep === 3) {
         showMainButton({
           text: "Confirm and Send",
           onClick: handleSubmitSend,
           isEnabled: isSendFormValid && !isSendingTransaction,
-          showLoader: isSendingTransaction
+          showLoader: isSendingTransaction,
         });
       } else if (sendStep === 4) {
         if (sendError) {
@@ -1329,7 +1367,7 @@ export default function Home() {
               setSendSheetOpen(false);
             },
             isEnabled: true,
-            showLoader: false
+            showLoader: false,
           });
         } else {
           // Success step - show Transaction details button
@@ -1346,7 +1384,9 @@ export default function Home() {
                   type: "outgoing",
                   amountLamports: Math.round(sentAmountSol * LAMPORTS_PER_SOL),
                   recipient: trimmedRecipient,
-                  recipientUsername: trimmedRecipient.startsWith("@") ? trimmedRecipient : undefined,
+                  recipientUsername: trimmedRecipient.startsWith("@")
+                    ? trimmedRecipient
+                    : undefined,
                   status: "completed",
                   timestamp: Date.now(),
                 };
@@ -1356,7 +1396,7 @@ export default function Home() {
               }
             },
             isEnabled: true,
-            showLoader: false
+            showLoader: false,
           });
         }
       }
@@ -1393,7 +1433,7 @@ export default function Home() {
     sendFormValues,
     showClaimSuccess,
     claimError,
-    sendError
+    sendError,
   ]);
 
   const formattedUsdBalance = formatUsdValue(balance, solPriceUsd);
@@ -1446,7 +1486,9 @@ export default function Home() {
 
   // Detect new transactions for animation
   useEffect(() => {
-    const currentIds = new Set(limitedActivityItems.map(item => item.transaction.id));
+    const currentIds = new Set(
+      limitedActivityItems.map((item) => item.transaction.id)
+    );
     const previousIds = seenTransactionIdsRef.current;
 
     // Find newly added transactions
@@ -1479,11 +1521,12 @@ export default function Home() {
         className="min-h-screen text-white font-sans overflow-hidden relative flex flex-col"
         style={{ background: "#16161a" }}
       >
-
         {/* Main Content */}
         <div
           className="relative flex-1 flex flex-col w-full"
-          style={{ paddingTop: "calc(var(--app-safe-top, 20px) + 16px)" }}
+          style={{
+            paddingTop: `${Math.max(safeAreaInsetTop || 0, 12) + 15}px`,
+          }}
         >
           {/* Balance Section */}
           <div className="flex flex-col items-center pb-6 px-6">
@@ -1526,7 +1569,7 @@ export default function Home() {
                   if (hapticFeedback.selectionChanged.isAvailable()) {
                     hapticFeedback.selectionChanged();
                   }
-                  setDisplayCurrency(prev => {
+                  setDisplayCurrency((prev) => {
                     const newCurrency = prev === "USD" ? "SOL" : "USD";
                     cachedDisplayCurrency = newCurrency;
                     void setCloudValue(DISPLAY_CURRENCY_KEY, newCurrency);
@@ -1537,10 +1580,14 @@ export default function Home() {
               >
                 <div className="flex items-center leading-[48px] gap-2">
                   <NumberFlow
-                    value={displayCurrency === "USD" ? usdBalanceNumeric : solBalanceNumeric}
+                    value={
+                      displayCurrency === "USD"
+                        ? usdBalanceNumeric
+                        : solBalanceNumeric
+                    }
                     format={{
                       minimumFractionDigits: displayCurrency === "USD" ? 2 : 4,
-                      maximumFractionDigits: displayCurrency === "USD" ? 2 : 4
+                      maximumFractionDigits: displayCurrency === "USD" ? 2 : 4,
                     }}
                     prefix={displayCurrency === "USD" ? "$" : undefined}
                     suffix={displayCurrency === "SOL" ? " SOL" : undefined}
@@ -1555,10 +1602,14 @@ export default function Home() {
               {/* Secondary Amount */}
               <div className="text-base text-white/60 leading-5">
                 <NumberFlow
-                  value={displayCurrency === "USD" ? solBalanceNumeric : usdBalanceNumeric}
+                  value={
+                    displayCurrency === "USD"
+                      ? solBalanceNumeric
+                      : usdBalanceNumeric
+                  }
                   format={{
                     minimumFractionDigits: displayCurrency === "USD" ? 4 : 2,
-                    maximumFractionDigits: displayCurrency === "USD" ? 4 : 2
+                    maximumFractionDigits: displayCurrency === "USD" ? 4 : 2,
                   }}
                   prefix={displayCurrency === "SOL" ? "$" : undefined}
                   suffix={displayCurrency === "USD" ? " SOL" : undefined}
@@ -1598,7 +1649,7 @@ export default function Home() {
                 className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full"
                 style={{
                   background: "rgba(255, 255, 255, 0.06)",
-                  mixBlendMode: "lighten"
+                  mixBlendMode: "lighten",
                 }}
               >
                 {/* Left - Icon */}
@@ -1607,7 +1658,7 @@ export default function Home() {
                     className="w-12 h-12 rounded-full flex items-center justify-center"
                     style={{
                       background: "rgba(255, 255, 255, 0.06)",
-                      mixBlendMode: "lighten"
+                      mixBlendMode: "lighten",
                     }}
                   >
                     <Image
@@ -1635,7 +1686,11 @@ export default function Home() {
 
                 {/* Chevron */}
                 <div className="pl-3 py-2 flex items-center justify-center">
-                  <ChevronRight size={16} strokeWidth={1.5} className="text-white/60" />
+                  <ChevronRight
+                    size={16}
+                    strokeWidth={1.5}
+                    className="text-white/60"
+                  />
                 </div>
               </div>
             ) : (
@@ -1645,7 +1700,7 @@ export default function Home() {
                 className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
                 style={{
                   background: "rgba(255, 255, 255, 0.06)",
-                  mixBlendMode: "lighten"
+                  mixBlendMode: "lighten",
                 }}
               >
                 {/* Left - Icon */}
@@ -1654,7 +1709,7 @@ export default function Home() {
                     className="w-12 h-12 rounded-full flex items-center justify-center"
                     style={{
                       background: "rgba(255, 255, 255, 0.06)",
-                      mixBlendMode: "lighten"
+                      mixBlendMode: "lighten",
                     }}
                   >
                     <Image
@@ -1676,13 +1731,21 @@ export default function Home() {
 
                 {/* Right - Value */}
                 <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
-                  <p className="text-base text-white leading-5">{starsBalance.toLocaleString()}</p>
-                  <p className="text-[13px] text-white/60 leading-4">${(starsBalance * 0.02).toFixed(2)}</p>
+                  <p className="text-base text-white leading-5">
+                    {starsBalance.toLocaleString()}
+                  </p>
+                  <p className="text-[13px] text-white/60 leading-4">
+                    ${(starsBalance * 0.02).toFixed(2)}
+                  </p>
                 </div>
 
                 {/* Chevron */}
                 <div className="pl-3 py-2 flex items-center justify-center">
-                  <ChevronRight size={16} strokeWidth={1.5} className="text-white/60" />
+                  <ChevronRight
+                    size={16}
+                    strokeWidth={1.5}
+                    className="text-white/60"
+                  />
                 </div>
               </button>
             )}
@@ -1714,47 +1777,47 @@ export default function Home() {
                   <div className="flex-1 px-4 pb-4">
                     <div className="flex flex-col gap-2">
                       {/* Skeleton Transaction Card 1 */}
-                    <div
-                      className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
-                      style={{
-                        background: "rgba(255, 255, 255, 0.06)",
-                        mixBlendMode: "lighten"
-                      }}
-                    >
-                      <div className="py-1.5 pr-3">
-                        <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
+                      <div
+                        className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
+                        style={{
+                          background: "rgba(255, 255, 255, 0.06)",
+                          mixBlendMode: "lighten",
+                        }}
+                      >
+                        <div className="py-1.5 pr-3">
+                          <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
+                        </div>
+                        <div className="flex-1 py-2.5 flex flex-col gap-1.5">
+                          <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
+                          <div className="w-28 h-4 bg-white/5 animate-pulse rounded" />
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
+                          <div className="w-16 h-5 bg-white/5 animate-pulse rounded" />
+                          <div className="w-12 h-4 bg-white/5 animate-pulse rounded" />
+                        </div>
                       </div>
-                      <div className="flex-1 py-2.5 flex flex-col gap-1.5">
-                        <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
-                        <div className="w-28 h-4 bg-white/5 animate-pulse rounded" />
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
-                        <div className="w-16 h-5 bg-white/5 animate-pulse rounded" />
-                        <div className="w-12 h-4 bg-white/5 animate-pulse rounded" />
-                      </div>
-                    </div>
-                    {/* Skeleton Transaction Card 2 */}
-                    <div
-                      className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
-                      style={{
-                        background: "rgba(255, 255, 255, 0.06)",
-                        mixBlendMode: "lighten"
-                      }}
-                    >
-                      <div className="py-1.5 pr-3">
-                        <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
-                      </div>
-                      <div className="flex-1 py-2.5 flex flex-col gap-1.5">
-                        <div className="w-16 h-5 bg-white/5 animate-pulse rounded" />
-                        <div className="w-24 h-4 bg-white/5 animate-pulse rounded" />
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
-                        <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
-                        <div className="w-14 h-4 bg-white/5 animate-pulse rounded" />
+                      {/* Skeleton Transaction Card 2 */}
+                      <div
+                        className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
+                        style={{
+                          background: "rgba(255, 255, 255, 0.06)",
+                          mixBlendMode: "lighten",
+                        }}
+                      >
+                        <div className="py-1.5 pr-3">
+                          <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
+                        </div>
+                        <div className="flex-1 py-2.5 flex flex-col gap-1.5">
+                          <div className="w-16 h-5 bg-white/5 animate-pulse rounded" />
+                          <div className="w-24 h-4 bg-white/5 animate-pulse rounded" />
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
+                          <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
+                          <div className="w-14 h-4 bg-white/5 animate-pulse rounded" />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
                 </>
               );
             }
@@ -1768,7 +1831,7 @@ export default function Home() {
                     className="flex flex-col gap-4 items-center justify-center px-8 py-6 rounded-2xl h-[200px]"
                     style={{
                       background: "rgba(255, 255, 255, 0.03)",
-                      mixBlendMode: "lighten"
+                      mixBlendMode: "lighten",
                     }}
                   >
                     <p className="text-base text-white/60 leading-5 text-center">
@@ -1782,7 +1845,7 @@ export default function Home() {
                       className="px-4 py-2 rounded-[40px] text-sm text-white leading-5"
                       style={{
                         backgroundImage:
-                          "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
+                          "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
                       }}
                     >
                       Add Stars
@@ -1800,7 +1863,7 @@ export default function Home() {
                     className="flex items-center justify-center px-8 py-6 rounded-2xl h-[200px]"
                     style={{
                       background: "rgba(255, 255, 255, 0.03)",
-                      mixBlendMode: "lighten"
+                      mixBlendMode: "lighten",
                     }}
                   >
                     <p className="text-base text-white/60 leading-5 text-center">
@@ -1829,26 +1892,41 @@ export default function Home() {
                 <div className="flex-1 px-4 pb-4">
                   <div className="flex flex-col gap-2 pb-36">
                     <AnimatePresence initial={false} mode="popLayout">
-                      {limitedActivityItems.map(item => {
-                        const isNewTransaction = newTransactionIds.has(item.transaction.id);
+                      {limitedActivityItems.map((item) => {
+                        const isNewTransaction = newTransactionIds.has(
+                          item.transaction.id
+                        );
 
                         if (item.type === "incoming") {
                           const transaction = item.transaction;
-                          const isClaiming = claimingTransactionId === transaction.id;
+                          const isClaiming =
+                            claimingTransactionId === transaction.id;
                           return (
                             <motion.button
                               key={transaction.id}
                               layout
-                              initial={isNewTransaction ? { opacity: 0, scale: 0.85, y: -10 } : false}
+                              initial={
+                                isNewTransaction
+                                  ? { opacity: 0, scale: 0.85, y: -10 }
+                                  : false
+                              }
                               animate={{ opacity: 1, scale: 1, y: 0 }}
                               exit={{ opacity: 0, scale: 0.85 }}
                               transition={{
-                                layout: { type: "spring", stiffness: 500, damping: 35 },
+                                layout: {
+                                  type: "spring",
+                                  stiffness: 500,
+                                  damping: 35,
+                                },
                                 opacity: { duration: 0.25 },
-                                scale: { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }
+                                scale: {
+                                  duration: 0.3,
+                                  ease: [0.34, 1.56, 0.64, 1],
+                                },
                               }}
                               onClick={() =>
-                                !isClaiming && handleOpenTransactionDetails(transaction)
+                                !isClaiming &&
+                                handleOpenTransactionDetails(transaction)
                               }
                               disabled={isClaiming}
                               className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity ${
@@ -1856,14 +1934,16 @@ export default function Home() {
                               }`}
                               style={{
                                 background: "rgba(255, 255, 255, 0.06)",
-                                mixBlendMode: "lighten"
+                                mixBlendMode: "lighten",
                               }}
                             >
                               {/* Left - Icon */}
                               <div className="py-1.5 pr-3">
                                 <div
                                   className="w-12 h-12 rounded-full flex items-center justify-center"
-                                  style={{ background: "rgba(50, 229, 94, 0.15)" }}
+                                  style={{
+                                    background: "rgba(50, 229, 94, 0.15)",
+                                  }}
                                 >
                                   <ArrowDown
                                     className="w-7 h-7"
@@ -1875,7 +1955,9 @@ export default function Home() {
 
                               {/* Middle - Text */}
                               <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                                <p className="text-base text-white leading-5">Received</p>
+                                <p className="text-base text-white leading-5">
+                                  Received
+                                </p>
                                 <p className="text-[13px] text-white/60 leading-4">
                                   from {formatSenderAddress(transaction.sender)}
                                 </p>
@@ -1887,12 +1969,14 @@ export default function Home() {
                                   className="px-4 py-2 rounded-full text-sm text-white leading-5"
                                   style={{
                                     background:
-                                      "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
+                                      "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
                                   }}
                                 >
                                   {isClaiming
                                     ? "Claiming..."
-                                    : `Claim ${formatTransactionAmount(transaction.amountLamports)} SOL`}
+                                    : `Claim ${formatTransactionAmount(
+                                        transaction.amountLamports
+                                      )} SOL`}
                                 </div>
                               </div>
                             </motion.button>
@@ -1906,8 +1990,9 @@ export default function Home() {
                         const transferTypeLabel =
                           transaction.transferType === "store"
                             ? "Store data"
-                            : transaction.transferType === "verify_telegram_init_data"
-                              ? "Verify data"
+                            : transaction.transferType ===
+                              "verify_telegram_init_data"
+                            ? "Verify data"
                             : null;
                         const counterparty = isIncoming
                           ? transaction.sender || "Unknown sender"
@@ -1918,21 +2003,21 @@ export default function Home() {
                         const formattedCounterparty = isUnknownRecipient
                           ? counterparty
                           : counterparty.startsWith("@")
-                            ? counterparty
-                            : formatSenderAddress(counterparty);
+                          ? counterparty
+                          : formatSenderAddress(counterparty);
                         const isEffectivelyZero =
                           Math.abs(transaction.amountLamports) <
                           LAMPORTS_PER_SOL / 10000; // below 0.0001 SOL displays as 0
                         const amountPrefix = isEffectivelyZero
                           ? ""
                           : isIncoming
-                            ? "+"
-                            : "−";
+                          ? "+"
+                          : "−";
                         const amountColor = isIncoming
                           ? "#32e55e"
                           : isPending
-                            ? "#00b1fb"
-                            : "white";
+                          ? "#00b1fb"
+                          : "white";
                         const timestamp = new Date(transaction.timestamp);
 
                         // Compact view for store/verify transactions
@@ -1943,19 +2028,32 @@ export default function Home() {
                             <motion.button
                               key={transaction.id}
                               layout
-                              initial={isNewTransaction ? { opacity: 0, scale: 0.85, y: -10 } : false}
+                              initial={
+                                isNewTransaction
+                                  ? { opacity: 0, scale: 0.85, y: -10 }
+                                  : false
+                              }
                               animate={{ opacity: 1, scale: 1, y: 0 }}
                               exit={{ opacity: 0, scale: 0.85 }}
                               transition={{
-                                layout: { type: "spring", stiffness: 500, damping: 35 },
+                                layout: {
+                                  type: "spring",
+                                  stiffness: 500,
+                                  damping: 35,
+                                },
                                 opacity: { duration: 0.25 },
-                                scale: { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }
+                                scale: {
+                                  duration: 0.3,
+                                  ease: [0.34, 1.56, 0.64, 1],
+                                },
                               }}
-                              onClick={() => handleOpenWalletTransactionDetails(transaction)}
+                              onClick={() =>
+                                handleOpenWalletTransactionDetails(transaction)
+                              }
                               className="flex items-center py-2 px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
                               style={{
                                 background: "rgba(255, 255, 255, 0.06)",
-                                mixBlendMode: "lighten"
+                                mixBlendMode: "lighten",
                               }}
                             >
                               {/* Left - Text */}
@@ -1970,12 +2068,12 @@ export default function Home() {
                                 <p className="text-[13px] text-white/40 leading-4">
                                   {timestamp.toLocaleDateString("en-US", {
                                     month: "short",
-                                    day: "numeric"
+                                    day: "numeric",
                                   })}
                                   ,{" "}
                                   {timestamp.toLocaleTimeString([], {
                                     hour: "numeric",
-                                    minute: "2-digit"
+                                    minute: "2-digit",
                                   })}
                                 </p>
                               </div>
@@ -1987,19 +2085,32 @@ export default function Home() {
                           <motion.button
                             key={transaction.id}
                             layout
-                            initial={isNewTransaction ? { opacity: 0, scale: 0.85, y: -10 } : false}
+                            initial={
+                              isNewTransaction
+                                ? { opacity: 0, scale: 0.85, y: -10 }
+                                : false
+                            }
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.85 }}
                             transition={{
-                              layout: { type: "spring", stiffness: 500, damping: 35 },
+                              layout: {
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 35,
+                              },
                               opacity: { duration: 0.25 },
-                              scale: { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }
+                              scale: {
+                                duration: 0.3,
+                                ease: [0.34, 1.56, 0.64, 1],
+                              },
                             }}
-                            onClick={() => handleOpenWalletTransactionDetails(transaction)}
+                            onClick={() =>
+                              handleOpenWalletTransactionDetails(transaction)
+                            }
                             className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
                             style={{
                               background: "rgba(255, 255, 255, 0.06)",
-                              mixBlendMode: "lighten"
+                              mixBlendMode: "lighten",
                             }}
                           >
                             {/* Left - Icon */}
@@ -2010,10 +2121,12 @@ export default function Home() {
                                   background: isIncoming
                                     ? "rgba(50, 229, 94, 0.15)"
                                     : isPending
-                                      ? "rgba(0, 177, 251, 0.15)"
-                                      : "rgba(255, 255, 255, 0.06)",
+                                    ? "rgba(0, 177, 251, 0.15)"
+                                    : "rgba(255, 255, 255, 0.06)",
                                   mixBlendMode:
-                                    isIncoming || isPending ? "normal" : "lighten"
+                                    isIncoming || isPending
+                                      ? "normal"
+                                      : "lighten",
                                 }}
                               >
                                 {isIncoming ? (
@@ -2043,12 +2156,20 @@ export default function Home() {
                                 {isIncoming
                                   ? "Received"
                                   : isPending
-                                    ? "To be claimed"
-                                    : "Sent"}
+                                  ? "To be claimed"
+                                  : "Sent"}
                               </p>
-                              {!(isPending === false && !isIncoming && isUnknownRecipient) && (
+                              {!(
+                                isPending === false &&
+                                !isIncoming &&
+                                isUnknownRecipient
+                              ) && (
                                 <p className="text-[13px] text-white/60 leading-4">
-                                  {isIncoming ? "from" : isPending ? "by" : "to"}{" "}
+                                  {isIncoming
+                                    ? "from"
+                                    : isPending
+                                    ? "by"
+                                    : "to"}{" "}
                                   {formattedCounterparty}
                                 </p>
                               )}
@@ -2063,18 +2184,20 @@ export default function Home() {
                                 {amountPrefix}
                                 {isEffectivelyZero
                                   ? "0"
-                                  : formatTransactionAmount(transaction.amountLamports)}{" "}
+                                  : formatTransactionAmount(
+                                      transaction.amountLamports
+                                    )}{" "}
                                 SOL
                               </p>
                               <p className="text-[13px] text-white/60 leading-4">
                                 {timestamp.toLocaleDateString("en-US", {
                                   month: "short",
-                                  day: "numeric"
+                                  day: "numeric",
                                 })}
                                 ,{" "}
                                 {timestamp.toLocaleTimeString([], {
                                   hour: "numeric",
-                                  minute: "2-digit"
+                                  minute: "2-digit",
                                 })}
                               </p>
                             </div>

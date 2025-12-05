@@ -27,11 +27,19 @@ const navItems: NavItem[] = [
 export default function BottomNav() {
   const pathname = usePathname();
 
+  // Hide nav on certain pages (e.g., feed page)
+  const hiddenPaths = ["/telegram/summaries/feed"];
+  const shouldHide = hiddenPaths.some(path => pathname?.startsWith(path));
+
   const handleNavClick = () => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
   };
+
+  if (shouldHide) {
+    return null;
+  }
 
   // Find active index
   const activeIndex = navItems.findIndex(
