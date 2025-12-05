@@ -20,11 +20,12 @@ import {
   LAST_AMOUNT_KEY,
   MAX_RECENT_RECIPIENTS,
   RECENT_RECIPIENTS_KEY,
+  SOL_PRICE_USD,
   SOLANA_FEE_SOL,
-  STARS_FEE_AMOUNT,
   STARS_TO_USD,
 } from "@/lib/constants";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
+import { calculateStarsFee } from "@/lib/solana/rpc/calculate-stars-fee";
 import {
   getCloudValue,
   setCloudValue,
@@ -43,6 +44,8 @@ export type SendSheetProps = {
   walletAddress?: string;
   starsBalance?: number; // Balance in Stars
   onTopUpStars?: () => void; // Callback when user wants to top up Stars
+  solPriceUsd?: number | null;
+  isSolPriceLoading?: boolean;
   // Success/Error step props
   sentAmountSol?: number; // Amount sent in SOL (for success display)
   sendError?: string | null; // Error message (if present, shows error state instead of success)
@@ -163,6 +166,8 @@ export default function SendSheet({
   walletAddress,
   starsBalance = 0,
   onTopUpStars,
+  solPriceUsd: solPriceUsdProp,
+  isSolPriceLoading: isSolPriceLoadingProp,
   sentAmountSol,
   sendError,
 }: SendSheetProps) {
@@ -199,8 +204,8 @@ export default function SendSheet({
   const [lastAmount, setLastAmount] = useState<LastAmount | null>(null);
   const [recentRecipients, setRecentRecipients] = useState<RecentRecipient[]>([]);
   const [feePaymentMethod, setFeePaymentMethod] = useState<'solana' | 'stars'>('solana');
-  const [solPriceUsd, setSolPriceUsd] = useState<number | null>(null);
-  const [isSolPriceLoading, setIsSolPriceLoading] = useState(true);
+  const [solPriceUsdState, setSolPriceUsdState] = useState<number | null>(null);
+  const [isSolPriceLoadingState, setIsSolPriceLoadingState] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const amountInputRef = useRef<HTMLInputElement>(null);
   const amountTextRef = useRef<HTMLParagraphElement>(null);
@@ -208,25 +213,45 @@ export default function SendSheet({
 
   // Convert balance from lamports to SOL
   const balanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
+  const isUsingExternalPrice =
+    solPriceUsdProp !== undefined || isSolPriceLoadingProp !== undefined;
+  const solPriceUsd = isUsingExternalPrice
+    ? solPriceUsdProp ?? null
+    : solPriceUsdState;
+  const isSolPriceLoading = isUsingExternalPrice
+    ? isSolPriceLoadingProp ?? solPriceUsd === null
+    : isSolPriceLoadingState;
   const balanceInUsd = solPriceUsd ? balanceInSol * solPriceUsd : null;
   const solanaFeeUsd = solPriceUsd ? SOLANA_FEE_SOL * solPriceUsd : null;
+  const starsFeeAmount = useMemo(() => {
+    if (solPriceUsd === null) return null;
+    return calculateStarsFee(SOLANA_FEE_SOL, solPriceUsd);
+  }, [solPriceUsd]);
+  const starsFeeUsd = starsFeeAmount !== null ? starsFeeAmount * STARS_TO_USD : null;
+  const hasEnoughStarsForFee = starsFeeAmount !== null && starsBalance >= starsFeeAmount;
 
-  // Load SOL price for USD conversions
+  // Load SOL price for USD conversions when not provided externally
   useEffect(() => {
+    if (isUsingExternalPrice) {
+      // If parent handles price, rely on that state
+      setIsSolPriceLoadingState(false);
+      return;
+    }
+
     let isMounted = true;
 
     const loadPrice = async () => {
       try {
         const price = await fetchSolUsdPrice();
         if (!isMounted) return;
-        setSolPriceUsd(price);
+        setSolPriceUsdState(price);
       } catch (error) {
         console.error("Failed to fetch SOL price", error);
         if (!isMounted) return;
-        setSolPriceUsd(null);
+        setSolPriceUsdState(SOL_PRICE_USD);
       } finally {
         if (isMounted) {
-          setIsSolPriceLoading(false);
+          setIsSolPriceLoadingState(false);
         }
       }
     };
@@ -236,7 +261,7 @@ export default function SendSheet({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isUsingExternalPrice]);
 
   // Reset state when opening
   useEffect(() => {
@@ -390,8 +415,6 @@ export default function SendSheet({
     // For step 3, also check if selected fee method has sufficient funds
     if (step === 3) {
       const hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
-      const hasEnoughStarsForFee = starsBalance >= STARS_FEE_AMOUNT;
-
       const hasSufficientFeeBalance = feePaymentMethod === 'solana'
         ? hasEnoughSolForFee
         : hasEnoughStarsForFee;
@@ -408,7 +431,7 @@ export default function SendSheet({
 
     // Default to invalid for any other state
     onValidationChange?.(false);
-  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, feePaymentMethod, starsBalance, solPriceUsd]);
+  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, feePaymentMethod, hasEnoughStarsForFee, solPriceUsd]);
 
 
   const handleRecipientSelect = (selected: string) => {
@@ -1028,7 +1051,6 @@ export default function SendSheet({
                         ? amountVal / solPriceUsd
                         : NaN;
                   const _hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
-                  const hasEnoughStarsForFee = starsBalance >= STARS_FEE_AMOUNT;
 
                   // Check circle icons
                   const CheckCircleOn = () => (
@@ -1081,14 +1103,22 @@ export default function SendSheet({
                           </div>
                           {/* Text */}
                           <div className="flex-1 flex flex-col gap-0.5 py-2.5 text-left">
-                            <p className="text-base leading-5 text-white">{STARS_FEE_AMOUNT} Stars</p>
+                            <p className="text-base leading-5 text-white">
+                              {starsFeeAmount !== null
+                                ? `${starsFeeAmount.toFixed(4).replace(/\.?0+$/, '')} Stars`
+                                : '—'}
+                            </p>
                             <p className="text-[13px] leading-4 text-white/60">
-                              {hasEnoughStarsForFee ? `≈ $${(STARS_FEE_AMOUNT * STARS_TO_USD).toFixed(2)}` : 'Not enough Stars'}
+                              {starsFeeAmount === null
+                                ? 'Calculating...'
+                                : hasEnoughStarsForFee
+                                  ? `≈ $${(starsFeeUsd ?? 0).toFixed(2)}`
+                                  : 'Not enough Stars'}
                             </p>
                           </div>
                         </button>
                         {/* Top up button (shown when not enough stars) - outside dimmed area */}
-                        {!hasEnoughStarsForFee && onTopUpStars && (
+                        {!hasEnoughStarsForFee && starsFeeAmount !== null && onTopUpStars && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1202,8 +1232,10 @@ export default function SendSheet({
                           return ` ≈ $${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                         })()}
                       </span>
-                      {feePaymentMethod === 'stars' && (
-                        <span className="text-white/60">&nbsp;+ {STARS_FEE_AMOUNT} Star</span>
+                      {feePaymentMethod === 'stars' && starsFeeAmount !== null && (
+                        <span className="text-white/60">
+                          &nbsp;+ {starsFeeAmount.toFixed(4).replace(/\.?0+$/, '')} Stars
+                        </span>
                       )}
                     </div>
                   </div>

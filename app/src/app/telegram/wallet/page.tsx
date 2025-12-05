@@ -2114,6 +2114,8 @@ export default function Home() {
         walletAddress={walletAddress ?? undefined}
         starsBalance={starsBalance}
         onTopUpStars={handleTopUpStars}
+        solPriceUsd={solPriceUsd}
+        isSolPriceLoading={isSolPriceLoading}
         sentAmountSol={sentAmountSol}
         sendError={sendError}
       />
