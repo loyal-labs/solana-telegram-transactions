@@ -56,7 +56,7 @@ const encodeAnchorStringFilter = (value: string): string => {
 };
 
 const VALIDATION_AUTH_DATE = 1763598375;
-const VALIDATION_USERNAME = "dig133713337";
+const VALIDATION_USERNAME = "vlad_arbatov";
 
 const TELEGRAM_PUBKEY_PROD_HEX =
   "e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d";
@@ -68,6 +68,7 @@ describe.only("telegram-verification test suite", () => {
 
   const userKp = web3.Keypair.generate();
   const user = userKp.publicKey;
+  // const user = baseProvider.wallet.publicKey;
   const wallet = new anchor.Wallet(userKp);
 
   const otherUserKp = web3.Keypair.generate();
@@ -85,7 +86,10 @@ describe.only("telegram-verification test suite", () => {
     wallet,
     baseProvider.opts
   );
-  anchor.setProvider(provider);
+
+  // const provider = baseProvider;
+
+  anchor.setProvider(baseProvider);
 
   const verificationProgram = anchor.workspace
     .TelegramVerification as Program<TelegramVerification>;
@@ -141,13 +145,6 @@ describe.only("telegram-verification test suite", () => {
   });
 
   it("Create deposit for user A and put money in the vault", async () => {
-    [vaultPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("vault")],
-      transferProgram.programId
-    );
-    let vault = await transferProgram.account.vault.fetch(vaultPda);
-    let totalDeposited = vault.totalDeposited.toNumber();
-
     await transferProgram.methods
       .depositForUsername(VALIDATION_USERNAME, new BN(initialAmount / 2))
       .accounts({
@@ -169,11 +166,6 @@ describe.only("telegram-verification test suite", () => {
     expect(deposit.amount.toNumber()).to.equal(initialAmount / 2);
     expect(deposit.user.toBase58()).to.equal(user.toBase58());
     expect(deposit.username).to.equal(VALIDATION_USERNAME);
-
-    vault = await transferProgram.account.vault.fetch(vaultPda);
-    expect(vault.totalDeposited.toNumber()).to.equal(
-      totalDeposited + initialAmount / 2
-    );
   });
 
   it("Scans deposits by username using memcmp filters", async () => {
@@ -198,6 +190,13 @@ describe.only("telegram-verification test suite", () => {
   });
 
   it("Top up existing deposit for user A", async () => {
+    [vaultPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault")],
+      transferProgram.programId
+    );
+    let vault = await transferProgram.account.vault.fetch(vaultPda);
+    let totalDeposited = vault.totalDeposited.toNumber();
+
     await transferProgram.methods
       .depositForUsername(VALIDATION_USERNAME, new BN(initialAmount / 4))
       .accounts({
@@ -210,6 +209,11 @@ describe.only("telegram-verification test suite", () => {
     expect(deposit.amount.toNumber()).to.equal((initialAmount * 3) / 4);
     expect(deposit.user.toBase58()).to.equal(user.toBase58());
     expect(deposit.username).to.equal(VALIDATION_USERNAME);
+
+    vault = await transferProgram.account.vault.fetch(vaultPda);
+    expect(vault.totalDeposited.toNumber()).to.equal(
+      totalDeposited + initialAmount / 4
+    );
   });
 
   it("Refund deposit for user A", async () => {

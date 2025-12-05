@@ -181,6 +181,10 @@ pub struct ClaimDeposit<'info> {
     pub deposit: Account<'info, Deposit>,
 
     /// CHECK: We only read from instructions sysvar
+    #[account(
+        constraint = session.user_wallet == recipient.key() @ ErrorCode::InvalidRecipient,
+        constraint = session.verified @ ErrorCode::NotVerified
+    )]
     pub session: Account<'info, TelegramSession>,
     pub system_program: Program<'info, System>,
 }
