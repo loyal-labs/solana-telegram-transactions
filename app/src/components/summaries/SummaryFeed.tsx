@@ -1,6 +1,11 @@
 "use client";
 
-import { backButton, hapticFeedback, swipeBehavior } from "@telegram-apps/sdk-react";
+import {
+  backButton,
+  hapticFeedback,
+  swipeBehavior,
+  themeParams,
+} from "@telegram-apps/sdk-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -12,11 +17,8 @@ export type ChatSummary = {
   topics: Array<{
     id: string;
     title: string;
-    paragraphs: Array<{
-      id: string;
-      text: string;
-      sources: string[];
-    }>;
+    content: string;
+    sources: string[];
   }>;
 };
 
@@ -25,28 +27,35 @@ const MOCK_SUMMARIES: ChatSummary[] = [
   {
     id: "1",
     title: "Telegram Developers Community",
-    messageCount: 2986,
+    messageCount: 973,
     topics: [
       {
         id: "1-1",
-        title: "Topic",
-        paragraphs: [
-          {
-            id: "1-1-1",
-            text: "Blockchain technology offers a way to coordinate many independent actors around a single, append-only record of events. It combines cryptography.",
-            sources: ["Alice", "Bob"],
-          },
-          {
-            id: "1-1-2",
-            text: "This structure makes the history tamper-evident: if someone tries to modify a past block, all following references stop matching. Within this general idea, there are many variations: public vs permissioned networks, simple value-transfer systems vs expressive smart contract. Blockchain technology offers a way to coordinate many independent actors around a single, append-only record of events. It combines cryptography. Blockchain technology offers a way to coordinate many independent actors around a single, append-only record of events. It combines cryptography.",
-            sources: ["Charlie", "David"],
-          },
-          {
-            id: "1-1-3",
-            text: "Within this general idea, there are many variations: public vs permissioned networks, simple value-transfer systems vs expressive smart contract. Within this general idea, there are many variations: public vs permissioned networks, simple value-transfer systems vs expressive smart contract. Blockchain technology offers a way to coordinate many independent actors around a single, append-only record of events. It combines cryptography. Blockchain technology offers a way to coordinate many independent actors around a single, append-only record of events. It combines cryptography.",
-            sources: ["Eve", "Frank"],
-          },
-        ],
+        title: "Topic 1",
+        content:
+          "Blockchain technology offers a way to coordinate many independent actors around a single, append-only record of events. It combines cryptography.",
+        sources: ["Alice", "Bob", "Charlie"],
+      },
+      {
+        id: "1-2",
+        title: "Topic 2",
+        content:
+          "Blockchain technology offers a way to coordinate many independent actors around a single, append-only record of events. It combines cryptography.",
+        sources: ["David", "Eve", "Frank"],
+      },
+      {
+        id: "1-3",
+        title: "Topic 3",
+        content:
+          "Blockchain technology offers a way to coordinate many independent actors around",
+        sources: ["Grace", "Henry"],
+      },
+      {
+        id: "1-4",
+        title: "Topic 4",
+        content:
+          "Blockchain technology offers a way to coordinate many independent actors around a single, append-only record of events. It combines cryptography. A single, append-only record of events. It combines cryptography.",
+        sources: ["Ivan", "Julia"],
       },
     ],
   },
@@ -58,18 +67,16 @@ const MOCK_SUMMARIES: ChatSummary[] = [
       {
         id: "2-1",
         title: "Network Performance",
-        paragraphs: [
-          {
-            id: "2-1-1",
-            text: "Recent network upgrades have improved transaction throughput significantly. The community reported faster confirmation times.",
-            sources: ["Grace", "Henry"],
-          },
-          {
-            id: "2-1-2",
-            text: "Discussions around the new priority fee system and how developers should adjust their applications to optimize for both speed and cost.",
-            sources: ["Ivan", "Julia"],
-          },
-        ],
+        content:
+          "Recent network upgrades have improved transaction throughput significantly. The community reported faster confirmation times.",
+        sources: ["Grace", "Henry"],
+      },
+      {
+        id: "2-2",
+        title: "Priority Fees",
+        content:
+          "Discussions around the new priority fee system and how developers should adjust their applications to optimize for both speed and cost.",
+        sources: ["Ivan", "Julia"],
       },
     ],
   },
@@ -81,18 +88,16 @@ const MOCK_SUMMARIES: ChatSummary[] = [
       {
         id: "3-1",
         title: "Smart Contract Development",
-        paragraphs: [
-          {
-            id: "3-1-1",
-            text: "New tooling for FunC development was released, including improved IDE support and better debugging capabilities.",
-            sources: ["Kevin", "Laura"],
-          },
-          {
-            id: "3-1-2",
-            text: "Community projects showcased innovative use cases for TON blockchain including decentralized social features.",
-            sources: ["Mike", "Nancy"],
-          },
-        ],
+        content:
+          "New tooling for FunC development was released, including improved IDE support and better debugging capabilities.",
+        sources: ["Kevin", "Laura"],
+      },
+      {
+        id: "3-2",
+        title: "Community Projects",
+        content:
+          "Community projects showcased innovative use cases for TON blockchain including decentralized social features.",
+        sources: ["Mike", "Nancy"],
       },
     ],
   },
@@ -133,24 +138,42 @@ function getFirstLetter(name: string): string {
 // Source avatars component (overlapping circles)
 function SourceAvatars({ sources }: { sources: string[] }) {
   return (
-    <div className="flex items-center h-10">
-      <div className="flex items-center pl-1 pr-3">
-        <div className="flex items-center">
-          {sources.slice(0, 3).map((source, index) => (
-            <div
-              key={source}
-              className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium text-white border border-[#28282c]"
-              style={{
-                backgroundColor: getAvatarColor(source),
-                marginLeft: index > 0 ? -4 : 0,
-                zIndex: sources.length - index,
-              }}
-            >
-              {getFirstLetter(source)}
-            </div>
-          ))}
-        </div>
+    <div className="flex items-center h-12">
+      <div className="flex items-center">
+        {sources.slice(0, 3).map((source, index) => (
+          <div
+            key={source}
+            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium text-white border-2 border-[#242427]"
+            style={{
+              backgroundColor: getAvatarColor(source),
+              marginLeft: index > 0 ? -4 : 0,
+              zIndex: sources.length - index,
+            }}
+          >
+            {getFirstLetter(source)}
+          </div>
+        ))}
       </div>
+    </div>
+  );
+}
+
+// Topic card component
+function TopicCard({
+  topic,
+}: {
+  topic: ChatSummary["topics"][0];
+}) {
+  return (
+    <div className="bg-[#242427] rounded-2xl px-3 pt-4 pb-2 overflow-hidden">
+      {/* Topic Title */}
+      <h2 className="text-xl font-semibold text-white leading-7 pb-2">
+        {topic.title}
+      </h2>
+      {/* Content */}
+      <p className="text-base text-white leading-7">{topic.content}</p>
+      {/* Source Avatars */}
+      <SourceAvatars sources={topic.sources} />
     </div>
   );
 }
@@ -163,6 +186,7 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
   const router = useRouter();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [currentSummaryIndex, setCurrentSummaryIndex] = useState(0);
+  const [scrollY, setScrollY] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Touch tracking for overscroll detection
@@ -170,6 +194,15 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
   const isAtBottom = useRef(false);
   const isAtTop = useRef(true);
   const overscrollAmount = useRef(0);
+
+  // Get button color from Telegram theme
+  const [buttonColor] = useState(() => {
+    try {
+      return themeParams.buttonColor() || "#2990ff";
+    } catch {
+      return "#2990ff";
+    }
+  });
 
   // Find initial summary index based on chatId
   useEffect(() => {
@@ -185,6 +218,9 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
   const nextSummary = MOCK_SUMMARIES[currentSummaryIndex + 1];
   const prevSummary = MOCK_SUMMARIES[currentSummaryIndex - 1];
   const remainingCount = MOCK_SUMMARIES.length - currentSummaryIndex;
+
+  // Calculate collapse progress (0 = expanded, 1 = collapsed)
+  const collapseProgress = Math.min(1, Math.max(0, scrollY / 60));
 
   // Setup Telegram back button and disable vertical swipe to close
   useEffect(() => {
@@ -237,6 +273,7 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
     setTimeout(() => {
       setCurrentSummaryIndex((prev) => prev + 1);
       setIsTransitioning(false);
+      setScrollY(0);
       // Reset scroll to top
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = 0;
@@ -340,6 +377,9 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
   // Handle scroll event
   const handleScroll = useCallback(() => {
     updateScrollPosition();
+    if (scrollContainerRef.current) {
+      setScrollY(scrollContainerRef.current.scrollTop);
+    }
   }, [updateScrollPosition]);
 
   if (!currentSummary) {
@@ -356,161 +396,139 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
   const avatarColor = getAvatarColor(currentSummary.title);
   const firstLetter = getFirstLetter(currentSummary.title);
 
+  // Interpolate values based on collapse progress
+  const avatarSize = 40 - 12 * collapseProgress; // 40px -> 28px
+  const pillPaddingY = 6 - 2 * collapseProgress; // 6px -> 4px
+  const pillPaddingRight = 24 - 12 * collapseProgress; // 24px -> 12px
+  const titleSize = 16 - 2 * collapseProgress; // 16px -> 14px
+  const subtitleOpacity = 1 - collapseProgress;
+  const subtitleHeight = 16 * (1 - collapseProgress);
+
   return (
     <main
-      className="min-h-screen text-white font-sans overflow-hidden relative flex flex-col"
+      className="h-screen text-white font-sans overflow-hidden relative flex flex-col"
       style={{ background: "#16161a" }}
     >
-      {/* Header - Fixed */}
+      {/* Header - "X chats left" */}
       <div
         className="relative h-[52px] flex items-center justify-center shrink-0 z-20"
-        style={{ marginTop: "var(--app-safe-top, 20px)" }}
+        style={{ paddingTop: "var(--app-safe-top, 20px)" }}
       >
-        {/* Center - Remaining count */}
         <div className="flex items-center gap-1.5">
-          <div className="bg-[#2990ff] h-6 min-w-6 px-1.5 rounded-full flex items-center justify-center">
+          <div
+            className="h-6 min-w-6 px-1.5 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: buttonColor }}
+          >
             <span className="text-sm font-medium text-white">
               {remainingCount}
             </span>
           </div>
-          <span className="text-base text-white">Left</span>
+          <span className="text-base text-white">chats left</span>
         </div>
       </div>
 
-      {/* Card Container */}
-      <div className="flex-1 flex flex-col mx-4 mb-4 min-h-0 overflow-visible relative">
-        {/* Back Card (next card preview) */}
-        {nextSummary && (
+      {/* Content Container */}
+      <div className="flex-1 flex flex-col relative overflow-hidden">
+        {/* Chat Title Pill - Floating above content */}
+        <div className="absolute top-0 left-0 right-0 z-10 flex justify-center">
           <div
-            className="absolute inset-0 flex flex-col rounded-[20px] overflow-hidden pointer-events-none"
+            className="flex items-center backdrop-blur-xl rounded-full overflow-hidden transition-all duration-150 ease-out"
             style={{
-              background: "#28282c",
-              transform: "rotate(-2deg) translateX(-8px)",
-              transformOrigin: "center bottom",
-              opacity: 0.4,
-              zIndex: 0,
+              backgroundColor: "rgba(128, 128, 128, 0.1)",
+              paddingLeft: collapseProgress > 0.5 ? 4 : 6,
+              paddingRight: pillPaddingRight,
+              paddingTop: pillPaddingY,
+              paddingBottom: pillPaddingY,
             }}
           >
-            {/* Back card header */}
+            {/* Avatar */}
             <div
-              className="flex items-center gap-4 p-1 border-b shrink-0"
-              style={{ borderColor: "rgba(255, 255, 255, 0.1)" }}
+              className="rounded-full flex items-center justify-center font-medium text-white shrink-0 transition-all duration-150 ease-out"
+              style={{
+                backgroundColor: avatarColor,
+                width: avatarSize,
+                height: avatarSize,
+                fontSize: avatarSize * 0.4,
+                marginRight: 12 - 6 * collapseProgress,
+              }}
             >
-              <div className="w-10 h-10 rounded-full opacity-0" />
-              <div className="flex-1 flex flex-col items-center justify-center h-11 gap-0.5">
-                <p className="text-base font-medium text-white leading-5 tracking-[-0.176px] truncate max-w-full">
-                  {nextSummary.title}
-                </p>
-                {nextSummary.messageCount && (
-                  <p className="text-[13px] text-white/60 leading-5">
-                    {nextSummary.messageCount.toLocaleString()} messages
-                  </p>
-                )}
-              </div>
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-medium text-white"
-                style={{ backgroundColor: getAvatarColor(nextSummary.title) }}
+              {firstLetter}
+            </div>
+
+            {/* Text */}
+            <div className="flex flex-col justify-center">
+              <p
+                className="font-normal text-white leading-5 transition-all duration-150 ease-out whitespace-nowrap"
+                style={{ fontSize: titleSize }}
               >
-                {getFirstLetter(nextSummary.title)}
+                {currentSummary.title}
+              </p>
+              {/* Subtitle - animates out */}
+              <div
+                className="overflow-hidden transition-all duration-150 ease-out"
+                style={{
+                  height: subtitleHeight,
+                  opacity: subtitleOpacity,
+                }}
+              >
+                <p className="text-[13px] text-white/60 leading-4 whitespace-nowrap">
+                  Summary of {currentSummary.messageCount?.toLocaleString()}{" "}
+                  messages
+                </p>
               </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Front Card */}
+        {/* Fade gradient at top */}
         <div
-          className="flex-1 flex flex-col rounded-[20px] overflow-hidden min-h-0 relative"
+          className="absolute top-0 left-0 right-0 h-[76px] z-[5] pointer-events-none"
           style={{
-            background: "#28282c",
-            zIndex: 1,
+            background:
+              "linear-gradient(to bottom, #16161a 0%, #16161a 40%, transparent 100%)",
+          }}
+        />
+
+        {/* Scrollable Topics List */}
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className="flex-1 overflow-y-auto px-4 pt-16 pb-8"
+          style={{
+            WebkitOverflowScrolling: "touch",
             opacity: isTransitioning ? 0.5 : 1,
             transition: "opacity 0.2s ease-out",
           }}
         >
-          {/* Chat Header - Fixed at top of card */}
-          <div
-            className="flex items-center gap-4 p-1 border-b shrink-0"
-            style={{ borderColor: "rgba(255, 255, 255, 0.1)" }}
-          >
-            {/* Left avatar (invisible for spacing) */}
-            <div className="w-10 h-10 rounded-full opacity-0" />
-
-            {/* Center - Chat info */}
-            <div className="flex-1 flex flex-col items-center justify-center h-11 gap-0.5">
-              <p className="text-base font-medium text-white leading-5 tracking-[-0.176px] truncate max-w-full">
-                {currentSummary.title}
-              </p>
-              {currentSummary.messageCount && (
-                <p className="text-[13px] text-white/60 leading-5">
-                  {currentSummary.messageCount.toLocaleString()} messages
-                </p>
-              )}
-            </div>
-
-            {/* Right avatar */}
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-medium text-white"
-              style={{ backgroundColor: avatarColor }}
-            >
-              {firstLetter}
-            </div>
-          </div>
-
-          {/* Summary Content - Scrollable */}
-          <div
-            ref={scrollContainerRef}
-            onScroll={handleScroll}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            className="flex-1 overflow-y-auto px-5 pt-4 pb-6 min-h-0"
-            style={{ WebkitOverflowScrolling: "touch" }}
-          >
+          <div className="flex flex-col gap-3 pt-4">
             {currentSummary.topics.map((topic) => (
-              <div key={topic.id} className="flex flex-col">
-                {/* Topic Title */}
-                <h2 className="text-2xl font-semibold text-white leading-8 pb-2">
-                  {topic.title}
-                </h2>
-
-                {/* Paragraphs */}
-                {topic.paragraphs.map((paragraph, index) => (
-                  <div key={paragraph.id} className="flex flex-col">
-                    <p
-                      className={`text-base text-white leading-7 ${
-                        index > 0 ? "pt-2" : ""
-                      }`}
-                    >
-                      {paragraph.text}
-                    </p>
-                    {/* Sources */}
-                    <SourceAvatars sources={paragraph.sources} />
-                  </div>
-                ))}
-              </div>
+              <TopicCard key={topic.id} topic={topic} />
             ))}
-
-            {/* Bottom indicator */}
-            {nextSummary && (
-              <div className="flex flex-col items-center justify-center pt-6 pb-2">
-                <p className="text-sm text-white/40">
-                  {isTransitioning ? "Loading..." : "Pull up for next summary"}
-                </p>
-              </div>
-            )}
-
-            {/* End message */}
-            {!nextSummary && (
-              <div className="flex flex-col items-center justify-center pt-6 pb-2">
-                <p className="text-sm text-white/40">You&apos;ve caught up!</p>
-              </div>
-            )}
           </div>
+
+          {/* Bottom indicator */}
+          {nextSummary && (
+            <div className="flex flex-col items-center justify-center pt-6 pb-2">
+              <p className="text-sm text-white/40">
+                {isTransitioning ? "Loading..." : "Pull up for next summary"}
+              </p>
+            </div>
+          )}
+
+          {/* End message */}
+          {!nextSummary && (
+            <div className="flex flex-col items-center justify-center pt-6 pb-2">
+              <p className="text-sm text-white/40">You&apos;ve caught up!</p>
+            </div>
+          )}
+
+          {/* Bottom padding for safe area */}
+          <div className="h-24 shrink-0" />
         </div>
       </div>
-
-      {/* Bottom padding for safe area */}
-      <div className="h-32 shrink-0" />
     </main>
   );
 }

@@ -1,23 +1,73 @@
 "use client";
 
-import { hapticFeedback } from "@telegram-apps/sdk-react";
-import { ChevronRight } from "lucide-react";
+import { hapticFeedback, themeParams } from "@telegram-apps/sdk-react";
+import { ChevronRight, CircleHelp, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 // Mock chat data - placeholder for now
 const MOCK_CHATS = [
-  { id: "1", title: "Telegram Developers Community", messageCount: 2986 },
-  { id: "2", title: "X Live 🎻 classic", messageCount: 1523 },
-  { id: "3", title: "Gift Concepts", messageCount: 847 },
-  { id: "4", title: "TON Community", messageCount: 4521 },
-  { id: "5", title: "Solana Developers", messageCount: 3298 },
-  { id: "6", title: "UX Live 🎻 classic", messageCount: 912 },
-  { id: "7", title: "Crypto Trading", messageCount: 7834 },
-  { id: "8", title: "Web3 Builders", messageCount: 2156 },
-  { id: "9", title: "DeFi Discussion", messageCount: 1847 },
-  { id: "10", title: "NFT Collectors", messageCount: 956 },
-  { id: "11", title: "Blockchain News", messageCount: 3412 },
-  { id: "12", title: "Smart Contracts", messageCount: 1289 },
+  {
+    id: "1",
+    title: "The Loyal Community",
+    subtitle:
+      "Blockchain technology offers a way to coordinate many independent actors around a single, append-only record of events.",
+  },
+  {
+    id: "2",
+    title: "X Live 🎻 classic",
+    subtitle: "Latest updates and discussions about live performances",
+  },
+  {
+    id: "3",
+    title: "Gift Concepts",
+    subtitle: "Creative ideas for digital gifts and collectibles",
+  },
+  {
+    id: "4",
+    title: "TON Community",
+    subtitle: "The Open Network community discussions and updates",
+  },
+  {
+    id: "5",
+    title: "Solana Developers",
+    subtitle: "Building on Solana blockchain",
+  },
+  {
+    id: "6",
+    title: "UX Live 🎻 classic",
+    subtitle: "User experience design discussions",
+  },
+  {
+    id: "7",
+    title: "Crypto Trading",
+    subtitle: "Market analysis and trading strategies",
+  },
+  {
+    id: "8",
+    title: "Web3 Builders",
+    subtitle: "Decentralized application development",
+  },
+  {
+    id: "9",
+    title: "DeFi Discussion",
+    subtitle: "Decentralized finance protocols and strategies",
+  },
+  {
+    id: "10",
+    title: "NFT Collectors",
+    subtitle: "Digital art and collectibles marketplace",
+  },
+  {
+    id: "11",
+    title: "Blockchain News",
+    subtitle: "Latest news from the blockchain ecosystem",
+  },
+  {
+    id: "12",
+    title: "Smart Contracts",
+    subtitle: "Smart contract development and security",
+  },
 ];
 
 // Generate a consistent color based on the chat title
@@ -46,12 +96,17 @@ function getAvatarColor(title: string): string {
 // Get the first letter of the title (skip emojis)
 function getFirstLetter(title: string): string {
   // Remove emojis and get first alphanumeric character
-  const cleaned = title.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, "").trim();
+  const cleaned = title
+    .replace(
+      /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu,
+      ""
+    )
+    .trim();
   return cleaned.charAt(0).toUpperCase() || title.charAt(0).toUpperCase();
 }
 
 interface ChatItemProps {
-  chat: { id: string; title: string; messageCount?: number };
+  chat: { id: string; title: string; subtitle?: string };
   onClick: () => void;
 }
 
@@ -74,9 +129,14 @@ function ChatItem({ chat, onClick }: ChatItemProps) {
         </div>
       </div>
 
-      {/* Title */}
-      <div className="flex-1 py-2.5 min-w-0">
+      {/* Title and Subtitle */}
+      <div className="flex-1 py-2.5 min-w-0 flex flex-col gap-0.5">
         <p className="text-base text-white leading-5 truncate">{chat.title}</p>
+        {chat.subtitle && (
+          <p className="text-[13px] text-white/60 leading-4 truncate">
+            {chat.subtitle}
+          </p>
+        )}
       </div>
 
       {/* Chevron */}
@@ -87,38 +147,183 @@ function ChatItem({ chat, onClick }: ChatItemProps) {
   );
 }
 
+interface EmptyStateBannerProps {
+  onClose: () => void;
+  onConnectChats: () => void;
+}
+
+function EmptyStateBanner({ onClose, onConnectChats }: EmptyStateBannerProps) {
+  return (
+    <div className="px-3 pt-1 pb-2">
+      <div className="relative bg-white/[0.06] rounded-2xl overflow-hidden pl-4 pr-11 py-4">
+        <div className="flex flex-col gap-3">
+          {/* Text Content */}
+          <div className="flex flex-col gap-0.5">
+            <p className="text-base font-medium text-white leading-5 tracking-[-0.18px]">
+              No summarized chats yet
+            </p>
+            <p className="text-[13px] text-white/60 leading-[18px] tracking-[-0.08px]">
+              Connect your Telegram groups to start getting summaries here.
+            </p>
+          </div>
+
+          {/* Connect Button */}
+          <div>
+            <button
+              onClick={onConnectChats}
+              className="bg-white/[0.06] backdrop-blur-xl rounded-full px-4 py-2 active:opacity-80 transition-opacity"
+            >
+              <span className="text-sm font-medium text-white leading-5">
+                Connect Chats
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 p-1 active:opacity-80 transition-opacity"
+        >
+          <X size={24} strokeWidth={1.5} className="text-white/60" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface TooltipProps {
+  text: string;
+  color: string;
+}
+
+function Tooltip({ text, color }: TooltipProps) {
+  return (
+    <div className="absolute top-full right-0 mt-2.5 z-20">
+      {/* Tail/Arrow - centered under the ? icon (button is ~48px, center at 24px) */}
+      <div className="absolute -top-2 right-[18px] w-4 h-2 overflow-hidden">
+        <div
+          className="w-4 h-4 rotate-45 origin-bottom-left"
+          style={{ backgroundColor: color }}
+        />
+      </div>
+      {/* Tooltip Body */}
+      <div
+        className="rounded-xl p-2.5 shadow-[0px_0px_4px_0px_rgba(0,0,0,0.04),0px_4px_32px_0px_rgba(0,0,0,0.16)]"
+        style={{ backgroundColor: color }}
+      >
+        <p className="text-[13px] text-white leading-4 text-center whitespace-nowrap">{text}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function SummariesPage() {
   const router = useRouter();
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
+  const [isTooltipVisible, setIsTooltipVisible] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
-  const handleChatClick = (chat: typeof MOCK_CHATS[0]) => {
+  const [buttonColor] = useState(() => {
+    try {
+      return themeParams.buttonColor() || "#2990ff";
+    } catch {
+      return "#2990ff";
+    }
+  });
+
+  // Close tooltip when clicking outside
+  useEffect(() => {
+    if (!isTooltipVisible) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        tooltipRef.current &&
+        !tooltipRef.current.contains(event.target as Node)
+      ) {
+        setIsTooltipVisible(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isTooltipVisible]);
+
+  const handleHelpClick = () => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    setIsTooltipVisible((prev) => !prev);
+  };
+
+  const handleChatClick = (chat: (typeof MOCK_CHATS)[0]) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
     router.push(`/telegram/summaries/feed?chatId=${chat.id}`);
   };
 
+  const handleBannerClose = () => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    setIsBannerDismissed(true);
+  };
+
+  const handleConnectChats = () => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("medium");
+    }
+    // TODO: Navigate to connect chats flow
+  };
+
   return (
     <main
-      className="min-h-screen text-white font-sans overflow-hidden relative flex flex-col"
+      className="h-screen text-white font-sans overflow-y-auto relative flex flex-col"
       style={{ background: "#16161a" }}
     >
-      {/* Header */}
+      {/* Header - fixed at top */}
       <div
-        className="px-4"
-        style={{ paddingTop: "calc(var(--app-safe-top, 20px) + 16px)" }}
+        className="sticky top-0 z-10 border-b border-white/10"
+        style={{
+          paddingTop: "calc(var(--app-safe-top, 20px) + 4px)",
+          background: "#16161a",
+        }}
       >
-        <h1 className="text-xl font-medium text-white leading-6 py-3">Chats</h1>
+        <div className="flex items-center pl-4 pr-1.5">
+          <div className="flex-1 py-3 pr-3">
+            <h1 className="text-xl font-medium text-white leading-6">Chats</h1>
+          </div>
+          <div className="h-12 flex items-center relative" ref={tooltipRef}>
+            <button className="p-2.5" onClick={handleHelpClick}>
+              <CircleHelp
+                size={28}
+                strokeWidth={1.5}
+                className="text-white opacity-40"
+              />
+            </button>
+            {isTooltipVisible && (
+              <Tooltip
+                text="These are your Telegram chats that have summaries available."
+                color={buttonColor}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Chat List or Empty State */}
       {MOCK_CHATS.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-8 pb-32 pt-6">
-          <p className="text-base text-white/60 leading-5 text-center">
-            No summarized chats yet
-          </p>
+        <div className="flex-1 flex flex-col pt-1">
+          {!isBannerDismissed && (
+            <EmptyStateBanner
+              onClose={handleBannerClose}
+              onConnectChats={handleConnectChats}
+            />
+          )}
         </div>
       ) : (
-        <div className="flex-1 flex flex-col pt-1 pb-4 px-0 overflow-y-auto">
+        <div className="flex-1 flex flex-col pt-1 pb-4 px-0">
           {MOCK_CHATS.map((chat) => (
             <ChatItem
               key={chat.id}
