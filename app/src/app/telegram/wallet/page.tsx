@@ -14,6 +14,7 @@ import {
   useSignal,
   viewport
 } from "@telegram-apps/sdk-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, ChevronRight, Clock, Copy } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -30,6 +31,7 @@ import SendSheet, {
 import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
+  DISPLAY_CURRENCY_KEY,
   SOL_PRICE_USD,
   TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
@@ -68,6 +70,10 @@ import {
   showMainButton,
   showReceiveShareButton
 } from "@/lib/telegram/mini-app/buttons";
+import {
+  getCloudValue,
+  setCloudValue
+} from "@/lib/telegram/mini-app/cloud-storage";
 import {
   cleanInitData,
   createValidationBytesFromRawInitData,
@@ -123,6 +129,68 @@ const ensureWalletBalanceSubscription = async (walletAddress: string) => {
   return walletBalanceSubscriptionPromise;
 };
 
+// SOL price cache (shared across page visits)
+let cachedSolPriceUsd: number | null = null;
+let solPriceFetchedAt: number | null = null;
+const SOL_PRICE_CACHE_TTL = 60_000; // 1 minute
+
+const getCachedSolPrice = (): number | null => {
+  if (cachedSolPriceUsd === null || solPriceFetchedAt === null) return null;
+  // Return cached price if within TTL
+  if (Date.now() - solPriceFetchedAt < SOL_PRICE_CACHE_TTL) {
+    return cachedSolPriceUsd;
+  }
+  return cachedSolPriceUsd; // Still return stale price, but allow refresh
+};
+
+const setCachedSolPrice = (price: number): void => {
+  cachedSolPriceUsd = price;
+  solPriceFetchedAt = Date.now();
+};
+
+// Stars balance cache (keyed by wallet address)
+const starsBalanceCache = new Map<string, number>();
+
+const getCachedStarsBalance = (walletAddress: string | null): number | null => {
+  if (!walletAddress) return null;
+  const cached = starsBalanceCache.get(walletAddress);
+  return typeof cached === "number" ? cached : null;
+};
+
+const setCachedStarsBalance = (walletAddress: string | null, stars: number): void => {
+  if (!walletAddress) return;
+  starsBalanceCache.set(walletAddress, stars);
+};
+
+// Incoming transactions cache (keyed by username)
+let cachedUsername: string | null = null;
+const incomingTransactionsCache = new Map<string, IncomingTransaction[]>();
+
+const getCachedIncomingTransactions = (username: string | null): IncomingTransaction[] | null => {
+  if (!username) return null;
+  return incomingTransactionsCache.get(username) ?? null;
+};
+
+const setCachedIncomingTransactions = (username: string | null, txns: IncomingTransaction[]): void => {
+  if (!username) return;
+  cachedUsername = username;
+  incomingTransactionsCache.set(username, txns);
+};
+
+// Track wallet address at module level for cache lookups on remount
+let cachedWalletAddress: string | null = null;
+
+// Display currency preference cache
+let cachedDisplayCurrency: "USD" | "SOL" | null = null;
+
+// Check if we have enough cached data to skip loading
+const hasCachedWalletData = (): boolean => {
+  if (!cachedWalletAddress) return false;
+  const hasBalance = getCachedWalletBalance(cachedWalletAddress) !== null;
+  const hasPrice = getCachedSolPrice() !== null;
+  return hasBalance && hasPrice;
+};
+
 export default function Home() {
   const rawInitData = useRawInitData();
   const { bottom: _safeBottom } = useTelegramSafeArea();
@@ -138,19 +206,25 @@ export default function Home() {
   ] = useState(false);
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [balance, setBalance] = useState<number | null>(null);
-  const [starsBalance, setStarsBalance] = useState<number>(0);
-  const [isStarsLoading, setIsStarsLoading] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(() => cachedWalletAddress);
+  const [balance, setBalance] = useState<number | null>(() =>
+    cachedWalletAddress ? getCachedWalletBalance(cachedWalletAddress) : null
+  );
+  const [starsBalance, setStarsBalance] = useState<number>(() =>
+    cachedWalletAddress ? (getCachedStarsBalance(cachedWalletAddress) ?? 0) : 0
+  );
+  const [isStarsLoading, setIsStarsLoading] = useState(() =>
+    !cachedWalletAddress || getCachedStarsBalance(cachedWalletAddress) === null
+  );
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !hasCachedWalletData());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
   const [incomingTransactions, setIncomingTransactions] = useState<
     IncomingTransaction[]
-  >([]);
+  >(() => (cachedUsername ? getCachedIncomingTransactions(cachedUsername) ?? [] : []));
   const [walletTransactions, setWalletTransactions] = useState<Transaction[]>(
-    []
+    () => (cachedWalletAddress ? walletTransactionsCache.get(cachedWalletAddress) ?? [] : [])
   );
   const [isFetchingTransactions, setIsFetchingTransactions] = useState(false);
   const [
@@ -175,17 +249,23 @@ export default function Home() {
     recipient: ""
   });
   const [isSendingTransaction, setIsSendingTransaction] = useState(false);
-  const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">("USD");
+  const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">(
+    () => cachedDisplayCurrency ?? "USD"
+  );
   const [addressCopied, setAddressCopied] = useState(false);
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
-  const [solPriceUsd, setSolPriceUsd] = useState<number | null>(null);
-  const [isSolPriceLoading, setIsSolPriceLoading] = useState(true);
+  const [solPriceUsd, setSolPriceUsd] = useState<number | null>(() => getCachedSolPrice());
+  const [isSolPriceLoading, setIsSolPriceLoading] = useState(() => getCachedSolPrice() === null);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(
     secondaryButton.setParams.isAvailable
   );
   const ensuredWalletRef = useRef(false);
+
+  // Track seen transaction IDs to detect new ones for animation
+  const seenTransactionIdsRef = useRef<Set<string>>(new Set());
+  const [newTransactionIds, setNewTransactionIds] = useState<Set<string>>(new Set());
 
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -392,15 +472,18 @@ export default function Home() {
     async ({ force = false }: { force?: boolean } = {}) => {
       if (!walletAddress) return;
 
-      if (!force) {
-        const cached = walletTransactionsCache.get(walletAddress);
-        if (cached) {
-          setWalletTransactions(cached);
-          return;
-        }
+      const cached = walletTransactionsCache.get(walletAddress);
+
+      if (!force && cached) {
+        // Use cached data immediately, no loading state
+        setWalletTransactions(cached);
+        return;
       }
 
-      setIsFetchingTransactions(true);
+      // Only show loading if we don't have cached data to display
+      if (!cached) {
+        setIsFetchingTransactions(true);
+      }
       try {
         const { transfers } = await getAccountTransactionHistory(
           new PublicKey(walletAddress),
@@ -796,11 +879,19 @@ export default function Home() {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = 1000;
 
+    // Check cache first - if we have a cached price, use it immediately
+    const cached = getCachedSolPrice();
+    if (cached !== null) {
+      setSolPriceUsd(cached);
+      setIsSolPriceLoading(false);
+    }
+
     const loadPrice = async () => {
       while (retryCount < MAX_RETRIES && isMounted) {
         try {
           const price = await fetchSolUsdPrice();
           if (!isMounted) return;
+          setCachedSolPrice(price);
           setSolPriceUsd(price);
           setIsSolPriceLoading(false);
           return; // Success, exit
@@ -815,6 +906,7 @@ export default function Home() {
       // All retries failed, use fallback price
       if (isMounted) {
         console.warn("Using fallback SOL price after all retries failed");
+        setCachedSolPrice(SOL_PRICE_USD);
         setSolPriceUsd(SOL_PRICE_USD);
         setIsSolPriceLoading(false);
       }
@@ -840,6 +932,13 @@ export default function Home() {
         if (!username) {
           setIncomingTransactions([]);
           return;
+        }
+
+        // Check cache first - state may have been initialized from it
+        const cached = getCachedIncomingTransactions(username);
+        if (cached !== null) {
+          // Use cached data, refresh in background
+          setIncomingTransactions(cached);
         }
 
         const provider = await getWalletProvider();
@@ -872,6 +971,7 @@ export default function Home() {
           mappedTransactions.length,
           mappedTransactions
         );
+        setCachedIncomingTransactions(username, mappedTransactions);
         setIncomingTransactions(mappedTransactions);
       } catch (error) {
         console.error("Failed to fetch deposits", error);
@@ -951,6 +1051,23 @@ export default function Home() {
     };
   }, []);
 
+  // Load display currency preference from cloud storage
+  useEffect(() => {
+    if (cachedDisplayCurrency !== null) return; // Already loaded from cache
+
+    void (async () => {
+      try {
+        const stored = await getCloudValue(DISPLAY_CURRENCY_KEY);
+        if (stored === "USD" || stored === "SOL") {
+          cachedDisplayCurrency = stored;
+          setDisplayCurrency(stored);
+        }
+      } catch (error) {
+        console.error("Failed to load display currency preference", error);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     if (ensuredWalletRef.current) return;
     ensuredWalletRef.current = true;
@@ -963,14 +1080,29 @@ export default function Home() {
           isNew,
           publicKey: publicKeyBase58
         });
+
+        // Store wallet address in module-level cache for future mounts
+        cachedWalletAddress = publicKeyBase58;
         setWalletAddress(publicKeyBase58);
 
+        // Check if we already have cached balance (from previous visit)
         const cachedBalance = getCachedWalletBalance(publicKeyBase58);
-        const balanceLamports =
-          cachedBalance !== null ? cachedBalance : await getWalletBalance();
-        setCachedWalletBalance(publicKeyBase58, balanceLamports);
-        setBalance(balanceLamports);
-        setIsLoading(false);
+
+        if (cachedBalance !== null) {
+          // We have cache - state was already initialized from it
+          // Just refresh in background without loading state
+          setIsLoading(false);
+          void getWalletBalance().then(freshBalance => {
+            setCachedWalletBalance(publicKeyBase58, freshBalance);
+            setBalance(freshBalance);
+          });
+        } else {
+          // First load - need to fetch balance
+          const balanceLamports = await getWalletBalance();
+          setCachedWalletBalance(publicKeyBase58, balanceLamports);
+          setBalance(balanceLamports);
+          setIsLoading(false);
+        }
       } catch (error) {
         console.error("Failed to ensure wallet keypair", error);
         setIsLoading(false);
@@ -988,19 +1120,33 @@ export default function Home() {
 
     let isCancelled = false;
 
-    const loadStarsBalance = async () => {
+    // Check if we have cached stars (state may have been initialized from it)
+    const hasCache = getCachedStarsBalance(walletAddress) !== null;
+
+    // Only show loading if we don't have cache
+    if (!hasCache) {
       setIsStarsLoading(true);
+    } else {
+      // Ensure loading is false if we have cache
+      setIsStarsLoading(false);
+    }
+
+    const loadStarsBalance = async () => {
       try {
         const invoice = await fetchInvoiceState(walletAddress);
         if (isCancelled) return;
         const remaining = Number.isFinite(invoice.remainingStars)
           ? Number(invoice.remainingStars)
           : 0;
+        setCachedStarsBalance(walletAddress, remaining);
         setStarsBalance(remaining);
       } catch (error) {
         if (!isCancelled) {
           console.error("Failed to fetch Stars balance", error);
-          setStarsBalance(0);
+          // Only reset to 0 if we don't have cached data
+          if (!hasCache) {
+            setStarsBalance(0);
+          }
         }
       } finally {
         if (!isCancelled) {
@@ -1298,6 +1444,35 @@ export default function Home() {
     return items.slice(0, 10);
   }, [incomingTransactions, walletTransactions]);
 
+  // Detect new transactions for animation
+  useEffect(() => {
+    const currentIds = new Set(limitedActivityItems.map(item => item.transaction.id));
+    const previousIds = seenTransactionIdsRef.current;
+
+    // Find newly added transactions
+    const newIds = new Set<string>();
+    for (const id of currentIds) {
+      if (!previousIds.has(id)) {
+        newIds.add(id);
+      }
+    }
+
+    // Update seen transactions
+    seenTransactionIdsRef.current = currentIds;
+
+    // If we have new transactions, mark them for animation
+    if (newIds.size > 0) {
+      setNewTransactionIds(newIds);
+
+      // Clear the new status after animation completes (500ms)
+      const timer = setTimeout(() => {
+        setNewTransactionIds(new Set());
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [limitedActivityItems]);
+
   return (
     <>
       <main
@@ -1351,7 +1526,12 @@ export default function Home() {
                   if (hapticFeedback.selectionChanged.isAvailable()) {
                     hapticFeedback.selectionChanged();
                   }
-                  setDisplayCurrency(prev => (prev === "USD" ? "SOL" : "USD"));
+                  setDisplayCurrency(prev => {
+                    const newCurrency = prev === "USD" ? "SOL" : "USD";
+                    cachedDisplayCurrency = newCurrency;
+                    void setCloudValue(DISPLAY_CURRENCY_KEY, newCurrency);
+                    return newCurrency;
+                  });
                 }}
                 className="active:scale-[0.98] transition-transform"
               >
@@ -1421,19 +1601,41 @@ export default function Home() {
                   mixBlendMode: "lighten"
                 }}
               >
-                {/* Skeleton Icon */}
+                {/* Left - Icon */}
                 <div className="py-1.5 pr-3">
-                  <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.06)",
+                      mixBlendMode: "lighten"
+                    }}
+                  >
+                    <Image
+                      src="/icons/telegram-stars.svg"
+                      alt="Stars"
+                      width={28}
+                      height={28}
+                    />
+                  </div>
                 </div>
-                {/* Skeleton Text */}
-                <div className="flex-1 py-2.5 flex flex-col gap-1.5">
-                  <div className="w-12 h-5 bg-white/5 animate-pulse rounded" />
-                  <div className="w-16 h-4 bg-white/5 animate-pulse rounded" />
+
+                {/* Middle - Text */}
+                <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                  <p className="text-base text-white leading-5">Stars</p>
+                  <p className="text-[13px] text-white/60 leading-4">
+                    for free gas
+                  </p>
                 </div>
-                {/* Skeleton Value */}
+
+                {/* Right - Skeleton Value */}
                 <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
-                  <div className="w-12 h-5 bg-white/5 animate-pulse rounded" />
-                  <div className="w-10 h-4 bg-white/5 animate-pulse rounded" />
+                  <div className="w-10 h-5 bg-white/5 animate-pulse rounded" />
+                  <div className="w-8 h-4 bg-white/5 animate-pulse rounded" />
+                </div>
+
+                {/* Chevron */}
+                <div className="pl-3 py-2 flex items-center justify-center">
+                  <ChevronRight size={16} strokeWidth={1.5} className="text-white/60" />
                 </div>
               </div>
             ) : (
@@ -1503,9 +1705,15 @@ export default function Home() {
             // Loading state - show skeleton transaction cards
             if (isActivityLoading) {
               return (
-                <div className="flex-1 px-4 pb-4">
-                  <div className="flex flex-col gap-2">
-                    {/* Skeleton Transaction Card 1 */}
+                <>
+                  <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+                    <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
+                      Activity
+                    </p>
+                  </div>
+                  <div className="flex-1 px-4 pb-4">
+                    <div className="flex flex-col gap-2">
+                      {/* Skeleton Transaction Card 1 */}
                     <div
                       className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
                       style={{
@@ -1547,6 +1755,7 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
+                </>
               );
             }
 
@@ -1619,20 +1828,175 @@ export default function Home() {
                 </div>
                 <div className="flex-1 px-4 pb-4">
                   <div className="flex flex-col gap-2 pb-36">
-                    {limitedActivityItems.map(item => {
-                      if (item.type === "incoming") {
+                    <AnimatePresence initial={false} mode="popLayout">
+                      {limitedActivityItems.map(item => {
+                        const isNewTransaction = newTransactionIds.has(item.transaction.id);
+
+                        if (item.type === "incoming") {
+                          const transaction = item.transaction;
+                          const isClaiming = claimingTransactionId === transaction.id;
+                          return (
+                            <motion.button
+                              key={transaction.id}
+                              layout
+                              initial={isNewTransaction ? { opacity: 0, scale: 0.85, y: -10 } : false}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.85 }}
+                              transition={{
+                                layout: { type: "spring", stiffness: 500, damping: 35 },
+                                opacity: { duration: 0.25 },
+                                scale: { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }
+                              }}
+                              onClick={() =>
+                                !isClaiming && handleOpenTransactionDetails(transaction)
+                              }
+                              disabled={isClaiming}
+                              className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity ${
+                                isClaiming ? "opacity-60" : ""
+                              }`}
+                              style={{
+                                background: "rgba(255, 255, 255, 0.06)",
+                                mixBlendMode: "lighten"
+                              }}
+                            >
+                              {/* Left - Icon */}
+                              <div className="py-1.5 pr-3">
+                                <div
+                                  className="w-12 h-12 rounded-full flex items-center justify-center"
+                                  style={{ background: "rgba(50, 229, 94, 0.15)" }}
+                                >
+                                  <ArrowDown
+                                    className="w-7 h-7"
+                                    strokeWidth={1.5}
+                                    style={{ color: "#32e55e" }}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Middle - Text */}
+                              <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                                <p className="text-base text-white leading-5">Received</p>
+                                <p className="text-[13px] text-white/60 leading-4">
+                                  from {formatSenderAddress(transaction.sender)}
+                                </p>
+                              </div>
+
+                              {/* Right - Claim Badge */}
+                              <div className="py-2.5 pl-3">
+                                <div
+                                  className="px-4 py-2 rounded-full text-sm text-white leading-5"
+                                  style={{
+                                    background:
+                                      "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
+                                  }}
+                                >
+                                  {isClaiming
+                                    ? "Claiming..."
+                                    : `Claim ${formatTransactionAmount(transaction.amountLamports)} SOL`}
+                                </div>
+                              </div>
+                            </motion.button>
+                          );
+                        }
+
+                        // Wallet transaction
                         const transaction = item.transaction;
-                        const isClaiming = claimingTransactionId === transaction.id;
+                        const isIncoming = transaction.type === "incoming";
+                        const isPending = transaction.type === "pending";
+                        const transferTypeLabel =
+                          transaction.transferType === "store"
+                            ? "Store data"
+                            : transaction.transferType === "verify_telegram_init_data"
+                              ? "Verify data"
+                            : null;
+                        const counterparty = isIncoming
+                          ? transaction.sender || "Unknown sender"
+                          : transaction.recipient || "Unknown recipient";
+                        const isUnknownRecipient = counterparty
+                          .toLowerCase()
+                          .startsWith("unknown recipient");
+                        const formattedCounterparty = isUnknownRecipient
+                          ? counterparty
+                          : counterparty.startsWith("@")
+                            ? counterparty
+                            : formatSenderAddress(counterparty);
+                        const isEffectivelyZero =
+                          Math.abs(transaction.amountLamports) <
+                          LAMPORTS_PER_SOL / 10000; // below 0.0001 SOL displays as 0
+                        const amountPrefix = isEffectivelyZero
+                          ? ""
+                          : isIncoming
+                            ? "+"
+                            : "−";
+                        const amountColor = isIncoming
+                          ? "#32e55e"
+                          : isPending
+                            ? "#00b1fb"
+                            : "white";
+                        const timestamp = new Date(transaction.timestamp);
+
+                        // Compact view for store/verify transactions
+                        const isCompactTransaction = transferTypeLabel !== null;
+
+                        if (isCompactTransaction) {
+                          return (
+                            <motion.button
+                              key={transaction.id}
+                              layout
+                              initial={isNewTransaction ? { opacity: 0, scale: 0.85, y: -10 } : false}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.85 }}
+                              transition={{
+                                layout: { type: "spring", stiffness: 500, damping: 35 },
+                                opacity: { duration: 0.25 },
+                                scale: { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }
+                              }}
+                              onClick={() => handleOpenWalletTransactionDetails(transaction)}
+                              className="flex items-center py-2 px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
+                              style={{
+                                background: "rgba(255, 255, 255, 0.06)",
+                                mixBlendMode: "lighten"
+                              }}
+                            >
+                              {/* Left - Text */}
+                              <div className="flex-1 flex items-center">
+                                <p className="text-sm text-white/60 leading-5">
+                                  {transferTypeLabel}
+                                </p>
+                              </div>
+
+                              {/* Right - Date only */}
+                              <div className="pl-3">
+                                <p className="text-[13px] text-white/40 leading-4">
+                                  {timestamp.toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric"
+                                  })}
+                                  ,{" "}
+                                  {timestamp.toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit"
+                                  })}
+                                </p>
+                              </div>
+                            </motion.button>
+                          );
+                        }
+
                         return (
-                          <button
+                          <motion.button
                             key={transaction.id}
-                            onClick={() =>
-                              !isClaiming && handleOpenTransactionDetails(transaction)
-                            }
-                            disabled={isClaiming}
-                            className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity ${
-                              isClaiming ? "opacity-60" : ""
-                            }`}
+                            layout
+                            initial={isNewTransaction ? { opacity: 0, scale: 0.85, y: -10 } : false}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.85 }}
+                            transition={{
+                              layout: { type: "spring", stiffness: 500, damping: 35 },
+                              opacity: { duration: 0.25 },
+                              scale: { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }
+                            }}
+                            onClick={() => handleOpenWalletTransactionDetails(transaction)}
+                            className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
                             style={{
                               background: "rgba(255, 255, 255, 0.06)",
                               mixBlendMode: "lighten"
@@ -1642,102 +2006,67 @@ export default function Home() {
                             <div className="py-1.5 pr-3">
                               <div
                                 className="w-12 h-12 rounded-full flex items-center justify-center"
-                                style={{ background: "rgba(50, 229, 94, 0.15)" }}
+                                style={{
+                                  background: isIncoming
+                                    ? "rgba(50, 229, 94, 0.15)"
+                                    : isPending
+                                      ? "rgba(0, 177, 251, 0.15)"
+                                      : "rgba(255, 255, 255, 0.06)",
+                                  mixBlendMode:
+                                    isIncoming || isPending ? "normal" : "lighten"
+                                }}
                               >
-                                <ArrowDown
-                                  className="w-7 h-7"
-                                  strokeWidth={1.5}
-                                  style={{ color: "#32e55e" }}
-                                />
+                                {isIncoming ? (
+                                  <ArrowDown
+                                    className="w-7 h-7"
+                                    strokeWidth={1.5}
+                                    style={{ color: "#32e55e" }}
+                                  />
+                                ) : isPending ? (
+                                  <Clock
+                                    className="w-7 h-7"
+                                    strokeWidth={1.5}
+                                    style={{ color: "#00b1fb" }}
+                                  />
+                                ) : (
+                                  <ArrowUp
+                                    className="w-7 h-7 text-white/60"
+                                    strokeWidth={1.5}
+                                  />
+                                )}
                               </div>
                             </div>
 
                             {/* Middle - Text */}
                             <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                              <p className="text-base text-white leading-5">Received</p>
-                              <p className="text-[13px] text-white/60 leading-4">
-                                from {formatSenderAddress(transaction.sender)}
+                              <p className="text-base text-white leading-5">
+                                {isIncoming
+                                  ? "Received"
+                                  : isPending
+                                    ? "To be claimed"
+                                    : "Sent"}
                               </p>
+                              {!(isPending === false && !isIncoming && isUnknownRecipient) && (
+                                <p className="text-[13px] text-white/60 leading-4">
+                                  {isIncoming ? "from" : isPending ? "by" : "to"}{" "}
+                                  {formattedCounterparty}
+                                </p>
+                              )}
                             </div>
 
-                            {/* Right - Claim Badge */}
-                            <div className="py-2.5 pl-3">
-                              <div
-                                className="px-4 py-2 rounded-full text-sm text-white leading-5"
-                                style={{
-                                  background:
-                                    "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
-                                }}
+                            {/* Right - Value */}
+                            <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
+                              <p
+                                className="text-base leading-5"
+                                style={{ color: amountColor }}
                               >
-                                {isClaiming
-                                  ? "Claiming..."
-                                  : `Claim ${formatTransactionAmount(transaction.amountLamports)} SOL`}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      }
-
-                      // Wallet transaction
-                      const transaction = item.transaction;
-                      const isIncoming = transaction.type === "incoming";
-                      const isPending = transaction.type === "pending";
-                      const transferTypeLabel =
-                        transaction.transferType === "store"
-                          ? "Store data"
-                          : transaction.transferType === "verify_telegram_init_data"
-                            ? "Verify data"
-                          : null;
-                      const counterparty = isIncoming
-                        ? transaction.sender || "Unknown sender"
-                        : transaction.recipient || "Unknown recipient";
-                      const isUnknownRecipient = counterparty
-                        .toLowerCase()
-                        .startsWith("unknown recipient");
-                      const formattedCounterparty = isUnknownRecipient
-                        ? counterparty
-                        : counterparty.startsWith("@")
-                          ? counterparty
-                          : formatSenderAddress(counterparty);
-                      const isEffectivelyZero =
-                        Math.abs(transaction.amountLamports) <
-                        LAMPORTS_PER_SOL / 10000; // below 0.0001 SOL displays as 0
-                      const amountPrefix = isEffectivelyZero
-                        ? ""
-                        : isIncoming
-                          ? "+"
-                          : "−";
-                      const amountColor = isIncoming
-                        ? "#32e55e"
-                        : isPending
-                          ? "#00b1fb"
-                          : "white";
-                      const timestamp = new Date(transaction.timestamp);
-
-                      // Compact view for store/verify transactions
-                      const isCompactTransaction = transferTypeLabel !== null;
-
-                      if (isCompactTransaction) {
-                        return (
-                          <button
-                            key={transaction.id}
-                            onClick={() => handleOpenWalletTransactionDetails(transaction)}
-                            className="flex items-center py-2 px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                            style={{
-                              background: "rgba(255, 255, 255, 0.06)",
-                              mixBlendMode: "lighten"
-                            }}
-                          >
-                            {/* Left - Text */}
-                            <div className="flex-1 flex items-center">
-                              <p className="text-sm text-white/60 leading-5">
-                                {transferTypeLabel}
+                                {amountPrefix}
+                                {isEffectivelyZero
+                                  ? "0"
+                                  : formatTransactionAmount(transaction.amountLamports)}{" "}
+                                SOL
                               </p>
-                            </div>
-
-                            {/* Right - Date only */}
-                            <div className="pl-3">
-                              <p className="text-[13px] text-white/40 leading-4">
+                              <p className="text-[13px] text-white/60 leading-4">
                                 {timestamp.toLocaleDateString("en-US", {
                                   month: "short",
                                   day: "numeric"
@@ -1749,99 +2078,10 @@ export default function Home() {
                                 })}
                               </p>
                             </div>
-                          </button>
+                          </motion.button>
                         );
-                      }
-
-                      return (
-                        <button
-                          key={transaction.id}
-                          onClick={() => handleOpenWalletTransactionDetails(transaction)}
-                          className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                          style={{
-                            background: "rgba(255, 255, 255, 0.06)",
-                            mixBlendMode: "lighten"
-                          }}
-                        >
-                          {/* Left - Icon */}
-                          <div className="py-1.5 pr-3">
-                            <div
-                              className="w-12 h-12 rounded-full flex items-center justify-center"
-                              style={{
-                                background: isIncoming
-                                  ? "rgba(50, 229, 94, 0.15)"
-                                  : isPending
-                                    ? "rgba(0, 177, 251, 0.15)"
-                                    : "rgba(255, 255, 255, 0.06)",
-                                mixBlendMode:
-                                  isIncoming || isPending ? "normal" : "lighten"
-                              }}
-                            >
-                              {isIncoming ? (
-                                <ArrowDown
-                                  className="w-7 h-7"
-                                  strokeWidth={1.5}
-                                  style={{ color: "#32e55e" }}
-                                />
-                              ) : isPending ? (
-                                <Clock
-                                  className="w-7 h-7"
-                                  strokeWidth={1.5}
-                                  style={{ color: "#00b1fb" }}
-                                />
-                              ) : (
-                                <ArrowUp
-                                  className="w-7 h-7 text-white/60"
-                                  strokeWidth={1.5}
-                                />
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Middle - Text */}
-                          <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                            <p className="text-base text-white leading-5">
-                              {isIncoming
-                                ? "Received"
-                                : isPending
-                                  ? "To be claimed"
-                                  : "Sent"}
-                            </p>
-                            {!(isPending === false && !isIncoming && isUnknownRecipient) && (
-                              <p className="text-[13px] text-white/60 leading-4">
-                                {isIncoming ? "from" : isPending ? "by" : "to"}{" "}
-                                {formattedCounterparty}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Right - Value */}
-                          <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
-                            <p
-                              className="text-base leading-5"
-                              style={{ color: amountColor }}
-                            >
-                              {amountPrefix}
-                              {isEffectivelyZero
-                                ? "0"
-                                : formatTransactionAmount(transaction.amountLamports)}{" "}
-                              SOL
-                            </p>
-                            <p className="text-[13px] text-white/60 leading-4">
-                              {timestamp.toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric"
-                              })}
-                              ,{" "}
-                              {timestamp.toLocaleTimeString([], {
-                                hour: "numeric",
-                                minute: "2-digit"
-                              })}
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })}
+                      })}
+                    </AnimatePresence>
                   </div>
                 </div>
               </>
