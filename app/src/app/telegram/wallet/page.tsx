@@ -291,6 +291,10 @@ export default function Home() {
     new Set()
   );
 
+  // Sticky balance pill state
+  const balanceRef = useRef<HTMLDivElement>(null);
+  const [showStickyBalance, setShowStickyBalance] = useState(false);
+
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
@@ -1515,12 +1519,66 @@ export default function Home() {
     }
   }, [limitedActivityItems]);
 
+  // Track balance visibility for sticky pill
+  useEffect(() => {
+    const balanceElement = balanceRef.current;
+    if (!balanceElement) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Show sticky pill when balance is not visible
+        setShowStickyBalance(!entry.isIntersecting);
+      },
+      {
+        threshold: 0,
+        rootMargin: `-${Math.max(safeAreaInsetTop || 0, 12) + 15}px 0px 0px 0px`,
+      }
+    );
+
+    observer.observe(balanceElement);
+    return () => observer.disconnect();
+  }, [safeAreaInsetTop]);
+
+  const handleScrollToTop = useCallback(() => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   return (
     <>
       <main
         className="min-h-screen text-white font-sans overflow-hidden relative flex flex-col"
         style={{ background: "#16161a" }}
       >
+        {/* Sticky Balance Pill */}
+        <AnimatePresence>
+          {showStickyBalance && !isLoading && (
+            <motion.button
+              initial={{ opacity: 0, y: -20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ duration: 0.2, ease: [0.34, 1.56, 0.64, 1] }}
+              onClick={handleScrollToTop}
+              className="fixed left-1/2 -translate-x-1/2 z-50 flex items-center px-4 py-2 rounded-[54px] active:opacity-80 transition-opacity"
+              style={{
+                top: `${Math.max(safeAreaInsetTop || 0, 12) + 8}px`,
+                background: "rgba(255, 255, 255, 0.06)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+              }}
+            >
+              <span className="text-sm font-medium text-white" style={{ fontVariantNumeric: "tabular-nums" }}>
+                {displayCurrency === "USD"
+                  ? `$${usdBalanceNumeric.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : `${solBalanceNumeric.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })} SOL`}
+              </span>
+            </motion.button>
+          )}
+        </AnimatePresence>
+
         {/* Main Content */}
         <div
           className="relative flex-1 flex flex-col w-full"
@@ -1563,7 +1621,7 @@ export default function Home() {
             )}
 
             {/* Balance Display */}
-            <div className="flex flex-col items-center gap-1.5 mt-1.5">
+            <div ref={balanceRef} className="flex flex-col items-center gap-1.5 mt-1.5">
               <button
                 onClick={() => {
                   if (hapticFeedback.selectionChanged.isAvailable()) {
