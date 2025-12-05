@@ -224,15 +224,20 @@ type TransitionPhase =
 // Spring easing for bouncy feel
 const SPRING_EASING = "cubic-bezier(0.34, 1.56, 0.64, 1)";
 
+// Smooth ease-out for content sliding (no bounce)
+const EASE_OUT = "cubic-bezier(0.0, 0.0, 0.2, 1)";
+
 // Next chat indicator component (arrow + avatar) - fixed at bottom
 function NextChatIndicator({
   nextChat,
   swipeProgress,
   phase,
+  onClick,
 }: {
   nextChat: ChatSummary;
   swipeProgress: number; // 0-1, how far user has swiped
   phase: TransitionPhase;
+  onClick?: () => void;
 }) {
   const avatarColor = getAvatarColor(nextChat.title);
   const firstLetter = getFirstLetter(nextChat.title);
@@ -314,8 +319,9 @@ function NextChatIndicator({
   const transitionOpacity = isSliding ? 0 : 1;
 
   return (
-    <div
-      className="flex flex-col items-center gap-2"
+    <button
+      className="flex flex-col items-center gap-2 cursor-pointer active:opacity-80 transition-opacity"
+      onClick={onClick}
       style={{
         transform: transitionTransform,
         opacity: transitionOpacity,
@@ -374,7 +380,7 @@ function NextChatIndicator({
           {nextChat.title}
         </p>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -395,6 +401,9 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
 
   // Ref to track phase synchronously during touch events (state updates are async)
   const transitionPhaseRef = useRef<TransitionPhase>("idle");
+
+  // Lock to prevent multiple transitions from starting simultaneously
+  const transitionLockRef = useRef(false);
 
   // Touch tracking for overscroll detection
   const touchStartY = useRef<number | null>(null);
@@ -499,13 +508,31 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
 
   // Start the next summary transition with full animation
   const startNextTransition = useCallback(() => {
+    // Guard: prevent multiple simultaneous transitions
     if (
-      currentSummaryIndex >= MOCK_SUMMARIES.length - 1 ||
+      transitionLockRef.current ||
       transitionPhaseRef.current === "content-slide" ||
       transitionPhaseRef.current === "avatar-hold" ||
       transitionPhaseRef.current === "content-enter"
     )
       return;
+
+    // Check if this is the last summary - navigate to chats list instead
+    const isLastSummary = currentSummaryIndex >= MOCK_SUMMARIES.length - 1;
+
+    if (isLastSummary) {
+      // On last summary, just navigate to chats list
+      if (hapticFeedback.impactOccurred.isAvailable()) {
+        hapticFeedback.impactOccurred("light");
+      }
+      setProgress(0);
+      setPhase("idle");
+      router.push("/telegram/summaries");
+      return;
+    }
+
+    // Lock transition
+    transitionLockRef.current = true;
 
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("medium");
@@ -521,7 +548,14 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
 
     // Phase 3: After slide animation completes, switch to next summary and return to idle
     setTimeout(() => {
-      setCurrentSummaryIndex((prev) => prev + 1);
+      setCurrentSummaryIndex((prev) => {
+        const nextIndex = prev + 1;
+        // Safety check: don't exceed array bounds
+        if (nextIndex >= MOCK_SUMMARIES.length) {
+          return prev;
+        }
+        return nextIndex;
+      });
       setScrollY(0);
       setProgress(0);
       if (scrollContainerRef.current) {
@@ -530,13 +564,23 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
       isAtTop.current = true;
       isAtBottom.current = false;
       setPhase("idle");
+      // Unlock transition
+      transitionLockRef.current = false;
     }, 800); // 300ms hold + 500ms slide
-  }, [currentSummaryIndex, setPhase, setProgress]);
+  }, [currentSummaryIndex, setPhase, setProgress, router]);
 
   // Go to previous summary (simpler animation)
   const goToPrevSummary = useCallback(() => {
-    if (currentSummaryIndex <= 0 || transitionPhaseRef.current !== "idle")
+    // Guard: prevent multiple simultaneous transitions
+    if (
+      transitionLockRef.current ||
+      currentSummaryIndex <= 0 ||
+      transitionPhaseRef.current !== "idle"
+    )
       return;
+
+    // Lock transition
+    transitionLockRef.current = true;
 
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("medium");
@@ -545,7 +589,14 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
     setPhase("content-slide");
 
     setTimeout(() => {
-      setCurrentSummaryIndex((prev) => prev - 1);
+      setCurrentSummaryIndex((prev) => {
+        const nextIndex = prev - 1;
+        // Safety check: don't go below 0
+        if (nextIndex < 0) {
+          return prev;
+        }
+        return nextIndex;
+      });
       // Scroll to bottom of previous summary
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop =
@@ -557,8 +608,11 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
 
     setTimeout(() => {
       setPhase("idle");
+      setProgress(0);
+      // Unlock transition
+      transitionLockRef.current = false;
     }, 400);
-  }, [currentSummaryIndex, setPhase]);
+  }, [currentSummaryIndex, setPhase, setProgress]);
 
   // Check scroll position
   const updateScrollPosition = useCallback(() => {
@@ -588,8 +642,13 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
 
       const phase = transitionPhaseRef.current;
 
-      // Don't process during content slide
-      if (phase === "content-slide") {
+      // Don't process if a transition is in progress
+      if (
+        transitionLockRef.current ||
+        phase === "content-slide" ||
+        phase === "avatar-hold" ||
+        phase === "content-enter"
+      ) {
         return;
       }
 
@@ -620,7 +679,8 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
       }
 
       // User is at bottom and scrolling down - start tracking swipe
-      if (isAtBottom.current && deltaY > 0 && nextSummary && phase === "idle") {
+      // Allow swiping on last summary too (will navigate to chats list)
+      if (isAtBottom.current && deltaY > 0 && phase === "idle") {
         swipeStartY.current = touchY;
         setPhase("swiping");
         if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -647,7 +707,6 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
       }
     },
     [
-      nextSummary,
       prevSummary,
       startNextTransition,
       goToPrevSummary,
@@ -661,6 +720,12 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
   const handleTouchEnd = useCallback(() => {
     touchStartY.current = null;
     overscrollAmount.current = 0;
+    swipeStartY.current = null;
+
+    // Don't process if a transition is already in progress
+    if (transitionLockRef.current) {
+      return;
+    }
 
     const phase = transitionPhaseRef.current;
     const progress = swipeProgressRef.current;
@@ -676,8 +741,6 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
         setPhase("idle");
       }
     }
-
-    swipeStartY.current = null;
   }, [startNextTransition, setPhase, setProgress]);
 
   // Handle scroll event
@@ -687,6 +750,23 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
       setScrollY(scrollContainerRef.current.scrollTop);
     }
   }, [updateScrollPosition]);
+
+  // Page entrance animation - must be before early return to maintain hook order
+  const [isPageMounted, setIsPageMounted] = useState(false);
+  const [entranceComplete, setEntranceComplete] = useState(false);
+  useEffect(() => {
+    // Trigger entrance animation after mount
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsPageMounted(true);
+      });
+    });
+    // Mark entrance as complete after animations finish
+    const timer = setTimeout(() => {
+      setEntranceComplete(true);
+    }, 700); // 500ms animation + 150ms max delay + buffer
+    return () => clearTimeout(timer);
+  }, []);
 
   if (!currentSummary) {
     return (
@@ -718,7 +798,12 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
       {/* Header - "X chats left" - aligned with native Telegram header buttons */}
       <div
         className="relative flex items-center justify-center shrink-0 z-20 py-3"
-        style={{ paddingTop: `${Math.max(safeAreaInsetTop || 0, 12) + 10}px` }}
+        style={{
+          paddingTop: `${Math.max(safeAreaInsetTop || 0, 12) + 10}px`,
+          opacity: isPageMounted ? 1 : 0,
+          transform: isPageMounted ? "translateY(0)" : "translateY(-10px)",
+          transition: isPageMounted ? `all 400ms ${EASE_OUT}` : "none",
+        }}
       >
         <div className="flex items-center gap-1.5">
           <div
@@ -740,8 +825,12 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
         <div
           className="absolute top-2 left-0 right-0 z-10 flex justify-center"
           style={{
-            opacity: transitionPhase === "content-slide" ? 0 : 1,
-            // No transition - instant swap with FlyingAvatar to avoid flicker
+            // Hide during content-slide, otherwise show (instant after entrance complete)
+            opacity: transitionPhase === "content-slide" ? 0 : isPageMounted ? 1 : 0,
+            // Slide up on initial mount only
+            transform: isPageMounted ? "translateY(0)" : "translateY(20px)",
+            // Animate only during entrance, then instant transitions
+            transition: entranceComplete ? "none" : isPageMounted ? `all 500ms ${EASE_OUT} 100ms` : "none",
           }}
         >
           <div
@@ -809,65 +898,79 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          className="flex-1 overflow-y-auto px-4 pt-16"
+          className="flex-1 overflow-y-auto px-4 pt-16 flex flex-col"
           style={{
             WebkitOverflowScrolling: "touch",
+            opacity: isPageMounted ? 1 : 0,
+            transform: isPageMounted ? "translateY(0)" : "translateY(30px)",
+            transition: isPageMounted ? `all 500ms ${EASE_OUT} 150ms` : "none",
           }}
         >
           {/* Content wrapper for slide animations */}
           <ContentSlider
             phase={transitionPhase}
             currentContent={
-              <>
+              <div className="flex flex-col min-h-full">
                 <div className="flex flex-col gap-3 pt-4">
                   {currentSummary.topics.map((topic) => (
                     <TopicCard key={topic.id} topic={topic} />
                   ))}
                 </div>
 
-                {/* End message */}
-                {!nextSummary && (
-                  <div className="flex flex-col items-center justify-center pt-6 pb-2">
-                    <p className="text-sm text-white/40">You&apos;ve caught up!</p>
+                {/* Spacer pushes indicator to bottom if content is short */}
+                <div className="flex-1" />
+
+                {/* End message or Next Chat Indicator - always at bottom of viewport or content */}
+                {nextSummary ? (
+                  <div className="flex justify-center py-6 pb-10">
+                    <NextChatIndicator
+                      nextChat={nextSummary}
+                      swipeProgress={swipeProgress}
+                      phase={transitionPhase}
+                      onClick={startNextTransition}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center pt-6 pb-10">
+                    <button
+                      onClick={() => {
+                        if (hapticFeedback.impactOccurred.isAvailable()) {
+                          hapticFeedback.impactOccurred("light");
+                        }
+                        router.push("/telegram/summaries");
+                      }}
+                      className="backdrop-blur-xl px-4 py-2 rounded-full text-sm font-medium text-white active:opacity-80 transition-opacity"
+                      style={{
+                        backgroundColor: "rgba(255, 255, 255, 0.06)",
+                        mixBlendMode: "lighten",
+                        boxShadow: "0px 4px 8px 0px rgba(0,0,0,0.04), 0px 2px 4px 0px rgba(0,0,0,0.02)",
+                      }}
+                    >
+                      You&apos;ve caught up!
+                    </button>
                   </div>
                 )}
-
-                {/* Bottom padding for indicator and safe area */}
-                <div className="h-40 shrink-0" />
-              </>
+              </div>
             }
             nextContent={
               nextSummary ? (
-                <>
+                <div className="flex flex-col min-h-full">
                   <div className="flex flex-col gap-3 pt-4">
                     {nextSummary.topics.map((topic) => (
                       <TopicCard key={topic.id} topic={topic} />
                     ))}
                   </div>
 
-                  {/* Bottom padding for indicator and safe area */}
-                  <div className="h-40 shrink-0" />
-                </>
+                  {/* Spacer pushes content to fill viewport */}
+                  <div className="flex-1" />
+
+                  {/* Bottom padding for safe area */}
+                  <div className="h-24 shrink-0" />
+                </div>
               ) : null
             }
           />
         </div>
-
-        {/* Fixed Next Chat Indicator at bottom */}
-        {nextSummary && (
-          <div
-            className="absolute bottom-0 left-0 right-0 z-20 flex justify-center pointer-events-none"
-            style={{
-              paddingBottom: 24,
-            }}
-          >
-            <NextChatIndicator
-              nextChat={nextSummary}
-              swipeProgress={swipeProgress}
-              phase={transitionPhase}
-            />
-          </div>
-        )}
 
         {/* Flying avatar during transition - slides in with new content in parallel */}
         {transitionPhase === "content-slide" && nextSummary && (
@@ -877,9 +980,6 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
     </main>
   );
 }
-
-// Smooth ease-out for content sliding (no bounce)
-const EASE_OUT = "cubic-bezier(0.0, 0.0, 0.2, 1)";
 
 // Content slider component that handles slide up/down animations
 // Both contents slide up in parallel - current exits top, next enters from bottom
@@ -915,9 +1015,10 @@ function ContentSlider({
   const isSliding = phase === "content-slide";
 
   return (
-    <div className="relative">
+    <div className="relative flex-1 flex flex-col">
       {/* Current content - slides up and out during transition */}
       <div
+        className="flex-1 flex flex-col"
         style={{
           transform: isSliding && isAnimating ? "translateY(-100vh)" : "translateY(0)",
           transition: isSliding && isAnimating ? `transform 500ms ${EASE_OUT}` : "none",
