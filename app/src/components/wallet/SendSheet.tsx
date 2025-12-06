@@ -15,6 +15,7 @@ import {
 import Image from "next/image";
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import ClaimFreeTransactionsSheet from "@/components/wallet/ClaimFreeTransactionsSheet";
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
   LAST_AMOUNT_KEY,
@@ -210,6 +211,7 @@ export default function SendSheet({
   const amountInputRef = useRef<HTMLInputElement>(null);
   const amountTextRef = useRef<HTMLParagraphElement>(null);
   const [caretLeft, setCaretLeft] = useState(0);
+  const [isClaimFreeSheetOpen, setIsClaimFreeSheetOpen] = useState(false);
 
   // Convert balance from lamports to SOL
   const balanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
@@ -503,6 +505,7 @@ export default function SendSheet({
   );
 
   return (
+  <>
     <Modal
       aria-label="Send assets"
       trigger={trigger || <button style={{ display: 'none' }} />}
@@ -1073,9 +1076,9 @@ export default function SendSheet({
                         mixBlendMode: "lighten",
                       }}
                     >
-                      {/* Stars Row */}
+                      {/* Stars Row - "Free" / "Gasless" */}
                       <div className="flex items-center pl-3 pr-4">
-                        {/* Clickable area for selection (dimmed when insufficient) */}
+                        {/* Clickable area for selection (dimmed when not available) */}
                         <button
                           onClick={() => {
                             if (hasEnoughStarsForFee) {
@@ -1103,42 +1106,34 @@ export default function SendSheet({
                           </div>
                           {/* Text */}
                           <div className="flex-1 flex flex-col gap-0.5 py-2.5 text-left">
-                            <p className="text-base leading-5 text-white">
-                              {starsFeeAmount !== null
-                                ? `${starsFeeAmount.toFixed(4).replace(/\.?0+$/, '')} Stars`
-                                : '—'}
-                            </p>
-                            <p className="text-[13px] leading-4 text-white/60">
-                              {starsFeeAmount === null
-                                ? 'Calculating...'
-                                : hasEnoughStarsForFee
-                                  ? `≈ $${(starsFeeUsd ?? 0).toFixed(2)}`
-                                  : 'Not enough Stars'}
-                            </p>
+                            <p className="text-base leading-5 text-white">Free</p>
+                            <p className="text-[13px] leading-4 text-white/60">Gasless</p>
                           </div>
                         </button>
-                        {/* Top up button (shown when not enough stars) - outside dimmed area */}
-                        {!hasEnoughStarsForFee && starsFeeAmount !== null && onTopUpStars && (
+                        {/* "Claim free transactions" button (shown when not enough stars) */}
+                        {!hasEnoughStarsForFee && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               if (hapticFeedback.impactOccurred.isAvailable()) {
                                 hapticFeedback.impactOccurred("light");
                               }
-                              onTopUpStars();
+                              setIsClaimFreeSheetOpen(true);
                             }}
-                            className="px-3 py-1.5 rounded-full text-sm text-white leading-5 active:opacity-80 transition-opacity mr-3"
+                            className="px-3 py-1.5 rounded-full text-sm text-white leading-5 active:opacity-80 transition-opacity"
                             style={{
                               background: "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
                             }}
                           >
-                            Top up
+                            Claim free transactions
                           </button>
                         )}
-                        {/* Check - also dimmed when insufficient */}
-                        <div className={`pl-4 py-1.5 shrink-0 ${!hasEnoughStarsForFee ? 'opacity-40' : ''}`}>
-                          {feePaymentMethod === 'stars' && hasEnoughStarsForFee ? <CheckCircleOn /> : <CheckCircleOff />}
-                        </div>
+                        {/* Check - only show when enough stars */}
+                        {hasEnoughStarsForFee && (
+                          <div className="pl-4 py-1.5 shrink-0">
+                            {feePaymentMethod === 'stars' ? <CheckCircleOn /> : <CheckCircleOff />}
+                          </div>
+                        )}
                       </div>
 
                       {/* SOL Row */}
@@ -1357,5 +1352,11 @@ export default function SendSheet({
         </div>
       </div>
     </Modal>
+
+    <ClaimFreeTransactionsSheet
+      open={isClaimFreeSheetOpen}
+      onOpenChange={setIsClaimFreeSheetOpen}
+    />
+  </>
   );
 }

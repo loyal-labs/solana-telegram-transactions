@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScanIcon } from "@/components/ui/icons/ScanIcon";
 import { ActionButton } from "@/components/wallet/ActionButton";
 import ActivitySheet from "@/components/wallet/ActivitySheet";
+import ClaimFreeTransactionsSheet from "@/components/wallet/ClaimFreeTransactionsSheet";
 import ReceiveSheet from "@/components/wallet/ReceiveSheet";
 import SendSheet, {
   addRecentRecipient,
@@ -217,6 +218,7 @@ export default function Home() {
   const [isActivitySheetOpen, setActivitySheetOpen] = useState(false);
   const [isTransactionDetailsSheetOpen, setTransactionDetailsSheetOpen] =
     useState(false);
+  const [isClaimFreeSheetOpen, setIsClaimFreeSheetOpen] = useState(false);
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [needsGas, setNeedsGas] = useState(false);
@@ -391,8 +393,8 @@ export default function Home() {
       }
       // Store original incoming transaction for claim functionality
       setSelectedIncomingTransaction(transaction);
-      // Check if user needs gas (0 SOL and 0 stars)
-      const userNeedsGas = (balance === null || balance === 0) && starsBalance === 0;
+      // Check if user needs gas (0 SOL)
+      const userNeedsGas = balance === null || balance === 0;
       setNeedsGas(userNeedsGas);
       // Convert to TransactionDetailsData format
       const detailsData: TransactionDetailsData = {
@@ -1321,10 +1323,12 @@ export default function Home() {
       } else if (selectedIncomingTransaction) {
         // Only show Claim button for incoming (claimable) transactions
         if (needsGas) {
-          // User needs gas - show "Top up stars" button
+          // User needs gas - show "Claim free transactions" button
           showMainButton({
-            text: "Top up stars",
-            onClick: () => {}, // No-op for now
+            text: "Claim free transactions",
+            onClick: () => {
+              setIsClaimFreeSheetOpen(true);
+            },
             isEnabled: true,
             showLoader: false,
           });
@@ -1715,128 +1719,68 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Stars Card Section */}
-          <div className="px-4 pb-4">
-            {showStarsSkeleton ? (
-              <div
-                className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full"
-                style={{
-                  background: "rgba(255, 255, 255, 0.06)",
-                  mixBlendMode: "lighten",
-                }}
-              >
-                {/* Left - Icon */}
-                <div className="py-1.5 pr-3">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center"
-                    style={{
-                      background: "rgba(255, 255, 255, 0.06)",
-                      mixBlendMode: "lighten",
-                    }}
-                  >
-                    <Image
-                      src="/icons/telegram-stars.svg"
-                      alt="Stars"
-                      width={28}
-                      height={28}
-                    />
-                  </div>
-                </div>
-
-                {/* Middle - Text */}
-                <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                  <p className="text-base text-white leading-5">Stars</p>
-                  <p className="text-[13px] text-white/60 leading-4">
-                    for free gas
-                  </p>
-                </div>
-
-                {/* Right - Skeleton Value */}
-                <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
-                  <div className="w-10 h-5 bg-white/5 animate-pulse rounded" />
-                  <div className="w-8 h-4 bg-white/5 animate-pulse rounded" />
-                </div>
-
-                {/* Chevron */}
-                <div className="pl-3 py-2 flex items-center justify-center">
-                  <ChevronRight
-                    size={16}
-                    strokeWidth={1.5}
-                    className="text-white/60"
-                  />
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={handleTopUpStars}
-                disabled={isCreatingInvoice}
-                className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                style={{
-                  background: "rgba(255, 255, 255, 0.06)",
-                  mixBlendMode: "lighten",
-                }}
-              >
-                {/* Left - Icon */}
-                <div className="py-1.5 pr-3">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center"
-                    style={{
-                      background: "rgba(255, 255, 255, 0.06)",
-                      mixBlendMode: "lighten",
-                    }}
-                  >
-                    <Image
-                      src="/icons/telegram-stars.svg"
-                      alt="Stars"
-                      width={28}
-                      height={28}
-                    />
-                  </div>
-                </div>
-
-                {/* Middle - Text */}
-                <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                  <p className="text-base text-white leading-5">Stars</p>
-                  <p className="text-[13px] text-white/60 leading-4">
-                    for free gas
-                  </p>
-                </div>
-
-                {/* Right - Value */}
-                <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
-                  <p className="text-base text-white leading-5">
-                    {starsBalance.toLocaleString()}
-                  </p>
-                  <p className="text-[13px] text-white/60 leading-4">
-                    ${(starsBalance * 0.02).toFixed(2)}
-                  </p>
-                </div>
-
-                {/* Chevron */}
-                <div className="pl-3 py-2 flex items-center justify-center">
-                  <ChevronRight
-                    size={16}
-                    strokeWidth={1.5}
-                    className="text-white/60"
-                  />
-                </div>
-              </button>
-            )}
-          </div>
-
           {/* Activity Section - conditionally rendered */}
           {(() => {
             const hasNoTransactions =
               incomingTransactions.length === 0 &&
               walletTransactions.length === 0;
-            const isEmptyWallet =
-              (balance === null || balance === 0) &&
-              starsBalance === 0 &&
-              !isStarsLoading;
+            const isEmptyWallet = balance === null || balance === 0;
             const isActivityLoading =
               isLoading ||
-              isStarsLoading ||
               (isFetchingTransactions && walletTransactions.length === 0);
+
+            // Empty wallet banner component
+            const EmptyWalletBanner = () => (
+              <div className="px-4 pb-4">
+                <div
+                  className="flex flex-col gap-4 items-center justify-center px-8 py-6 rounded-2xl"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.03)",
+                    mixBlendMode: "lighten",
+                  }}
+                >
+                  <p className="text-base text-white/60 leading-5 text-center">
+                    You don&apos;t have SOL yet. Network fees (gas) can be
+                    paid with Telegram Stars, so add a small Stars balance to
+                    receive tokens.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (hapticFeedback.impactOccurred.isAvailable()) {
+                          hapticFeedback.impactOccurred("light");
+                        }
+                        // TODO: Replace with actual channel link
+                        window.open("https://t.me/+placeholder_channel", "_blank");
+                      }}
+                      className="px-4 py-2 rounded-[40px] text-sm text-white leading-5"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
+                      }}
+                    >
+                      Join channel
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (hapticFeedback.impactOccurred.isAvailable()) {
+                          hapticFeedback.impactOccurred("light");
+                        }
+                        // TODO: Replace with actual emoji settings deep link
+                        window.open("https://t.me/settings/emoji_status", "_blank");
+                      }}
+                      className="px-4 py-2 rounded-[40px] text-sm text-white leading-5"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
+                      }}
+                    >
+                      Set custom emoji
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
 
             // Loading state - show skeleton transaction cards
             if (isActivityLoading) {
@@ -1895,35 +1839,11 @@ export default function Home() {
               );
             }
 
-            // Empty wallet state - no SOL, no Stars, no transactions
-            // Activity title is NOT shown in this state
+            // Empty wallet AND no transactions - show only banner
             if (isEmptyWallet && hasNoTransactions) {
               return (
-                <div className="flex-1 px-4 pb-4">
-                  <div
-                    className="flex flex-col gap-4 items-center justify-center px-8 py-6 rounded-2xl h-[200px]"
-                    style={{
-                      background: "rgba(255, 255, 255, 0.03)",
-                      mixBlendMode: "lighten",
-                    }}
-                  >
-                    <p className="text-base text-white/60 leading-5 text-center">
-                      You don&apos;t have SOL yet. Network fees (gas) can be
-                      paid with Telegram Stars, so add a small Stars balance to
-                      receive tokens.
-                    </p>
-                    <button
-                      onClick={handleTopUpStars}
-                      disabled={isCreatingInvoice}
-                      className="px-4 py-2 rounded-[40px] text-sm text-white leading-5"
-                      style={{
-                        backgroundImage:
-                          "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
-                      }}
-                    >
-                      Add Stars
-                    </button>
-                  </div>
+                <div className="flex-1">
+                  <EmptyWalletBanner />
                 </div>
               );
             }
@@ -1950,6 +1870,8 @@ export default function Home() {
             // Normal state with transactions
             return (
               <>
+                {/* Show empty wallet banner above Activity title if wallet is empty */}
+                {isEmptyWallet && <EmptyWalletBanner />}
                 <div className="px-4 pt-3 pb-2 flex items-center justify-between">
                   <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
                     Activity
@@ -2039,7 +1961,7 @@ export default function Home() {
                               {/* Right - Claim Badge */}
                               <div className="py-2.5 pl-3">
                                 {(() => {
-                                  const userNeedsGas = (balance === null || balance === 0) && starsBalance === 0;
+                                  const userNeedsGas = balance === null || balance === 0;
                                   return (
                                     <div
                                       className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-white leading-5"
@@ -2353,6 +2275,10 @@ export default function Home() {
         claimingTransactionId={claimingTransactionId}
         balance={balance}
         starsBalance={starsBalance}
+      />
+      <ClaimFreeTransactionsSheet
+        open={isClaimFreeSheetOpen}
+        onOpenChange={setIsClaimFreeSheetOpen}
       />
     </>
   );
