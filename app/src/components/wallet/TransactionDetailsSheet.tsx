@@ -28,6 +28,7 @@ export type TransactionDetailsSheetProps = {
   showSuccess?: boolean; // Show success state after claiming
   showError?: string | null; // Show error state with message after failed claim
   solPriceUsd?: number | null;
+  needsGas?: boolean; // Show gas required warning for claimable transactions
 };
 
 // Wallet icon SVG component
@@ -48,6 +49,7 @@ export default function TransactionDetailsSheet({
   showSuccess = false,
   showError = null,
   solPriceUsd = null,
+  needsGas = false,
 }: TransactionDetailsSheetProps) {
   // Safe area handling - must be before early return
   const snapPoint = useModalSnapPoint();
@@ -485,7 +487,13 @@ export default function TransactionDetailsSheet({
                 {/* Status */}
                 <div className="flex flex-col gap-0.5 px-4 py-2.5">
                   <p className="text-[13px] leading-4 text-white/60">Status</p>
-                  <p className="text-base leading-5 text-white">{getStatusText(transaction.status, isIncoming)}</p>
+                  {needsGas && isIncoming ? (
+                    <p className="text-base leading-5" style={{ color: "#eab308" }}>
+                      Gas required to claim. Add SOL or stars to the wallet.
+                    </p>
+                  ) : (
+                    <p className="text-base leading-5 text-white">{getStatusText(transaction.status, isIncoming)}</p>
+                  )}
                 </div>
 
                 {/* Recipient/Sender */}

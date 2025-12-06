@@ -3,7 +3,7 @@
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
-import { ArrowDown, ArrowUp, Clock, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Clock, TriangleAlert, X } from "lucide-react";
 import {
   type CSSProperties,
   type ReactNode,
@@ -32,6 +32,8 @@ export type ActivitySheetProps = {
   onTransactionClick: (transaction: Transaction) => void;
   onIncomingTransactionClick: (transaction: IncomingTransaction) => void;
   claimingTransactionId?: string | null;
+  balance?: number | null;
+  starsBalance?: number;
 };
 
 type GroupedTransactions = {
@@ -117,6 +119,8 @@ export default function ActivitySheet({
   onTransactionClick,
   onIncomingTransactionClick,
   claimingTransactionId,
+  balance,
+  starsBalance = 0,
 }: ActivitySheetProps) {
   const snapPoint = useModalSnapPoint();
   const { bottom: safeBottom } = useTelegramSafeArea();
@@ -318,17 +322,28 @@ export default function ActivitySheet({
 
                           {/* Right - Claim Badge */}
                           <div className="py-2.5 pl-3">
-                            <div
-                              className="px-4 py-2 rounded-full text-sm text-white leading-5"
-                              style={{
-                                background:
-                                  "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
-                              }}
-                            >
-                              {isClaiming
-                                ? "Claiming..."
-                                : `Claim ${formatTransactionAmount(transaction.amountLamports)} SOL`}
-                            </div>
+                            {(() => {
+                              const userNeedsGas = (balance === null || balance === 0) && starsBalance === 0;
+                              return (
+                                <div
+                                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-white leading-5"
+                                  style={{
+                                    background: userNeedsGas
+                                      ? "linear-gradient(90deg, rgba(234, 179, 8, 0.15) 0%, rgba(234, 179, 8, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
+                                      : "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
+                                  }}
+                                >
+                                  {userNeedsGas && (
+                                    <TriangleAlert className="w-4 h-4" style={{ color: "#eab308" }} strokeWidth={2} />
+                                  )}
+                                  {isClaiming
+                                    ? "Claiming..."
+                                    : userNeedsGas
+                                      ? "Details"
+                                      : `Claim ${formatTransactionAmount(transaction.amountLamports)} SOL`}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </button>
                       );

@@ -15,7 +15,7 @@ import {
   viewport,
 } from "@telegram-apps/sdk-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDown, ArrowUp, ChevronRight, Clock, Copy } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, Clock, Copy, TriangleAlert } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -219,6 +219,7 @@ export default function Home() {
     useState(false);
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [needsGas, setNeedsGas] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(
     () => cachedWalletAddress
   );
@@ -239,9 +240,10 @@ export default function Home() {
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
   const [incomingTransactions, setIncomingTransactions] = useState<
     IncomingTransaction[]
-  >(() =>
-    cachedUsername ? getCachedIncomingTransactions(cachedUsername) ?? [] : []
-  );
+  >(() => {
+    const cached = cachedUsername ? getCachedIncomingTransactions(cachedUsername) ?? [] : [];
+    return cached;
+  });
   const [walletTransactions, setWalletTransactions] = useState<Transaction[]>(
     () =>
       cachedWalletAddress
@@ -389,6 +391,9 @@ export default function Home() {
       }
       // Store original incoming transaction for claim functionality
       setSelectedIncomingTransaction(transaction);
+      // Check if user needs gas (0 SOL and 0 stars)
+      const userNeedsGas = (balance === null || balance === 0) && starsBalance === 0;
+      setNeedsGas(userNeedsGas);
       // Convert to TransactionDetailsData format
       const detailsData: TransactionDetailsData = {
         id: transaction.id,
@@ -404,7 +409,7 @@ export default function Home() {
       setSelectedTransaction(detailsData);
       setTransactionDetailsSheetOpen(true);
     },
-    []
+    [balance, starsBalance]
   );
 
   const handleOpenWalletTransactionDetails = useCallback(
@@ -412,8 +417,9 @@ export default function Home() {
       if (hapticFeedback.impactOccurred.isAvailable()) {
         hapticFeedback.impactOccurred("light");
       }
-      // Clear incoming transaction ref
+      // Clear incoming transaction ref and gas warning
       setSelectedIncomingTransaction(null);
+      setNeedsGas(false);
       // Convert to TransactionDetailsData format
       const detailsData: TransactionDetailsData = {
         id: transaction.id,
@@ -1314,7 +1320,15 @@ export default function Home() {
         });
       } else if (selectedIncomingTransaction) {
         // Only show Claim button for incoming (claimable) transactions
-        if (isClaimingTransaction) {
+        if (needsGas) {
+          // User needs gas - show "Top up stars" button
+          showMainButton({
+            text: "Top up stars",
+            onClick: () => {}, // No-op for now
+            isEnabled: true,
+            showLoader: false,
+          });
+        } else if (isClaimingTransaction) {
           // Show only main button with loader during claim
           showMainButton({
             text: "Claim",
@@ -1425,6 +1439,7 @@ export default function Home() {
     selectedTransaction,
     selectedIncomingTransaction,
     isClaimingTransaction,
+    needsGas,
     mainButtonAvailable,
     secondaryButtonAvailable,
     handleOpenSendSheet,
@@ -2023,19 +2038,30 @@ export default function Home() {
 
                               {/* Right - Claim Badge */}
                               <div className="py-2.5 pl-3">
-                                <div
-                                  className="px-4 py-2 rounded-full text-sm text-white leading-5"
-                                  style={{
-                                    background:
-                                      "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
-                                  }}
-                                >
-                                  {isClaiming
-                                    ? "Claiming..."
-                                    : `Claim ${formatTransactionAmount(
-                                        transaction.amountLamports
-                                      )} SOL`}
-                                </div>
+                                {(() => {
+                                  const userNeedsGas = (balance === null || balance === 0) && starsBalance === 0;
+                                  return (
+                                    <div
+                                      className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-white leading-5"
+                                      style={{
+                                        background: userNeedsGas
+                                          ? "linear-gradient(90deg, rgba(234, 179, 8, 0.15) 0%, rgba(234, 179, 8, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
+                                          : "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
+                                      }}
+                                    >
+                                      {userNeedsGas && (
+                                        <TriangleAlert className="w-4 h-4" style={{ color: "#eab308" }} strokeWidth={2} />
+                                      )}
+                                      {isClaiming
+                                        ? "Claiming..."
+                                        : userNeedsGas
+                                          ? "Details"
+                                          : `Claim ${formatTransactionAmount(
+                                              transaction.amountLamports
+                                            )} SOL`}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </motion.button>
                           );
@@ -2314,6 +2340,7 @@ export default function Home() {
         showSuccess={showClaimSuccess}
         showError={claimError}
         solPriceUsd={solPriceUsd}
+        needsGas={needsGas}
       />
       <ActivitySheet
         open={isActivitySheetOpen}
@@ -2324,6 +2351,8 @@ export default function Home() {
         onTransactionClick={handleOpenWalletTransactionDetails}
         onIncomingTransactionClick={handleOpenTransactionDetails}
         claimingTransactionId={claimingTransactionId}
+        balance={balance}
+        starsBalance={starsBalance}
       />
     </>
   );
