@@ -1,4 +1,5 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
+import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import {
   clusterApiUrl,
   Connection,
@@ -56,6 +57,22 @@ export const getWalletProvider = async (): Promise<AnchorProvider> => {
   const wallet = new SimpleWallet(keypair);
 
   return new AnchorProvider(connection, wallet);
+};
+
+export const getCustomWalletProvider = async (
+  keypair: Keypair
+): Promise<AnchorProvider> => {
+  const connection = getConnection();
+  const wallet = new SimpleWallet(keypair);
+  return new AnchorProvider(connection, wallet);
+};
+
+export const getGaslessKeypair = async (): Promise<Keypair> => {
+  const privateKey = process.env.DEPLOYMENT_PK;
+  if (!privateKey) {
+    throw new Error("GASLESS_SOLANA_KEY is not set");
+  }
+  return Keypair.fromSecretKey(bs58.decode(privateKey));
 };
 
 export const getWalletPublicKey = async (): Promise<PublicKey> => {
@@ -135,7 +152,7 @@ export const subscribeToWalletBalance = async (
 
   const subscriptionId = await connection.onAccountChange(
     keypair.publicKey,
-    accountInfo => {
+    (accountInfo) => {
       const lamports = accountInfo.lamports;
       if (typeof lastLamports === "number" && lamports === lastLamports) {
         return;

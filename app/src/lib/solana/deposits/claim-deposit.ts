@@ -1,5 +1,5 @@
 import { Program } from "@coral-xyz/anchor";
-import { PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
 
 import type { TelegramTransfer } from "../../../../../target/types/telegram_transfer";
 import type { TelegramVerification } from "../../../../../target/types/telegram_verification";
@@ -10,7 +10,6 @@ import {
   numberToBN,
 } from "../solana-helpers";
 
-// TODO: check for the balance of the recipient after
 export const claimDeposit = async (
   transferProgram: Program<TelegramTransfer>,
   verificationProgram: Program<TelegramVerification>,
