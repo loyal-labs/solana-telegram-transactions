@@ -2,8 +2,9 @@
 
 import { NextResponse } from "next/server";
 
-import { createInvoiceLink } from "@/lib/telegram/bot-api/create-invoice-link";
+import { hasCustomEmoji } from "@/lib/telegram/bot-api/check-custom-emoji";
 import { createValidationBytesFromRawInitData } from "@/lib/telegram/mini-app/init-data-transform";
+import { cleanInitData } from "@/lib/telegram/mini-app/init-data-transform";
 import { verifyInitData } from "@/lib/telegram/mini-app/verify-init-data";
 
 const textDecoder = new TextDecoder();
@@ -29,7 +30,10 @@ export async function POST(req: Request) {
       ({ validationBytes, signatureBytes } =
         createValidationBytesFromRawInitData(initData));
     } catch (error) {
-      console.error("[telegram][invoice] failed to parse initData", error);
+      console.error(
+        "[telegram][verify][emoji] failed to parse initData",
+        error
+      );
       return NextResponse.json(
         { error: "Invalid initData payload" },
         { status: 400 }
@@ -44,13 +48,22 @@ export async function POST(req: Request) {
       );
     }
 
-    const invoiceLink = await createInvoiceLink();
+    const cleanData = cleanInitData(initData);
+    const user = JSON.parse(cleanData.user as string) as { id: number };
+    const hasCustomEmojiResponse = await hasCustomEmoji(user.id);
 
-    return NextResponse.json({ invoiceLink });
+    if (!hasCustomEmojiResponse) {
+      return NextResponse.json(
+        { error: "User does not have a custom emoji" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[telegram][invoice] failed to create invoice link", error);
+    console.error("[telegram][verify][emoji] failed to verify emoji", error);
     return NextResponse.json(
-      { error: "Failed to create invoice link" },
+      { error: "Failed to verify emoji" },
       { status: 500 }
     );
   }

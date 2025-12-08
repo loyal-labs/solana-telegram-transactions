@@ -2,8 +2,10 @@
 
 import { NextResponse } from "next/server";
 
-import { createInvoiceLink } from "@/lib/telegram/bot-api/create-invoice-link";
+import { checkChatParticipation } from "@/lib/telegram/bot-api/check-chat-participation";
+import { CHANNEL_USERNAME } from "@/lib/telegram/bot-api/constants";
 import { createValidationBytesFromRawInitData } from "@/lib/telegram/mini-app/init-data-transform";
+import { cleanInitData } from "@/lib/telegram/mini-app/init-data-transform";
 import { verifyInitData } from "@/lib/telegram/mini-app/verify-init-data";
 
 const textDecoder = new TextDecoder();
@@ -29,7 +31,7 @@ export async function POST(req: Request) {
       ({ validationBytes, signatureBytes } =
         createValidationBytesFromRawInitData(initData));
     } catch (error) {
-      console.error("[telegram][invoice] failed to parse initData", error);
+      console.error("[telegram][verify][join] failed to parse initData", error);
       return NextResponse.json(
         { error: "Invalid initData payload" },
         { status: 400 }
@@ -44,13 +46,25 @@ export async function POST(req: Request) {
       );
     }
 
-    const invoiceLink = await createInvoiceLink();
+    const cleanData = cleanInitData(initData);
+    const user = JSON.parse(cleanData.user as string) as { id: number };
+    const isParticipant = await checkChatParticipation(
+      CHANNEL_USERNAME,
+      user.id
+    );
 
-    return NextResponse.json({ invoiceLink });
+    if (!isParticipant) {
+      return NextResponse.json(
+        { error: "User is not a participant of the channel" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[telegram][invoice] failed to create invoice link", error);
+    console.error("[telegram][verify][join] failed to verify join", error);
     return NextResponse.json(
-      { error: "Failed to create invoice link" },
+      { error: "Failed to verify join" },
       { status: 500 }
     );
   }

@@ -90,10 +90,6 @@ import type {
   IncomingTransaction,
   Transaction,
   TransactionDetailsData,
-<<<<<<< Updated upstream
-  TransactionType,
-=======
->>>>>>> Stashed changes
 } from "@/types/wallet";
 
 hashes.sha512 = sha512;
@@ -224,6 +220,7 @@ export default function Home() {
   const [isClaimFreeSheetOpen, setIsClaimFreeSheetOpen] = useState(false);
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [buttonRefreshTick, setButtonRefreshTick] = useState(0);
   const [needsGas, setNeedsGas] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(
     () => cachedWalletAddress
@@ -1289,6 +1286,26 @@ export default function Home() {
   }, [mapTransferToTransaction, walletAddress]);
 
   useEffect(() => {
+    const handleClaimVerified = () => {
+      setButtonRefreshTick((tick) => tick + 1);
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("claim-free-verified", handleClaimVerified);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("claim-free-verified", handleClaimVerified);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isClaimFreeSheetOpen) {
+      return () => {};
+    }
+
     if (!mainButtonAvailable) {
       mainButton.mount.ifAvailable?.();
       hideMainButton();
@@ -1460,6 +1477,8 @@ export default function Home() {
     showClaimSuccess,
     claimError,
     sendError,
+    isClaimFreeSheetOpen,
+    buttonRefreshTick,
   ]);
 
   const formattedUsdBalance = formatUsdValue(balance, solPriceUsd);

@@ -230,7 +230,47 @@ export default function SendSheet({
     return calculateStarsFee(SOLANA_FEE_SOL, solPriceUsd);
   }, [solPriceUsd]);
   const starsFeeUsd = starsFeeAmount !== null ? starsFeeAmount * STARS_TO_USD : null;
-  const hasEnoughStarsForFee = starsFeeAmount !== null && starsBalance >= starsFeeAmount;
+  const [hasGaslessAccess, setHasGaslessAccess] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadGaslessStatus = async () => {
+      try {
+        const value = await getCloudValue("gassless-action");
+        if (!isMounted) return;
+        setHasGaslessAccess(value === "true");
+      } catch (error) {
+        if (!isMounted) return;
+        console.warn("Failed to load gasless status", error);
+        setHasGaslessAccess(false);
+      }
+    };
+
+    void loadGaslessStatus();
+
+    const handleClaimVerified = () => {
+      setHasGaslessAccess(true); // enable immediately in-session
+      void loadGaslessStatus(); // sync from storage for persistence
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("claim-free-verified", handleClaimVerified);
+    }
+
+    return () => {
+      isMounted = false;
+      if (typeof window !== "undefined") {
+        window.removeEventListener("claim-free-verified", handleClaimVerified);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasGaslessAccess && feePaymentMethod === "stars") {
+      setFeePaymentMethod("solana");
+    }
+  }, [feePaymentMethod, hasGaslessAccess]);
 
   // Load SOL price for USD conversions when not provided externally
   useEffect(() => {
@@ -419,7 +459,7 @@ export default function SendSheet({
       const hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
       const hasSufficientFeeBalance = feePaymentMethod === 'solana'
         ? hasEnoughSolForFee
-        : hasEnoughStarsForFee;
+        : hasGaslessAccess;
 
       const isValid =
         isAmountValid &&
@@ -433,7 +473,7 @@ export default function SendSheet({
 
     // Default to invalid for any other state
     onValidationChange?.(false);
-  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, feePaymentMethod, hasEnoughStarsForFee, solPriceUsd]);
+  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, feePaymentMethod, hasGaslessAccess, solPriceUsd]);
 
 
   const handleRecipientSelect = (selected: string) => {
@@ -1081,16 +1121,16 @@ export default function SendSheet({
                         {/* Clickable area for selection (dimmed when not available) */}
                         <button
                           onClick={() => {
-                            if (hasEnoughStarsForFee) {
+                            if (hasGaslessAccess) {
                               if (hapticFeedback.selectionChanged.isAvailable()) {
                                 hapticFeedback.selectionChanged();
                               }
                               setFeePaymentMethod('stars');
                             }
                           }}
-                          disabled={!hasEnoughStarsForFee}
+                          disabled={!hasGaslessAccess}
                           className={`flex items-center flex-1 transition-opacity ${
-                            !hasEnoughStarsForFee ? 'opacity-40 cursor-not-allowed' : ''
+                            !hasGaslessAccess ? 'opacity-40 cursor-not-allowed' : ''
                           }`}
                         >
                           {/* Icon */}
@@ -1111,7 +1151,7 @@ export default function SendSheet({
                           </div>
                         </button>
                         {/* "Claim free transactions" button (shown when not enough stars) */}
-                        {!hasEnoughStarsForFee && (
+                        {!hasGaslessAccess && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1129,7 +1169,7 @@ export default function SendSheet({
                           </button>
                         )}
                         {/* Check - only show when enough stars */}
-                        {hasEnoughStarsForFee && (
+                        {hasGaslessAccess && (
                           <div className="pl-4 py-1.5 shrink-0">
                             {feePaymentMethod === 'stars' ? <CheckCircleOn /> : <CheckCircleOff />}
                           </div>
@@ -1227,11 +1267,6 @@ export default function SendSheet({
                           return ` ≈ $${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                         })()}
                       </span>
-                      {feePaymentMethod === 'stars' && starsFeeAmount !== null && (
-                        <span className="text-white/60">
-                          &nbsp;+ {starsFeeAmount.toFixed(4).replace(/\.?0+$/, '')} Stars
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
