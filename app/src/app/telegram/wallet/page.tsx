@@ -90,7 +90,10 @@ import type {
   IncomingTransaction,
   Transaction,
   TransactionDetailsData,
+<<<<<<< Updated upstream
   TransactionType,
+=======
+>>>>>>> Stashed changes
 } from "@/types/wallet";
 
 hashes.sha512 = sha512;
