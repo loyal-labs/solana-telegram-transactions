@@ -1,5 +1,5 @@
 import { Program } from "@coral-xyz/anchor";
-import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 
 import type { TelegramTransfer } from "../../../../../target/types/telegram_transfer";
 import type { TelegramVerification } from "../../../../../target/types/telegram_verification";

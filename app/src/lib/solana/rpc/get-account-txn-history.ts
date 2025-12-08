@@ -146,7 +146,7 @@ const mapTransactionToTransfer = (
       try {
         const decoded = decode(data);
         if (decoded) return decoded;
-      } catch (err) {
+      } catch {
         continue;
       }
     }

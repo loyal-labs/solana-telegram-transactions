@@ -1,9 +1,7 @@
 import { InlineQueryResultBuilder } from "grammy";
-import { InlineKeyboard } from "grammy";
 import { PreparedInlineMessage } from "grammy/types";
 
 import { getBot } from "./bot";
-import { MINI_APP_LINK } from "./constants";
 
 export const prepareInlineMessage = async (
   userId: number,

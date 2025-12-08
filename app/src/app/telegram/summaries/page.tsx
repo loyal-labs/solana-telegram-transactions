@@ -1,7 +1,7 @@
 "use client";
 
 import { hapticFeedback, themeParams } from "@telegram-apps/sdk-react";
-import { ChevronRight, CircleHelp, X } from "lucide-react";
+import { CircleHelp, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -73,44 +73,59 @@ function getFirstLetter(title: string): string {
 interface ChatItemProps {
   chat: { id: string; title: string; subtitle?: string };
   onClick: () => void;
+  showDivider?: boolean;
 }
 
-function ChatItem({ chat, onClick }: ChatItemProps) {
+function ChatItem({ chat, onClick, showDivider = true }: ChatItemProps) {
   const avatarColor = getAvatarColor(chat.title);
   const firstLetter = getFirstLetter(chat.title);
 
   return (
-    <button
-      onClick={onClick}
-      className="flex items-center w-full px-3 py-1.5 rounded-2xl active:opacity-80 transition-opacity text-left"
-    >
-      {/* Avatar */}
-      <div className="pr-3">
-        <div
-          className="w-12 h-12 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: avatarColor }}
-        >
-          <span className="text-lg font-medium text-white">{firstLetter}</span>
+    <div className="px-4">
+      <button
+        onClick={onClick}
+        className="flex items-center w-full py-2 active:opacity-80 transition-opacity text-left"
+      >
+        {/* Avatar */}
+        <div className="pr-3">
+          <div
+            className="w-14 h-14 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: avatarColor }}
+          >
+            <span className="text-xl font-medium text-white">{firstLetter}</span>
+          </div>
         </div>
-      </div>
 
-      {/* Title and Subtitle */}
-      <div className="flex-1 py-2.5 min-w-0 flex flex-col gap-0.5">
-        <p className="text-base text-white leading-5 truncate">{chat.title}</p>
-        {chat.subtitle && (
-          <p className="text-[13px] text-white/60 leading-4 truncate">
-            {chat.subtitle}
-          </p>
-        )}
-      </div>
-
-      {/* Chevron */}
-      <div className="pl-3 flex items-center">
-        <ChevronRight size={16} strokeWidth={1.5} className="text-white/60" />
-      </div>
-    </button>
+        {/* Title and Subtitle */}
+        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+          <p className="text-base text-white leading-5 truncate">{chat.title}</p>
+          {chat.subtitle && (
+            <p className="text-[13px] text-white/60 leading-4 truncate">
+              {chat.subtitle}
+            </p>
+          )}
+        </div>
+      </button>
+      {showDivider && <div className="h-px bg-white/10 ml-[68px]" />}
+    </div>
   );
 }
+
+// Tab types
+type TabId = "groups" | "direct" | "personal" | "work";
+
+interface Tab {
+  id: TabId;
+  label: string;
+  count: number;
+}
+
+const TABS: Tab[] = [
+  { id: "groups", label: "Groups", count: 19 },
+  { id: "direct", label: "Direct", count: 4 },
+  { id: "personal", label: "Personal", count: 8 },
+  { id: "work", label: "Work", count: 0 },
+];
 
 interface EmptyStateBannerProps {
   onClose: () => void;
@@ -187,6 +202,7 @@ export default function SummariesPage() {
   const router = useRouter();
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("groups");
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const [buttonColor] = useState(() => {
@@ -249,7 +265,7 @@ export default function SummariesPage() {
     >
       {/* Header - fixed at top */}
       <div
-        className="sticky top-0 z-10 border-b border-white/10"
+        className="sticky top-0 z-10"
         style={{
           paddingTop: "calc(var(--app-safe-top, 20px) + 4px)",
           background: "#16161a",
@@ -257,7 +273,7 @@ export default function SummariesPage() {
       >
         <div className="flex items-center pl-4 pr-1.5">
           <div className="flex-1 py-3 pr-3">
-            <h1 className="text-xl font-medium text-white leading-6">Chats</h1>
+            <h1 className="text-xl font-semibold text-white leading-6">Chat Highlights</h1>
           </div>
           <div className="h-12 flex items-center relative" ref={tooltipRef}>
             <button className="p-2.5" onClick={handleHelpClick}>
@@ -275,6 +291,37 @@ export default function SummariesPage() {
             )}
           </div>
         </div>
+
+        {/* Tabs */}
+        <div className="flex pl-4 gap-4 border-b border-white/10">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                if (hapticFeedback.impactOccurred.isAvailable()) {
+                  hapticFeedback.impactOccurred("light");
+                }
+                setActiveTab(tab.id);
+              }}
+              className={`flex items-center gap-1.5 pb-2.5 pt-1 relative transition-colors ${
+                activeTab === tab.id ? "text-white" : "text-white/60"
+              }`}
+            >
+              <span className="text-[15px] font-medium leading-5">{tab.label}</span>
+              {tab.count > 0 && (
+                <span
+                  className="text-xs font-medium leading-4 px-1.5 py-0.5 rounded-full text-white"
+                  style={{ backgroundColor: buttonColor }}
+                >
+                  {tab.count}
+                </span>
+              )}
+              {activeTab === tab.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-white" />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Chat List or Empty State */}
@@ -288,12 +335,13 @@ export default function SummariesPage() {
           )}
         </div>
       ) : (
-        <div className="flex-1 flex flex-col pt-1 pb-4 px-0">
-          {MOCK_CHATS.map((chat) => (
+        <div className="flex-1 flex flex-col pt-2 pb-4">
+          {MOCK_CHATS.map((chat, index) => (
             <ChatItem
               key={chat.id}
               chat={chat}
               onClick={() => handleChatClick(chat)}
+              showDivider={index < MOCK_CHATS.length - 1}
             />
           ))}
 

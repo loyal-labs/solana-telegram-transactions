@@ -1,9 +1,7 @@
 import { AnchorProvider, Program } from "@coral-xyz/anchor";
 import { Wallet } from "@coral-xyz/anchor";
 import {
-  Keypair,
   PublicKey,
-  Signer,
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";

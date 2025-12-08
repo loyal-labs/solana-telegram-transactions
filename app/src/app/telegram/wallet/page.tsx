@@ -23,6 +23,7 @@ import { ScanIcon } from "@/components/ui/icons/ScanIcon";
 import { ActionButton } from "@/components/wallet/ActionButton";
 import ActivitySheet from "@/components/wallet/ActivitySheet";
 import ClaimFreeTransactionsSheet from "@/components/wallet/ClaimFreeTransactionsSheet";
+import GaslessBanner from "@/components/wallet/GaslessBanner";
 import ReceiveSheet from "@/components/wallet/ReceiveSheet";
 import SendSheet, {
   addRecentRecipient,
@@ -1751,57 +1752,15 @@ export default function Home() {
               isLoading ||
               (isFetchingTransactions && walletTransactions.length === 0);
 
-            // Empty wallet banner component
+            // Empty wallet banner component - promotes gasless transactions
             const EmptyWalletBanner = () => (
-              <div className="px-4 pb-4">
-                <div
-                  className="flex flex-col gap-4 items-center justify-center px-8 py-6 rounded-2xl"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.03)",
-                    mixBlendMode: "lighten",
-                  }}
-                >
-                  <p className="text-base text-white/60 leading-5 text-center">
-                    You don&apos;t have SOL yet. Network fees (gas) can be
-                    paid with Telegram Stars, so add a small Stars balance to
-                    receive tokens.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        if (hapticFeedback.impactOccurred.isAvailable()) {
-                          hapticFeedback.impactOccurred("light");
-                        }
-                        // TODO: Replace with actual channel link
-                        window.open("https://t.me/+placeholder_channel", "_blank");
-                      }}
-                      className="px-4 py-2 rounded-[40px] text-sm text-white leading-5"
-                      style={{
-                        backgroundImage:
-                          "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
-                      }}
-                    >
-                      Join channel
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (hapticFeedback.impactOccurred.isAvailable()) {
-                          hapticFeedback.impactOccurred("light");
-                        }
-                        // TODO: Replace with actual emoji settings deep link
-                        window.open("https://t.me/settings/emoji_status", "_blank");
-                      }}
-                      className="px-4 py-2 rounded-[40px] text-sm text-white leading-5"
-                      style={{
-                        backgroundImage:
-                          "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
-                      }}
-                    >
-                      Set custom emoji
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <GaslessBanner
+                onHaptic={() => {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
+                }}
+              />
             );
 
             // Loading state - show skeleton transaction cards

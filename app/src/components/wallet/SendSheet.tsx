@@ -165,8 +165,8 @@ export default function SendSheet({
   onStepChange,
   balance,
   walletAddress,
-  starsBalance = 0,
-  onTopUpStars,
+  starsBalance: _starsBalance = 0,
+  onTopUpStars: _onTopUpStars,
   solPriceUsd: solPriceUsdProp,
   isSolPriceLoading: isSolPriceLoadingProp,
   sentAmountSol,
@@ -229,7 +229,7 @@ export default function SendSheet({
     if (solPriceUsd === null) return null;
     return calculateStarsFee(SOLANA_FEE_SOL, solPriceUsd);
   }, [solPriceUsd]);
-  const starsFeeUsd = starsFeeAmount !== null ? starsFeeAmount * STARS_TO_USD : null;
+  const _starsFeeUsd = starsFeeAmount !== null ? starsFeeAmount * STARS_TO_USD : null;
   const [hasGaslessAccess, setHasGaslessAccess] = useState(false);
 
   useEffect(() => {
@@ -1093,7 +1093,7 @@ export default function SendSheet({
                       : solPriceUsd
                         ? amountVal / solPriceUsd
                         : NaN;
-                  const _hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
+                  const __hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
 
                   // Check circle icons
                   const CheckCircleOn = () => (
