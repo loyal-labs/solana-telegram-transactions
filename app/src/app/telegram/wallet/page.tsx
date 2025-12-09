@@ -1936,29 +1936,58 @@ export default function Home() {
               );
             }
 
-            // Empty wallet AND no transactions - show only banner
+            // Empty wallet AND no transactions - show banner and empty state
             if (isEmptyWallet && hasNoTransactions) {
               return (
                 <div className="flex-1">
                   <EmptyWalletBanner />
+                  {/* Activity header */}
+                  <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+                    <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
+                      Activity
+                    </p>
+                  </div>
+                  {/* Empty transactions state */}
+                  <div className="px-4 pb-4">
+                    <div
+                      className="flex items-center justify-center px-8 py-6 rounded-2xl"
+                      style={{
+                        background: "rgba(255, 255, 255, 0.03)",
+                        mixBlendMode: "lighten",
+                      }}
+                    >
+                      <p className="text-base text-white/60 leading-5 text-center">
+                        You don&apos;t have any transactions yet
+                      </p>
+                    </div>
+                  </div>
                 </div>
               );
             }
 
-            // Has balance but no transactions - no Activity label
+            // Has balance but no transactions
             if (hasNoTransactions) {
               return (
-                <div className="flex-1 px-4 pb-4">
-                  <div
-                    className="flex items-center justify-center px-8 py-6 rounded-2xl h-[200px]"
-                    style={{
-                      background: "rgba(255, 255, 255, 0.03)",
-                      mixBlendMode: "lighten",
-                    }}
-                  >
-                    <p className="text-base text-white/60 leading-5 text-center">
-                      You don&apos;t have any transactions yet
+                <div className="flex-1">
+                  {/* Activity header */}
+                  <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+                    <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
+                      Activity
                     </p>
+                  </div>
+                  {/* Empty transactions state */}
+                  <div className="px-4 pb-4">
+                    <div
+                      className="flex items-center justify-center px-8 py-6 rounded-2xl"
+                      style={{
+                        background: "rgba(255, 255, 255, 0.03)",
+                        mixBlendMode: "lighten",
+                      }}
+                    >
+                      <p className="text-base text-white/60 leading-5 text-center">
+                        You don&apos;t have any transactions yet
+                      </p>
+                    </div>
                   </div>
                 </div>
               );

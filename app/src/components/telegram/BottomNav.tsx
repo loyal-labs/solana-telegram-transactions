@@ -27,8 +27,8 @@ const navItems: NavItem[] = [
 export default function BottomNav() {
   const pathname = usePathname();
 
-  // Hide nav on certain pages (e.g., feed page)
-  const hiddenPaths = ["/telegram/summaries/feed"];
+  // Hide nav on certain pages (e.g., feed page, direct chat page)
+  const hiddenPaths = ["/telegram/summaries/feed", "/telegram/summaries/direct"];
   const shouldHide = hiddenPaths.some(path => pathname?.startsWith(path));
 
   const handleNavClick = () => {

@@ -7,8 +7,8 @@ import { useEffect, useRef, useState } from "react";
 
 import ConnectBotModal from "@/components/telegram/ConnectBotModal";
 
-// Mock chat data - matches the summaries in SummaryFeed.tsx
-const MOCK_CHATS = [
+// Mock chat data for Groups tab - matches the summaries in SummaryFeed.tsx
+const MOCK_GROUP_CHATS = [
   {
     id: "1",
     title: "The Loyal Community",
@@ -34,6 +34,56 @@ const MOCK_CHATS = [
     id: "5",
     title: "Solana Developers",
     subtitle: "Building on Solana blockchain",
+  },
+];
+
+// Mock chat data for Direct tab - personal conversations
+const MOCK_DIRECT_CHATS = [
+  {
+    id: "d1",
+    title: "Alice Johnson",
+    subtitle: "Hey! Did you see the latest update on the project?",
+    messageCount: 47,
+  },
+  {
+    id: "d2",
+    title: "Bob Smith",
+    subtitle: "Thanks for helping with that bug yesterday",
+    messageCount: 23,
+  },
+  {
+    id: "d3",
+    title: "Charlie Davis",
+    subtitle: "Can we schedule a call for tomorrow?",
+    messageCount: 156,
+  },
+  {
+    id: "d4",
+    title: "Diana Wilson",
+    subtitle: "The design looks great! Just a few small tweaks...",
+    messageCount: 89,
+  },
+];
+
+// Mock chat data for Spam tab
+const MOCK_SPAM_CHATS = [
+  {
+    id: "s1",
+    title: "Crypto Giveaway Bot",
+    subtitle: "Congratulations! You've won 10 ETH! Click here to claim...",
+    messageCount: 12,
+  },
+  {
+    id: "s2",
+    title: "Investment Guru",
+    subtitle: "Make $10,000 daily with this secret trading strategy!",
+    messageCount: 34,
+  },
+  {
+    id: "s3",
+    title: "Lucky Winner",
+    subtitle: "You have been selected for an exclusive NFT airdrop...",
+    messageCount: 8,
   },
 ];
 
@@ -123,10 +173,11 @@ interface Tab {
   hasDividerBefore?: boolean;
 }
 
-const TABS: Tab[] = [
-  { id: "groups", label: "Groups", count: 19 },
-  { id: "direct", label: "Direct", count: 4, hasDividerBefore: true },
-  { id: "spam", label: "Spam", count: 0 },
+// Tab data will be computed dynamically based on mock data
+const getTabsData = (): Tab[] => [
+  { id: "groups", label: "Groups", count: MOCK_GROUP_CHATS.length },
+  { id: "direct", label: "Direct", count: MOCK_DIRECT_CHATS.length, hasDividerBefore: true },
+  { id: "spam", label: "Spam", count: MOCK_SPAM_CHATS.length },
 ];
 
 interface DirectTabBannerProps {
@@ -233,11 +284,22 @@ function Tooltip({ text, color }: TooltipProps) {
   );
 }
 
+const ACTIVE_TAB_STORAGE_KEY = "summaries_active_tab";
+
 export default function SummariesPage() {
   const router = useRouter();
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>("direct");
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    // Initialize from localStorage, default to "direct"
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+      if (saved === "groups" || saved === "direct" || saved === "spam") {
+        return saved;
+      }
+    }
+    return "direct";
+  });
   const [isConnectBotModalOpen, setIsConnectBotModalOpen] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -248,6 +310,19 @@ export default function SummariesPage() {
       return "#2990ff";
     }
   });
+
+  // Get tabs data and current chat list based on active tab
+  const tabs = getTabsData();
+  const currentChatList = activeTab === "groups"
+    ? MOCK_GROUP_CHATS
+    : activeTab === "direct"
+      ? MOCK_DIRECT_CHATS
+      : MOCK_SPAM_CHATS;
+
+  // Save active tab to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
+  }, [activeTab]);
 
   // Close tooltip when clicking outside
   useEffect(() => {
@@ -273,11 +348,19 @@ export default function SummariesPage() {
     setIsTooltipVisible((prev) => !prev);
   };
 
-  const handleChatClick = (chat: (typeof MOCK_CHATS)[0]) => {
+  const handleChatClick = (chat: { id: string; title: string; subtitle?: string; messageCount?: number }) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
-    router.push(`/telegram/summaries/feed?chatId=${chat.id}`);
+
+    // Groups tab: navigate to SummaryFeed page (vertical swipe)
+    if (activeTab === "groups") {
+      router.push(`/telegram/summaries/feed?chatId=${chat.id}`);
+      return;
+    }
+
+    // Direct and Spam tabs: navigate to DirectFeed page (horizontal swipe)
+    router.push(`/telegram/summaries/direct?chatId=${chat.id}&tab=${activeTab}`);
   };
 
   const handleBannerClose = () => {
@@ -337,7 +420,7 @@ export default function SummariesPage() {
 
         {/* Tabs */}
         <div className="flex pl-4 border-b border-white/10">
-          {TABS.map((tab, index) => (
+          {tabs.map((tab, index) => (
             <div key={tab.id} className="flex items-center">
               {/* Vertical divider before tab if specified */}
               {tab.hasDividerBefore && (
@@ -379,7 +462,7 @@ export default function SummariesPage() {
       </div>
 
       {/* Chat List or Empty State */}
-      {MOCK_CHATS.length === 0 ? (
+      {currentChatList.length === 0 ? (
         <div className="flex-1 flex flex-col pt-1">
           {!isBannerDismissed && (
             <EmptyStateBanner
@@ -390,17 +473,17 @@ export default function SummariesPage() {
         </div>
       ) : (
         <div className="flex-1 flex flex-col pt-2 pb-4">
-          {/* Direct tab banner */}
-          {activeTab === "direct" && (
+          {/* Direct and Spam tab banner */}
+          {(activeTab === "direct" || activeTab === "spam") && (
             <DirectTabBanner onConnectBot={handleConnectBot} />
           )}
 
-          {MOCK_CHATS.map((chat, index) => (
+          {currentChatList.map((chat, index) => (
             <ChatItem
               key={chat.id}
               chat={chat}
               onClick={() => handleChatClick(chat)}
-              showDivider={index < MOCK_CHATS.length - 1}
+              showDivider={index < currentChatList.length - 1}
             />
           ))}
 
