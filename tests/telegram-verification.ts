@@ -56,7 +56,7 @@ const encodeAnchorStringFilter = (value: string): string => {
 };
 
 const VALIDATION_AUTH_DATE = 1763598375;
-const VALIDATION_USERNAME = "vlad_arbatov";
+const VALIDATION_USERNAME = "dig133713337";
 
 const TELEGRAM_PUBKEY_PROD_HEX =
   "e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d";

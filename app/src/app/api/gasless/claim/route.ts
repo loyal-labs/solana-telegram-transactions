@@ -1,7 +1,7 @@
 "use server";
 
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
-import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { PublicKey, Transaction } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
 import { claimDeposit } from "@/lib/solana/deposits/claim-deposit";
@@ -19,10 +19,9 @@ import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
 const storeInitData = async (
   anchorProvider: AnchorProvider,
   transaction: Transaction,
-  payer: Keypair
+  payerWallet: Wallet
 ): Promise<boolean> => {
-  const wallet = new SimpleWallet(payer);
-  await wallet.signTransaction(transaction);
+  await payerWallet.signTransaction(transaction);
 
   let threw = false;
   try {
@@ -46,7 +45,8 @@ const storeInitData = async (
 
 const verifyAndClaimDeposit = async (
   provider: AnchorProvider,
-  wallet: Wallet,
+  transaction: Transaction,
+  payerWallet: Wallet,
   user: PublicKey,
   recipient: PublicKey,
   username: string,
@@ -61,9 +61,11 @@ const verifyAndClaimDeposit = async (
   const transferProgram = getTelegramTransferProgram(provider);
   const verificationProgram = getTelegramVerificationProgram(provider);
 
+  const sessionData = await storeInitData(provider, transaction, payerWallet);
+
   const verified = await verifyInitData(
     provider,
-    wallet,
+    payerWallet,
     recipient,
     verificationProgram,
     processedInitDataBytes,
@@ -122,9 +124,9 @@ export async function POST(req: Request) {
     }
     const payer = await getGaslessKeypair();
     const provider = await getCustomWalletProvider(payer);
-    const wallet = new SimpleWallet(payer);
+    const payerWallet = new SimpleWallet(payer);
 
-    const storeResult = await storeInitData(provider, transaction, payer);
+    const storeResult = await storeInitData(provider, transaction, payerWallet);
     if (!storeResult) {
       return NextResponse.json(
         { error: "Failed to store init data" },
@@ -134,7 +136,8 @@ export async function POST(req: Request) {
 
     const result = await verifyAndClaimDeposit(
       provider,
-      wallet,
+      transaction,
+      payerWallet,
       user,
       recipient,
       username,
