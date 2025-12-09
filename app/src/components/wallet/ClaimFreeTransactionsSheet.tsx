@@ -173,8 +173,6 @@ export default function ClaimFreeTransactionsSheet({
   useEffect(() => {
     if (!open) {
       setIsVerifying(false);
-      hideMainButton();
-      hideSecondaryButton();
       return;
     }
 

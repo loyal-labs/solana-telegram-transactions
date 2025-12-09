@@ -656,7 +656,6 @@ export default function Home() {
     }
 
     const trimmedRecipient = sendFormValues.recipient.trim();
-    console.log("Trimmed recipient:", trimmedRecipient);
     const amountSol = parseFloat(sendFormValues.amount);
     if (Number.isNaN(amountSol) || amountSol <= 0) {
       return;
@@ -671,18 +670,12 @@ export default function Home() {
     setIsSendingTransaction(true);
 
     try {
-      console.log("Sending transaction to:", trimmedRecipient);
 
       let signature: string | null = null;
 
       if (isValidSolanaAddress(trimmedRecipient)) {
-        console.log("Sending transaction to Solana address:");
         signature = await sendSolTransaction(trimmedRecipient, lamports);
       } else if (isValidTelegramUsername(trimmedRecipient)) {
-        console.log(
-          "Sending transaction to Telegram username:",
-          trimmedRecipient
-        );
         const username = trimmedRecipient.replace(/^@/, "");
         const provider = await getWalletProvider();
         const transferProgram = getTelegramTransferProgram(provider);
@@ -808,7 +801,6 @@ export default function Home() {
       if (navigator?.clipboard?.writeText) {
         try {
           await navigator.clipboard.writeText(address);
-          console.log("Copied wallet address to clipboard");
           return;
         } catch (copyError) {
           console.warn("Clipboard copy failed", copyError);
@@ -816,7 +808,6 @@ export default function Home() {
       }
 
       if (sendString(address)) {
-        console.log("Shared wallet address via Telegram bridge");
       }
     } catch (error) {
       console.error("Failed to share wallet address", error);
@@ -862,12 +853,6 @@ export default function Home() {
 
         const username = transaction.username;
         const amountLamports = transaction.amountLamports;
-        console.log(
-          "username:",
-          username,
-          " to:",
-          recipientPublicKey.toBase58()
-        );
 
         await verifyAndClaimDeposit(
           provider,
@@ -1049,11 +1034,6 @@ export default function Home() {
           }
         );
 
-        console.log(
-          "Setting incoming transactions:",
-          mappedTransactions.length,
-          mappedTransactions
-        );
         setCachedIncomingTransactions(username, mappedTransactions);
         setIncomingTransactions(mappedTransactions);
       } catch (error) {
@@ -1075,13 +1055,11 @@ export default function Home() {
       // Mount closing behavior if needed
       if (closingBehavior.mount.isAvailable?.()) {
         closingBehavior.mount();
-        console.log("Closing behavior mounted");
       }
 
       if (closingBehavior.enableConfirmation.isAvailable()) {
         closingBehavior.enableConfirmation();
         const isEnabled = closingBehavior.isConfirmationEnabled();
-        console.log("Closing confirmation enabled:", isEnabled);
       } else {
         console.warn("enableConfirmation is not available");
       }
@@ -1103,7 +1081,6 @@ export default function Home() {
 
     const isMobile = platform === "ios" || platform === "android";
     setIsMobilePlatform(isMobile);
-    console.log("Platform detected:", platform, "isMobile:", isMobile);
 
     if (isMobile) {
       if (viewport.requestFullscreen.isAvailable()) {
@@ -1159,10 +1136,6 @@ export default function Home() {
       try {
         const { keypair, isNew } = await ensureWalletKeypair();
         const publicKeyBase58 = keypair.publicKey.toBase58();
-        console.log("Wallet keypair ready", {
-          isNew,
-          publicKey: publicKeyBase58,
-        });
 
         // Store wallet address in module-level cache for future mounts
         cachedWalletAddress = publicKeyBase58;
@@ -1388,7 +1361,9 @@ export default function Home() {
         });
       } else if (selectedIncomingTransaction) {
         // Only show Claim button for incoming (claimable) transactions
-        if (needsGas) {
+        const hasGaslessAccess = gaslessState === GaslessState.CLAIMED;
+
+        if (needsGas && !hasGaslessAccess) {
           // User needs gas - show "Claim free transactions" button
           showMainButton({
             text: "Claim free transactions",
@@ -1398,7 +1373,7 @@ export default function Home() {
             isEnabled: true,
             showLoader: false,
           });
-        } else if (isClaimingTransaction) {
+        } else if (isClaimingTransaction && !hasGaslessAccess) {
           // Show only main button with loader during claim
           showMainButton({
             text: "Claim",
@@ -1510,6 +1485,7 @@ export default function Home() {
     selectedIncomingTransaction,
     isClaimingTransaction,
     needsGas,
+    gaslessState,
     mainButtonAvailable,
     secondaryButtonAvailable,
     handleOpenSendSheet,

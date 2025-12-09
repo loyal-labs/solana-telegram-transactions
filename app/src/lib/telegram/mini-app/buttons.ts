@@ -111,6 +111,8 @@ export const showMainButton = (options: MainButtonOptions): boolean => {
   if (!ensureMainButton()) return false;
   if (!mainButton.setParams.isAvailable()) return false;
 
+  console.log("showing main button", options);
+
   mainButton.setParams(buildMainButtonParams(options));
   bindMainClick(options.onClick);
 
@@ -122,6 +124,8 @@ export const hideMainButton = (): boolean => {
     detachMainClick();
     detachMainClick = null;
   }
+
+  console.log("hiding main button");
 
   if (!isInMiniApp()) return false;
   if (!mainButton.setParams.isAvailable()) return false;
