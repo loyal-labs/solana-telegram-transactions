@@ -75,6 +75,14 @@ export const getGaslessKeypair = async (): Promise<Keypair> => {
   return Keypair.fromSecretKey(bs58.decode(privateKey));
 };
 
+export const getGaslessPublicKey = async (): Promise<PublicKey> => {
+  const publicKey = process.env.NEXT_PUBLIC_GAS_PUBLIC_KEY;
+  if (!publicKey) {
+    throw new Error("NEXT_PUBLIC_GAS_PUBLIC_KEY is not set");
+  }
+  return new PublicKey(publicKey);
+};
+
 export const getWalletPublicKey = async (): Promise<PublicKey> => {
   const keypair = await getWalletKeypair();
   return keypair.publicKey;

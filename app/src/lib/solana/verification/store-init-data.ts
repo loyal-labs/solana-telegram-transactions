@@ -1,10 +1,6 @@
 import { AnchorProvider, Program } from "@coral-xyz/anchor";
 import { Wallet } from "@coral-xyz/anchor";
-import {
-  PublicKey,
-  SystemProgram,
-  Transaction,
-} from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 
 import type { TelegramVerification } from "../../../../../target/types/telegram_verification";
 import { getSessionPda } from "../solana-helpers";
@@ -35,6 +31,7 @@ export const storeInitData = async (
 };
 
 export const storeInitDataGasless = async (
+  provider: AnchorProvider,
   verificationProgram: Program<TelegramVerification>,
   payer: PublicKey,
   initData: Uint8Array,
@@ -43,7 +40,7 @@ export const storeInitDataGasless = async (
   const userPublicKey = userWallet.publicKey;
   const sessionPda = getSessionPda(userPublicKey, verificationProgram);
 
-  const storeIx = await verificationProgram.methods
+  const storeTx = await verificationProgram.methods
     .store(Buffer.from(initData))
     .accounts({
       payer: payer,
@@ -52,12 +49,16 @@ export const storeInitDataGasless = async (
       session: sessionPda,
       systemProgram: SystemProgram.programId,
     })
-    .instruction();
+    .transaction();
 
-  const tx = new Transaction().add(storeIx);
-  // sign partially with userSigner
-  tx.feePayer = payer;
-  userWallet.signTransaction(tx);
+  const { blockhash, lastValidBlockHeight } =
+    await provider.connection.getLatestBlockhash();
 
-  return tx;
+  storeTx.feePayer = payer;
+  storeTx.recentBlockhash = blockhash;
+  storeTx.lastValidBlockHeight = lastValidBlockHeight;
+
+  await userWallet.signTransaction(storeTx);
+
+  return storeTx;
 };

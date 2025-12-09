@@ -1,14 +1,24 @@
 "use server";
 
-import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
+import {
+  Ed25519Program,
+  PublicKey,
+  Transaction,
+  VersionedTransaction,
+} from "@solana/web3.js";
+import { SYSVAR_INSTRUCTIONS_PUBKEY } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
 import { claimDeposit } from "@/lib/solana/deposits/claim-deposit";
 import {
+  getDepositPda,
   getTelegramTransferProgram,
   getTelegramVerificationProgram,
+  getVaultPda,
+  numberToBN,
 } from "@/lib/solana/solana-helpers";
+import { getSessionPda } from "@/lib/solana/solana-helpers";
 import { verifyInitData } from "@/lib/solana/verification/verify-init-data";
 import {
   getCustomWalletProvider,
@@ -16,9 +26,40 @@ import {
 } from "@/lib/solana/wallet/wallet-details";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
 
+import { TelegramTransfer } from "../../../../../../target/types/telegram_transfer";
+import { TelegramVerification } from "../../../../../../target/types/telegram_verification";
+
+const normalizeBytes = (value: unknown): Uint8Array => {
+  if (typeof value === "string") {
+    return new Uint8Array(Buffer.from(value, "base64"));
+  }
+  if (Array.isArray(value)) {
+    return Uint8Array.from(value);
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value)
+      .map(([k, v]) => [Number(k), v as number])
+      .sort(([a], [b]) => a - b)
+      .map(([, v]) => v);
+    return Uint8Array.from(entries);
+  }
+  throw new Error("Invalid byte array format");
+};
+
+const deserializeTransaction = (
+  serializedTx: string
+): Transaction | VersionedTransaction => {
+  const buffer = Buffer.from(serializedTx, "base64");
+  try {
+    return VersionedTransaction.deserialize(buffer);
+  } catch {
+    return Transaction.from(buffer);
+  }
+};
+
 const storeInitData = async (
   anchorProvider: AnchorProvider,
-  transaction: Transaction,
+  transaction: Transaction | VersionedTransaction,
   payerWallet: Wallet
 ): Promise<boolean> => {
   await payerWallet.signTransaction(transaction);
@@ -43,9 +84,108 @@ const storeInitData = async (
   return !threw;
 };
 
+const verifyInitDataGasless = async (
+  provider: AnchorProvider,
+  verificationProgram: Program<TelegramVerification>,
+  payerWallet: Wallet,
+  recipientPubKey: PublicKey,
+  telegramPublicKeyBytes: Uint8Array,
+  telegramSignatureBytes: Uint8Array,
+  processedInitDataBytes: Uint8Array
+): Promise<boolean> => {
+  const sessionPda = getSessionPda(recipientPubKey, verificationProgram);
+  const payerPubKey = payerWallet.publicKey;
+  const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
+    publicKey: telegramPublicKeyBytes,
+    message: processedInitDataBytes,
+    signature: telegramSignatureBytes,
+  });
+
+  const verifyIx = await verificationProgram.methods
+    .verifyTelegramInitData()
+    .accounts({
+      session: sessionPda,
+      // @ts-expect-error - SYSVAR_INSTRUCTIONS_PUBKEY is a PublicKey
+      instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
+    })
+    .transaction();
+
+  const verifyTx = new Transaction().add(ed25519Ix, verifyIx);
+
+  const { blockhash, lastValidBlockHeight } =
+    await provider.connection.getLatestBlockhash();
+  verifyTx.feePayer = payerPubKey;
+  verifyTx.recentBlockhash = blockhash;
+  verifyTx.lastValidBlockHeight = lastValidBlockHeight;
+  await payerWallet.signTransaction(verifyTx);
+
+  let threw = false;
+  try {
+    const sig = await provider.connection.sendRawTransaction(
+      verifyTx.serialize(),
+      {
+        skipPreflight: false,
+      }
+    );
+    await provider.connection.confirmTransaction(sig, "confirmed");
+  } catch (e) {
+    threw = true;
+    console.error("Error:", e);
+  }
+  return !threw;
+};
+
+const claimDepositGasless = async (
+  provider: AnchorProvider,
+  transferProgram: Program<TelegramTransfer>,
+  verificationProgram: Program<TelegramVerification>,
+  payerWallet: Wallet,
+  userPubKey: PublicKey,
+  recipientPubKey: PublicKey,
+  amount: number,
+  username: string
+): Promise<boolean> => {
+  const vaultPda = getVaultPda(transferProgram);
+  const depositPda = getDepositPda(userPubKey, username, transferProgram);
+  const payerPubKey = payerWallet.publicKey;
+  const sessionPda = getSessionPda(recipientPubKey, verificationProgram);
+  const amountBN = numberToBN(amount);
+
+  const claimTx = await transferProgram.methods
+    .claimDeposit(amountBN)
+    .accounts({
+      recipient: recipientPubKey,
+      // @ts-expect-error - vaultPda is a PublicKey
+      vault: vaultPda,
+      deposit: depositPda,
+      session: sessionPda,
+    })
+    .transaction();
+  const { blockhash, lastValidBlockHeight } =
+    await provider.connection.getLatestBlockhash();
+  claimTx.feePayer = payerPubKey;
+  claimTx.recentBlockhash = blockhash;
+  claimTx.lastValidBlockHeight = lastValidBlockHeight;
+  await payerWallet.signTransaction(claimTx);
+
+  let threw = false;
+  try {
+    const sig = await provider.connection.sendRawTransaction(
+      claimTx.serialize(),
+      {
+        skipPreflight: false,
+      }
+    );
+    await provider.connection.confirmTransaction(sig, "confirmed");
+  } catch (e) {
+    threw = true;
+    console.error("Error:", e);
+  }
+  return !threw;
+};
+
 const verifyAndClaimDeposit = async (
   provider: AnchorProvider,
-  transaction: Transaction,
   payerWallet: Wallet,
   user: PublicKey,
   recipient: PublicKey,
@@ -60,23 +200,24 @@ const verifyAndClaimDeposit = async (
   }
   const transferProgram = getTelegramTransferProgram(provider);
   const verificationProgram = getTelegramVerificationProgram(provider);
+  console.log("Got programs");
 
-  const sessionData = await storeInitData(provider, transaction, payerWallet);
-
-  const verified = await verifyInitData(
+  const verified = await verifyInitDataGasless(
     provider,
+    verificationProgram,
     payerWallet,
     recipient,
-    verificationProgram,
-    processedInitDataBytes,
+    telegramPublicKeyBytes,
     telegramSignatureBytes,
-    telegramPublicKeyBytes
+    processedInitDataBytes
   );
   console.log("verified:", verified);
 
-  const claimed = await claimDeposit(
+  const claimed = await claimDepositGasless(
+    provider,
     transferProgram,
     verificationProgram,
+    payerWallet,
     user,
     recipient,
     amount,
@@ -96,37 +237,68 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+    const bodyString = new TextDecoder().decode(body);
+    const bodyJson = JSON.parse(bodyString);
+    console.log("bodyJson:", bodyJson);
 
     const {
-      transaction,
-      user,
-      recipient,
+      storeTx,
+      userPubKey,
+      recipientPubKey,
       username,
       amount,
       processedInitDataBytes,
       telegramSignatureBytes,
       telegramPublicKeyBytes,
-    } = await req.json();
+    } = bodyJson;
+
     if (
-      !transaction ||
-      !user ||
-      !recipient ||
+      !storeTx ||
+      !userPubKey ||
+      !recipientPubKey ||
       !username ||
       !amount ||
       !processedInitDataBytes ||
       !telegramSignatureBytes ||
       !telegramPublicKeyBytes
     ) {
+      console.log("Missing required fields");
       return NextResponse.json(
         { error: "transaction and payer are required" },
         { status: 400 }
       );
     }
+    if (typeof storeTx !== "string") {
+      return NextResponse.json(
+        { error: "Invalid transaction format" },
+        { status: 400 }
+      );
+    }
+    console.log("Got all required fields");
     const payer = await getGaslessKeypair();
     const provider = await getCustomWalletProvider(payer);
     const payerWallet = new SimpleWallet(payer);
 
-    const storeResult = await storeInitData(provider, transaction, payerWallet);
+    const parsedStoreTx = deserializeTransaction(storeTx);
+    const parsedUser = new PublicKey(userPubKey);
+    const parsedRecipient = new PublicKey(recipientPubKey);
+    const processedInitData = normalizeBytes(processedInitDataBytes);
+    const telegramSignature = normalizeBytes(telegramSignatureBytes);
+    const telegramPublicKey = normalizeBytes(telegramPublicKeyBytes);
+
+    console.log("parsedStoreTx:", parsedStoreTx);
+    console.log("parsedUser:", parsedUser);
+    console.log("parsedRecipient:", parsedRecipient);
+    console.log("processedInitData:", processedInitData);
+    console.log("telegramSignature:", telegramSignature);
+    console.log("telegramPublicKey:", telegramPublicKey);
+
+    const storeResult = await storeInitData(
+      provider,
+      parsedStoreTx,
+      payerWallet
+    );
+    console.log("storeResult:", storeResult);
     if (!storeResult) {
       return NextResponse.json(
         { error: "Failed to store init data" },
@@ -136,15 +308,14 @@ export async function POST(req: Request) {
 
     const result = await verifyAndClaimDeposit(
       provider,
-      transaction,
       payerWallet,
-      user,
-      recipient,
+      parsedUser,
+      parsedRecipient,
       username,
       amount,
-      processedInitDataBytes,
-      telegramSignatureBytes,
-      telegramPublicKeyBytes
+      processedInitData,
+      telegramSignature,
+      telegramPublicKey
     );
     if (!result) {
       return NextResponse.json(

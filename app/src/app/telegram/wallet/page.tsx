@@ -48,7 +48,8 @@ import {
 } from "@/lib/solana/rpc/get-account-txn-history";
 import type { WalletTransfer } from "@/lib/solana/rpc/types";
 import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
-import { verifyAndClaimDeposit } from "@/lib/solana/verify-and-claim-deposit";
+import { storeInitDataGasless } from "@/lib/solana/verification/store-init-data";
+import { prepareStoreInitDataTxn, sendStoreInitDataTxn, verifyAndClaimDeposit } from "@/lib/solana/verify-and-claim-deposit";
 import {
   formatAddress,
   formatBalance,
@@ -57,6 +58,7 @@ import {
   formatUsdValue,
 } from "@/lib/solana/wallet/formatters";
 import {
+  getGaslessPublicKey,
   getWalletBalance,
   getWalletKeypair,
   getWalletProvider,
@@ -898,6 +900,91 @@ export default function Home() {
     [incomingTransactions, rawInitData, refreshWalletBalance]
   );
 
+  const handleGaslessApproveTransaction = useCallback(
+    async (transactionId: string) => {
+      if (!rawInitData) {
+        console.error("Cannot verify init data: raw init data missing");
+        return;
+      }
+
+      const transaction = incomingTransactions.find(
+        (tx) => tx.id === transactionId
+      );
+      if (!transaction) {
+        console.warn("Transaction not found for approval:", transactionId);
+        return;
+      }
+
+      if (hapticFeedback.impactOccurred.isAvailable()) {
+        hapticFeedback.impactOccurred("medium");
+      }
+      setIsClaimingTransaction(true);
+      setClaimingTransactionId(transactionId);
+
+      try {
+        const provider = await getWalletProvider();
+        const keypair = await getWalletKeypair();
+        const wallet = new SimpleWallet(keypair);
+        const recipientPublicKey = provider.publicKey;
+
+        const { validationBytes, signatureBytes } =
+          createValidationBytesFromRawInitData(rawInitData);
+        const senderPublicKey = new PublicKey(transaction.sender);
+
+        const username = transaction.username;
+        const amountLamports = transaction.amountLamports;
+        const payerPublicKey = await getGaslessPublicKey();
+
+        const storeTx = await prepareStoreInitDataTxn(
+          provider,
+          payerPublicKey,
+          validationBytes,
+          wallet
+        );
+
+        await sendStoreInitDataTxn(
+          storeTx, 
+          senderPublicKey, 
+          recipientPublicKey, 
+          username, 
+          amountLamports, 
+          validationBytes, 
+          signatureBytes, 
+          TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
+        );
+
+        setIncomingTransactions((prev) =>
+          prev.filter((tx) => tx.id !== transactionId)
+        );
+
+        await refreshWalletBalance(true);
+
+        if (hapticFeedback.notificationOccurred.isAvailable()) {
+          hapticFeedback.notificationOccurred("success");
+        }
+
+        // Show success state instead of closing
+        setShowClaimSuccess(true);
+      } catch (error) {
+        console.error("Failed to claim transaction", error);
+        if (hapticFeedback.notificationOccurred.isAvailable()) {
+          hapticFeedback.notificationOccurred("error");
+        }
+
+        // Set error message and show error state
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Something went wrong. Please try again.";
+        setClaimError(errorMessage);
+      } finally {
+        setIsClaimingTransaction(false);
+        setClaimingTransactionId(null);
+      }
+    },
+    [incomingTransactions, rawInitData, refreshWalletBalance]
+  );
+
   useEffect(() => {
     if (rawInitData) {
       if (!TELEGRAM_BOT_ID) {
@@ -1380,6 +1467,12 @@ export default function Home() {
             onClick: () => {}, // No-op during loading
             isEnabled: false,
             showLoader: true,
+          });
+        } else if (!isClaimingTransaction && hasGaslessAccess) {
+          // Show only main button with loader during claim
+          showMainButton({
+            text: "Gasless Claim",
+            onClick: () => handleGaslessApproveTransaction(selectedIncomingTransaction.id)
           });
         } else {
           // Show only Claim button (no Ignore)
