@@ -78,6 +78,10 @@ import {
   setCloudValue,
 } from "@/lib/telegram/mini-app/cloud-storage";
 import {
+  GaslessState,
+  getGaslessState,
+} from "@/lib/telegram/mini-app/cloud-storage-gassless";
+import {
   cleanInitData,
   createValidationBytesFromRawInitData,
   createValidationString,
@@ -223,6 +227,7 @@ export default function Home() {
   const [claimError, setClaimError] = useState<string | null>(null);
   const [buttonRefreshTick, setButtonRefreshTick] = useState(0);
   const [needsGas, setNeedsGas] = useState(false);
+  const [gaslessState, setGaslessState] = useState<GaslessState | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(
     () => cachedWalletAddress
   );
@@ -322,6 +327,10 @@ export default function Home() {
     setReceiveSheetOpen(true);
   }, []);
 
+  const handleGaslessStateChange = useCallback((state: GaslessState) => {
+    setGaslessState(state);
+  }, []);
+
   const handleTopUpStars = useCallback(async () => {
     if (isCreatingInvoice) return;
 
@@ -394,8 +403,10 @@ export default function Home() {
       }
       // Store original incoming transaction for claim functionality
       setSelectedIncomingTransaction(transaction);
-      // Check if user needs gas (0 SOL)
-      const userNeedsGas = balance === null || balance === 0;
+      // Check if user needs gas (0 SOL) and hasn't completed gasless onboarding
+      const isWalletEmpty = balance === null || balance === 0;
+      const userNeedsGas =
+        gaslessState !== GaslessState.CLAIMED && isWalletEmpty;
       setNeedsGas(userNeedsGas);
       // Convert to TransactionDetailsData format
       const detailsData: TransactionDetailsData = {
@@ -412,7 +423,7 @@ export default function Home() {
       setSelectedTransaction(detailsData);
       setTransactionDetailsSheetOpen(true);
     },
-    [balance, starsBalance]
+    [balance, gaslessState]
   );
 
   const handleOpenWalletTransactionDetails = useCallback(
@@ -921,6 +932,28 @@ export default function Home() {
   }, [rawInitData]);
 
   useEffect(() => {
+    let isCancelled = false;
+
+    const syncGaslessState = async () => {
+      try {
+        const state = await getGaslessState();
+        if (isCancelled) return;
+        setGaslessState(state);
+      } catch (error) {
+        console.warn("Failed to load gasless state", error);
+        if (isCancelled) return;
+        setGaslessState(GaslessState.NOT_CLAIMED);
+      }
+    };
+
+    void syncGaslessState();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
     let retryCount = 0;
     const MAX_RETRIES = 3;
@@ -1301,6 +1334,18 @@ export default function Home() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedIncomingTransaction) {
+      setNeedsGas(false);
+      return;
+    }
+
+    const isWalletEmpty = balance === null || balance === 0;
+    const userNeedsGas =
+      gaslessState !== GaslessState.CLAIMED && isWalletEmpty;
+    setNeedsGas(userNeedsGas);
+  }, [balance, gaslessState, selectedIncomingTransaction]);
 
   useEffect(() => {
     if (isClaimFreeSheetOpen) {
@@ -1760,6 +1805,8 @@ export default function Home() {
                     hapticFeedback.impactOccurred("light");
                   }
                 }}
+                initialState={gaslessState}
+                onStateChange={handleGaslessStateChange}
               />
             );
 
@@ -1942,7 +1989,10 @@ export default function Home() {
                               {/* Right - Claim Badge */}
                               <div className="py-2.5 pl-3">
                                 {(() => {
-                                  const userNeedsGas = balance === null || balance === 0;
+                                  const isWalletEmpty = balance === null || balance === 0;
+                                  const userNeedsGas =
+                                    gaslessState !== GaslessState.CLAIMED &&
+                                    isWalletEmpty;
                                   return (
                                     <div
                                       className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-white leading-5"
@@ -1951,14 +2001,14 @@ export default function Home() {
                                           ? "linear-gradient(90deg, rgba(234, 179, 8, 0.15) 0%, rgba(234, 179, 8, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
                                           : "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
                                       }}
-                                    >
-                                      {userNeedsGas && (
-                                        <TriangleAlert className="w-4 h-4" style={{ color: "#eab308" }} strokeWidth={2} />
-                                      )}
+                                      >
+                                        {userNeedsGas && (
+                                          <TriangleAlert className="w-4 h-4" style={{ color: "#eab308" }} strokeWidth={2} />
+                                        )}
                                       {isClaiming
                                         ? "Claiming..."
                                         : userNeedsGas
-                                          ? "Details"
+                                          ? "Needs gas"
                                           : `Claim ${formatTransactionAmount(
                                               transaction.amountLamports
                                             )} SOL`}
@@ -2260,6 +2310,7 @@ export default function Home() {
       <ClaimFreeTransactionsSheet
         open={isClaimFreeSheetOpen}
         onOpenChange={setIsClaimFreeSheetOpen}
+        onStateChange={handleGaslessStateChange}
       />
     </>
   );

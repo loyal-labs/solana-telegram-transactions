@@ -19,27 +19,31 @@ import {
   hideMainButton,
   hideSecondaryButton,
   showMainButton,
-  showSecondaryButton,
 } from "@/lib/telegram/mini-app/buttons";
-import { setCloudValue } from "@/lib/telegram/mini-app/cloud-storage";
-import { setLoyalEmojiStatus } from "@/lib/telegram/mini-app/emoji-status";
+import {
+  GaslessState,
+  getGaslessState,
+  setGaslessState,
+} from "@/lib/telegram/mini-app/cloud-storage-gassless";
 import { openLoyalTgLink } from "@/lib/telegram/mini-app/open-telegram-link";
 
 export type ClaimFreeTransactionsSheetProps = {
   trigger?: ReactNode | null;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  onStateChange?: (state: GaslessState) => void;
 };
 
 export default function ClaimFreeTransactionsSheet({
   trigger,
   open,
   onOpenChange,
+  onStateChange,
 }: ClaimFreeTransactionsSheetProps) {
   const rawInitData = useRawInitData();
   const snapPoint = useModalSnapPoint();
   const { bottom: safeBottom } = useTelegramSafeArea();
-  const [selectedAction, setSelectedAction] = useState<"join-channel" | "custom-emoji" | null>(null);
+  const [gaslessState, setGaslessStateLocal] = useState<GaslessState | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [buttonColors] = useState(() => {
     try {
@@ -88,23 +92,14 @@ export default function ClaimFreeTransactionsSheet({
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
-    setSelectedAction("join-channel");
+    setGaslessStateLocal(GaslessState.CLAIMING);
+    onStateChange?.(GaslessState.CLAIMING);
+    void setGaslessState(GaslessState.CLAIMING);
     void openLoyalTgLink();
-  }, []);
-
-  const handleSetCustomEmoji = useCallback(async () => {
-    if (hapticFeedback.impactOccurred.isAvailable()) {
-      hapticFeedback.impactOccurred("light");
-    }
-    setSelectedAction("custom-emoji");
-    const success = await setLoyalEmojiStatus();
-    if (!success) {
-      console.warn("Failed to set custom emoji status");
-    }
-  }, []);
+  }, [onStateChange]);
 
   const handleVerify = useCallback(async () => {
-    if (!selectedAction) return;
+    if (gaslessState !== GaslessState.CLAIMING) return;
     if (!rawInitData) {
       console.error("Cannot verify: Telegram init data is missing");
       return;
@@ -117,10 +112,7 @@ export default function ClaimFreeTransactionsSheet({
 
     setIsVerifying(true);
 
-    const path =
-      selectedAction === "custom-emoji"
-        ? "/api/telegram/verify/emoji"
-        : "/api/telegram/verify/join";
+    const path = "/api/telegram/verify/join";
     const endpoint = resolveEndpoint(path);
 
     try {
@@ -139,32 +131,63 @@ export default function ClaimFreeTransactionsSheet({
       }
 
       console.log("Verification success", payload);
-      void setCloudValue("gassless-action", "true");
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("claim-free-verified"));
-      }
+      void setGaslessState(GaslessState.CLAIMED);
+      setGaslessStateLocal(GaslessState.CLAIMED);
+      onStateChange?.(GaslessState.CLAIMED);
 
       if (onOpenChange) {
         onOpenChange(false);
       }
-      setSelectedAction(null);
     } catch (error) {
       console.error("Verification request failed", error);
     } finally {
       setIsVerifying(false);
     }
-  }, [isVerifying, onOpenChange, rawInitData, resolveEndpoint, selectedAction]);
+  }, [gaslessState, isVerifying, onOpenChange, onStateChange, rawInitData, resolveEndpoint]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const syncGaslessState = async () => {
+      if (!open) return;
+      try {
+        const state = await getGaslessState();
+        if (isCancelled) return;
+        setGaslessStateLocal(state);
+        onStateChange?.(state);
+      } catch (error) {
+        console.warn("Failed to fetch gasless state", error);
+        if (isCancelled) return;
+        setGaslessStateLocal(GaslessState.NOT_CLAIMED);
+        onStateChange?.(GaslessState.NOT_CLAIMED);
+      }
+    };
+
+    void syncGaslessState();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [onStateChange, open]);
 
   useEffect(() => {
     if (!open) {
-      setSelectedAction(null);
       setIsVerifying(false);
       hideMainButton();
       hideSecondaryButton();
       return;
     }
 
-    if (selectedAction) {
+    if (!gaslessState) {
+      hideMainButton();
+      hideSecondaryButton();
+      return () => {
+        hideMainButton();
+        hideSecondaryButton();
+      };
+    }
+
+    if (gaslessState === GaslessState.CLAIMING) {
       const verifyShown = showMainButton({
         text: "Verify",
         onClick: handleVerify,
@@ -186,6 +209,28 @@ export default function ClaimFreeTransactionsSheet({
       };
     }
 
+    if (gaslessState === GaslessState.CLAIMED) {
+      const completedShown = showMainButton({
+        text: "Completed",
+        onClick: () => {},
+        backgroundColor: buttonColors.background,
+        textColor: buttonColors.text,
+        isEnabled: false,
+        showLoader: false,
+      });
+
+      hideSecondaryButton();
+
+      if (!completedShown) {
+        hideMainButton();
+      }
+
+      return () => {
+        hideMainButton();
+        hideSecondaryButton();
+      };
+    }
+
     const mainShown = showMainButton({
       text: "Join channel",
       onClick: handleJoinChannel,
@@ -193,16 +238,10 @@ export default function ClaimFreeTransactionsSheet({
       textColor: buttonColors.text,
     });
 
-    const secondaryShown = showSecondaryButton({
-      text: "Set custom emoji",
-      position: "left",
-      onClick: handleSetCustomEmoji,
-      backgroundColor: buttonColors.background,
-      textColor: buttonColors.text,
-    });
+    hideSecondaryButton();
 
     // If Telegram native buttons are unavailable, fall back to hiding both
-    if (!mainShown && !secondaryShown) {
+    if (!mainShown) {
       hideMainButton();
       hideSecondaryButton();
     }
@@ -215,12 +254,11 @@ export default function ClaimFreeTransactionsSheet({
     buttonColors.background,
     buttonColors.text,
     handleJoinChannel,
-    handleSetCustomEmoji,
     handleVerify,
     isVerifying,
+    gaslessState,
     open,
     rawInitData,
-    selectedAction,
   ]);
 
   return (
@@ -274,10 +312,10 @@ export default function ClaimFreeTransactionsSheet({
         <div className="flex-1 flex flex-col items-center justify-center px-4 pb-4 text-center gap-6">
           {/* Info Text */}
           <p className="text-base text-white/60 leading-5 px-4">
-            Complete either of the following tasks to get gasless transactions.
+            Join our Telegram channel to get gasless transactions.
           </p>
           <p className="text-sm text-white/50 leading-5 px-6">
-            Use the Telegram buttons to join the channel or set a custom emoji and unlock free transactions.
+            Use the Telegram button to join the channel and unlock free transactions.
           </p>
         </div>
       </div>
