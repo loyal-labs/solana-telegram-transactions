@@ -5,6 +5,8 @@ import { CircleHelp, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import ConnectBotModal from "@/components/telegram/ConnectBotModal";
+
 // Mock chat data - matches the summaries in SummaryFeed.tsx
 const MOCK_CHATS = [
   {
@@ -112,20 +114,53 @@ function ChatItem({ chat, onClick, showDivider = true }: ChatItemProps) {
 }
 
 // Tab types
-type TabId = "groups" | "direct" | "personal" | "work";
+type TabId = "groups" | "direct" | "spam";
 
 interface Tab {
   id: TabId;
   label: string;
   count: number;
+  hasDividerBefore?: boolean;
 }
 
 const TABS: Tab[] = [
   { id: "groups", label: "Groups", count: 19 },
-  { id: "direct", label: "Direct", count: 4 },
-  { id: "personal", label: "Personal", count: 8 },
-  { id: "work", label: "Work", count: 0 },
+  { id: "direct", label: "Direct", count: 4, hasDividerBefore: true },
+  { id: "spam", label: "Spam", count: 0 },
 ];
+
+interface DirectTabBannerProps {
+  onConnectBot: () => void;
+}
+
+function DirectTabBanner({ onConnectBot }: DirectTabBannerProps) {
+  return (
+    <div className="px-3 py-2">
+      <div className="bg-white/[0.06] rounded-2xl pl-3 pr-11 py-1">
+        <div className="flex flex-col gap-3 py-2">
+          <div className="flex flex-col gap-0.5">
+            <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
+              Connect Loyal Bot to Your Account
+            </p>
+            <p className="text-[13px] text-white/60 leading-4">
+              Loyal private AI will summarize, prioritize, and filter your Telegram chats so you can review what matters in this app
+            </p>
+          </div>
+          <div>
+            <button
+              onClick={onConnectBot}
+              className="bg-white/[0.06] rounded-full px-4 py-2 active:opacity-80 transition-opacity"
+            >
+              <span className="text-sm font-medium text-white leading-5">
+                Connect Loyal Bot
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface EmptyStateBannerProps {
   onClose: () => void;
@@ -202,7 +237,8 @@ export default function SummariesPage() {
   const router = useRouter();
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>("groups");
+  const [activeTab, setActiveTab] = useState<TabId>("direct");
+  const [isConnectBotModalOpen, setIsConnectBotModalOpen] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const [buttonColor] = useState(() => {
@@ -258,6 +294,13 @@ export default function SummariesPage() {
     // TODO: Navigate to connect chats flow
   };
 
+  const handleConnectBot = () => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("medium");
+    }
+    setIsConnectBotModalOpen(true);
+  };
+
   return (
     <main
       className="h-screen text-white font-sans overflow-y-auto relative flex flex-col"
@@ -293,33 +336,44 @@ export default function SummariesPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex pl-4 gap-4 border-b border-white/10">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                if (hapticFeedback.impactOccurred.isAvailable()) {
-                  hapticFeedback.impactOccurred("light");
-                }
-                setActiveTab(tab.id);
-              }}
-              className={`flex items-center gap-1.5 pb-2.5 pt-1 relative transition-colors ${
-                activeTab === tab.id ? "text-white" : "text-white/60"
-              }`}
-            >
-              <span className="text-[15px] font-medium leading-5">{tab.label}</span>
-              {tab.count > 0 && (
-                <span
-                  className="text-xs font-medium leading-4 px-1.5 py-0.5 rounded-full text-white"
-                  style={{ backgroundColor: buttonColor }}
-                >
-                  {tab.count}
-                </span>
+        <div className="flex pl-4 border-b border-white/10">
+          {TABS.map((tab, index) => (
+            <div key={tab.id} className="flex items-center">
+              {/* Vertical divider before tab if specified */}
+              {tab.hasDividerBefore && (
+                <div className="flex items-center self-stretch px-2">
+                  <div className="w-px h-5 bg-white/20 rounded-[1px]" />
+                </div>
               )}
-              {activeTab === tab.id && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-white" />
-              )}
-            </button>
+              <button
+                onClick={() => {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
+                  setActiveTab(tab.id);
+                }}
+                className={`flex items-center gap-1.5 pr-4 pb-2.5 pt-1 relative transition-colors ${
+                  index > 0 ? "pl-4" : ""
+                } ${activeTab === tab.id ? "text-white" : "text-white/60"}`}
+              >
+                <span className="text-base font-medium leading-5 tracking-[-0.176px]">{tab.label}</span>
+                {tab.count > 0 && (
+                  <span
+                    className="text-xs font-medium leading-4 px-1.5 py-0.5 rounded-full text-white"
+                    style={{ backgroundColor: buttonColor }}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+                {activeTab === tab.id && (
+                  <div
+                    className={`absolute bottom-0 right-3 h-[3px] rounded-t-[4px] rounded-b-[1px] bg-white ${
+                      index > 0 ? "left-3" : "left-0"
+                    }`}
+                  />
+                )}
+              </button>
+            </div>
           ))}
         </div>
       </div>
@@ -336,6 +390,11 @@ export default function SummariesPage() {
         </div>
       ) : (
         <div className="flex-1 flex flex-col pt-2 pb-4">
+          {/* Direct tab banner */}
+          {activeTab === "direct" && (
+            <DirectTabBanner onConnectBot={handleConnectBot} />
+          )}
+
           {MOCK_CHATS.map((chat, index) => (
             <ChatItem
               key={chat.id}
@@ -349,6 +408,12 @@ export default function SummariesPage() {
           <div className="h-32 shrink-0" />
         </div>
       )}
+
+      {/* Connect Bot Modal */}
+      <ConnectBotModal
+        open={isConnectBotModalOpen}
+        onOpenChange={setIsConnectBotModalOpen}
+      />
     </main>
   );
 }
