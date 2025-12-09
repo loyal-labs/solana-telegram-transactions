@@ -56,7 +56,7 @@ const encodeAnchorStringFilter = (value: string): string => {
 };
 
 const VALIDATION_AUTH_DATE = 1763598375;
-const VALIDATION_USERNAME = "vlad_arbatov";
+const VALIDATION_USERNAME = "dig133713337";
 
 const TELEGRAM_PUBKEY_PROD_HEX =
   "e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d";
@@ -180,5 +180,89 @@ describe.only("telegram-verification test suite", () => {
     const session = await verificationProgram.account.telegramSession.fetch(
       sessionPda
     );
+    console.log("session:", session);
+  });
+
+  it("[gasless] User B verifies Telegram initData with native sysvar instructions", async () => {
+    // this ix verifies ed25519 signature
+    const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
+      publicKey: TELEGRAM_PUBKEY_UINT8ARRAY,
+      message: VALIDATION_BYTES,
+      signature: VALIDATION_SIGNATURE_BYTES,
+    });
+
+    const verifyIx = await verificationProgram.methods
+      .verifyTelegramInitData()
+      .accounts({
+        session: sessionPda,
+        // @ts-ignore
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
+      })
+      .instruction();
+
+    const tx = new Transaction().add(ed25519Ix, verifyIx);
+    tx.feePayer = user;
+    const { blockhash } = await provider.connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    await wallet.signTransaction(tx);
+
+    let threw = false;
+    try {
+      const sig = await provider.connection.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false,
+      });
+      await provider.connection.confirmTransaction(sig, "confirmed");
+    } catch (e) {
+      threw = true;
+      console.error("Error:", e);
+    }
+    expect(threw).to.eq(false);
+
+    let session = await verificationProgram.account.telegramSession.fetch(
+      sessionPda
+    );
+    expect(session.username).to.eq(VALIDATION_USERNAME);
+    expect(session.verified).to.be.true;
+    expect(session.verifiedAt).to.not.be.null;
+  });
+
+  it("User B claims deposit from user A with verified initData", async () => {
+    [vaultPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault")],
+      transferProgram.programId
+    );
+    let vault = await transferProgram.account.vault.fetch(vaultPda);
+    const vaultBalanceInitial = vault.totalDeposited.toNumber();
+
+    const claimTx = await transferProgram.methods
+      .claimDeposit(new BN(initialAmount / 4))
+      .accounts({
+        recipient: otherUser,
+        // @ts-ignore
+        vault: vaultPda,
+        deposit: depositPda,
+        session: sessionPda,
+      })
+      .transaction();
+
+    claimTx.feePayer = user;
+    const { blockhash, lastValidBlockHeight } =
+      await provider.connection.getLatestBlockhash();
+    claimTx.recentBlockhash = blockhash;
+    claimTx.lastValidBlockHeight = lastValidBlockHeight;
+    await wallet.signTransaction(claimTx);
+
+    const sig = await provider.connection.sendRawTransaction(
+      claimTx.serialize(),
+      {
+        skipPreflight: false,
+      }
+    );
+    await provider.connection.confirmTransaction(sig, "confirmed");
+
+    const deposit = await transferProgram.account.deposit.fetch(depositPda);
+
+    const otherUserBalance = await provider.connection.getBalance(otherUser);
+    console.log("otherUserBalance:", otherUserBalance);
   });
 });
