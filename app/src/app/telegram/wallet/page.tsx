@@ -92,6 +92,7 @@ import {
 import { parseUsernameFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
 import { openInvoice } from "@/lib/telegram/mini-app/invoice";
 import { openQrScanner } from "@/lib/telegram/mini-app/qr-code";
+import { createShareMessage, shareSavedInlineMessage } from "@/lib/telegram/mini-app/share-message";
 import { ensureTelegramTheme } from "@/lib/telegram/mini-app/theme";
 import type {
   IncomingTransaction,
@@ -1534,29 +1535,32 @@ export default function Home() {
             showLoader: false,
           });
         } else {
-          // Success step - show Transaction details button
+          // Success step - share the details of the transaction
           showMainButton({
-            text: "Transaction details",
-            onClick: () => {
+            text: "Share transaction",
+            onClick: async () => {
               // Close send sheet and open transaction details
               setSendSheetOpen(false);
-              // Create transaction details for the just-sent transaction
-              if (sentAmountSol && sendFormValues.recipient) {
-                const trimmedRecipient = sendFormValues.recipient.trim();
-                const detailsData: TransactionDetailsData = {
-                  id: `sent-${Date.now()}`,
-                  type: "outgoing",
-                  amountLamports: Math.round(sentAmountSol * LAMPORTS_PER_SOL),
-                  recipient: trimmedRecipient,
-                  recipientUsername: trimmedRecipient.startsWith("@")
-                    ? trimmedRecipient
-                    : undefined,
-                  status: "completed",
-                  timestamp: Date.now(),
-                };
-                setSelectedTransaction(detailsData);
-                setSelectedIncomingTransaction(null);
-                setTransactionDetailsSheetOpen(true);
+              const recipientUsername = sendFormValues.recipient.trim().replace(/^@/, "");
+
+              if (sentAmountSol && recipientUsername && rawInitData && solPriceUsd) {
+                try {
+                  const amountSol = sentAmountSol;
+                  const amountUsd = amountSol * (solPriceUsd || 0);
+                  const msgId = await createShareMessage(
+                    rawInitData,
+                    recipientUsername,
+                    amountSol,
+                    amountUsd
+                  );
+                  if (msgId) {
+                    await shareSavedInlineMessage(msgId);
+                  }
+                } catch (error) {
+                  console.error("Failed to share transaction", error);
+                }
+              } else {
+                console.error("Failed to share transaction: missing required data");
               }
             },
             isEnabled: true,
@@ -1602,6 +1606,9 @@ export default function Home() {
     sendError,
     isClaimFreeSheetOpen,
     buttonRefreshTick,
+    rawInitData,
+    solPriceUsd,
+    handleGaslessApproveTransaction
   ]);
 
   const formattedUsdBalance = formatUsdValue(balance, solPriceUsd);

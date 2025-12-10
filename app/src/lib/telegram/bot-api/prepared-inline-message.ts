@@ -1,7 +1,8 @@
-import { InlineQueryResultBuilder } from "grammy";
+import { InlineKeyboard, InlineQueryResultBuilder } from "grammy";
 import { PreparedInlineMessage } from "grammy/types";
 
 import { getBot } from "./bot";
+import { MINI_APP_LINK } from "./constants";
 
 export const prepareInlineMessage = async (
   userId: number,
@@ -9,11 +10,14 @@ export const prepareInlineMessage = async (
 ): Promise<PreparedInlineMessage> => {
   const bot = await getBot();
 
-  // const keyboard = new InlineKeyboard().webApp("Open", MINI_APP_LINK);
+  const keyboard = new InlineKeyboard().url("Open", MINI_APP_LINK);
 
   const inlineMessage = InlineQueryResultBuilder.photo("id0", photoUrl).text(
     "Tap to open the transaction"
   );
+  inlineMessage.reply_markup = keyboard;
+
+  console.log("inlineMessage", inlineMessage);
 
   const preparedInlineMessage = await bot.api.savePreparedInlineMessage(
     userId,

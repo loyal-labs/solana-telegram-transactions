@@ -4,11 +4,12 @@ export const resolveEndpoint = (path: string): string => {
 
   try {
     const configured = new URL(serverHost);
-    const current = new URL(window.location.origin);
-    const hostsMatch =
-      configured.protocol === current.protocol &&
-      configured.host === current.host;
-    return hostsMatch ? new URL(path, configured).toString() : path;
+    const url = new URL(path, configured);
+
+    console.log("configured", configured);
+    console.log("url", url);
+    console.log("result", url.toString());
+    return url.toString();
   } catch {
     return path;
   }
