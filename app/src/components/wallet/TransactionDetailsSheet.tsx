@@ -29,6 +29,7 @@ export type TransactionDetailsSheetProps = {
   showError?: string | null; // Show error state with message after failed claim
   solPriceUsd?: number | null;
   needsGas?: boolean; // Show gas required warning for claimable transactions
+  onShare?: () => void; // Custom share handler (for deposit transactions)
 };
 
 // Wallet icon SVG component
@@ -50,6 +51,7 @@ export default function TransactionDetailsSheet({
   showError = null,
   solPriceUsd = null,
   needsGas = false,
+  onShare,
 }: TransactionDetailsSheetProps) {
   // Safe area handling - must be before early return
   const snapPoint = useModalSnapPoint();
@@ -129,6 +131,12 @@ export default function TransactionDetailsSheet({
   const handleShare = () => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
+    }
+
+    // Use custom share handler if provided (for deposit transactions)
+    if (onShare) {
+      onShare();
+      return;
     }
 
     const shareText = `Transaction: ${isIncoming ? "+" : "-"}${formattedAmount} SOL`;

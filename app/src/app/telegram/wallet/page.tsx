@@ -821,6 +821,38 @@ export default function Home() {
     }
   }, [walletAddress]);
 
+  const handleShareDepositTransaction = useCallback(async () => {
+    if (!selectedTransaction || !rawInitData || !solPriceUsd) {
+      console.error("Failed to share deposit transaction: missing required data");
+      return;
+    }
+
+    // Get recipient username from transaction (remove @ prefix if present)
+    const recipientUsername = selectedTransaction.recipientUsername?.replace(/^@/, "") || "";
+    if (!recipientUsername) {
+      console.error("Failed to share deposit transaction: missing recipient username");
+      return;
+    }
+
+    try {
+      const amountSol = selectedTransaction.amountLamports / LAMPORTS_PER_SOL;
+      const amountUsd = amountSol * solPriceUsd;
+
+      const msgId = await createShareMessage(
+        rawInitData,
+        recipientUsername,
+        amountSol,
+        amountUsd
+      );
+
+      if (msgId) {
+        await shareSavedInlineMessage(msgId);
+      }
+    } catch (error) {
+      console.error("Failed to share deposit transaction", error);
+    }
+  }, [selectedTransaction, rawInitData, solPriceUsd]);
+
   const handleScanQR = useCallback(() => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
@@ -2421,6 +2453,7 @@ export default function Home() {
         showError={claimError}
         solPriceUsd={solPriceUsd}
         needsGas={needsGas}
+        onShare={selectedTransaction?.transferType === "deposit_for_username" ? handleShareDepositTransaction : undefined}
       />
       <ActivitySheet
         open={isActivitySheetOpen}

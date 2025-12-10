@@ -1,7 +1,7 @@
 "use client";
 
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { hapticFeedback, retrieveLaunchParams, themeParams } from "@telegram-apps/sdk-react";
+import { hapticFeedback, openTelegramLink, retrieveLaunchParams, themeParams } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import {
@@ -554,11 +554,20 @@ export default function SendSheet({
           {/* Recipient Pill for Step 2 */}
           {step === 2 && (
             <div
-              className="flex items-center pl-1 pr-3 py-1 rounded-[54px]"
+              className={`flex items-center pl-1 pr-3 py-1 rounded-[54px] ${recipient.startsWith('@') ? 'cursor-pointer active:scale-95 active:opacity-80 transition-all duration-150' : ''}`}
               style={{
                 background: "rgba(255, 255, 255, 0.06)",
                 mixBlendMode: "lighten",
                 boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+              }}
+              onClick={() => {
+                if (recipient.startsWith('@') && openTelegramLink.isAvailable()) {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
+                  const username = recipient.slice(1); // Remove @ prefix
+                  openTelegramLink(`https://t.me/${username}`);
+                }
               }}
             >
               <div className="pr-1.5">
@@ -590,11 +599,20 @@ export default function SendSheet({
           {/* Recipient Pill for Step 3 and 4 */}
           {(step === 3 || step === 4) && (
             <div
-              className="flex items-center pl-1 pr-3 py-1 rounded-[54px]"
+              className={`flex items-center pl-1 pr-3 py-1 rounded-[54px] ${recipient.startsWith('@') ? 'cursor-pointer active:scale-95 active:opacity-80 transition-all duration-150' : ''}`}
               style={{
                 background: "rgba(255, 255, 255, 0.06)",
                 mixBlendMode: "lighten",
                 boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+              }}
+              onClick={() => {
+                if (recipient.startsWith('@') && openTelegramLink.isAvailable()) {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
+                  const username = recipient.slice(1); // Remove @ prefix
+                  openTelegramLink(`https://t.me/${username}`);
+                }
               }}
             >
               <div className="pr-1.5">
