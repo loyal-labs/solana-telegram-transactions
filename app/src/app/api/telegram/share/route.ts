@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     if (!user.username) {
       senderUsername = "@unknown";
     } else {
-      senderUsername = `@${user.username}`;
+      senderUsername = `${user.username}`;
     }
 
     const userId = user.id;
@@ -84,7 +84,6 @@ export async function POST(req: Request) {
       solAmount,
       usdAmount
     );
-    console.log("photoUrl", photoUrl);
 
     const preparedInlineMessage = await prepareInlineMessage(userId, photoUrl);
 

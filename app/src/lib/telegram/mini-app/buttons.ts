@@ -111,8 +111,6 @@ export const showMainButton = (options: MainButtonOptions): boolean => {
   if (!ensureMainButton()) return false;
   if (!mainButton.setParams.isAvailable()) return false;
 
-  console.log("showing main button", options);
-
   mainButton.setParams(buildMainButtonParams(options));
   bindMainClick(options.onClick);
 

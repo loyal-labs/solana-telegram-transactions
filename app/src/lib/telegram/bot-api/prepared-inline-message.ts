@@ -12,12 +12,18 @@ export const prepareInlineMessage = async (
 
   const keyboard = new InlineKeyboard().url("Open", MINI_APP_LINK);
 
-  const inlineMessage = InlineQueryResultBuilder.photo("id0", photoUrl).text(
-    "Tap to open the transaction"
-  );
-  inlineMessage.reply_markup = keyboard;
+  const invisibleUnicodeSymbol = String.fromCharCode(0x200b);
+  const text = `Tap to open Loyal app and claim the transaction!<a href="${photoUrl}">${invisibleUnicodeSymbol}</a>`;
 
-  console.log("inlineMessage", inlineMessage);
+  const inlineMessage = InlineQueryResultBuilder.article(
+    "id0",
+    "Tap to open Loyal app and claim the transaction!",
+    {
+      reply_markup: keyboard,
+      url: photoUrl,
+      thumbnail_url: photoUrl,
+    }
+  ).text(text, { parse_mode: "HTML" });
 
   const preparedInlineMessage = await bot.api.savePreparedInlineMessage(
     userId,
