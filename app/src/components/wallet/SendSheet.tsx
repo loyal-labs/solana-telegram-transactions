@@ -787,6 +787,25 @@ export default function SendSheet({
                   type="text"
                   inputMode="decimal"
                   value={amountStr}
+                  onFocus={(e) => {
+                    // iOS: ensure cursor is always at the end when keyboard reopens
+                    const input = e.target;
+                    const moveCursorToEnd = () => {
+                      const len = input.value.length;
+                      input.setSelectionRange(len, len);
+                    };
+                    // Multiple attempts - iOS cursor positioning timing is unpredictable
+                    setTimeout(moveCursorToEnd, 0);
+                    setTimeout(moveCursorToEnd, 50);
+                  }}
+                  onClick={(e) => {
+                    // Also handle click for iOS keyboard reopen
+                    const input = e.target as HTMLInputElement;
+                    setTimeout(() => {
+                      const len = input.value.length;
+                      input.setSelectionRange(len, len);
+                    }, 50);
+                  }}
                   onChange={(e) => {
                     // Convert comma to dot for locales that use comma as decimal separator
                     const val = e.target.value.replace(',', '.');
