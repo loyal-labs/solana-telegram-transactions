@@ -288,7 +288,7 @@ export default function SendSheet({
       }
       if (step === 2) {
         const timer = setTimeout(() => {
-          amountInputRef.current?.focus();
+          amountInputRef.current?.focus({ preventScroll: true });
         }, 300);
         return () => clearTimeout(timer);
       }
@@ -437,12 +437,13 @@ export default function SendSheet({
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
-    // iOS requires focus in direct user interaction context
-    if (isIOS) {
-      amountInputRef.current?.focus();
-    }
     setRecipient(selected);
     onStepChange(2);
+    // iOS requires focus in direct user interaction context
+    // Use preventScroll to avoid viewport shift while step is animating
+    if (isIOS) {
+      amountInputRef.current?.focus({ preventScroll: true });
+    }
   };
 
   const handlePresetAmount = (val: number | string) => {
@@ -451,7 +452,7 @@ export default function SendSheet({
     }
     // Only focus if not already focused - avoids keyboard open/close causing modal jump
     if (document.activeElement !== amountInputRef.current) {
-      amountInputRef.current?.focus();
+      amountInputRef.current?.focus({ preventScroll: true });
     }
     // Ensure we set a clean string value
     const strVal = typeof val === 'string' ? val : val.toString();
