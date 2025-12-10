@@ -26,12 +26,19 @@ import {
   showMainButton,
 } from "@/lib/telegram/mini-app/buttons";
 
+// Message with timestamp
+type Message = {
+  text: string;
+  date: string; // e.g., "December 10"
+  time: string; // e.g., "18:20"
+};
+
 // Chat data type - messages from a single person
 type DirectChat = {
   id: string;
   title: string;
   username: string;
-  messages: string[];
+  messages: Message[];
 };
 
 // Mock data for direct chats - messages from each person
@@ -41,11 +48,11 @@ const MOCK_DIRECT_SUMMARIES: DirectChat[] = [
     title: "Alice Johnson",
     username: "candyflipline",
     messages: [
-      "I'll paste some text below — analyze it and suggest how to improve it for the reader",
-      "Once your selection is received, we will send you the Renewal Lease Document to be signed by all Parties.",
-      "Your current lease is coming to an end, and I just sent you a renewal offer. Please check the Resident Portal for the notice and select the desired term.",
-      "The project timeline has been updated. Can you review the new milestones?",
-      "Once your selection is received, we will send you the Renewal Lease Document to be signed by all Parties.",
+      { text: "I'll paste some text below — analyze it and suggest how to improve it for the reader", date: "December 10", time: "18:20" },
+      { text: "Once your selection is received, we will send you the Renewal Lease Document to be signed by all Parties.", date: "December 10", time: "18:20" },
+      { text: "Your current lease is coming to an end, and I just sent you a renewal offer. Please check the Resident Portal for the notice and select the desired term.", date: "December 10", time: "18:20" },
+      { text: "The project timeline has been updated. Can you review the new milestones?", date: "December 11", time: "09:15" },
+      { text: "Once your selection is received, we will send you the Renewal Lease Document to be signed by all Parties.", date: "December 11", time: "09:30" },
     ],
   },
   {
@@ -53,7 +60,7 @@ const MOCK_DIRECT_SUMMARIES: DirectChat[] = [
     title: "Bob Smith",
     username: "vlad_arbatov",
     messages: [
-      "Thanks for helping with that bug yesterday! The fix is working perfectly in production now.",
+      { text: "Thanks for helping with that bug yesterday! The fix is working perfectly in production now.", date: "December 9", time: "14:45" },
     ],
   },
   {
@@ -61,9 +68,9 @@ const MOCK_DIRECT_SUMMARIES: DirectChat[] = [
     title: "Charlie Davis",
     username: "candyflipline",
     messages: [
-      "Can we schedule a call for tomorrow?",
-      "I need to discuss the upcoming release timeline with you.",
-      "Also, could you review the API documentation before we publish it?",
+      { text: "Can we schedule a call for tomorrow?", date: "December 8", time: "10:00" },
+      { text: "I need to discuss the upcoming release timeline with you.", date: "December 8", time: "10:02" },
+      { text: "Also, could you review the API documentation before we publish it?", date: "December 9", time: "16:30" },
     ],
   },
   {
@@ -71,10 +78,10 @@ const MOCK_DIRECT_SUMMARIES: DirectChat[] = [
     title: "Diana Wilson",
     username: "vlad_arbatov",
     messages: [
-      "The design looks great! Just a few small tweaks needed for mobile.",
-      "I've added the new components to the shared design system.",
-      "This will help maintain consistency across all our products.",
-      "Let me know if you have any questions about the implementation.",
+      { text: "The design looks great! Just a few small tweaks needed for mobile.", date: "December 7", time: "11:20" },
+      { text: "I've added the new components to the shared design system.", date: "December 7", time: "11:25" },
+      { text: "This will help maintain consistency across all our products.", date: "December 8", time: "09:00" },
+      { text: "Let me know if you have any questions about the implementation.", date: "December 8", time: "09:05" },
     ],
   },
 ];
@@ -84,33 +91,33 @@ const MOCK_SPAM_SUMMARIES: DirectChat[] = [
   {
     id: "s1",
     title: "Crypto Giveaway Bot",
-    username: "vlad_arbatov",
+    username: "cryptogiveaway",
     messages: [
-      "Congratulations! You've won 10 ETH!",
-      "Click here to claim your prize now!",
-      "Limited time offer - act fast!",
-      "Send 0.1 ETH to verify your wallet and receive 10 ETH instantly!",
+      { text: "Congratulations! You've won 10 ETH!", date: "December 9", time: "03:21" },
+      { text: "Click here to claim your prize now!", date: "December 9", time: "03:21" },
+      { text: "Limited time offer - act fast!", date: "December 10", time: "03:22" },
+      { text: "Send 0.1 ETH to verify your wallet and receive 10 ETH instantly!", date: "December 10", time: "03:22" },
     ],
   },
   {
     id: "s2",
     title: "Investment Guru",
-    username: "candyflipline",
+    username: "investguru2024",
     messages: [
-      "Make $10,000 daily with this secret trading strategy!",
-      "I've helped thousands of people achieve financial freedom.",
-      "Join my exclusive VIP group for only $999!",
-      "DM me now for a free consultation.",
+      { text: "Make $10,000 daily with this secret trading strategy!", date: "December 8", time: "12:00" },
+      { text: "I've helped thousands of people achieve financial freedom.", date: "December 8", time: "12:01" },
+      { text: "Join my exclusive VIP group for only $999!", date: "December 9", time: "08:30" },
+      { text: "DM me now for a free consultation.", date: "December 9", time: "08:31" },
     ],
   },
   {
     id: "s3",
     title: "Lucky Winner",
-    username: "vlad_arbatov",
+    username: "nftairdrop_official",
     messages: [
-      "You have been selected for an exclusive NFT airdrop!",
-      "Your wallet has been chosen from millions of users.",
-      "Connect your wallet to claim your free NFTs worth $50,000!",
+      { text: "You have been selected for an exclusive NFT airdrop!", date: "December 7", time: "15:45" },
+      { text: "Your wallet has been chosen from millions of users.", date: "December 7", time: "15:45" },
+      { text: "Connect your wallet to claim your free NFTs worth $50,000!", date: "December 7", time: "15:46" },
     ],
   },
 ];
@@ -155,17 +162,58 @@ function getFirstLetter(name: string): string {
   return cleaned.charAt(0).toUpperCase() || name.charAt(0).toUpperCase();
 }
 
+// Group messages by date
+function groupMessagesByDate(messages: Message[]): { date: string; messages: Message[] }[] {
+  const groups: { date: string; messages: Message[] }[] = [];
+  let currentDate = "";
+
+  for (const message of messages) {
+    if (message.date !== currentDate) {
+      currentDate = message.date;
+      groups.push({ date: currentDate, messages: [message] });
+    } else {
+      groups[groups.length - 1].messages.push(message);
+    }
+  }
+
+  return groups;
+}
+
+// Date separator component
+function DateSeparator({ date }: { date: string }) {
+  return (
+    <div className="flex items-center justify-center py-3 w-full">
+      <div
+        className="px-2 py-0.5 rounded-full"
+        style={{ background: "rgba(255, 255, 255, 0.06)" }}
+      >
+        <p className="text-sm text-white leading-5 text-center">{date}</p>
+      </div>
+    </div>
+  );
+}
+
 // Message bubble component
-function MessageBubble({ message }: { message: string }) {
+function MessageBubble({ message, time, isLast }: { message: string; time: string; isLast: boolean }) {
   return (
     <div
-      className="px-4 py-2 w-full"
+      className="w-full relative"
       style={{
         background: "rgba(255, 255, 255, 0.12)",
-        borderRadius: "20px 20px 20px 4px",
+        borderRadius: isLast ? "16px 16px 16px 4px" : "16px",
       }}
     >
-      <p className="text-base text-white leading-6">{message}</p>
+      <div className="px-3 py-1.5">
+        <p className="text-base text-white leading-6">
+          {message}
+          {/* Invisible spacer to reserve space for timestamp at end of text */}
+          <span className="inline-block w-[50px] h-[1px] align-bottom" />
+        </p>
+      </div>
+      {/* Timestamp absolutely positioned at bottom-right, close to edge */}
+      <span className="absolute bottom-0.5 right-3 text-xs text-white/40 leading-5">
+        {time}
+      </span>
     </div>
   );
 }
@@ -556,10 +604,13 @@ function DirectFeedContent() {
                   {getFirstLetter(nextChat.title)}
                 </div>
               </div>
-              {/* Name */}
-              <div className="flex-1 py-2.5">
+              {/* Name and Username */}
+              <div className="flex-1 flex flex-col gap-0.5 py-2.5">
                 <p className="text-base text-white leading-5">
                   {nextChat.title}
+                </p>
+                <p className="text-[13px] text-white/60 leading-4">
+                  @{nextChat.username}
                 </p>
               </div>
             </div>
@@ -597,13 +648,16 @@ function DirectFeedContent() {
                 {chatFirstLetter}
               </div>
             </div>
-            {/* Name - clickable to open Telegram */}
+            {/* Name and Username - clickable to open Telegram */}
             <button
               onClick={handleOpenTelegram}
-              className="flex-1 py-2.5 text-left active:opacity-70 transition-opacity"
+              className="flex-1 flex flex-col gap-0.5 py-2.5 text-left active:opacity-70 transition-opacity"
             >
               <p className="text-base text-white leading-5">
                 {currentChat.title}
+              </p>
+              <p className="text-[13px] text-white/60 leading-4">
+                @{currentChat.username}
               </p>
             </button>
             {/* Undo button */}
@@ -626,9 +680,21 @@ function DirectFeedContent() {
               className="absolute inset-0 overflow-y-auto overscroll-contain"
               style={{ touchAction: "pan-y" }}
             >
-              <div className="flex flex-col gap-3 pl-3 pr-6 pt-4 pb-6">
-                {currentChat.messages.map((message, index) => (
-                  <MessageBubble key={index} message={message} />
+              <div className="flex flex-col pl-3 pr-6 pb-6">
+                {groupMessagesByDate(currentChat.messages).map((group, groupIndex) => (
+                  <div key={groupIndex} className="flex flex-col">
+                    <DateSeparator date={group.date} />
+                    <div className="flex flex-col gap-2">
+                      {group.messages.map((message, msgIndex) => (
+                        <MessageBubble
+                          key={msgIndex}
+                          message={message.text}
+                          time={message.time}
+                          isLast={msgIndex === group.messages.length - 1}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

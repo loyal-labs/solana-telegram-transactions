@@ -1,9 +1,10 @@
 "use client";
 
 import { hapticFeedback, themeParams } from "@telegram-apps/sdk-react";
+import { motion, type PanInfo } from "framer-motion";
 import { CircleHelp, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import ConnectBotModal from "@/components/telegram/ConnectBotModal";
 
@@ -301,6 +302,7 @@ export default function SummariesPage() {
     return "direct";
   });
   const [isConnectBotModalOpen, setIsConnectBotModalOpen] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<1 | -1>(1); // 1 = from right, -1 = from left
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const [buttonColor] = useState(() => {
@@ -323,6 +325,32 @@ export default function SummariesPage() {
   useEffect(() => {
     localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
   }, [activeTab]);
+
+  // Handle swipe to switch tabs
+  const handleSwipe = useCallback(
+    (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+      const SWIPE_THRESHOLD = 50;
+      const tabOrder: TabId[] = ["groups", "direct", "spam"];
+      const currentIndex = tabOrder.indexOf(activeTab);
+
+      if (info.offset.x < -SWIPE_THRESHOLD && currentIndex < tabOrder.length - 1) {
+        // Swipe left - go to next tab (content comes from right)
+        if (hapticFeedback.impactOccurred.isAvailable()) {
+          hapticFeedback.impactOccurred("light");
+        }
+        setSwipeDirection(1);
+        setActiveTab(tabOrder[currentIndex + 1]);
+      } else if (info.offset.x > SWIPE_THRESHOLD && currentIndex > 0) {
+        // Swipe right - go to previous tab (content comes from left)
+        if (hapticFeedback.impactOccurred.isAvailable()) {
+          hapticFeedback.impactOccurred("light");
+        }
+        setSwipeDirection(-1);
+        setActiveTab(tabOrder[currentIndex - 1]);
+      }
+    },
+    [activeTab]
+  );
 
   // Close tooltip when clicking outside
   useEffect(() => {
@@ -433,6 +461,10 @@ export default function SummariesPage() {
                   if (hapticFeedback.impactOccurred.isAvailable()) {
                     hapticFeedback.impactOccurred("light");
                   }
+                  const tabOrder: TabId[] = ["groups", "direct", "spam"];
+                  const currentIndex = tabOrder.indexOf(activeTab);
+                  const targetIndex = tabOrder.indexOf(tab.id);
+                  setSwipeDirection(targetIndex > currentIndex ? 1 : -1);
                   setActiveTab(tab.id);
                 }}
                 className={`flex items-center gap-1.5 pr-4 pb-2.5 pt-1 relative transition-colors ${
@@ -461,36 +493,48 @@ export default function SummariesPage() {
         </div>
       </div>
 
-      {/* Chat List or Empty State */}
-      {currentChatList.length === 0 ? (
-        <div className="flex-1 flex flex-col pt-1">
-          {!isBannerDismissed && (
-            <EmptyStateBanner
-              onClose={handleBannerClose}
-              onConnectChats={handleConnectChats}
-            />
-          )}
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col pt-2 pb-4">
-          {/* Direct and Spam tab banner */}
-          {(activeTab === "direct" || activeTab === "spam") && (
-            <DirectTabBanner onConnectBot={handleConnectBot} />
-          )}
+      {/* Chat List or Empty State - Swipeable */}
+      <motion.div
+        className="flex-1 flex flex-col"
+        drag="x"
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.1}
+        onDragEnd={handleSwipe}
+        key={activeTab}
+        initial={{ opacity: 0.7, x: swipeDirection * 30 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+      >
+        {currentChatList.length === 0 ? (
+          <div className="flex-1 flex flex-col pt-1">
+            {!isBannerDismissed && (
+              <EmptyStateBanner
+                onClose={handleBannerClose}
+                onConnectChats={handleConnectChats}
+              />
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col pt-2 pb-4">
+            {/* Direct and Spam tab banner */}
+            {(activeTab === "direct" || activeTab === "spam") && (
+              <DirectTabBanner onConnectBot={handleConnectBot} />
+            )}
 
-          {currentChatList.map((chat, index) => (
-            <ChatItem
-              key={chat.id}
-              chat={chat}
-              onClick={() => handleChatClick(chat)}
-              showDivider={index < currentChatList.length - 1}
-            />
-          ))}
+            {currentChatList.map((chat, index) => (
+              <ChatItem
+                key={chat.id}
+                chat={chat}
+                onClick={() => handleChatClick(chat)}
+                showDivider={index < currentChatList.length - 1}
+              />
+            ))}
 
-          {/* Bottom padding for navigation */}
-          <div className="h-32 shrink-0" />
-        </div>
-      )}
+            {/* Bottom padding for navigation */}
+            <div className="h-32 shrink-0" />
+          </div>
+        )}
+      </motion.div>
 
       {/* Connect Bot Modal */}
       <ConnectBotModal
