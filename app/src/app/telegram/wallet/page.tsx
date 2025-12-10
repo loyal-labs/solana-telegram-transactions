@@ -262,6 +262,10 @@ export default function Home() {
         : []
   );
   const [isFetchingTransactions, setIsFetchingTransactions] = useState(false);
+  const [isFetchingDeposits, setIsFetchingDeposits] = useState(() => {
+    // Only show loading if we don't have cached deposits
+    return cachedUsername ? getCachedIncomingTransactions(cachedUsername) === null : true;
+  });
   const [selectedTransaction, setSelectedTransaction] =
     useState<TransactionDetailsData | null>(null);
   // Keep original incoming transaction for claim functionality
@@ -1076,7 +1080,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!rawInitData) return;
+    if (!rawInitData) {
+      setIsFetchingDeposits(false);
+      return;
+    }
 
     let isCancelled = false;
 
@@ -1087,6 +1094,7 @@ export default function Home() {
 
         if (!username) {
           setIncomingTransactions([]);
+          setIsFetchingDeposits(false);
           return;
         }
 
@@ -1095,6 +1103,7 @@ export default function Home() {
         if (cached !== null) {
           // Use cached data, refresh in background
           setIncomingTransactions(cached);
+          setIsFetchingDeposits(false);
         }
 
         const provider = await getWalletProvider();
@@ -1126,6 +1135,10 @@ export default function Home() {
         setIncomingTransactions(mappedTransactions);
       } catch (error) {
         console.error("Failed to fetch deposits", error);
+      } finally {
+        if (!isCancelled) {
+          setIsFetchingDeposits(false);
+        }
       }
     })();
 
@@ -1879,7 +1892,8 @@ export default function Home() {
             const isEmptyWallet = balance === null || balance === 0;
             const isActivityLoading =
               isLoading ||
-              (isFetchingTransactions && walletTransactions.length === 0);
+              (isFetchingTransactions && walletTransactions.length === 0) ||
+              (isFetchingDeposits && incomingTransactions.length === 0);
 
             // Empty wallet banner component - promotes gasless transactions
             const EmptyWalletBanner = () => (
@@ -2419,6 +2433,10 @@ export default function Home() {
         claimingTransactionId={claimingTransactionId}
         balance={balance}
         starsBalance={starsBalance}
+        isLoading={
+          (isFetchingTransactions && walletTransactions.length === 0) ||
+          (isFetchingDeposits && incomingTransactions.length === 0)
+        }
       />
       <ClaimFreeTransactionsSheet
         open={isClaimFreeSheetOpen}
