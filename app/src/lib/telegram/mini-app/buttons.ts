@@ -125,8 +125,6 @@ export const hideMainButton = (): boolean => {
     detachMainClick = null;
   }
 
-  console.log("hiding main button");
-
   if (!isInMiniApp()) return false;
   if (!mainButton.setParams.isAvailable()) return false;
 

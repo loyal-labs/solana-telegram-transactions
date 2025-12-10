@@ -1468,6 +1468,14 @@ export default function Home() {
             isEnabled: false,
             showLoader: true,
           });
+        } else if (isClaimingTransaction && hasGaslessAccess) {
+          // Show only main button with loader during claim
+          showMainButton({
+            text: "Gasless Claim",
+            onClick: () => {}, // No-op during loading
+            isEnabled: false,
+            showLoader: true,
+          });
         } else if (!isClaimingTransaction && hasGaslessAccess) {
           // Show only main button with loader during claim
           showMainButton({

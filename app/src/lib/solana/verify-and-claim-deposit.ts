@@ -34,7 +34,6 @@ export const verifyAndClaimDeposit = async (
     recipient,
     processedInitDataBytes
   );
-  console.log("sessionData:", sessionData);
 
   const verified = await verifyInitData(
     provider,
@@ -45,7 +44,6 @@ export const verifyAndClaimDeposit = async (
     telegramSignatureBytes,
     telegramPublicKeyBytes
   );
-  console.log("verified:", verified);
 
   const claimed = await claimDeposit(
     transferProgram,
@@ -55,7 +53,6 @@ export const verifyAndClaimDeposit = async (
     amount,
     username
   );
-  console.log("claimed:", claimed);
 
   return claimed;
 };

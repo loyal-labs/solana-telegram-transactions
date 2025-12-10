@@ -1,35 +1,15 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import {
-  clusterApiUrl,
-  Connection,
   Keypair,
   PublicKey,
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";
 
+import { getConnection } from "../rpc/connection";
 import { SimpleWallet } from "./wallet-implementation";
 import { ensureWalletKeypair } from "./wallet-keypair-logic";
-
-const defaultEndpoint = clusterApiUrl("devnet");
-const envEndpoint =
-  typeof process !== "undefined"
-    ? process.env.NEXT_PUBLIC_SOLANA_RPC_URL
-    : undefined;
-
-const rpcEndpoint =
-  envEndpoint && envEndpoint.length > 0 ? envEndpoint : defaultEndpoint;
-
-let cachedConnection: Connection | null = null;
-
-export const getConnection = (): Connection => {
-  if (cachedConnection) return cachedConnection;
-
-  cachedConnection = new Connection(rpcEndpoint, "confirmed");
-
-  return cachedConnection;
-};
 
 let cachedWalletKeypair: Keypair | null = null;
 let walletKeypairPromise: Promise<Keypair> | null = null;

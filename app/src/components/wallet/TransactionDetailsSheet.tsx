@@ -489,7 +489,7 @@ export default function TransactionDetailsSheet({
                   <p className="text-[13px] leading-4 text-white/60">Status</p>
                   {needsGas && isIncoming ? (
                     <p className="text-base leading-5" style={{ color: "#eab308" }}>
-                      Gas required to claim. Add SOL or claim gasless transactions.
+                      Gas required to claim. Add SOL to complete the claim.
                     </p>
                   ) : (
                     <p className="text-base leading-5 text-white">{getStatusText(transaction.status, isIncoming)}</p>

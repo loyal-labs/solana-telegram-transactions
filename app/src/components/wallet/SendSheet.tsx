@@ -15,7 +15,6 @@ import {
 import Image from "next/image";
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-import ClaimFreeTransactionsSheet from "@/components/wallet/ClaimFreeTransactionsSheet";
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
   LAST_AMOUNT_KEY,
@@ -23,10 +22,8 @@ import {
   RECENT_RECIPIENTS_KEY,
   SOL_PRICE_USD,
   SOLANA_FEE_SOL,
-  STARS_TO_USD,
 } from "@/lib/constants";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
-import { calculateStarsFee } from "@/lib/solana/rpc/calculate-stars-fee";
 import {
   getCloudValue,
   setCloudValue,
@@ -211,7 +208,6 @@ export default function SendSheet({
   const amountInputRef = useRef<HTMLInputElement>(null);
   const amountTextRef = useRef<HTMLParagraphElement>(null);
   const [caretLeft, setCaretLeft] = useState(0);
-  const [isClaimFreeSheetOpen, setIsClaimFreeSheetOpen] = useState(false);
 
   // Convert balance from lamports to SOL
   const balanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
@@ -225,46 +221,7 @@ export default function SendSheet({
     : isSolPriceLoadingState;
   const balanceInUsd = solPriceUsd ? balanceInSol * solPriceUsd : null;
   const solanaFeeUsd = solPriceUsd ? SOLANA_FEE_SOL * solPriceUsd : null;
-  const starsFeeAmount = useMemo(() => {
-    if (solPriceUsd === null) return null;
-    return calculateStarsFee(SOLANA_FEE_SOL, solPriceUsd);
-  }, [solPriceUsd]);
-  const _starsFeeUsd = starsFeeAmount !== null ? starsFeeAmount * STARS_TO_USD : null;
-  const [hasGaslessAccess, setHasGaslessAccess] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadGaslessStatus = async () => {
-      try {
-        const value = await getCloudValue("gassless-action");
-        if (!isMounted) return;
-        setHasGaslessAccess(value === "true");
-      } catch (error) {
-        if (!isMounted) return;
-        console.warn("Failed to load gasless status", error);
-        setHasGaslessAccess(false);
-      }
-    };
-
-    void loadGaslessStatus();
-
-    const handleClaimVerified = () => {
-      setHasGaslessAccess(true); // enable immediately in-session
-      void loadGaslessStatus(); // sync from storage for persistence
-    };
-
-    if (typeof window !== "undefined") {
-      window.addEventListener("claim-free-verified", handleClaimVerified);
-    }
-
-    return () => {
-      isMounted = false;
-      if (typeof window !== "undefined") {
-        window.removeEventListener("claim-free-verified", handleClaimVerified);
-      }
-    };
-  }, []);
+  const hasGaslessAccess = false;
 
   useEffect(() => {
     if (!hasGaslessAccess && feePaymentMethod === "stars") {
@@ -1116,23 +1073,9 @@ export default function SendSheet({
                         mixBlendMode: "lighten",
                       }}
                     >
-                      {/* Stars Row - "Free" / "Gasless" */}
-                      <div className="flex items-center pl-3 pr-4">
-                        {/* Clickable area for selection (dimmed when not available) */}
-                        <button
-                          onClick={() => {
-                            if (hasGaslessAccess) {
-                              if (hapticFeedback.selectionChanged.isAvailable()) {
-                                hapticFeedback.selectionChanged();
-                              }
-                              setFeePaymentMethod('stars');
-                            }
-                          }}
-                          disabled={!hasGaslessAccess}
-                          className={`flex items-center flex-1 transition-opacity ${
-                            !hasGaslessAccess ? 'opacity-40 cursor-not-allowed' : ''
-                          }`}
-                        >
+                      {/* Stars Row - Gasless (disabled) */}
+                      <div className="flex items-center pl-3 pr-4 opacity-50">
+                        <div className="flex items-center flex-1 cursor-not-allowed">
                           {/* Icon */}
                           <div className="pr-3 py-1">
                             <div
@@ -1146,34 +1089,13 @@ export default function SendSheet({
                           </div>
                           {/* Text */}
                           <div className="flex-1 flex flex-col gap-0.5 py-2.5 text-left">
-                            <p className="text-base leading-5 text-white">Free</p>
-                            <p className="text-[13px] leading-4 text-white/60">Gasless</p>
+                            <p className="text-base leading-5 text-white">Gasless unavailable</p>
+                            <p className="text-[13px] leading-4 text-white/60">Pay network fees with SOL for now</p>
                           </div>
-                        </button>
-                        {/* "Claim free transactions" button (shown when not enough stars) */}
-                        {!hasGaslessAccess && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (hapticFeedback.impactOccurred.isAvailable()) {
-                                hapticFeedback.impactOccurred("light");
-                              }
-                              setIsClaimFreeSheetOpen(true);
-                            }}
-                            className="px-3 py-1.5 rounded-full text-sm text-white leading-5 active:opacity-80 transition-opacity"
-                            style={{
-                              background: "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
-                            }}
-                          >
-                            Claim free transactions
-                          </button>
-                        )}
-                        {/* Check - only show when enough stars */}
-                        {hasGaslessAccess && (
-                          <div className="pl-4 py-1.5 shrink-0">
-                            {feePaymentMethod === 'stars' ? <CheckCircleOn /> : <CheckCircleOff />}
-                          </div>
-                        )}
+                        </div>
+                        <div className="pl-4 py-1.5 shrink-0">
+                          <CheckCircleOff />
+                        </div>
                       </div>
 
                       {/* SOL Row */}
@@ -1388,10 +1310,6 @@ export default function SendSheet({
       </div>
     </Modal>
 
-    <ClaimFreeTransactionsSheet
-      open={isClaimFreeSheetOpen}
-      onOpenChange={setIsClaimFreeSheetOpen}
-    />
   </>
   );
 }

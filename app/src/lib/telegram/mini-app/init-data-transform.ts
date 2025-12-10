@@ -86,17 +86,9 @@ export const validateInitData = (
   validationString: string,
   signature: string
 ) => {
-  console.log("=== validateInitData START ===");
-  console.log("Validation string:", validationString);
-  console.log("Signature:", signature);
-
   try {
     const message = new TextEncoder().encode(validationString);
     const signatureBytes = parseSignature(signature);
-
-    console.log("Message bytes:", Array.from(message));
-    console.log("Signature bytes:", Array.from(signatureBytes));
-    console.log("Signature length:", signatureBytes.length);
 
     if (signatureBytes.length !== 64) {
       console.error(
@@ -107,13 +99,7 @@ export const validateInitData = (
       return false;
     }
 
-    console.log("Testing against", TELEGRAM_PUBLIC_KEYS.length, "public keys");
-
     const result = TELEGRAM_PUBLIC_KEYS.some((publicKeyHex, index) => {
-      console.log(
-        `Testing public key ${index + 1}/${TELEGRAM_PUBLIC_KEYS.length}:`,
-        publicKeyHex
-      );
       const publicKeyBytes = etc.hexToBytes(publicKeyHex);
 
       if (publicKeyBytes.length !== 32) {
@@ -126,15 +112,12 @@ export const validateInitData = (
       }
 
       const isValid = verify(signatureBytes, message, publicKeyBytes);
-      console.log(`Public key ${index + 1} verification result:`, isValid);
       return isValid;
     });
 
-    console.log("=== validateInitData RESULT:", result, "===");
     return result;
   } catch (error) {
     console.error("Failed to validate Telegram init data", error);
-    console.log("=== validateInitData FAILED ===");
     return false;
   }
 };

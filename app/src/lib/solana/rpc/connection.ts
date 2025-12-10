@@ -26,6 +26,9 @@ const connectionConfig = { commitment: "confirmed" as const };
 
 export const getConnection = (): Connection => {
   if (cachedConnection) return cachedConnection;
+  console.log(selectedSolanaEnv);
+  console.log(rpcEndpoint);
+
   cachedConnection = new Connection(rpcEndpoint, connectionConfig);
   return cachedConnection;
 };

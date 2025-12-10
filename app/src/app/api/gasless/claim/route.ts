@@ -200,7 +200,6 @@ const verifyAndClaimDeposit = async (
   }
   const transferProgram = getTelegramTransferProgram(provider);
   const verificationProgram = getTelegramVerificationProgram(provider);
-  console.log("Got programs");
 
   const verified = await verifyInitDataGasless(
     provider,
@@ -211,7 +210,6 @@ const verifyAndClaimDeposit = async (
     telegramSignatureBytes,
     processedInitDataBytes
   );
-  console.log("verified:", verified);
 
   const claimed = await claimDepositGasless(
     provider,
@@ -223,7 +221,6 @@ const verifyAndClaimDeposit = async (
     amount,
     username
   );
-  console.log("claimed:", claimed);
 
   return claimed;
 };
@@ -239,7 +236,6 @@ export async function POST(req: Request) {
     }
     const bodyString = new TextDecoder().decode(body);
     const bodyJson = JSON.parse(bodyString);
-    console.log("bodyJson:", bodyJson);
 
     const {
       storeTx,
@@ -262,7 +258,6 @@ export async function POST(req: Request) {
       !telegramSignatureBytes ||
       !telegramPublicKeyBytes
     ) {
-      console.log("Missing required fields");
       return NextResponse.json(
         { error: "transaction and payer are required" },
         { status: 400 }
@@ -274,7 +269,6 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    console.log("Got all required fields");
     const payer = await getGaslessKeypair();
     const provider = await getCustomWalletProvider(payer);
     const payerWallet = new SimpleWallet(payer);
@@ -286,19 +280,11 @@ export async function POST(req: Request) {
     const telegramSignature = normalizeBytes(telegramSignatureBytes);
     const telegramPublicKey = normalizeBytes(telegramPublicKeyBytes);
 
-    console.log("parsedStoreTx:", parsedStoreTx);
-    console.log("parsedUser:", parsedUser);
-    console.log("parsedRecipient:", parsedRecipient);
-    console.log("processedInitData:", processedInitData);
-    console.log("telegramSignature:", telegramSignature);
-    console.log("telegramPublicKey:", telegramPublicKey);
-
     const storeResult = await storeInitData(
       provider,
       parsedStoreTx,
       payerWallet
     );
-    console.log("storeResult:", storeResult);
     if (!storeResult) {
       return NextResponse.json(
         { error: "Failed to store init data" },
