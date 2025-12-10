@@ -442,15 +442,21 @@ export default function Home() {
       setSelectedIncomingTransaction(null);
       setNeedsGas(false);
       // Convert to TransactionDetailsData format
+      // For deposit_for_username transactions, the recipient is the username
+      const isDepositTransaction = transaction.transferType === "deposit_for_username";
+      const recipientUsername = transaction.recipient?.startsWith("@")
+        ? transaction.recipient
+        : isDepositTransaction && transaction.recipient
+          ? `@${transaction.recipient}`
+          : undefined;
+
       const detailsData: TransactionDetailsData = {
         id: transaction.id,
         type: transaction.type === "incoming" ? "incoming" : "outgoing",
         amountLamports: transaction.amountLamports,
         transferType: transaction.transferType,
         recipient: transaction.recipient,
-        recipientUsername: transaction.recipient?.startsWith("@")
-          ? transaction.recipient
-          : undefined,
+        recipientUsername,
         sender: transaction.sender,
         senderUsername: transaction.sender?.startsWith("@")
           ? transaction.sender
@@ -1837,7 +1843,7 @@ export default function Home() {
             )}
 
             {/* Balance Display */}
-            <div ref={balanceRef} className="flex flex-col items-center gap-1.5 mt-1.5">
+            <div ref={balanceRef} className="flex flex-col items-center gap-1.5 mt-12">
               <button
                 onClick={() => {
                   if (hapticFeedback.selectionChanged.isAvailable()) {
