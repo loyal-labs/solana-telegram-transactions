@@ -1,7 +1,7 @@
 "use client";
 
+import { addToHomeScreen, postEvent } from "@telegram-apps/sdk";
 import {
-  addToHomeScreen,
   hapticFeedback,
   openTelegramLink,
   retrieveLaunchParams,
@@ -175,7 +175,13 @@ export default function ProfilePage() {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
-    addToHomeScreen.ifAvailable();
+    // Try SDK method first, fall back to direct postEvent for Android
+    if (addToHomeScreen.isAvailable()) {
+      addToHomeScreen();
+    } else {
+      // Direct postEvent as fallback
+      postEvent("web_app_add_to_home_screen");
+    }
   }, []);
 
   const handleSetCustomEmoji = useCallback(async () => {

@@ -1022,7 +1022,7 @@ export default function SendSheet({
 
           {/* STEP 3: CONFIRMATION */}
           <div
-            className="absolute inset-0 flex flex-col transition-all duration-300 ease-out"
+            className="absolute inset-0 flex flex-col overflow-y-auto transition-all duration-300 ease-out"
             style={{
               transform: `translateX(${(3 - step) * 100}%)`,
               opacity: step === 3 ? 1 : 0,
@@ -1065,6 +1065,12 @@ export default function SendSheet({
                     return `≈$${usdVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                   })()}
                 </p>
+                {/* Username case sensitivity warning */}
+                {recipient.startsWith('@') && (
+                  <p className="text-[11px] leading-[14px] mt-1" style={{ color: "#eab308" }}>
+                    ⚠️ Usernames are case-sensitive. Double-check spelling.
+                  </p>
+                )}
               </div>
             </div>
 
