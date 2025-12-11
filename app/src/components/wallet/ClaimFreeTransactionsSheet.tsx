@@ -45,6 +45,7 @@ export default function ClaimFreeTransactionsSheet({
   const { bottom: safeBottom } = useTelegramSafeArea();
   const [gaslessState, setGaslessStateLocal] = useState<GaslessState | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
   const [buttonColors] = useState(() => {
     try {
       const background = (themeParams.buttonColor?.() ?? "#2990ff") as RGB;
@@ -92,6 +93,7 @@ export default function ClaimFreeTransactionsSheet({
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
+    setVerificationError(null);
     setGaslessStateLocal(GaslessState.CLAIMING);
     onStateChange?.(GaslessState.CLAIMING);
     void setGaslessState(GaslessState.CLAIMING);
@@ -111,6 +113,7 @@ export default function ClaimFreeTransactionsSheet({
     }
 
     setIsVerifying(true);
+    setVerificationError(null);
 
     const path = "/api/telegram/verify/join";
     const endpoint = resolveEndpoint(path);
@@ -127,6 +130,14 @@ export default function ClaimFreeTransactionsSheet({
 
       if (!response.ok) {
         console.error("Verification failed", payload);
+        // Reset state to NOT_CLAIMED so user can try again
+        void setGaslessState(GaslessState.NOT_CLAIMED);
+        setGaslessStateLocal(GaslessState.NOT_CLAIMED);
+        onStateChange?.(GaslessState.NOT_CLAIMED);
+        setVerificationError("Verification failed. Please try again.");
+        if (hapticFeedback.notificationOccurred.isAvailable()) {
+          hapticFeedback.notificationOccurred("error");
+        }
         return;
       }
 
@@ -140,6 +151,14 @@ export default function ClaimFreeTransactionsSheet({
       }
     } catch (error) {
       console.error("Verification request failed", error);
+      // Reset state to NOT_CLAIMED so user can try again
+      void setGaslessState(GaslessState.NOT_CLAIMED);
+      setGaslessStateLocal(GaslessState.NOT_CLAIMED);
+      onStateChange?.(GaslessState.NOT_CLAIMED);
+      setVerificationError("Verification failed. Please try again.");
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred("error");
+      }
     } finally {
       setIsVerifying(false);
     }
@@ -173,6 +192,7 @@ export default function ClaimFreeTransactionsSheet({
   useEffect(() => {
     if (!open) {
       setIsVerifying(false);
+      setVerificationError(null);
       return;
     }
 
@@ -308,6 +328,17 @@ export default function ClaimFreeTransactionsSheet({
 
         {/* Content */}
         <div className="flex-1 flex flex-col items-center justify-center px-4 pb-4 text-center gap-6">
+          {/* Error Message */}
+          {verificationError && (
+            <div
+              className="mx-4 px-4 py-3 rounded-xl"
+              style={{ background: "rgba(239, 68, 68, 0.15)" }}
+            >
+              <p className="text-sm text-red-400 leading-5">
+                {verificationError}
+              </p>
+            </div>
+          )}
           {/* Info Text */}
           <p className="text-base text-white/60 leading-5 px-4">
             Join our Telegram channel to get gasless transactions.
