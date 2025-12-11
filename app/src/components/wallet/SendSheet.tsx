@@ -1,7 +1,7 @@
 "use client";
 
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { hapticFeedback, retrieveLaunchParams, themeParams } from "@telegram-apps/sdk-react";
+import { hapticFeedback, openTelegramLink, retrieveLaunchParams, themeParams } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import {
@@ -288,7 +288,7 @@ export default function SendSheet({
       }
       if (step === 2) {
         const timer = setTimeout(() => {
-          amountInputRef.current?.focus();
+          amountInputRef.current?.focus({ preventScroll: true });
         }, 300);
         return () => clearTimeout(timer);
       }
@@ -437,12 +437,13 @@ export default function SendSheet({
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
-    // iOS requires focus in direct user interaction context
-    if (isIOS) {
-      amountInputRef.current?.focus();
-    }
     setRecipient(selected);
     onStepChange(2);
+    // iOS requires focus in direct user interaction context
+    // Use preventScroll to avoid viewport shift while step is animating
+    if (isIOS) {
+      amountInputRef.current?.focus({ preventScroll: true });
+    }
   };
 
   const handlePresetAmount = (val: number | string) => {
@@ -451,7 +452,7 @@ export default function SendSheet({
     }
     // Only focus if not already focused - avoids keyboard open/close causing modal jump
     if (document.activeElement !== amountInputRef.current) {
-      amountInputRef.current?.focus();
+      amountInputRef.current?.focus({ preventScroll: true });
     }
     // Ensure we set a clean string value
     const strVal = typeof val === 'string' ? val : val.toString();
@@ -553,11 +554,20 @@ export default function SendSheet({
           {/* Recipient Pill for Step 2 */}
           {step === 2 && (
             <div
-              className="flex items-center pl-1 pr-3 py-1 rounded-[54px]"
+              className={`flex items-center pl-1 pr-3 py-1 rounded-[54px] ${recipient.startsWith('@') ? 'cursor-pointer active:scale-95 active:opacity-80 transition-all duration-150' : ''}`}
               style={{
                 background: "rgba(255, 255, 255, 0.06)",
                 mixBlendMode: "lighten",
                 boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+              }}
+              onClick={() => {
+                if (recipient.startsWith('@') && openTelegramLink.isAvailable()) {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
+                  const username = recipient.slice(1); // Remove @ prefix
+                  openTelegramLink(`https://t.me/${username}`);
+                }
               }}
             >
               <div className="pr-1.5">
@@ -589,11 +599,20 @@ export default function SendSheet({
           {/* Recipient Pill for Step 3 and 4 */}
           {(step === 3 || step === 4) && (
             <div
-              className="flex items-center pl-1 pr-3 py-1 rounded-[54px]"
+              className={`flex items-center pl-1 pr-3 py-1 rounded-[54px] ${recipient.startsWith('@') ? 'cursor-pointer active:scale-95 active:opacity-80 transition-all duration-150' : ''}`}
               style={{
                 background: "rgba(255, 255, 255, 0.06)",
                 mixBlendMode: "lighten",
                 boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+              }}
+              onClick={() => {
+                if (recipient.startsWith('@') && openTelegramLink.isAvailable()) {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
+                  const username = recipient.slice(1); // Remove @ prefix
+                  openTelegramLink(`https://t.me/${username}`);
+                }
               }}
             >
               <div className="pr-1.5">
@@ -786,6 +805,25 @@ export default function SendSheet({
                   type="text"
                   inputMode="decimal"
                   value={amountStr}
+                  onFocus={(e) => {
+                    // iOS: ensure cursor is always at the end when keyboard reopens
+                    const input = e.target;
+                    const moveCursorToEnd = () => {
+                      const len = input.value.length;
+                      input.setSelectionRange(len, len);
+                    };
+                    // Multiple attempts - iOS cursor positioning timing is unpredictable
+                    setTimeout(moveCursorToEnd, 0);
+                    setTimeout(moveCursorToEnd, 50);
+                  }}
+                  onClick={(e) => {
+                    // Also handle click for iOS keyboard reopen
+                    const input = e.target as HTMLInputElement;
+                    setTimeout(() => {
+                      const len = input.value.length;
+                      input.setSelectionRange(len, len);
+                    }, 50);
+                  }}
                   onChange={(e) => {
                     // Convert comma to dot for locales that use comma as decimal separator
                     const val = e.target.value.replace(',', '.');

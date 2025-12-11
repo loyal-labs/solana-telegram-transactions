@@ -34,6 +34,7 @@ export type ActivitySheetProps = {
   claimingTransactionId?: string | null;
   balance?: number | null;
   starsBalance?: number;
+  isLoading?: boolean;
 };
 
 type GroupedTransactions = {
@@ -121,6 +122,7 @@ export default function ActivitySheet({
   claimingTransactionId,
   balance,
   starsBalance = 0,
+  isLoading = false,
 }: ActivitySheetProps) {
   const snapPoint = useModalSnapPoint();
   const { bottom: safeBottom } = useTelegramSafeArea();
@@ -255,7 +257,33 @@ export default function ActivitySheet({
           onScroll={handleScroll}
           className="flex-1 overflow-y-auto px-4 pb-4"
         >
-          {groupedTransactions.length === 0 ? (
+          {isLoading ? (
+            /* Skeleton Loading State */
+            <div className="flex flex-col gap-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    mixBlendMode: "lighten",
+                  }}
+                >
+                  <div className="py-1.5 pr-3">
+                    <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
+                  </div>
+                  <div className="flex-1 py-2.5 flex flex-col gap-1.5">
+                    <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
+                    <div className="w-28 h-4 bg-white/5 animate-pulse rounded" />
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
+                    <div className="w-16 h-5 bg-white/5 animate-pulse rounded" />
+                    <div className="w-12 h-4 bg-white/5 animate-pulse rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : groupedTransactions.length === 0 ? (
             <div
               className="flex items-center justify-center px-8 py-6 rounded-2xl h-[200px]"
               style={{

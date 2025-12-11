@@ -262,6 +262,10 @@ export default function Home() {
         : []
   );
   const [isFetchingTransactions, setIsFetchingTransactions] = useState(false);
+  const [isFetchingDeposits, setIsFetchingDeposits] = useState(() => {
+    // Only show loading if we don't have cached deposits
+    return cachedUsername ? getCachedIncomingTransactions(cachedUsername) === null : true;
+  });
   const [selectedTransaction, setSelectedTransaction] =
     useState<TransactionDetailsData | null>(null);
   // Keep original incoming transaction for claim functionality
@@ -438,15 +442,21 @@ export default function Home() {
       setSelectedIncomingTransaction(null);
       setNeedsGas(false);
       // Convert to TransactionDetailsData format
+      // For deposit_for_username transactions, the recipient is the username
+      const isDepositTransaction = transaction.transferType === "deposit_for_username";
+      const recipientUsername = transaction.recipient?.startsWith("@")
+        ? transaction.recipient
+        : isDepositTransaction && transaction.recipient
+          ? `@${transaction.recipient}`
+          : undefined;
+
       const detailsData: TransactionDetailsData = {
         id: transaction.id,
         type: transaction.type === "incoming" ? "incoming" : "outgoing",
         amountLamports: transaction.amountLamports,
         transferType: transaction.transferType,
         recipient: transaction.recipient,
-        recipientUsername: transaction.recipient?.startsWith("@")
-          ? transaction.recipient
-          : undefined,
+        recipientUsername,
         sender: transaction.sender,
         senderUsername: transaction.sender?.startsWith("@")
           ? transaction.sender
@@ -817,6 +827,38 @@ export default function Home() {
     }
   }, [walletAddress]);
 
+  const handleShareDepositTransaction = useCallback(async () => {
+    if (!selectedTransaction || !rawInitData || !solPriceUsd) {
+      console.error("Failed to share deposit transaction: missing required data");
+      return;
+    }
+
+    // Get recipient username from transaction (remove @ prefix if present)
+    const recipientUsername = selectedTransaction.recipientUsername?.replace(/^@/, "") || "";
+    if (!recipientUsername) {
+      console.error("Failed to share deposit transaction: missing recipient username");
+      return;
+    }
+
+    try {
+      const amountSol = selectedTransaction.amountLamports / LAMPORTS_PER_SOL;
+      const amountUsd = amountSol * solPriceUsd;
+
+      const msgId = await createShareMessage(
+        rawInitData,
+        recipientUsername,
+        amountSol,
+        amountUsd
+      );
+
+      if (msgId) {
+        await shareSavedInlineMessage(msgId);
+      }
+    } catch (error) {
+      console.error("Failed to share deposit transaction", error);
+    }
+  }, [selectedTransaction, rawInitData, solPriceUsd]);
+
   const handleScanQR = useCallback(() => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
@@ -1076,7 +1118,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!rawInitData) return;
+    if (!rawInitData) {
+      setIsFetchingDeposits(false);
+      return;
+    }
 
     let isCancelled = false;
 
@@ -1087,6 +1132,7 @@ export default function Home() {
 
         if (!username) {
           setIncomingTransactions([]);
+          setIsFetchingDeposits(false);
           return;
         }
 
@@ -1095,6 +1141,7 @@ export default function Home() {
         if (cached !== null) {
           // Use cached data, refresh in background
           setIncomingTransactions(cached);
+          setIsFetchingDeposits(false);
         }
 
         const provider = await getWalletProvider();
@@ -1126,6 +1173,10 @@ export default function Home() {
         setIncomingTransactions(mappedTransactions);
       } catch (error) {
         console.error("Failed to fetch deposits", error);
+      } finally {
+        if (!isCancelled) {
+          setIsFetchingDeposits(false);
+        }
       }
     })();
 
@@ -1792,7 +1843,7 @@ export default function Home() {
             )}
 
             {/* Balance Display */}
-            <div ref={balanceRef} className="flex flex-col items-center gap-1.5 mt-1.5">
+            <div ref={balanceRef} className="flex flex-col items-center gap-1.5 mt-12">
               <button
                 onClick={() => {
                   if (hapticFeedback.selectionChanged.isAvailable()) {
@@ -1879,7 +1930,8 @@ export default function Home() {
             const isEmptyWallet = balance === null || balance === 0;
             const isActivityLoading =
               isLoading ||
-              (isFetchingTransactions && walletTransactions.length === 0);
+              (isFetchingTransactions && walletTransactions.length === 0) ||
+              (isFetchingDeposits && incomingTransactions.length === 0);
 
             // Empty wallet banner component - promotes gasless transactions
             const EmptyWalletBanner = () => (
@@ -2407,6 +2459,7 @@ export default function Home() {
         showError={claimError}
         solPriceUsd={solPriceUsd}
         needsGas={needsGas}
+        onShare={selectedTransaction?.transferType === "deposit_for_username" ? handleShareDepositTransaction : undefined}
       />
       <ActivitySheet
         open={isActivitySheetOpen}
@@ -2419,6 +2472,10 @@ export default function Home() {
         claimingTransactionId={claimingTransactionId}
         balance={balance}
         starsBalance={starsBalance}
+        isLoading={
+          (isFetchingTransactions && walletTransactions.length === 0) ||
+          (isFetchingDeposits && incomingTransactions.length === 0)
+        }
       />
       <ClaimFreeTransactionsSheet
         open={isClaimFreeSheetOpen}
