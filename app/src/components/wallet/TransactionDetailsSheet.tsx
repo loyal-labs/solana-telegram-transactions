@@ -9,6 +9,8 @@ import Image from "next/image";
 import {
   type CSSProperties,
   type ReactNode,
+  useCallback,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -16,6 +18,11 @@ import {
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import { SOLANA_FEE_SOL } from "@/lib/constants";
 import { formatTransactionDate, getStatusText } from "@/lib/solana/wallet/formatters";
+import {
+  hideMainButton,
+  hideSecondaryButton,
+  showMainButton,
+} from "@/lib/telegram/mini-app/buttons";
 import type { TransactionDetailsData, TransactionStatus } from "@/types/wallet";
 
 export type { TransactionDetailsData, TransactionStatus };
@@ -65,6 +72,41 @@ export default function TransactionDetailsSheet({
       return "#2990ff";
     }
   });
+
+  const isDepositForUsername = transaction?.transferType === "deposit_for_username";
+
+  const handleCancelTransaction = useCallback(() => {
+    // Will be implemented later
+  }, []);
+
+  // Show "Cancel transaction" button for deposit_for_username transactions
+  useEffect(() => {
+    if (!open) {
+      hideMainButton();
+      hideSecondaryButton();
+      return;
+    }
+
+    if (isDepositForUsername) {
+      showMainButton({
+        text: "Cancel transaction",
+        onClick: handleCancelTransaction,
+        backgroundColor: "#FF4D4D",
+        textColor: "#FFFFFF",
+      });
+      hideSecondaryButton();
+
+      return () => {
+        hideMainButton();
+        hideSecondaryButton();
+      };
+    }
+
+    return () => {
+      hideMainButton();
+      hideSecondaryButton();
+    };
+  }, [open, isDepositForUsername, handleCancelTransaction]);
 
   const modalStyle = useMemo(
     () =>
