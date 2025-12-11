@@ -13,6 +13,8 @@
     "@coral-xyz/anchor": "^0.32.1",
     "@irys/upload": "^0.0.15",
     "@irys/upload-solana": "^0.1.8",
+    "@nillion/nuc": "^1.1.1",
+    "@nillion/secretvaults": "^1.1.0",
     "@noble/ed25519": "^3.0.0",
     "@number-flow/react": "^0.5.10",
     "@solana/wallet-adapter-react": "^0.15.39",
