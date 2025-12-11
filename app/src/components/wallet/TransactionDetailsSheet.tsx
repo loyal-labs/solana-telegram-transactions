@@ -122,7 +122,7 @@ export default function TransactionDetailsSheet({
       hapticFeedback.impactOccurred("light");
     }
     if (transaction.signature) {
-      const explorerUrl = `https://explorer.solana.com/tx/${transaction.signature}?cluster=devnet`;
+      const explorerUrl = `https://explorer.solana.com/tx/${transaction.signature}`;
       window.open(explorerUrl, "_blank");
     }
   };
@@ -144,7 +144,7 @@ export default function TransactionDetailsSheet({
     // Use Telegram native share
     if (shareURL.isAvailable()) {
       const explorerUrl = transaction.signature
-        ? `https://explorer.solana.com/tx/${transaction.signature}?cluster=devnet`
+        ? `https://explorer.solana.com/tx/${transaction.signature}`
         : `https://solscan.io/account/${fullAddress}`;
       shareURL(explorerUrl, shareText);
     } else if (navigator?.clipboard?.writeText) {
