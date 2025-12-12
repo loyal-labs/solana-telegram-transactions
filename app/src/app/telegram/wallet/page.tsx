@@ -39,7 +39,7 @@ import {
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
 } from "@/lib/constants";
 import { fetchInvoiceState } from "@/lib/irys/fetch-invoice-state";
-import { topUpDeposit } from "@/lib/solana/deposits";
+import { refundDeposit, topUpDeposit } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import {
@@ -770,6 +770,32 @@ export default function Home() {
       setSelectedIncomingTransaction(null);
       setShowClaimSuccess(false); // Reset claim success state
       setClaimError(null); // Reset claim error state
+    }
+  }, []);
+
+  // Handle canceling (refunding) a deposit_for_username transaction
+  const handleCancelDeposit = useCallback(async (username: string, amount: number) => {
+    try {
+      const provider = await getWalletProvider();
+      const transferProgram = getTelegramTransferProgram(provider);
+      await refundDeposit(provider, transferProgram, username, amount);
+
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred("success");
+      }
+
+      // Close the modal and refresh data
+      setTransactionDetailsSheetOpen(false);
+      setSelectedTransaction(null);
+
+      // Refresh balance and transactions
+      void getWalletBalance(true).then(setBalance);
+    } catch (error) {
+      console.error("Failed to refund deposit:", error);
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred("error");
+      }
+      throw error; // Re-throw so the sheet can handle it
     }
   }, []);
 
@@ -2460,6 +2486,7 @@ export default function Home() {
         solPriceUsd={solPriceUsd}
         needsGas={needsGas}
         onShare={selectedTransaction?.transferType === "deposit_for_username" ? handleShareDepositTransaction : undefined}
+        onCancelDeposit={handleCancelDeposit}
       />
       <ActivitySheet
         open={isActivitySheetOpen}

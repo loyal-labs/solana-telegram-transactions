@@ -4,6 +4,7 @@ import "@telegram-apps/telegram-ui/dist/styles.css";
 import { AppRoot } from "@telegram-apps/telegram-ui";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 
 import { TelegramProvider } from "@/components/telegram/TelegramProvider";
 
@@ -36,13 +37,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-    <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
-      <AppRoot suppressHydrationWarning>
-        <TelegramProvider>
-          {children}
-        </TelegramProvider>
-      </AppRoot>
-    </body>
-  </html>
+      <head>
+        <Script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="f6491a00-a838-4c1d-aa01-4f61ff790967"
+          strategy="afterInteractive"
+        />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
+        <AppRoot suppressHydrationWarning>
+          <TelegramProvider>
+            {children}
+          </TelegramProvider>
+        </AppRoot>
+      </body>
+    </html>
   );
 }

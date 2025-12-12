@@ -17,7 +17,10 @@ import {
 
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import { SOLANA_FEE_SOL } from "@/lib/constants";
+import { getDeposit } from "@/lib/solana/deposits/get-deposit";
+import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import { formatTransactionDate, getStatusText } from "@/lib/solana/wallet/formatters";
+import { getWalletProvider } from "@/lib/solana/wallet/wallet-details";
 import {
   hideMainButton,
   hideSecondaryButton,
@@ -37,6 +40,7 @@ export type TransactionDetailsSheetProps = {
   solPriceUsd?: number | null;
   needsGas?: boolean; // Show gas required warning for claimable transactions
   onShare?: () => void; // Custom share handler (for deposit transactions)
+  onCancelDeposit?: (username: string, amount: number) => Promise<void>; // Handler for canceling deposit_for_username transactions
 };
 
 // Wallet icon SVG component
@@ -59,6 +63,7 @@ export default function TransactionDetailsSheet({
   solPriceUsd = null,
   needsGas = false,
   onShare,
+  onCancelDeposit,
 }: TransactionDetailsSheetProps) {
   // Safe area handling - must be before early return
   const snapPoint = useModalSnapPoint();
@@ -75,11 +80,60 @@ export default function TransactionDetailsSheet({
 
   const isDepositForUsername = transaction?.transferType === "deposit_for_username";
 
-  const handleCancelTransaction = useCallback(() => {
-    // Will be implemented later
-  }, []);
+  // Deposit state for deposit_for_username transactions
+  const [depositAmount, setDepositAmount] = useState<number | null>(null);
+  const [isLoadingDeposit, setIsLoadingDeposit] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
-  // Show "Cancel transaction" button for deposit_for_username transactions
+  // Fetch deposit info when modal opens for deposit_for_username
+  useEffect(() => {
+    if (!open || !isDepositForUsername || !transaction?.recipientUsername) {
+      setDepositAmount(null);
+      setIsLoadingDeposit(false);
+      return;
+    }
+
+    const fetchDepositInfo = async () => {
+      setIsLoadingDeposit(true);
+      try {
+        const provider = await getWalletProvider();
+        const transferProgram = getTelegramTransferProgram(provider);
+        const username = transaction.recipientUsername!.replace(/^@/, "");
+        const deposit = await getDeposit(provider, transferProgram, username);
+        setDepositAmount(deposit.amount);
+      } catch (error) {
+        console.warn("Failed to fetch deposit info:", error);
+        setDepositAmount(0);
+      } finally {
+        setIsLoadingDeposit(false);
+      }
+    };
+
+    void fetchDepositInfo();
+  }, [open, isDepositForUsername, transaction?.recipientUsername]);
+
+  const handleCancelTransaction = useCallback(async () => {
+    if (!onCancelDeposit || !transaction?.recipientUsername || !depositAmount) return;
+
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("medium");
+    }
+
+    setIsCancelling(true);
+    try {
+      const username = transaction.recipientUsername.replace(/^@/, "");
+      await onCancelDeposit(username, depositAmount);
+    } catch (error) {
+      console.error("Failed to cancel deposit:", error);
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred("error");
+      }
+    } finally {
+      setIsCancelling(false);
+    }
+  }, [onCancelDeposit, transaction?.recipientUsername, depositAmount]);
+
+  // Show "Cancel transaction" button for deposit_for_username transactions with non-zero deposit
   useEffect(() => {
     if (!open) {
       hideMainButton();
@@ -87,15 +141,30 @@ export default function TransactionDetailsSheet({
       return;
     }
 
-    if (isDepositForUsername) {
+    // Only show cancel button for deposit_for_username with funds
+    const canCancel = isDepositForUsername && !isLoadingDeposit && depositAmount !== null && depositAmount > 0;
+
+    if (canCancel) {
       showMainButton({
         text: "Cancel transaction",
         onClick: handleCancelTransaction,
         backgroundColor: "#FF4D4D",
         textColor: "#FFFFFF",
+        isEnabled: !isCancelling,
+        showLoader: isCancelling,
       });
       hideSecondaryButton();
 
+      return () => {
+        hideMainButton();
+        hideSecondaryButton();
+      };
+    }
+
+    // Hide buttons if deposit_for_username but no funds or still loading
+    if (isDepositForUsername) {
+      hideMainButton();
+      hideSecondaryButton();
       return () => {
         hideMainButton();
         hideSecondaryButton();
@@ -106,7 +175,7 @@ export default function TransactionDetailsSheet({
       hideMainButton();
       hideSecondaryButton();
     };
-  }, [open, isDepositForUsername, handleCancelTransaction]);
+  }, [open, isDepositForUsername, isLoadingDeposit, depositAmount, isCancelling, handleCancelTransaction]);
 
   const modalStyle = useMemo(
     () =>
