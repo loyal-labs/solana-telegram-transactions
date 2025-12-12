@@ -1,7 +1,7 @@
-import { Bot, webhookCallback } from "grammy";
-import { getBot } from "../../../lib/telegram/bot";
+import { webhookCallback } from "grammy";
+import { getBot } from "../../../../lib/telegram/bot-api/bot";
 
-const bot = getBot();
+const bot = await getBot();
 
 bot.command("start", async (ctx: any) => {
   await ctx.reply("Hello World!");
