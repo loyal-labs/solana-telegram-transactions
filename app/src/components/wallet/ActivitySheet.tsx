@@ -3,7 +3,8 @@
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
-import { ArrowDown, ArrowUp, Clock, TriangleAlert, X } from "lucide-react";
+import { motion } from "framer-motion";
+import { ArrowDown, ArrowUp, Clock, X } from "lucide-react";
 import {
   type CSSProperties,
   type ReactNode,
@@ -30,10 +31,6 @@ export type ActivitySheetProps = {
   walletTransactions: Transaction[];
   incomingTransactions: IncomingTransaction[];
   onTransactionClick: (transaction: Transaction) => void;
-  onIncomingTransactionClick: (transaction: IncomingTransaction) => void;
-  claimingTransactionId?: string | null;
-  balance?: number | null;
-  starsBalance?: number;
   isLoading?: boolean;
 };
 
@@ -118,10 +115,6 @@ export default function ActivitySheet({
   walletTransactions,
   incomingTransactions,
   onTransactionClick,
-  onIncomingTransactionClick,
-  claimingTransactionId,
-  balance,
-  starsBalance = 0,
   isLoading = false,
 }: ActivitySheetProps) {
   const snapPoint = useModalSnapPoint();
@@ -308,17 +301,10 @@ export default function ActivitySheet({
                   {group.items.map((item) => {
                     if (item.type === "incoming") {
                       const transaction = item.transaction;
-                      const isClaiming = claimingTransactionId === transaction.id;
                       return (
-                        <button
+                        <div
                           key={transaction.id}
-                          onClick={() =>
-                            !isClaiming && onIncomingTransactionClick(transaction)
-                          }
-                          disabled={isClaiming}
-                          className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity ${
-                            isClaiming ? "opacity-60" : ""
-                          }`}
+                          className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full"
                           style={{
                             background: "rgba(255, 255, 255, 0.06)",
                             mixBlendMode: "lighten",
@@ -341,39 +327,31 @@ export default function ActivitySheet({
                           {/* Middle - Text */}
                           <div className="flex-1 py-2.5 flex flex-col gap-0.5">
                             <p className="text-base text-white leading-5">
-                              Received
+                              Receiving
                             </p>
                             <p className="text-[13px] text-white/60 leading-4">
-                              from {formatSenderAddress(transaction.sender)}
+                              {formatTransactionAmount(transaction.amountLamports)} SOL from {formatSenderAddress(transaction.sender)}
                             </p>
                           </div>
 
-                          {/* Right - Claim Badge */}
+                          {/* Right - Claiming Badge with pulse animation */}
                           <div className="py-2.5 pl-3">
-                            {(() => {
-                              const userNeedsGas = (balance === null || balance === 0) && starsBalance === 0;
-                              return (
-                                <div
-                                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-white leading-5"
-                                  style={{
-                                    background: userNeedsGas
-                                      ? "linear-gradient(90deg, rgba(234, 179, 8, 0.15) 0%, rgba(234, 179, 8, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
-                                      : "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
-                                  }}
-                                >
-                                  {userNeedsGas && (
-                                    <TriangleAlert className="w-4 h-4" style={{ color: "#eab308" }} strokeWidth={2} />
-                                  )}
-                                  {isClaiming
-                                    ? "Claiming..."
-                                    : userNeedsGas
-                                      ? "Details"
-                                      : `Claim ${formatTransactionAmount(transaction.amountLamports)} SOL`}
-                                </div>
-                              );
-                            })()}
+                            <motion.div
+                              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-white leading-5"
+                              style={{
+                                background: "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
+                              }}
+                              animate={{ opacity: [1, 0.4, 1] }}
+                              transition={{
+                                duration: 1.5,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                              }}
+                            >
+                              Claiming...
+                            </motion.div>
                           </div>
-                        </button>
+                        </div>
                       );
                     }
 

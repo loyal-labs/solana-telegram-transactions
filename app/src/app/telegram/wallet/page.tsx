@@ -262,9 +262,6 @@ export default function Home() {
     useState<IncomingTransaction | null>(null);
   const [isSendFormValid, setIsSendFormValid] = useState(false);
   const [isClaimingTransaction, setIsClaimingTransaction] = useState(false);
-  const [claimingTransactionId, setClaimingTransactionId] = useState<
-    string | null
-  >(null);
   const [sendFormValues, setSendFormValues] = useState<{
     amount: string;
     recipient: string;
@@ -390,31 +387,6 @@ export default function Home() {
       setIsCreatingInvoice(false);
     }
   }, [isCreatingInvoice, rawInitData]);
-
-  const handleOpenTransactionDetails = useCallback(
-    (transaction: IncomingTransaction) => {
-      if (hapticFeedback.impactOccurred.isAvailable()) {
-        hapticFeedback.impactOccurred("light");
-      }
-      // Store original incoming transaction for claim functionality
-      setSelectedIncomingTransaction(transaction);
-      // Convert to TransactionDetailsData format
-      const detailsData: TransactionDetailsData = {
-        id: transaction.id,
-        type: "incoming",
-        amountLamports: transaction.amountLamports,
-        sender: transaction.sender,
-        senderUsername: transaction.username
-          ? `@${transaction.username}`
-          : undefined,
-        status: "pending", // Incoming claimable transactions are pending
-        timestamp: Date.now(), // TODO: Get actual timestamp from transaction
-      };
-      setSelectedTransaction(detailsData);
-      setTransactionDetailsSheetOpen(true);
-    },
-    []
-  );
 
   const handleOpenWalletTransactionDetails = useCallback(
     (transaction: Transaction) => {
@@ -894,7 +866,6 @@ export default function Home() {
         hapticFeedback.impactOccurred("medium");
       }
       setIsClaimingTransaction(true);
-      setClaimingTransactionId(transactionId);
       try {
         const provider = await getWalletProvider();
         const keypair = await getWalletKeypair();
@@ -925,13 +896,30 @@ export default function Home() {
         );
 
         await refreshWalletBalance(true);
+        void loadWalletTransactions({ force: true });
 
-        if (hapticFeedback.notificationOccurred.isAvailable()) {
-          hapticFeedback.notificationOccurred("success");
+        // Trigger confetti celebration
+        setShowConfetti(true);
+
+        // Extended intense haptic pattern for celebration
+        if (hapticFeedback.impactOccurred.isAvailable()) {
+          // First burst
+          hapticFeedback.impactOccurred("heavy");
+          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 80);
+          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 160);
+          // Second burst
+          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 300);
+          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 380);
+          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 460);
+          // Third burst
+          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 600);
+          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 680);
+          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 760);
+          // Final burst
+          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 900);
+          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 980);
+          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 1060);
         }
-
-        // Show success state instead of closing
-        setShowClaimSuccess(true);
       } catch (error) {
         console.error("Failed to claim transaction", error);
         if (hapticFeedback.notificationOccurred.isAvailable()) {
@@ -946,10 +934,9 @@ export default function Home() {
         setClaimError(errorMessage);
       } finally {
         setIsClaimingTransaction(false);
-        setClaimingTransactionId(null);
       }
     },
-    [incomingTransactions, rawInitData, refreshWalletBalance]
+    [incomingTransactions, rawInitData, refreshWalletBalance, loadWalletTransactions]
   );
 
   useEffect(() => {
@@ -1086,6 +1073,20 @@ export default function Home() {
       isCancelled = true;
     };
   }, [rawInitData]);
+
+  // Auto-claim incoming transactions
+  useEffect(() => {
+    // Don't auto-claim if already claiming or no transactions
+    if (isClaimingTransaction || incomingTransactions.length === 0) {
+      return;
+    }
+
+    // Auto-claim the first available transaction
+    const firstTransaction = incomingTransactions[0];
+    if (firstTransaction) {
+      void handleApproveTransaction(firstTransaction.id);
+    }
+  }, [incomingTransactions, isClaimingTransaction, handleApproveTransaction]);
 
   useEffect(() => {
     initTelegram();
@@ -1590,33 +1591,7 @@ export default function Home() {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // Trigger confetti on claim success with intense haptics
-  useEffect(() => {
-    if (showClaimSuccess) {
-      setShowConfetti(true);
-
-      // Extended intense haptic pattern for celebration
-      if (hapticFeedback.impactOccurred.isAvailable()) {
-        // First burst
-        hapticFeedback.impactOccurred("heavy");
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 80);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 160);
-        // Second burst
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 300);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 380);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 460);
-        // Third burst
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 600);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 680);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 760);
-        // Final burst
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 900);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 980);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 1060);
-      }
-    }
-  }, [showClaimSuccess]);
-
+  
   // Track balance visibility for sticky pill
   useEffect(() => {
     const balanceElement = balanceRef.current;
@@ -1933,10 +1908,8 @@ export default function Home() {
 
                         if (item.type === "incoming") {
                           const transaction = item.transaction;
-                          const isClaiming =
-                            claimingTransactionId === transaction.id;
                           return (
-                            <motion.button
+                            <motion.div
                               key={transaction.id}
                               layout
                               initial={
@@ -1958,14 +1931,7 @@ export default function Home() {
                                   ease: [0.34, 1.56, 0.64, 1],
                                 },
                               }}
-                              onClick={() =>
-                                !isClaiming &&
-                                handleOpenTransactionDetails(transaction)
-                              }
-                              disabled={isClaiming}
-                              className={`flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity ${
-                                isClaiming ? "opacity-60" : ""
-                              }`}
+                              className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full"
                               style={{
                                 background: "rgba(255, 255, 255, 0.06)",
                                 mixBlendMode: "lighten",
@@ -1990,29 +1956,31 @@ export default function Home() {
                               {/* Middle - Text */}
                               <div className="flex-1 py-2.5 flex flex-col gap-0.5">
                                 <p className="text-base text-white leading-5">
-                                  Received
+                                  Receiving
                                 </p>
                                 <p className="text-[13px] text-white/60 leading-4">
-                                  from {formatSenderAddress(transaction.sender)}
+                                  {formatTransactionAmount(transaction.amountLamports)} SOL from {formatSenderAddress(transaction.sender)}
                                 </p>
                               </div>
 
-                              {/* Right - Claim Badge */}
+                              {/* Right - Claiming Badge with pulse animation */}
                               <div className="py-2.5 pl-3">
-                                <div
+                                <motion.div
                                   className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-white leading-5"
                                   style={{
                                     background: "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
                                   }}
+                                  animate={{ opacity: [1, 0.4, 1] }}
+                                  transition={{
+                                    duration: 1.5,
+                                    repeat: Infinity,
+                                    ease: "easeInOut",
+                                  }}
                                 >
-                                  {isClaiming
-                                    ? "Claiming..."
-                                    : `Claim ${formatTransactionAmount(
-                                        transaction.amountLamports
-                                      )} SOL`}
-                                </div>
+                                  Claiming...
+                                </motion.div>
                               </div>
-                            </motion.button>
+                            </motion.div>
                           );
                         }
 
@@ -2299,10 +2267,6 @@ export default function Home() {
         walletTransactions={walletTransactions}
         incomingTransactions={incomingTransactions}
         onTransactionClick={handleOpenWalletTransactionDetails}
-        onIncomingTransactionClick={handleOpenTransactionDetails}
-        claimingTransactionId={claimingTransactionId}
-        balance={balance}
-        starsBalance={starsBalance}
         isLoading={
           (isFetchingTransactions && walletTransactions.length === 0) ||
           (isFetchingDeposits && incomingTransactions.length === 0)
