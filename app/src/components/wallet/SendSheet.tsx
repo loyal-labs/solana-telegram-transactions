@@ -201,7 +201,6 @@ export default function SendSheet({
   const [currency, setCurrency] = useState<'SOL' | 'USD'>('SOL');
   const [lastAmount, setLastAmount] = useState<LastAmount | null>(null);
   const [recentRecipients, setRecentRecipients] = useState<RecentRecipient[]>([]);
-  const [feePaymentMethod, setFeePaymentMethod] = useState<'solana' | 'stars'>('solana');
   const [solPriceUsdState, setSolPriceUsdState] = useState<number | null>(null);
   const [isSolPriceLoadingState, setIsSolPriceLoadingState] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -221,13 +220,6 @@ export default function SendSheet({
     : isSolPriceLoadingState;
   const balanceInUsd = solPriceUsd ? balanceInSol * solPriceUsd : null;
   const solanaFeeUsd = solPriceUsd ? SOLANA_FEE_SOL * solPriceUsd : null;
-  const hasGaslessAccess = false;
-
-  useEffect(() => {
-    if (!hasGaslessAccess && feePaymentMethod === "stars") {
-      setFeePaymentMethod("solana");
-    }
-  }, [feePaymentMethod, hasGaslessAccess]);
 
   // Load SOL price for USD conversions when not provided externally
   useEffect(() => {
@@ -400,7 +392,7 @@ export default function SendSheet({
     const hasEnoughBalance =
       !isNaN(amountInSol) && amountInSol <= balanceInSol;
 
-    // For step 2, don't check fee method yet
+    // For step 2, don't check fee yet
     if (step === 2) {
       const isValid =
         isAmountValid &&
@@ -411,18 +403,15 @@ export default function SendSheet({
       return;
     }
 
-    // For step 3, also check if selected fee method has sufficient funds
+    // For step 3, also check if user has sufficient SOL for fee
     if (step === 3) {
       const hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
-      const hasSufficientFeeBalance = feePaymentMethod === 'solana'
-        ? hasEnoughSolForFee
-        : hasGaslessAccess;
 
       const isValid =
         isAmountValid &&
         isRecipientValid &&
         hasEnoughBalance &&
-        hasSufficientFeeBalance &&
+        hasEnoughSolForFee &&
         (currency === 'SOL' || !!solPriceUsd);
       onValidationChange?.(isValid);
       return;
@@ -430,7 +419,7 @@ export default function SendSheet({
 
     // Default to invalid for any other state
     onValidationChange?.(false);
-  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, feePaymentMethod, hasGaslessAccess, solPriceUsd]);
+  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, solPriceUsd]);
 
 
   const handleRecipientSelect = (selected: string) => {
@@ -1076,108 +1065,26 @@ export default function SendSheet({
 
             {/* Payment Details Section */}
             <div className="flex flex-col w-full">
-              {/* Transfer Fee Header */}
-              <div className="px-4 pt-3 pb-2">
-                <p className="text-base font-medium text-white tracking-[-0.176px]">Transfer fee</p>
-              </div>
-
               {/* Cards */}
-              <div className="px-4 flex flex-col gap-2">
-                {/* Transfer Fee Section */}
-                {(() => {
-                  // Calculate if user has enough balance for selected fee method
-                  const amountVal = parseFloat(amountStr);
-                  const amountInSol = isNaN(amountVal)
-                    ? 0
-                    : currency === 'SOL'
-                      ? amountVal
-                      : solPriceUsd
-                        ? amountVal / solPriceUsd
-                        : NaN;
-                  const __hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
-
-                  // Check circle icons
-                  const CheckCircleOn = () => (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="12" cy="12" r="12" fill={buttonColor}/>
-                      <path d="M6.5 12.5L10 16L17.5 8.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  );
-                  const CheckCircleOff = () => (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 0C18.6289 0 24 5.37258 24 12C24 18.6289 18.6274 24 12 24C5.37113 24 0 18.6274 0 12C0 5.37113 5.37258 0 12 0ZM12 1.5C6.20044 1.5 1.5 6.20005 1.5 12C1.5 17.7996 6.20005 22.5 12 22.5C17.7996 22.5 22.5 17.8 22.5 12C22.5 6.20044 17.8 1.5 12 1.5Z" fill="white" fillOpacity="0.1"/>
-                    </svg>
-                  );
-
-                  return (
-                    <div
-                      className="flex flex-col py-1 rounded-2xl"
-                      style={{
-                        background: "rgba(255, 255, 255, 0.06)",
-                        mixBlendMode: "lighten",
-                      }}
-                    >
-                      {/* Stars Row - Gasless (disabled) */}
-                      <div className="flex items-center pl-3 pr-4 opacity-50">
-                        <div className="flex items-center flex-1 cursor-not-allowed">
-                          {/* Icon */}
-                          <div className="pr-3 py-1">
-                            <div
-                              className="w-10 h-10 rounded-full flex items-center justify-center"
-                              style={{ background: "rgba(255, 255, 255, 0.06)", mixBlendMode: "lighten" }}
-                            >
-                              <svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path fillRule="evenodd" clipRule="evenodd" d="M9.53309 15.7592L5.59486 18.1718C5.18536 18.4226 4.65002 18.294 4.39917 17.8845C4.27664 17.6845 4.24012 17.4435 4.29786 17.2162L4.9075 14.8167C5.12757 13.9504 5.72031 13.2264 6.52598 12.8396L10.8224 10.7768C11.0227 10.6806 11.1071 10.4403 11.0109 10.24C10.9331 10.0778 10.7569 9.98698 10.5796 10.0177L5.79718 10.8456C4.82501 11.0139 3.82807 10.7455 3.07187 10.1118L1.56105 8.84567C1.19298 8.53721 1.14465 7.98877 1.4531 7.62071C1.60313 7.44168 1.81886 7.33054 2.05172 7.31232L6.66772 6.95107C6.99383 6.92555 7.27802 6.71918 7.40322 6.41698L9.18399 2.11831C9.36778 1.67464 9.87644 1.46397 10.3201 1.64776C10.5331 1.73602 10.7024 1.90528 10.7907 2.11831L12.5714 6.41698C12.6966 6.71918 12.9808 6.92555 13.3069 6.95107L17.9483 7.31431C18.4271 7.35177 18.7848 7.77027 18.7473 8.24904C18.7293 8.47935 18.6203 8.69303 18.4446 8.84291L14.9049 11.8606C14.6555 12.0731 14.5469 12.4075 14.6235 12.7259L15.7117 17.2466C15.8241 17.7136 15.5367 18.1831 15.0699 18.2955C14.8455 18.3496 14.6089 18.3121 14.4121 18.1916L10.4416 15.7592C10.1628 15.5885 9.81183 15.5885 9.53309 15.7592Z" fill="white"/>
-                              </svg>
-                            </div>
-                          </div>
-                          {/* Text */}
-                          <div className="flex-1 flex flex-col gap-0.5 py-2.5 text-left">
-                            <p className="text-base leading-5 text-white">Gasless unavailable</p>
-                            <p className="text-[13px] leading-4 text-white/60">Pay network fees with SOL for now</p>
-                          </div>
-                        </div>
-                        <div className="pl-4 py-1.5 shrink-0">
-                          <CheckCircleOff />
-                        </div>
-                      </div>
-
-                      {/* SOL Row */}
-                      <button
-                        onClick={() => {
-                          if (hapticFeedback.selectionChanged.isAvailable()) {
-                            hapticFeedback.selectionChanged();
-                          }
-                          setFeePaymentMethod('solana');
-                        }}
-                        className="flex items-center pl-3 pr-4"
-                      >
-                        {/* Icon */}
-                        <div className="pr-3 py-1">
-                          <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center"
-                            style={{ background: "rgba(255, 255, 255, 0.06)", mixBlendMode: "lighten" }}
-                          >
-                            <svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M15.701 6.35782C15.601 6.44906 15.471 6.50032 15.3356 6.50184H2.51488C2.05973 6.50184 1.83037 5.98179 2.14507 5.67687L4.25105 3.64735C4.34876 3.55223 4.47918 3.49815 4.61553 3.49622H17.4852C17.9448 3.49622 18.1697 4.0216 17.8497 4.32741L15.701 6.35782ZM15.701 16.3632C15.6004 16.4528 15.4704 16.5025 15.3356 16.5028H2.51488C2.05973 16.5028 1.83037 15.9872 2.14507 15.6831L4.25105 13.6474C4.34973 13.5546 4.48004 13.5028 4.61553 13.5025H17.4852C17.9448 13.5025 18.1697 14.0225 17.8497 14.3275L15.701 16.3632ZM15.701 8.64159C15.6004 8.55197 15.4704 8.50232 15.3356 8.50202H2.51488C2.05973 8.50202 1.83037 9.01763 2.14507 9.32166L4.25105 11.3574C4.34973 11.4502 4.48004 11.5021 4.61553 11.5023H17.4852C17.9448 11.5023 18.1697 10.9823 17.8497 10.6773L15.701 8.64159Z" fill="white"/>
-                            </svg>
-                          </div>
-                        </div>
-                        {/* Text */}
-                        <div className="flex-1 flex flex-col gap-0.5 py-2.5 text-left">
-                          <p className="text-base leading-5 text-white">{SOLANA_FEE_SOL} SOL</p>
-                          <p className="text-[13px] leading-4 text-white/60">
-                            ≈ {solanaFeeUsd !== null ? `$${solanaFeeUsd.toFixed(2)}` : "—"}
-                          </p>
-                        </div>
-                        {/* Check */}
-                        <div className="pl-4 py-1.5 shrink-0">
-                          {feePaymentMethod === 'solana' ? <CheckCircleOn /> : <CheckCircleOff />}
-                        </div>
-                      </button>
+              <div className="px-4 pt-3 flex flex-col gap-2">
+                {/* Transfer Fee Card */}
+                <div
+                  className="flex items-center pl-3 pr-4 py-1 rounded-2xl"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    mixBlendMode: "lighten",
+                  }}
+                >
+                  <div className="flex-1 flex flex-col gap-0.5 py-2.5">
+                    <p className="text-[13px] leading-4 text-white/60">Transfer fee</p>
+                    <div className="flex items-baseline text-base leading-5">
+                      <span className="text-white">{SOLANA_FEE_SOL} SOL</span>
+                      <span className="text-white/60">
+                        {solanaFeeUsd !== null ? ` ≈ $${solanaFeeUsd.toFixed(2)}` : " ≈ $—"}
+                      </span>
                     </div>
-                  );
-                })()}
+                  </div>
+                </div>
 
                 {/* Total Amount Card */}
                 <div
@@ -1194,7 +1101,7 @@ export default function SendSheet({
                         {(() => {
                           const val = parseFloat(amountStr);
                           if (isNaN(val)) {
-                            return feePaymentMethod === 'solana' ? `${SOLANA_FEE_SOL} SOL` : '0 SOL';
+                            return `${SOLANA_FEE_SOL} SOL`;
                           }
                           const solVal =
                             currency === 'SOL'
@@ -1202,9 +1109,8 @@ export default function SendSheet({
                               : solPriceUsd
                                 ? val / solPriceUsd
                                 : NaN;
-                          // Only add SOL fee if paying with Solana
-                          const total = feePaymentMethod === 'solana' ? solVal + SOLANA_FEE_SOL : solVal;
-                          if (isNaN(total)) return feePaymentMethod === 'solana' ? `${SOLANA_FEE_SOL} SOL` : '0 SOL';
+                          const total = solVal + SOLANA_FEE_SOL;
+                          if (isNaN(total)) return `${SOLANA_FEE_SOL} SOL`;
                           return `${total.toFixed(6).replace(/\.?0+$/, '')} SOL`;
                         })()}
                       </span>
@@ -1212,9 +1118,7 @@ export default function SendSheet({
                         {(() => {
                           const val = parseFloat(amountStr);
                           if (isNaN(val)) {
-                            return feePaymentMethod === 'solana'
-                              ? ` ≈ ${solanaFeeUsd !== null ? `$${solanaFeeUsd.toFixed(2)}` : "$—"}`
-                              : ' ≈ $0.00';
+                            return solanaFeeUsd !== null ? ` ≈ $${solanaFeeUsd.toFixed(2)}` : " ≈ $—";
                           }
                           const usdVal =
                             currency === 'SOL'
@@ -1225,11 +1129,7 @@ export default function SendSheet({
                           if (usdVal === null) {
                             return ' ≈ $—';
                           }
-                          // Only add USD fee equivalent if paying with Solana
-                          const totalUsd =
-                            feePaymentMethod === 'solana' && solanaFeeUsd !== null
-                              ? usdVal + solanaFeeUsd
-                              : usdVal;
+                          const totalUsd = solanaFeeUsd !== null ? usdVal + solanaFeeUsd : usdVal;
                           return ` ≈ $${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                         })()}
                       </span>

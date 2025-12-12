@@ -15,15 +15,14 @@ import {
   viewport,
 } from "@telegram-apps/sdk-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDown, ArrowUp, ChevronRight, Clock, Copy, TriangleAlert } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, Clock, Copy } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Confetti from "react-confetti";
 
 import { ScanIcon } from "@/components/ui/icons/ScanIcon";
 import { ActionButton } from "@/components/wallet/ActionButton";
 import ActivitySheet from "@/components/wallet/ActivitySheet";
-import ClaimFreeTransactionsSheet from "@/components/wallet/ClaimFreeTransactionsSheet";
-import GaslessBanner from "@/components/wallet/GaslessBanner";
 import ReceiveSheet from "@/components/wallet/ReceiveSheet";
 import SendSheet, {
   addRecentRecipient,
@@ -48,8 +47,7 @@ import {
 } from "@/lib/solana/rpc/get-account-txn-history";
 import type { WalletTransfer } from "@/lib/solana/rpc/types";
 import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
-import { storeInitDataGasless } from "@/lib/solana/verification/store-init-data";
-import { prepareStoreInitDataTxn, sendStoreInitDataTxn, verifyAndClaimDeposit } from "@/lib/solana/verify-and-claim-deposit";
+import { verifyAndClaimDeposit } from "@/lib/solana/verify-and-claim-deposit";
 import {
   formatAddress,
   formatBalance,
@@ -58,7 +56,6 @@ import {
   formatUsdValue,
 } from "@/lib/solana/wallet/formatters";
 import {
-  getGaslessPublicKey,
   getWalletBalance,
   getWalletKeypair,
   getWalletProvider,
@@ -79,10 +76,6 @@ import {
   getCloudValue,
   setCloudValue,
 } from "@/lib/telegram/mini-app/cloud-storage";
-import {
-  GaslessState,
-  getGaslessState,
-} from "@/lib/telegram/mini-app/cloud-storage-gassless";
 import {
   cleanInitData,
   createValidationBytesFromRawInitData,
@@ -225,12 +218,8 @@ export default function Home() {
   const [isActivitySheetOpen, setActivitySheetOpen] = useState(false);
   const [isTransactionDetailsSheetOpen, setTransactionDetailsSheetOpen] =
     useState(false);
-  const [isClaimFreeSheetOpen, setIsClaimFreeSheetOpen] = useState(false);
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
-  const [buttonRefreshTick, setButtonRefreshTick] = useState(0);
-  const [needsGas, setNeedsGas] = useState(false);
-  const [gaslessState, setGaslessState] = useState<GaslessState | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(
     () => cachedWalletAddress
   );
@@ -295,6 +284,8 @@ export default function Home() {
   const [isSolPriceLoading, setIsSolPriceLoading] = useState(
     () => getCachedSolPrice() === null
   );
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(
@@ -334,9 +325,6 @@ export default function Home() {
     setReceiveSheetOpen(true);
   }, []);
 
-  const handleGaslessStateChange = useCallback((state: GaslessState) => {
-    setGaslessState(state);
-  }, []);
 
   const handleTopUpStars = useCallback(async () => {
     if (isCreatingInvoice) return;
@@ -410,11 +398,6 @@ export default function Home() {
       }
       // Store original incoming transaction for claim functionality
       setSelectedIncomingTransaction(transaction);
-      // Check if user needs gas (0 SOL) and hasn't completed gasless onboarding
-      const isWalletEmpty = balance === null || balance === 0;
-      const userNeedsGas =
-        gaslessState !== GaslessState.CLAIMED && isWalletEmpty;
-      setNeedsGas(userNeedsGas);
       // Convert to TransactionDetailsData format
       const detailsData: TransactionDetailsData = {
         id: transaction.id,
@@ -430,7 +413,7 @@ export default function Home() {
       setSelectedTransaction(detailsData);
       setTransactionDetailsSheetOpen(true);
     },
-    [balance, gaslessState]
+    []
   );
 
   const handleOpenWalletTransactionDetails = useCallback(
@@ -438,9 +421,8 @@ export default function Home() {
       if (hapticFeedback.impactOccurred.isAvailable()) {
         hapticFeedback.impactOccurred("light");
       }
-      // Clear incoming transaction ref and gas warning
+      // Clear incoming transaction ref
       setSelectedIncomingTransaction(null);
-      setNeedsGas(false);
       // Convert to TransactionDetailsData format
       // For deposit_for_username transactions, the recipient is the username
       const isDepositTransaction = transaction.transferType === "deposit_for_username";
@@ -770,6 +752,7 @@ export default function Home() {
       setSelectedIncomingTransaction(null);
       setShowClaimSuccess(false); // Reset claim success state
       setClaimError(null); // Reset claim error state
+      setShowConfetti(false); // Reset confetti state
     }
   }, []);
 
@@ -969,91 +952,6 @@ export default function Home() {
     [incomingTransactions, rawInitData, refreshWalletBalance]
   );
 
-  const handleGaslessApproveTransaction = useCallback(
-    async (transactionId: string) => {
-      if (!rawInitData) {
-        console.error("Cannot verify init data: raw init data missing");
-        return;
-      }
-
-      const transaction = incomingTransactions.find(
-        (tx) => tx.id === transactionId
-      );
-      if (!transaction) {
-        console.warn("Transaction not found for approval:", transactionId);
-        return;
-      }
-
-      if (hapticFeedback.impactOccurred.isAvailable()) {
-        hapticFeedback.impactOccurred("medium");
-      }
-      setIsClaimingTransaction(true);
-      setClaimingTransactionId(transactionId);
-
-      try {
-        const provider = await getWalletProvider();
-        const keypair = await getWalletKeypair();
-        const wallet = new SimpleWallet(keypair);
-        const recipientPublicKey = provider.publicKey;
-
-        const { validationBytes, signatureBytes } =
-          createValidationBytesFromRawInitData(rawInitData);
-        const senderPublicKey = new PublicKey(transaction.sender);
-
-        const username = transaction.username;
-        const amountLamports = transaction.amountLamports;
-        const payerPublicKey = await getGaslessPublicKey();
-
-        const storeTx = await prepareStoreInitDataTxn(
-          provider,
-          payerPublicKey,
-          validationBytes,
-          wallet
-        );
-
-        await sendStoreInitDataTxn(
-          storeTx, 
-          senderPublicKey, 
-          recipientPublicKey, 
-          username, 
-          amountLamports, 
-          validationBytes, 
-          signatureBytes, 
-          TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
-        );
-
-        setIncomingTransactions((prev) =>
-          prev.filter((tx) => tx.id !== transactionId)
-        );
-
-        await refreshWalletBalance(true);
-
-        if (hapticFeedback.notificationOccurred.isAvailable()) {
-          hapticFeedback.notificationOccurred("success");
-        }
-
-        // Show success state instead of closing
-        setShowClaimSuccess(true);
-      } catch (error) {
-        console.error("Failed to claim transaction", error);
-        if (hapticFeedback.notificationOccurred.isAvailable()) {
-          hapticFeedback.notificationOccurred("error");
-        }
-
-        // Set error message and show error state
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "Something went wrong. Please try again.";
-        setClaimError(errorMessage);
-      } finally {
-        setIsClaimingTransaction(false);
-        setClaimingTransactionId(null);
-      }
-    },
-    [incomingTransactions, rawInitData, refreshWalletBalance]
-  );
-
   useEffect(() => {
     if (rawInitData) {
       if (!TELEGRAM_BOT_ID) {
@@ -1071,28 +969,6 @@ export default function Home() {
       console.log("Signature is valid: ", isValid);
     }
   }, [rawInitData]);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    const syncGaslessState = async () => {
-      try {
-        const state = await getGaslessState();
-        if (isCancelled) return;
-        setGaslessState(state);
-      } catch (error) {
-        console.warn("Failed to load gasless state", error);
-        if (isCancelled) return;
-        setGaslessState(GaslessState.NOT_CLAIMED);
-      }
-    };
-
-    void syncGaslessState();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -1458,38 +1334,6 @@ export default function Home() {
   }, [mapTransferToTransaction, walletAddress]);
 
   useEffect(() => {
-    const handleClaimVerified = () => {
-      setButtonRefreshTick((tick) => tick + 1);
-    };
-
-    if (typeof window !== "undefined") {
-      window.addEventListener("claim-free-verified", handleClaimVerified);
-    }
-
-    return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("claim-free-verified", handleClaimVerified);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!selectedIncomingTransaction) {
-      setNeedsGas(false);
-      return;
-    }
-
-    const isWalletEmpty = balance === null || balance === 0;
-    const userNeedsGas =
-      gaslessState !== GaslessState.CLAIMED && isWalletEmpty;
-    setNeedsGas(userNeedsGas);
-  }, [balance, gaslessState, selectedIncomingTransaction]);
-
-  useEffect(() => {
-    if (isClaimFreeSheetOpen) {
-      return () => {};
-    }
-
     if (!mainButtonAvailable) {
       mainButton.mount.ifAvailable?.();
       hideMainButton();
@@ -1526,19 +1370,7 @@ export default function Home() {
         });
       } else if (selectedIncomingTransaction) {
         // Only show Claim button for incoming (claimable) transactions
-        const hasGaslessAccess = gaslessState === GaslessState.CLAIMED;
-
-        if (needsGas && !hasGaslessAccess) {
-          // User needs gas - show "Claim free transactions" button
-          showMainButton({
-            text: "Claim free transactions",
-            onClick: () => {
-              setIsClaimFreeSheetOpen(true);
-            },
-            isEnabled: true,
-            showLoader: false,
-          });
-        } else if (isClaimingTransaction && !hasGaslessAccess) {
+        if (isClaimingTransaction) {
           // Show only main button with loader during claim
           showMainButton({
             text: "Claim",
@@ -1546,22 +1378,8 @@ export default function Home() {
             isEnabled: false,
             showLoader: true,
           });
-        } else if (isClaimingTransaction && hasGaslessAccess) {
-          // Show only main button with loader during claim
-          showMainButton({
-            text: "Gasless Claim",
-            onClick: () => {}, // No-op during loading
-            isEnabled: false,
-            showLoader: true,
-          });
-        } else if (!isClaimingTransaction && hasGaslessAccess) {
-          // Show only main button with loader during claim
-          showMainButton({
-            text: "Gasless Claim",
-            onClick: () => handleGaslessApproveTransaction(selectedIncomingTransaction.id)
-          });
         } else {
-          // Show only Claim button (no Ignore)
+          // Show Claim button
           showMainButton({
             text: "Claim",
             onClick: () =>
@@ -1666,8 +1484,6 @@ export default function Home() {
     selectedTransaction,
     selectedIncomingTransaction,
     isClaimingTransaction,
-    needsGas,
-    gaslessState,
     mainButtonAvailable,
     secondaryButtonAvailable,
     handleOpenSendSheet,
@@ -1681,11 +1497,8 @@ export default function Home() {
     showClaimSuccess,
     claimError,
     sendError,
-    isClaimFreeSheetOpen,
-    buttonRefreshTick,
     rawInitData,
     solPriceUsd,
-    handleGaslessApproveTransaction
   ]);
 
   const formattedUsdBalance = formatUsdValue(balance, solPriceUsd);
@@ -1767,6 +1580,32 @@ export default function Home() {
     }
   }, [limitedActivityItems]);
 
+  // Track window size for confetti
+  useEffect(() => {
+    const updateSize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
+
+  // Trigger confetti on claim success with intense haptics
+  useEffect(() => {
+    if (showClaimSuccess) {
+      setShowConfetti(true);
+
+      // Intense haptic pattern for celebration
+      if (hapticFeedback.impactOccurred.isAvailable()) {
+        hapticFeedback.impactOccurred("heavy");
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 100);
+        setTimeout(() => hapticFeedback.impactOccurred("medium"), 200);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 300);
+        setTimeout(() => hapticFeedback.impactOccurred("medium"), 400);
+      }
+    }
+  }, [showClaimSuccess]);
+
   // Track balance visibility for sticky pill
   useEffect(() => {
     const balanceElement = balanceRef.current;
@@ -1796,6 +1635,18 @@ export default function Home() {
 
   return (
     <>
+      {/* Confetti for claim success */}
+      {showConfetti && (
+        <Confetti
+          width={windowSize.width}
+          height={windowSize.height}
+          recycle={false}
+          numberOfPieces={200}
+          gravity={0.15}
+          style={{ position: "fixed", top: 0, left: 0, zIndex: 100 }}
+          onConfettiComplete={() => setShowConfetti(false)}
+        />
+      )}
       <main
         className="min-h-screen text-white font-sans overflow-hidden relative flex flex-col"
         style={{ background: "#16161a" }}
@@ -1953,24 +1804,10 @@ export default function Home() {
             const hasNoTransactions =
               incomingTransactions.length === 0 &&
               walletTransactions.length === 0;
-            const isEmptyWallet = balance === null || balance === 0;
             const isActivityLoading =
               isLoading ||
               (isFetchingTransactions && walletTransactions.length === 0) ||
               (isFetchingDeposits && incomingTransactions.length === 0);
-
-            // Empty wallet banner component - promotes gasless transactions
-            const EmptyWalletBanner = () => (
-              <GaslessBanner
-                onHaptic={() => {
-                  if (hapticFeedback.impactOccurred.isAvailable()) {
-                    hapticFeedback.impactOccurred("light");
-                  }
-                }}
-                initialState={gaslessState}
-                onStateChange={handleGaslessStateChange}
-              />
-            );
 
             // Loading state - show skeleton transaction cards
             if (isActivityLoading) {
@@ -2029,36 +1866,7 @@ export default function Home() {
               );
             }
 
-            // Empty wallet AND no transactions - show banner and empty state
-            if (isEmptyWallet && hasNoTransactions) {
-              return (
-                <div className="flex-1">
-                  <EmptyWalletBanner />
-                  {/* Activity header */}
-                  <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-                    <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
-                      Activity
-                    </p>
-                  </div>
-                  {/* Empty transactions state */}
-                  <div className="px-4 pb-4">
-                    <div
-                      className="flex items-center justify-center px-8 py-6 rounded-2xl"
-                      style={{
-                        background: "rgba(255, 255, 255, 0.03)",
-                        mixBlendMode: "lighten",
-                      }}
-                    >
-                      <p className="text-base text-white/60 leading-5 text-center">
-                        You don&apos;t have any transactions yet
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            // Has balance but no transactions
+            // No transactions - show empty state
             if (hasNoTransactions) {
               return (
                 <div className="flex-1">
@@ -2089,8 +1897,6 @@ export default function Home() {
             // Normal state with transactions
             return (
               <>
-                {/* Show empty wallet banner above Activity title if wallet is empty */}
-                {isEmptyWallet && <EmptyWalletBanner />}
                 <div className="px-4 pt-3 pb-2 flex items-center justify-between">
                   <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
                     Activity
@@ -2179,33 +1985,18 @@ export default function Home() {
 
                               {/* Right - Claim Badge */}
                               <div className="py-2.5 pl-3">
-                                {(() => {
-                                  const isWalletEmpty = balance === null || balance === 0;
-                                  const userNeedsGas =
-                                    gaslessState !== GaslessState.CLAIMED &&
-                                    isWalletEmpty;
-                                  return (
-                                    <div
-                                      className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-white leading-5"
-                                      style={{
-                                        background: userNeedsGas
-                                          ? "linear-gradient(90deg, rgba(234, 179, 8, 0.15) 0%, rgba(234, 179, 8, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)"
-                                          : "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
-                                      }}
-                                      >
-                                        {userNeedsGas && (
-                                          <TriangleAlert className="w-4 h-4" style={{ color: "#eab308" }} strokeWidth={2} />
-                                        )}
-                                      {isClaiming
-                                        ? "Claiming..."
-                                        : userNeedsGas
-                                          ? "Needs gas"
-                                          : `Claim ${formatTransactionAmount(
-                                              transaction.amountLamports
-                                            )} SOL`}
-                                    </div>
-                                  );
-                                })()}
+                                <div
+                                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-white leading-5"
+                                  style={{
+                                    background: "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
+                                  }}
+                                >
+                                  {isClaiming
+                                    ? "Claiming..."
+                                    : `Claim ${formatTransactionAmount(
+                                        transaction.amountLamports
+                                      )} SOL`}
+                                </div>
                               </div>
                             </motion.button>
                           );
@@ -2484,7 +2275,6 @@ export default function Home() {
         showSuccess={showClaimSuccess}
         showError={claimError}
         solPriceUsd={solPriceUsd}
-        needsGas={needsGas}
         onShare={selectedTransaction?.transferType === "deposit_for_username" ? handleShareDepositTransaction : undefined}
         onCancelDeposit={handleCancelDeposit}
       />
@@ -2503,11 +2293,6 @@ export default function Home() {
           (isFetchingTransactions && walletTransactions.length === 0) ||
           (isFetchingDeposits && incomingTransactions.length === 0)
         }
-      />
-      <ClaimFreeTransactionsSheet
-        open={isClaimFreeSheetOpen}
-        onOpenChange={setIsClaimFreeSheetOpen}
-        onStateChange={handleGaslessStateChange}
       />
     </>
   );
