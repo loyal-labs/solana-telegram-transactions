@@ -1595,13 +1595,24 @@ export default function Home() {
     if (showClaimSuccess) {
       setShowConfetti(true);
 
-      // Intense haptic pattern for celebration
+      // Extended intense haptic pattern for celebration
       if (hapticFeedback.impactOccurred.isAvailable()) {
+        // First burst
         hapticFeedback.impactOccurred("heavy");
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 100);
-        setTimeout(() => hapticFeedback.impactOccurred("medium"), 200);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 80);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 160);
+        // Second burst
         setTimeout(() => hapticFeedback.impactOccurred("heavy"), 300);
-        setTimeout(() => hapticFeedback.impactOccurred("medium"), 400);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 380);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 460);
+        // Third burst
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 600);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 680);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 760);
+        // Final burst
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 900);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 980);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 1060);
       }
     }
   }, [showClaimSuccess]);
@@ -1641,8 +1652,11 @@ export default function Home() {
           width={windowSize.width}
           height={windowSize.height}
           recycle={false}
-          numberOfPieces={200}
-          gravity={0.15}
+          numberOfPieces={500}
+          gravity={0.2}
+          initialVelocityX={8}
+          initialVelocityY={25}
+          tweenDuration={100}
           style={{ position: "fixed", top: 0, left: 0, zIndex: 100 }}
           onConfettiComplete={() => setShowConfetti(false)}
         />
