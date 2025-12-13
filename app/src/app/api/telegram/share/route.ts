@@ -85,7 +85,13 @@ export async function POST(req: Request) {
       usdAmount
     );
 
-    const preparedInlineMessage = await prepareInlineMessage(userId, photoUrl);
+    const preparedInlineMessage = await prepareInlineMessage(
+      userId,
+      photoUrl,
+      senderUsername,
+      receiverUsername,
+      solAmount
+    );
 
     return NextResponse.json({ msgId: preparedInlineMessage.id });
   } catch (error) {

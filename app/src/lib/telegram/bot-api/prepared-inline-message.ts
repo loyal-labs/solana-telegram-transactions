@@ -6,14 +6,22 @@ import { MINI_APP_LINK } from "./constants";
 
 export const prepareInlineMessage = async (
   userId: number,
-  photoUrl: string
+  photoUrl: string,
+  senderUsername: string,
+  receiverUsername: string,
+  solAmount: number
 ): Promise<PreparedInlineMessage> => {
   const bot = await getBot();
-
-  const keyboard = new InlineKeyboard().url("Open", MINI_APP_LINK);
-
   const invisibleUnicodeSymbol = String.fromCharCode(0x200b);
-  const text = `Tap to open Loyal app and claim the transaction!<a href="${photoUrl}">${invisibleUnicodeSymbol}</a>`;
+  const text = `Hi ${senderUsername}!\n\nYou received <b>${solAmount} SOL</b> from <b>${receiverUsername}</b>.\n\nTap the button below the image to get your money!<a href="${photoUrl}">${invisibleUnicodeSymbol}</a>`;
+  const buttonText = "CLICK HERE TO CLAIM";
+
+  const keyboard = new InlineKeyboard()
+    .url("⬇️⬇️⬇️", MINI_APP_LINK)
+    .row()
+    .url(buttonText, MINI_APP_LINK)
+    .row()
+    .url("⬆️⬆️⬆️", MINI_APP_LINK);
 
   const inlineMessage = InlineQueryResultBuilder.article(
     "id0",

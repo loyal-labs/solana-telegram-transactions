@@ -246,8 +246,6 @@ export async function POST(req: Request) {
       telegramPublicKeyBytes,
     } = bodyJson;
 
-    console.log("storeTx", storeTx);
-
     if (
       !storeTx ||
       !userPubKey ||
@@ -285,7 +283,6 @@ export async function POST(req: Request) {
       parsedStoreTx,
       payerWallet
     );
-    console.log("storeResult", storeResult);
     if (!storeResult) {
       return NextResponse.json(
         { error: "Failed to store init data" },
@@ -304,7 +301,6 @@ export async function POST(req: Request) {
       telegramSignature,
       telegramPublicKey
     );
-    console.log("result", result);
     if (!result) {
       return NextResponse.json(
         { error: "Failed to claim deposit" },
