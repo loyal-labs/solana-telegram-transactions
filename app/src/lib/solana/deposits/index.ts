@@ -11,7 +11,7 @@ export {
   claimDeposit,
   getDeposit,
   getDepositWithUsername,
-  subscribeToDepositsWithUsername,
   refundDeposit,
+  subscribeToDepositsWithUsername,
   topUpDeposit,
 };
