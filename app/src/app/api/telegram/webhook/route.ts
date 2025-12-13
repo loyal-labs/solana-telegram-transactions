@@ -1,32 +1,22 @@
 import type { CommandContext, Context } from "grammy";
-import { InlineKeyboard } from "grammy";
 import { webhookCallback } from "grammy";
 
-import { getBot } from "../../../../lib/telegram/bot-api/bot";
-import { MINI_APP_LINK } from "../../../../lib/telegram/bot-api/constants";
+import { getBot } from "@/lib/telegram/bot-api/bot";
+import { sendBusinessConnectionMessage } from "@/lib/telegram/bot-api/handle-business-connection";
+import { handleStartCommand } from "@/lib/telegram/bot-api/handle-start-command";
 
 const bot = await getBot();
 
 bot.command("start", async (ctx: CommandContext<Context>) => {
-  const welcomeText = `<b>Welcome to Loyal!</b>\n\nThis bot utilizes Loyal private AI to summarize, prioritize and filter your Telegram chat.\n\nAll your messages are encrypted, and neither the Loyal team nor our compute providers can see them. For more info, visit our GitHub: https://github.com/loyal-labs\n\nWARNING: this product is in open test phase, so the functionality may be incomplete and you may encounter bugs.\n\nWe appreciate any feedback in our @loyal_tgchat`;
-  const buttonText = "Go Loyal";
-  const keyboard = new InlineKeyboard().url(buttonText, MINI_APP_LINK);
+  await handleStartCommand(ctx, bot);
+});
 
-  const user = ctx.from;
-  if (!user) {
-    console.error("User not found in start command");
-    return;
-  }
-  const userId = user.id;
+bot.on("business_connection:is_enabled", async (ctx) => {
+  const connectionId = ctx.update.business_connection.id;
+  const connectionEnabled = ctx.update.business_connection.is_enabled;
+  const userId = ctx.businessConnection.user_chat_id;
 
-  console.log(ctx);
-
-  const welcomeMessage = await bot.api.sendMessage(userId, welcomeText, {
-    reply_markup: keyboard,
-    parse_mode: "HTML",
-  });
-
-  await bot.api.pinChatMessage(userId, welcomeMessage.message_id);
+  await sendBusinessConnectionMessage(connectionId, connectionEnabled, userId);
 });
 
 export const POST = webhookCallback(bot, "std/http");
