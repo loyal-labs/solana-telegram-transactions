@@ -47,7 +47,7 @@ import {
 } from "@/lib/solana/rpc/get-account-txn-history";
 import type { WalletTransfer } from "@/lib/solana/rpc/types";
 import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
-import { verifyAndClaimDeposit } from "@/lib/solana/verify-and-claim-deposit";
+import { prepareStoreInitDataTxn, sendStoreInitDataTxn, verifyAndClaimDeposit } from "@/lib/solana/verify-and-claim-deposit";
 import {
   formatAddress,
   formatBalance,
@@ -879,9 +879,15 @@ export default function Home() {
         const username = transaction.username;
         const amountLamports = transaction.amountLamports;
 
-        await verifyAndClaimDeposit(
+        const preparedStoreInitDataTxn = await prepareStoreInitDataTxn(
           provider,
-          wallet,
+          senderPublicKey,
+          validationBytes,
+          wallet
+        );
+
+        await sendStoreInitDataTxn(
+          preparedStoreInitDataTxn,
           senderPublicKey,
           recipientPublicKey,
           username,
