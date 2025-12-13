@@ -6,6 +6,7 @@ export const BusinessConnectionsSchema = {
     type: "object",
     properties: {
       _id: { type: "string", format: "uuid" },
+      business_connection_id: { type: "string" },
       user_id: { type: "integer", minimum: 0 },
       enabled: { type: "boolean" },
       created_at: { type: "string", format: "date-time" },
