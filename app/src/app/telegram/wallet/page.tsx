@@ -56,6 +56,7 @@ import {
   formatUsdValue,
 } from "@/lib/solana/wallet/formatters";
 import {
+  getGaslessPublicKey,
   getWalletBalance,
   getWalletKeypair,
   getWalletProvider,
@@ -878,10 +879,12 @@ export default function Home() {
 
         const username = transaction.username;
         const amountLamports = transaction.amountLamports;
+        const payerPublicKey = await getGaslessPublicKey();
+        console.log("payerPublicKey", payerPublicKey);
 
         const preparedStoreInitDataTxn = await prepareStoreInitDataTxn(
           provider,
-          senderPublicKey,
+          payerPublicKey,
           validationBytes,
           wallet
         );

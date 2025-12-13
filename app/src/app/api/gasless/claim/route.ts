@@ -10,7 +10,6 @@ import {
 import { SYSVAR_INSTRUCTIONS_PUBKEY } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
-import { claimDeposit } from "@/lib/solana/deposits/claim-deposit";
 import {
   getDepositPda,
   getTelegramTransferProgram,
@@ -19,7 +18,6 @@ import {
   numberToBN,
 } from "@/lib/solana/solana-helpers";
 import { getSessionPda } from "@/lib/solana/solana-helpers";
-import { verifyInitData } from "@/lib/solana/verification/verify-init-data";
 import {
   getCustomWalletProvider,
   getGaslessKeypair,
@@ -201,7 +199,7 @@ const verifyAndClaimDeposit = async (
   const transferProgram = getTelegramTransferProgram(provider);
   const verificationProgram = getTelegramVerificationProgram(provider);
 
-  const verified = await verifyInitDataGasless(
+  await verifyInitDataGasless(
     provider,
     verificationProgram,
     payerWallet,
@@ -248,6 +246,8 @@ export async function POST(req: Request) {
       telegramPublicKeyBytes,
     } = bodyJson;
 
+    console.log("storeTx", storeTx);
+
     if (
       !storeTx ||
       !userPubKey ||
@@ -285,6 +285,7 @@ export async function POST(req: Request) {
       parsedStoreTx,
       payerWallet
     );
+    console.log("storeResult", storeResult);
     if (!storeResult) {
       return NextResponse.json(
         { error: "Failed to store init data" },
@@ -303,6 +304,7 @@ export async function POST(req: Request) {
       telegramSignature,
       telegramPublicKey
     );
+    console.log("result", result);
     if (!result) {
       return NextResponse.json(
         { error: "Failed to claim deposit" },
