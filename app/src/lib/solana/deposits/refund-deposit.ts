@@ -19,7 +19,7 @@ export const refundDeposit = async (
   if (deposit.amount < amount) {
     throw new Error("Insufficient deposit");
   }
-  if (deposit.user !== userPublicKey) {
+  if (deposit.user.toBase58() !== userPublicKey.toBase58()) {
     throw new Error("This deposit does not belong to the current user");
   }
 

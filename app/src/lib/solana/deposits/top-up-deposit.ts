@@ -5,7 +5,6 @@ import type { TelegramDeposit } from "../../../types/deposits";
 import { numberToBN } from "../solana-helpers";
 import { getDeposit } from "./get-deposit";
 
-// TODO: add check for sufficient balance
 export const topUpDeposit = async (
   provider: AnchorProvider,
   transferProgram: Program<TelegramTransfer>,
