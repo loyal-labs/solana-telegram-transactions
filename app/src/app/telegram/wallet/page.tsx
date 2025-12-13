@@ -38,7 +38,11 @@ import {
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
 } from "@/lib/constants";
 import { fetchInvoiceState } from "@/lib/irys/fetch-invoice-state";
-import { refundDeposit, topUpDeposit } from "@/lib/solana/deposits";
+import {
+  refundDeposit,
+  subscribeToDepositsWithUsername,
+  topUpDeposit,
+} from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import {
@@ -88,6 +92,7 @@ import { openInvoice } from "@/lib/telegram/mini-app/invoice";
 import { openQrScanner } from "@/lib/telegram/mini-app/qr-code";
 import { createShareMessage, shareSavedInlineMessage } from "@/lib/telegram/mini-app/share-message";
 import { ensureTelegramTheme } from "@/lib/telegram/mini-app/theme";
+import type { TelegramDeposit } from "@/types/deposits";
 import type {
   IncomingTransaction,
   Transaction,
@@ -188,6 +193,23 @@ const setCachedIncomingTransactions = (
   if (!username) return;
   cachedUsername = username;
   incomingTransactionsCache.set(username, txns);
+};
+
+const mapDepositToIncomingTransaction = (
+  deposit: TelegramDeposit
+): IncomingTransaction => {
+  const senderBase58 =
+    typeof (deposit.user as { toBase58?: () => string }).toBase58 ===
+    "function"
+      ? deposit.user.toBase58()
+      : String(deposit.user);
+
+  return {
+    id: `${senderBase58}-${deposit.lastNonce}`,
+    amountLamports: deposit.amount,
+    sender: senderBase58,
+    username: deposit.username,
+  };
 };
 
 // Track wallet address at module level for cache lookups on remount
@@ -1022,8 +1044,9 @@ export default function Home() {
     }
 
     let isCancelled = false;
+    let unsubscribe: (() => Promise<void>) | null = null;
 
-    void (async () => {
+    const subscribeAndFetchDeposits = async () => {
       try {
         const cleanInitDataResult = cleanInitData(rawInitData);
         const username = parseUsernameFromInitData(cleanInitDataResult);
@@ -1043,6 +1066,7 @@ export default function Home() {
         }
 
         const provider = await getWalletProvider();
+        const transferProgram = getTelegramTransferProgram(provider);
         console.log("Fetching deposits for username:", username);
         const deposits = await fetchDeposits(provider, username);
         console.log("Deposits fetched:", deposits.length, deposits);
@@ -1050,25 +1074,35 @@ export default function Home() {
           return;
         }
 
-        const mappedTransactions: IncomingTransaction[] = deposits.map(
-          (deposit) => {
-            const senderBase58 =
-              typeof (deposit.user as { toBase58?: () => string }).toBase58 ===
-              "function"
-                ? deposit.user.toBase58()
-                : String(deposit.user);
-
-            return {
-              id: `${senderBase58}-${deposit.lastNonce}`,
-              amountLamports: deposit.amount,
-              sender: senderBase58,
-              username: deposit.username,
-            };
-          }
-        );
+        const mappedTransactions = deposits.map(mapDepositToIncomingTransaction);
 
         setCachedIncomingTransactions(username, mappedTransactions);
         setIncomingTransactions(mappedTransactions);
+
+        unsubscribe = await subscribeToDepositsWithUsername(
+          transferProgram,
+          username,
+          (deposit) => {
+            if (isCancelled) {
+              return;
+            }
+            const mapped = mapDepositToIncomingTransaction(deposit);
+            setIncomingTransactions((prev) => {
+              const existingIndex = prev.findIndex(
+                (tx) => tx.id === mapped.id
+              );
+              let next: IncomingTransaction[];
+              if (existingIndex >= 0) {
+                next = [...prev];
+                next[existingIndex] = mapped;
+              } else {
+                next = [mapped, ...prev];
+              }
+              setCachedIncomingTransactions(username, next);
+              return next;
+            });
+          }
+        );
       } catch (error) {
         console.error("Failed to fetch deposits", error);
       } finally {
@@ -1076,10 +1110,17 @@ export default function Home() {
           setIsFetchingDeposits(false);
         }
       }
-    })();
+    };
+
+    void subscribeAndFetchDeposits();
 
     return () => {
       isCancelled = true;
+      if (unsubscribe) {
+        void unsubscribe().catch((error) =>
+          console.error("Failed to remove deposit subscription", error)
+        );
+      }
     };
   }, [rawInitData]);
 
