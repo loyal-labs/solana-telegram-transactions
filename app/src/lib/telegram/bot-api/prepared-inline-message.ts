@@ -13,7 +13,7 @@ export const prepareInlineMessage = async (
 ): Promise<PreparedInlineMessage> => {
   const bot = await getBot();
   const invisibleUnicodeSymbol = String.fromCharCode(0x200b);
-  const text = `Hi ${senderUsername}!\n\nYou received <b>${solAmount} SOL</b> from <b>${receiverUsername}</b>.\n\nTap the button below the image to get your money!<a href="${photoUrl}">${invisibleUnicodeSymbol}</a>`;
+  const text = `Hi ${receiverUsername}!\n\nYou received <b>${solAmount} SOL</b> from <b>${senderUsername}</b>.\n\nTap the button below the image to get your money!<a href="${photoUrl}">${invisibleUnicodeSymbol}</a>`;
   const buttonText = "CLICK HERE TO CLAIM";
 
   const keyboard = new InlineKeyboard()
