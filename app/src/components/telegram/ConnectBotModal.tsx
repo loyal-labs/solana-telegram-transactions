@@ -1,10 +1,16 @@
 "use client";
 
-import { hapticFeedback, themeParams } from "@telegram-apps/sdk-react";
+import {
+  hapticFeedback,
+  openTelegramLink,
+  retrieveLaunchParams,
+  themeParams,
+  useRawInitData,
+} from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import type { RGB } from "@telegram-apps/types";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
-import { X } from "lucide-react";
+import { CircleAlert, X } from "lucide-react";
 import Image from "next/image";
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -14,6 +20,28 @@ import {
   hideSecondaryButton,
   showMainButton,
 } from "@/lib/telegram/mini-app/buttons";
+import { cleanInitData } from "@/lib/telegram/mini-app/init-data-transform";
+
+function parseIsPremiumFromInitData(rawInitData: string | undefined): boolean {
+  if (!rawInitData) return false;
+
+  try {
+    const cleanData = cleanInitData(rawInitData);
+    const userField = cleanData["user"];
+
+    if (typeof userField === "string") {
+      const parsedUser = JSON.parse(userField);
+      return parsedUser.is_premium === true;
+    } else if (typeof userField === "object" && userField !== null) {
+      const user = userField as Record<string, unknown>;
+      return user.is_premium === true;
+    }
+  } catch (error) {
+    console.warn("Failed to parse premium status from initData", error);
+  }
+
+  return false;
+}
 
 export type ConnectBotModalProps = {
   open?: boolean;
@@ -26,6 +54,31 @@ export default function ConnectBotModal({
 }: ConnectBotModalProps) {
   const snapPoint = useModalSnapPoint();
   const { bottom: safeBottom } = useTelegramSafeArea();
+  const rawInitData = useRawInitData();
+
+  const [isWebClient, setIsWebClient] = useState(false);
+
+  // Detect platform on mount
+  useEffect(() => {
+    let platform: string | undefined;
+    try {
+      const launchParams = retrieveLaunchParams();
+      platform = launchParams.tgWebAppPlatform;
+    } catch {
+      // Fallback to hash parsing if SDK fails
+      if (typeof window !== "undefined") {
+        const hash = window.location.hash.slice(1);
+        const params = new URLSearchParams(hash);
+        platform = params.get("tgWebAppPlatform") || undefined;
+      }
+    }
+    setIsWebClient(platform === "web" || platform === "weba");
+  }, []);
+
+  const isPremium = useMemo(
+    () => parseIsPremiumFromInitData(rawInitData),
+    [rawInitData]
+  );
 
   const [buttonColors] = useState(() => {
     try {
@@ -66,7 +119,22 @@ export default function ConnectBotModal({
     }
   }, []);
 
-  // Show/hide native Telegram button based on modal open state
+  const handleBuyPremium = useCallback(() => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    if (isWebClient) {
+      // Web clients: use openTelegramLink to open PremiumBot
+      if (openTelegramLink.isAvailable()) {
+        openTelegramLink("https://t.me/PremiumBot");
+      }
+    } else {
+      // Native clients: use tg:// deep link
+      window.location.href = "tg://premium_offer";
+    }
+  }, [isWebClient]);
+
+  // Show/hide native Telegram button based on modal open state and premium status
   useEffect(() => {
     if (!open) {
       hideMainButton();
@@ -74,12 +142,21 @@ export default function ConnectBotModal({
       return;
     }
 
-    showMainButton({
-      text: "Copy Bot Username",
-      onClick: handleCopyUsername,
-      backgroundColor: buttonColors.background,
-      textColor: buttonColors.text,
-    });
+    if (isPremium) {
+      showMainButton({
+        text: "Copy Bot Username",
+        onClick: handleCopyUsername,
+        backgroundColor: buttonColors.background,
+        textColor: buttonColors.text,
+      });
+    } else {
+      showMainButton({
+        text: "Buy Telegram Premium",
+        onClick: handleBuyPremium,
+        backgroundColor: buttonColors.background,
+        textColor: buttonColors.text,
+      });
+    }
 
     hideSecondaryButton();
 
@@ -87,7 +164,7 @@ export default function ConnectBotModal({
       hideMainButton();
       hideSecondaryButton();
     };
-  }, [open, handleCopyUsername, buttonColors.background, buttonColors.text]);
+  }, [open, isPremium, handleCopyUsername, handleBuyPremium, buttonColors.background, buttonColors.text]);
 
   return (
     <Modal
@@ -156,10 +233,31 @@ export default function ConnectBotModal({
           </div>
         </div>
 
+        {/* Premium Banner (shown for non-premium users) */}
+        {!isPremium && (
+          <div className="px-4 pb-5">
+            <div
+              className="flex items-center px-3 py-1 rounded-2xl"
+              style={{
+                background: "rgba(255, 255, 255, 0.06)",
+              }}
+            >
+              <div className="flex items-center pr-3 py-2">
+                <CircleAlert size={24} strokeWidth={1.5} className="text-white" />
+              </div>
+              <div className="flex-1 py-2.5">
+                <p className="text-sm text-white/60 leading-5">
+                  Available only with Telegram Premium
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Steps */}
         <div className="flex flex-col pb-5">
           {/* Step 1 */}
-          <div className="flex items-start px-4 py-0">
+          <div className={`flex items-start px-4 py-0 ${!isPremium ? "opacity-50" : ""}`}>
             <div className="flex items-start pl-0 pr-3 py-2">
               <div
                 className="w-6 h-6 rounded-full flex items-center justify-center"
@@ -176,7 +274,7 @@ export default function ConnectBotModal({
           </div>
 
           {/* Step 2 */}
-          <div className="flex items-start px-4 py-0">
+          <div className={`flex items-start px-4 py-0 ${!isPremium ? "opacity-50" : ""}`}>
             <div className="flex items-start pl-0 pr-3 py-2 self-stretch">
               <div
                 className="w-6 h-6 rounded-full flex items-center justify-center"
