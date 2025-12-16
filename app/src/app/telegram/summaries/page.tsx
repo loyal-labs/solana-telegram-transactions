@@ -6,6 +6,7 @@ import { CircleHelp, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ConnectBotBanner } from "@/components/telegram/ChatBanners";
 import ConnectBotModal from "@/components/telegram/ConnectBotModal";
 
 // Mock chat data for Groups tab - matches the summaries in SummaryFeed.tsx
@@ -235,38 +236,6 @@ const getTabsData = (): Tab[] => [
   { id: "spam", label: "Spam", count: MOCK_SPAM_CHATS.length },
 ];
 
-interface DirectTabBannerProps {
-  onConnectBot: () => void;
-}
-
-function DirectTabBanner({ onConnectBot }: DirectTabBannerProps) {
-  return (
-    <div className="px-3 py-2">
-      <div className="bg-white/[0.06] rounded-2xl pl-3 pr-11 py-1">
-        <div className="flex flex-col gap-3 py-2">
-          <div className="flex flex-col gap-0.5">
-            <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
-              Connect Loyal Bot to Your Account
-            </p>
-            <p className="text-[13px] text-white/60 leading-4">
-              Loyal private AI will summarize, prioritize, and filter your Telegram chats so you can review what matters in this app
-            </p>
-          </div>
-          <div>
-            <button
-              onClick={onConnectBot}
-              className="bg-white/[0.06] rounded-full px-4 py-2 active:opacity-80 transition-opacity"
-            >
-              <span className="text-sm font-medium text-white leading-5">
-                Connect Loyal Bot
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 interface EmptyStateBannerProps {
   onClose: () => void;
@@ -573,7 +542,7 @@ export default function SummariesPage() {
           <div className="flex-1 flex flex-col pt-2 pb-4">
             {/* Direct and Spam tab banner skeleton placeholder */}
             {(activeTab === "direct" || activeTab === "spam") && (
-              <DirectTabBanner onConnectBot={handleConnectBot} />
+              <ConnectBotBanner onConnectBot={handleConnectBot} />
             )}
 
             <ChatListSkeleton count={5} />
@@ -594,7 +563,7 @@ export default function SummariesPage() {
           <div className="flex-1 flex flex-col pt-2 pb-4">
             {/* Direct and Spam tab banner */}
             {(activeTab === "direct" || activeTab === "spam") && (
-              <DirectTabBanner onConnectBot={handleConnectBot} />
+              <ConnectBotBanner onConnectBot={handleConnectBot} />
             )}
 
             {currentChatList.map((chat, index) => (

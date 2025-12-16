@@ -18,7 +18,8 @@ import {
   Smile,
 } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { setLoyalEmojiStatus } from "@/lib/telegram/mini-app/emoji-status";
 import { cleanInitData } from "@/lib/telegram/mini-app/init-data-transform";
@@ -118,6 +119,8 @@ type ProfileCellProps = {
   onClick?: () => void;
   disabled?: boolean;
   noBg?: boolean;
+  cellRef?: React.RefObject<HTMLDivElement | null>;
+  highlight?: boolean;
 };
 
 function ProfileCell({
@@ -130,12 +133,15 @@ function ProfileCell({
   onClick,
   disabled = false,
   noBg = false,
+  cellRef,
+  highlight = false,
 }: ProfileCellProps) {
   const content = (
     <div
+      ref={cellRef}
       className={`flex items-center w-full overflow-hidden pl-3 pr-4 py-1 ${
         disabled ? "opacity-50" : ""
-      } ${noBg ? "" : "rounded-2xl"}`}
+      } ${noBg ? "" : "rounded-2xl"} ${highlight ? "animate-highlight-border" : ""}`}
       style={
         noBg
           ? undefined
@@ -236,9 +242,12 @@ export default function ProfilePage() {
     viewport.contentSafeAreaInsetTop as Signal<number>
   );
   const rawInitData = useRawInitData();
+  const searchParams = useSearchParams();
 
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
   const [isCloudStorageEnabled, setIsCloudStorageEnabled] = useState(false);
+  const [highlightCloudStorage, setHighlightCloudStorage] = useState(false);
+  const cloudStorageRef = useRef<HTMLDivElement>(null);
 
   // Detect platform on mount
   useEffect(() => {
@@ -258,6 +267,39 @@ export default function ProfilePage() {
     const isMobile = platform === "ios" || platform === "android";
     setIsMobilePlatform(isMobile);
   }, []);
+
+  // Handle highlight param from URL (e.g., from PermissionRequiredBanner)
+  useEffect(() => {
+    const highlight = searchParams.get("highlight");
+    if (highlight === "cloud-storage") {
+      // Small delay to ensure the page has rendered
+      const scrollTimer = setTimeout(() => {
+        cloudStorageRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 100);
+
+      // Start the highlight animation after scroll
+      const highlightTimer = setTimeout(() => {
+        setHighlightCloudStorage(true);
+        if (hapticFeedback.notificationOccurred.isAvailable()) {
+          hapticFeedback.notificationOccurred("warning");
+        }
+      }, 400);
+
+      // Remove highlight after animation completes (1 cycle = 1s)
+      const clearTimer = setTimeout(() => {
+        setHighlightCloudStorage(false);
+      }, 1400);
+
+      return () => {
+        clearTimeout(scrollTimer);
+        clearTimeout(highlightTimer);
+        clearTimeout(clearTimer);
+      };
+    }
+  }, [searchParams]);
 
   const userData = useMemo(
     () => parseUserFromInitData(rawInitData),
@@ -396,6 +438,8 @@ export default function ProfilePage() {
                 onChange: setIsCloudStorageEnabled,
               }}
               noBg
+              cellRef={cloudStorageRef}
+              highlight={highlightCloudStorage}
             />
           </SettingsSection>
 
