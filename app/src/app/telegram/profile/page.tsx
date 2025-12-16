@@ -14,7 +14,7 @@ import {
   ChevronRight,
   CircleHelp,
   CirclePlus,
-  MessageCircleHeart,
+  Database,
   Smile,
 } from "lucide-react";
 import Image from "next/image";
@@ -63,14 +63,61 @@ function parseUserFromInitData(
   return null;
 }
 
+type ToggleProps = {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+};
+
+function Toggle({ checked, onChange, disabled = false }: ToggleProps) {
+  const handleClick = () => {
+    if (disabled) return;
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    onChange(!checked);
+  };
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={handleClick}
+      disabled={disabled}
+      className={`relative h-[31px] w-[51px] rounded-full transition-colors duration-200 ease-in-out ${
+        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+      }`}
+      style={{
+        backgroundColor: checked ? "#2990ff" : "rgba(255, 255, 255, 0.06)",
+        mixBlendMode: checked ? "normal" : "lighten",
+      }}
+    >
+      <div
+        className="absolute top-1/2 -translate-y-1/2 h-[27px] w-[27px] rounded-full bg-white transition-all duration-200 ease-in-out"
+        style={{
+          left: checked ? "calc(100% - 29px)" : "2px",
+          boxShadow:
+            "0px 0px 0px 1px rgba(0, 0, 0, 0.04), 0px 3px 8px 0px rgba(0, 0, 0, 0.15), 0px 3px 1px 0px rgba(0, 0, 0, 0.06)",
+        }}
+      />
+    </button>
+  );
+}
+
 type ProfileCellProps = {
   icon: React.ReactNode;
   title: string;
   subtitle?: string;
   rightContent?: React.ReactNode;
   showChevron?: boolean;
+  toggle?: {
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+  };
   onClick?: () => void;
   disabled?: boolean;
+  noBg?: boolean;
 };
 
 function ProfileCell({
@@ -79,18 +126,24 @@ function ProfileCell({
   subtitle,
   rightContent,
   showChevron = false,
+  toggle,
   onClick,
   disabled = false,
+  noBg = false,
 }: ProfileCellProps) {
   const content = (
     <div
-      className={`flex items-center w-full rounded-2xl overflow-hidden pl-3 pr-4 py-1 ${
+      className={`flex items-center w-full overflow-hidden pl-3 pr-4 py-1 ${
         disabled ? "opacity-50" : ""
-      }`}
-      style={{
-        background: "rgba(255, 255, 255, 0.06)",
-        mixBlendMode: "lighten",
-      }}
+      } ${noBg ? "" : "rounded-2xl"}`}
+      style={
+        noBg
+          ? undefined
+          : {
+              background: "rgba(255, 255, 255, 0.06)",
+              mixBlendMode: "lighten",
+            }
+      }
     >
       {/* Left - Icon */}
       <div className="flex items-center pr-3 py-1.5">
@@ -119,12 +172,21 @@ function ProfileCell({
         )}
       </div>
 
-      {/* Right - Value or Chevron */}
+      {/* Right - Value, Toggle, or Chevron */}
       {rightContent && (
         <div className="pl-3">
           <p className="text-base leading-5 text-white/60 text-right">
             {rightContent}
           </p>
+        </div>
+      )}
+      {toggle && (
+        <div className="pl-3">
+          <Toggle
+            checked={toggle.checked}
+            onChange={toggle.onChange}
+            disabled={disabled}
+          />
         </div>
       )}
       {showChevron && (
@@ -152,6 +214,20 @@ function ProfileCell({
   return content;
 }
 
+function SettingsSection({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="rounded-2xl py-1"
+      style={{
+        background: "rgba(255, 255, 255, 0.06)",
+        mixBlendMode: "lighten",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const safeAreaInsetTop = useSignal(
     viewport.safeAreaInsetTop as Signal<number>
@@ -162,6 +238,7 @@ export default function ProfilePage() {
   const rawInitData = useRawInitData();
 
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
+  const [isCloudStorageEnabled, setIsCloudStorageEnabled] = useState(false);
 
   // Detect platform on mount
   useEffect(() => {
@@ -228,15 +305,6 @@ export default function ProfilePage() {
     await setLoyalEmojiStatus();
   }, []);
 
-  const handleJoinChannel = useCallback(() => {
-    if (hapticFeedback.impactOccurred.isAvailable()) {
-      hapticFeedback.impactOccurred("light");
-    }
-    if (openTelegramLink.isAvailable()) {
-      openTelegramLink("https://t.me/loyal_tg");
-    }
-  }, []);
-
   const handleSupport = useCallback(() => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
@@ -297,57 +365,74 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Settings Section */}
-        <div className="flex flex-col gap-2 px-4 pb-4">
-          {/* Language */}
-          <ProfileCell
-            icon={
-              <Image
-                src="/globe.svg"
-                alt="Language"
-                width={28}
-                height={28}
-                className="opacity-60"
-              />
-            }
-            title="Language"
-            rightContent="English"
-            disabled
-          />
+        {/* Settings Sections */}
+        <div className="flex flex-col gap-4 px-4 pb-4">
+          {/* Section 1: Settings */}
+          <SettingsSection>
+            {/* Language */}
+            <ProfileCell
+              icon={
+                <Image
+                  src="/globe.svg"
+                  alt="Language"
+                  width={28}
+                  height={28}
+                  className="opacity-60"
+                />
+              }
+              title="Language"
+              rightContent="English"
+              disabled
+              noBg
+            />
 
-          {/* Add to Home Screen */}
-          <ProfileCell
-            icon={<CirclePlus size={28} strokeWidth={1.5} />}
-            title={addToHomeScreenTitle}
-            showChevron
-            onClick={handleAddToHomeScreen}
-            disabled={addToHomeScreenDisabled}
-          />
+            {/* Cloud Storage */}
+            <ProfileCell
+              icon={<Database size={28} strokeWidth={1.5} />}
+              title="Cloud Storage"
+              subtitle="Loyal bot will process your Telegram messages and generate summaries"
+              toggle={{
+                checked: isCloudStorageEnabled,
+                onChange: setIsCloudStorageEnabled,
+              }}
+              noBg
+            />
+          </SettingsSection>
 
-          {/* Join Loyal Channel */}
-          <ProfileCell
-            icon={<MessageCircleHeart size={28} strokeWidth={1.5} />}
-            title="Join Loyal channel"
-            showChevron
-            onClick={handleJoinChannel}
-          />
+          {/* Section 2: Actions */}
+          <SettingsSection>
+            {/* Add to Home Screen */}
+            <ProfileCell
+              icon={<CirclePlus size={28} strokeWidth={1.5} />}
+              title={addToHomeScreenTitle}
+              showChevron
+              onClick={handleAddToHomeScreen}
+              disabled={addToHomeScreenDisabled}
+              noBg
+            />
 
-          {/* Set Custom Emoji */}
-          <ProfileCell
-            icon={<Smile size={28} strokeWidth={1.5} />}
-            title="Set Custom Emoji"
-            showChevron
-            onClick={handleSetCustomEmoji}
-          />
+            {/* Set Custom Emoji */}
+            <ProfileCell
+              icon={<Smile size={28} strokeWidth={1.5} />}
+              title="Set Custom Emoji"
+              showChevron
+              onClick={handleSetCustomEmoji}
+              noBg
+            />
+          </SettingsSection>
 
-          {/* Support */}
-          <ProfileCell
-            icon={<CircleHelp size={28} strokeWidth={1.5} />}
-            title="Support"
-            subtitle="Report a bug or ask any question"
-            showChevron
-            onClick={handleSupport}
-          />
+          {/* Section 3: Help */}
+          <SettingsSection>
+            {/* Support */}
+            <ProfileCell
+              icon={<CircleHelp size={28} strokeWidth={1.5} />}
+              title="Support"
+              subtitle="Report a bug or ask any question"
+              showChevron
+              onClick={handleSupport}
+              noBg
+            />
+          </SettingsSection>
         </div>
       </div>
     </main>
