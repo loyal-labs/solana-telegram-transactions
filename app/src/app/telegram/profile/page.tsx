@@ -27,6 +27,7 @@ type UserData = {
   firstName: string;
   lastName?: string;
   username?: string;
+  photoUrl?: string;
 };
 
 function parseUserFromInitData(
@@ -44,6 +45,7 @@ function parseUserFromInitData(
         firstName: parsedUser.first_name || "User",
         lastName: parsedUser.last_name,
         username: parsedUser.username,
+        photoUrl: parsedUser.photo_url,
       };
     } else if (typeof userField === "object" && userField !== null) {
       const user = userField as Record<string, unknown>;
@@ -51,6 +53,7 @@ function parseUserFromInitData(
         firstName: (user.first_name as string) || "User",
         lastName: user.last_name as string | undefined,
         username: user.username as string | undefined,
+        photoUrl: user.photo_url as string | undefined,
       };
     }
   } catch (error) {
@@ -265,11 +268,21 @@ export default function ProfilePage() {
         {/* Avatar and Name Section */}
         <div className="flex flex-col gap-4 items-center justify-center pt-8 pb-6 px-8">
           {/* Avatar */}
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <span className="text-4xl font-semibold text-white">
-              {avatarLetter}
-            </span>
-          </div>
+          {userData?.photoUrl ? (
+            <Image
+              src={userData.photoUrl}
+              alt={fullName}
+              width={96}
+              height={96}
+              className="w-24 h-24 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <span className="text-4xl font-semibold text-white">
+                {avatarLetter}
+              </span>
+            </div>
+          )}
 
           {/* Name and Username */}
           <div className="flex flex-col gap-1 items-center text-center w-full">
