@@ -123,6 +123,60 @@ function getFirstLetter(title: string): string {
   return cleaned.charAt(0).toUpperCase() || title.charAt(0).toUpperCase();
 }
 
+interface ChatItemSkeletonProps {
+  showDivider?: boolean;
+  titleWidth?: string;
+  subtitleWidth?: string;
+}
+
+function ChatItemSkeleton({
+  showDivider = true,
+  titleWidth = "w-32",
+  subtitleWidth = "w-48",
+}: ChatItemSkeletonProps) {
+  return (
+    <div className="px-4">
+      <div className="flex items-center w-full py-2">
+        {/* Avatar Skeleton */}
+        <div className="pr-3">
+          <div className="w-14 h-14 rounded-full bg-white/5 animate-pulse" />
+        </div>
+
+        {/* Title and Subtitle Skeleton */}
+        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+          <div className={`${titleWidth} h-5 bg-white/5 animate-pulse rounded`} />
+          <div className={`${subtitleWidth} h-4 bg-white/5 animate-pulse rounded`} />
+        </div>
+      </div>
+      {showDivider && <div className="h-px bg-white/10 ml-[68px]" />}
+    </div>
+  );
+}
+
+// Skeleton configurations for visual variety
+const SKELETON_CONFIGS = [
+  { titleWidth: "w-36", subtitleWidth: "w-52" },
+  { titleWidth: "w-28", subtitleWidth: "w-44" },
+  { titleWidth: "w-32", subtitleWidth: "w-56" },
+  { titleWidth: "w-24", subtitleWidth: "w-40" },
+  { titleWidth: "w-40", subtitleWidth: "w-48" },
+];
+
+function ChatListSkeleton({ count = 5 }: { count?: number }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, index) => (
+        <ChatItemSkeleton
+          key={index}
+          showDivider={index < count - 1}
+          titleWidth={SKELETON_CONFIGS[index % SKELETON_CONFIGS.length].titleWidth}
+          subtitleWidth={SKELETON_CONFIGS[index % SKELETON_CONFIGS.length].subtitleWidth}
+        />
+      ))}
+    </>
+  );
+}
+
 interface ChatItemProps {
   chat: { id: string; title: string; subtitle?: string };
   onClick: () => void;
@@ -304,6 +358,7 @@ export default function SummariesPage() {
   const [isConnectBotModalOpen, setIsConnectBotModalOpen] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<1 | -1>(1); // 1 = from right, -1 = from left
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [buttonColor] = useState(() => {
     try {
@@ -324,6 +379,15 @@ export default function SummariesPage() {
   // Save active tab to localStorage when it changes
   useEffect(() => {
     localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
+  }, [activeTab]);
+
+  // Simulate loading state when tab changes (replace with real data fetching)
+  useEffect(() => {
+    setIsLoading(true);
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 800); // Simulated loading delay
+    return () => clearTimeout(timer);
   }, [activeTab]);
 
   // Handle swipe to switch tabs
@@ -505,7 +569,19 @@ export default function SummariesPage() {
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
       >
-        {currentChatList.length === 0 ? (
+        {isLoading ? (
+          <div className="flex-1 flex flex-col pt-2 pb-4">
+            {/* Direct and Spam tab banner skeleton placeholder */}
+            {(activeTab === "direct" || activeTab === "spam") && (
+              <DirectTabBanner onConnectBot={handleConnectBot} />
+            )}
+
+            <ChatListSkeleton count={5} />
+
+            {/* Bottom padding for navigation */}
+            <div className="h-32 shrink-0" />
+          </div>
+        ) : currentChatList.length === 0 ? (
           <div className="flex-1 flex flex-col pt-1">
             {!isBannerDismissed && (
               <EmptyStateBanner
