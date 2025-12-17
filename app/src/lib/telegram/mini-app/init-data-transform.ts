@@ -168,3 +168,43 @@ export const parseUsernameFromInitData = (
 
   return null;
 };
+
+export type UserData = {
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  photoUrl?: string;
+};
+
+export function parseUserFromInitData(
+  rawInitData: string | undefined
+): UserData | null {
+  if (!rawInitData) return null;
+
+  try {
+    const cleanData = cleanInitData(rawInitData);
+    const userField = cleanData["user"];
+
+    if (typeof userField === "string") {
+      const parsedUser = JSON.parse(userField);
+      return {
+        firstName: parsedUser.first_name || "User",
+        lastName: parsedUser.last_name,
+        username: parsedUser.username,
+        photoUrl: parsedUser.photo_url,
+      };
+    } else if (typeof userField === "object" && userField !== null) {
+      const user = userField as Record<string, unknown>;
+      return {
+        firstName: (user.first_name as string) || "User",
+        lastName: user.last_name as string | undefined,
+        username: user.username as string | undefined,
+        photoUrl: user.photo_url as string | undefined,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to parse user data from initData", error);
+  }
+
+  return null;
+}

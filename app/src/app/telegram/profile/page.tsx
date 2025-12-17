@@ -5,7 +5,6 @@ import {
   hapticFeedback,
   openTelegramLink,
   retrieveLaunchParams,
-  useRawInitData,
   useSignal,
   viewport,
 } from "@telegram-apps/sdk-react";
@@ -21,48 +20,10 @@ import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useTelegramUser } from "@/components/telegram/TelegramProvider";
+import { Skeleton } from "@/components/ui/skeleton";
 import { setLoyalEmojiStatus } from "@/lib/telegram/mini-app/emoji-status";
-import { cleanInitData } from "@/lib/telegram/mini-app/init-data-transform";
-
-type UserData = {
-  firstName: string;
-  lastName?: string;
-  username?: string;
-  photoUrl?: string;
-};
-
-function parseUserFromInitData(
-  rawInitData: string | undefined
-): UserData | null {
-  if (!rawInitData) return null;
-
-  try {
-    const cleanData = cleanInitData(rawInitData);
-    const userField = cleanData["user"];
-
-    if (typeof userField === "string") {
-      const parsedUser = JSON.parse(userField);
-      return {
-        firstName: parsedUser.first_name || "User",
-        lastName: parsedUser.last_name,
-        username: parsedUser.username,
-        photoUrl: parsedUser.photo_url,
-      };
-    } else if (typeof userField === "object" && userField !== null) {
-      const user = userField as Record<string, unknown>;
-      return {
-        firstName: (user.first_name as string) || "User",
-        lastName: user.last_name as string | undefined,
-        username: user.username as string | undefined,
-        photoUrl: user.photo_url as string | undefined,
-      };
-    }
-  } catch (error) {
-    console.warn("Failed to parse user data from initData", error);
-  }
-
-  return null;
-}
+import { cn } from "@/lib/utils";
 
 type ToggleProps = {
   checked: boolean;
@@ -241,12 +202,14 @@ export default function ProfilePage() {
   const contentSafeAreaInsetTop = useSignal(
     viewport.contentSafeAreaInsetTop as Signal<number>
   );
-  const rawInitData = useRawInitData();
   const searchParams = useSearchParams();
+
+  const { userData, cachedAvatar, isAvatarLoading } = useTelegramUser();
 
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
   const [isCloudStorageEnabled, setIsCloudStorageEnabled] = useState(false);
   const [highlightCloudStorage, setHighlightCloudStorage] = useState(false);
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
   const cloudStorageRef = useRef<HTMLDivElement>(null);
 
   // Detect platform on mount
@@ -300,11 +263,6 @@ export default function ProfilePage() {
       };
     }
   }, [searchParams]);
-
-  const userData = useMemo(
-    () => parseUserFromInitData(rawInitData),
-    [rawInitData]
-  );
 
   const fullName = useMemo(() => {
     if (!userData) return "User";
@@ -379,13 +337,23 @@ export default function ProfilePage() {
         <div className="flex flex-col gap-4 items-center justify-center pt-8 pb-6 px-8">
           {/* Avatar */}
           {userData?.photoUrl ? (
-            <Image
-              src={userData.photoUrl}
-              alt={fullName}
-              width={96}
-              height={96}
-              className="w-24 h-24 rounded-full object-cover"
-            />
+            <div className="relative w-24 h-24">
+              {(!isImageLoaded || isAvatarLoading) && (
+                <Skeleton className="absolute inset-0 w-24 h-24 rounded-full z-10" />
+              )}
+              <Image
+                src={cachedAvatar || userData.photoUrl}
+                alt={fullName}
+                width={96}
+                height={96}
+                className={cn(
+                  "w-24 h-24 rounded-full object-cover transition-opacity duration-300",
+                  !isImageLoaded || isAvatarLoading ? "opacity-0" : "opacity-100"
+                )}
+                priority
+                onLoad={() => setIsImageLoaded(true)}
+              />
+            </div>
           ) : (
             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
               <span className="text-4xl font-semibold text-white">
