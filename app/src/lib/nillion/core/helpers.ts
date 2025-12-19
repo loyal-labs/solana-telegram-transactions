@@ -33,14 +33,14 @@ export const getUserSigner = (): Signer => {
 
 export const getNilauthClient = async (): Promise<NilauthClient> => {
   if (!nilauthClient) {
-    const payer = await PayerBuilder.fromPrivateKey(USER_KEY)
-      .chainUrl(RPC_URL)
-      .gasLimit("auto")
-      .broadcastTimeoutMs(10000)
-      .broadcastPollIntervalMs(1000)
-      .build();
+    // const payer = await PayerBuilder.fromPrivateKey(USER_KEY)
+    //   .chainUrl(RPC_URL)
+    //   .gasLimit("auto")
+    //   .broadcastTimeoutMs(10000)
+    //   .broadcastPollIntervalMs(1000)
+    //   .build();
 
-    nilauthClient = await NilauthClient.create({ baseUrl: NILAUTH_URL, payer });
+    nilauthClient = await NilauthClient.create({ baseUrl: NILAUTH_URL });
   }
   return nilauthClient;
 };
