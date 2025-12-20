@@ -6,8 +6,13 @@ import {
 import base58 from "bs58";
 import { Buffer } from "buffer";
 
-import { NILAUTH_URL, NODE_DB_URLS, RPC_URL } from "./constants";
-import { BUILDER_KEY, USER_KEY } from "./env";
+import {
+  BUILDER_KEY,
+  NILAUTH_URL,
+  NODE_DB_URLS,
+  RPC_URL,
+  USER_KEY,
+} from "./constants";
 
 let builderSigner: Signer | null = null;
 let userSigner: Signer | null = null;
@@ -33,13 +38,6 @@ export const getUserSigner = (): Signer => {
 
 export const getNilauthClient = async (): Promise<NilauthClient> => {
   if (!nilauthClient) {
-    // const payer = await PayerBuilder.fromPrivateKey(USER_KEY)
-    //   .chainUrl(RPC_URL)
-    //   .gasLimit("auto")
-    //   .broadcastTimeoutMs(10000)
-    //   .broadcastPollIntervalMs(1000)
-    //   .build();
-
     nilauthClient = await NilauthClient.create({ baseUrl: NILAUTH_URL });
   }
   return nilauthClient;

@@ -8,3 +8,6 @@ export const NODE_DB_URLS = [
 
 export const NILAUTH_URL = "https://nilauth-cf7f.nillion.network";
 export const RPC_URL = "http://nilchain-rpc.nillion.network";
+
+export const BUILDER_KEY = process.env.NILLION_PRIVATE_KEY_HEX!;
+export const USER_KEY = process.env.USER_PRIVATE_KEY!;
