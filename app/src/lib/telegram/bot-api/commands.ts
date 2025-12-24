@@ -30,23 +30,23 @@ export const handleCaCommand = async (
   ctx: CommandContext<Context>,
   bot: Bot
 ) => {
-  const keyboard = new InlineKeyboard()
-    .url("Open on Jupiter", "https://trade.askloyal.com/")
-    .row()
-    .copyText("Copy CA address", "LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta");
+  const caAddress = "LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta";
+  const caAddressMarkdown = `\`${caAddress}\``;
 
-  const userId = ctx.from?.id;
-  if (!userId) {
-    console.error("User not found in ca command");
+  const keyboard = new InlineKeyboard()
+    .url("Jupiter", `https://jup.ag/tokens/${caAddress}`)
+    .url("Dexscreener", `https://dexscreener.com/solana/${caAddress}`)
+    .row()
+    .copyText("Copy CA to clipboard", caAddress);
+
+  const chatId = ctx.chat?.id;
+  if (!chatId) {
+    console.error("Chat ID not found in ca command");
     return;
   }
 
-  await bot.api.sendMessage(
-    userId,
-    "`LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta`",
-    {
-      parse_mode: "Markdown",
-      reply_markup: keyboard,
-    }
-  );
+  await bot.api.sendMessage(chatId, `$LOYAL's CA: ${caAddressMarkdown}`, {
+    parse_mode: "Markdown",
+    reply_markup: keyboard,
+  });
 };
