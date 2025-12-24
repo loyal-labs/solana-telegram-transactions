@@ -3,6 +3,7 @@ import { InlineQueryResult } from "grammy/types";
 
 import { MINI_APP_LINK } from "./constants";
 
+//TODO: implement results
 export const handleInlineQuery = async (ctx: InlineQueryContext<Context>) => {
   const results: InlineQueryResult[] = [];
 

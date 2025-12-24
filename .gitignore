@@ -66,3 +66,4 @@ my-ledger-1/
 test-ledger-magicblock/
 
 /app/testing.ts
+.vercel
