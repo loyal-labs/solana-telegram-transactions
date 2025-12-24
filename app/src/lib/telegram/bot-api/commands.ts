@@ -25,3 +25,26 @@ export const handleStartCommand = async (
 
   await bot.api.pinChatMessage(userId, welcomeMessage.message_id);
 };
+
+export const handleCaCommand = async (
+  ctx: CommandContext<Context>,
+  bot: Bot
+) => {
+  const keyboard = new InlineKeyboard()
+    .url("Open on Jupiter", "https://trade.askloyal.com/")
+    .row()
+    .copyText("Copy CA address", "LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta");
+
+  const userId = ctx.from?.id;
+  if (!userId) {
+    return;
+  }
+  await bot.api.sendMessage(
+    userId,
+    "`LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta`",
+    {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    }
+  );
+};
