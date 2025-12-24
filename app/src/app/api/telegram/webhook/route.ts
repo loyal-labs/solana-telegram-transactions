@@ -1,4 +1,4 @@
-import type { CommandContext, Context } from "grammy";
+import type { CommandContext, Context, InlineQueryContext } from "grammy";
 import { webhookCallback } from "grammy";
 
 import { getBot } from "@/lib/telegram/bot-api/bot";
@@ -7,6 +7,7 @@ import {
   handleStartCommand,
 } from "@/lib/telegram/bot-api/commands";
 import { sendBusinessConnectionMessage } from "@/lib/telegram/bot-api/handle-business-connection";
+import { handleInlineQuery } from "@/lib/telegram/bot-api/inline";
 
 const bot = await getBot();
 
@@ -16,6 +17,10 @@ bot.command("start", async (ctx: CommandContext<Context>) => {
 
 bot.command("ca", async (ctx: CommandContext<Context>) => {
   await handleCaCommand(ctx, bot);
+});
+
+bot.on("inline_query", async (ctx) => {
+  await handleInlineQuery(ctx as InlineQueryContext<Context>);
 });
 
 bot.on("business_connection:is_enabled", async (ctx) => {
