@@ -37,8 +37,10 @@ export const handleCaCommand = async (
 
   const userId = ctx.from?.id;
   if (!userId) {
+    console.error("User not found in ca command");
     return;
   }
+
   await bot.api.sendMessage(
     userId,
     "`LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta`",
