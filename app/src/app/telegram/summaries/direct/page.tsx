@@ -660,6 +660,23 @@ function DirectFeedContent() {
                 @{currentChat.username}
               </p>
             </button>
+            {/* Not spam button - only shown in spam tab */}
+            {tab === "spam" && (
+              <button
+                onClick={() => {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("medium");
+                  }
+                  // TODO: Implement not spam action
+                  completeSwipe("right");
+                }}
+                className="bg-white/[0.06] rounded-full px-3 py-1.5 active:opacity-80 transition-opacity mr-2"
+              >
+                <span className="text-sm font-medium text-white leading-5 whitespace-nowrap">
+                  Not spam
+                </span>
+              </button>
+            )}
             {/* Undo button */}
             <button
               onClick={handleUndo}
