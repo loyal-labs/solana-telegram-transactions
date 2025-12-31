@@ -8,6 +8,7 @@ import {
 } from "@/lib/telegram/bot-api/commands";
 import { sendBusinessConnectionMessage } from "@/lib/telegram/bot-api/handle-business-connection";
 import { handleInlineQuery } from "@/lib/telegram/bot-api/inline";
+import { handleGLoyalReaction } from "@/lib/telegram/bot-api/message_handlers";
 
 const bot = await getBot();
 
@@ -29,6 +30,10 @@ bot.on("business_connection:is_enabled", async (ctx) => {
   const userId = ctx.businessConnection.user_chat_id;
 
   await sendBusinessConnectionMessage(connectionId, connectionEnabled, userId);
+});
+
+bot.on("message:text", async (ctx) => {
+  await handleGLoyalReaction(ctx, bot);
 });
 
 export const POST = webhookCallback(bot, "std/http");
