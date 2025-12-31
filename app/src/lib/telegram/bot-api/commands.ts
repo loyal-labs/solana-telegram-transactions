@@ -32,6 +32,16 @@ export const handleCaCommand = async (
 ) => {
   const caAddress = "LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta";
   const caAddressMarkdown = `\`${caAddress}\``;
+  const cmcEndpoint =
+    "https://api.coinmarketcap.com/data-api/v3.3/cryptocurrency/detail/chart?id=39037&interval=3h&convertId=2781&range=All";
+  const priceFormatter = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  });
+  const marketCapFormatter = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  });
 
   const keyboard = new InlineKeyboard()
     .url("Jupiter", `https://jup.ag/tokens/${caAddress}`)
@@ -45,8 +55,48 @@ export const handleCaCommand = async (
     return;
   }
 
-  await bot.api.sendMessage(chatId, `$LOYAL's CA: ${caAddressMarkdown}`, {
-    parse_mode: "Markdown",
-    reply_markup: keyboard,
-  });
+  let priceValue = "N/A";
+  let marketCapValue = "N/A";
+
+  try {
+    const response = await fetch(cmcEndpoint);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch CMC data: ${response.status} ${response.statusText}`
+      );
+    }
+    const data = await response.json();
+    const points = data?.data?.points;
+    const latestPoint =
+      Array.isArray(points) && points.length > 0
+        ? points[points.length - 1]
+        : null;
+    const latestValues = latestPoint?.v;
+    const latestPrice = Array.isArray(latestValues)
+      ? Number(latestValues[0])
+      : NaN;
+    const latestMarketCap = Array.isArray(latestValues)
+      ? Number(latestValues[2])
+      : NaN;
+
+    if (Number.isFinite(latestPrice)) {
+      priceValue = `$${priceFormatter.format(latestPrice)}`;
+    }
+    if (Number.isFinite(latestMarketCap)) {
+      marketCapValue = `$${marketCapFormatter.format(latestMarketCap)}`;
+    }
+  } catch (error) {
+    console.error("Failed to fetch CMC data for ca command", error);
+  }
+
+  const priceLine = `\n\nPrice: **${priceValue}** | Market cap: **${marketCapValue}**`;
+
+  await bot.api.sendMessage(
+    chatId,
+    `$LOYAL's CA: ${caAddressMarkdown}${priceLine}`,
+    {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    }
+  );
 };
