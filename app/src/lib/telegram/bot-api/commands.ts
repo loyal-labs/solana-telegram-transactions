@@ -89,7 +89,7 @@ export const handleCaCommand = async (
     console.error("Failed to fetch CMC data for ca command", error);
   }
 
-  const priceLine = `\n\nPrice: **${priceValue}** | Market cap: **${marketCapValue}**`;
+  const priceLine = `\n\nPrice: **${priceValue}**\nMarket cap: **${marketCapValue}**`;
 
   await bot.api.sendMessage(
     chatId,
