@@ -1,10 +1,39 @@
-import type { Did } from "@nillion/nuc";
+import assert from "node:assert/strict";
+
+import { Did, Signer } from "@nillion/nuc";
 import {
   AclDto,
   CreateOwnedDataRequest,
   ReadDataRequestParams,
   SecretVaultUserClient,
 } from "@nillion/secretvaults";
+
+import { NODE_DB_URLS } from "./constants";
+import { USER_KEY } from "./constants";
+
+let userSigner: Signer | null = null;
+let userClient: SecretVaultUserClient | null = null;
+
+export const getUserSigner = (): Signer => {
+  if (!userSigner) {
+    userSigner = Signer.fromPrivateKey(USER_KEY);
+  }
+  return userSigner;
+};
+
+export const getUserClient = async (
+  userSigner: Signer
+): Promise<SecretVaultUserClient> => {
+  assert(userSigner, "User signer is required");
+  if (!userClient) {
+    userClient = await SecretVaultUserClient.from({
+      signer: userSigner,
+      baseUrls: NODE_DB_URLS,
+      blindfold: { operation: "store" },
+    });
+  }
+  return userClient;
+};
 
 export const uploadUserData = async (
   collectionId: string,

@@ -1,18 +1,19 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
-import { getBuilderClient } from "./helpers";
+import { SecretVaultBuilderClient } from "@nillion/secretvaults";
 
 export async function createCollection(
+  builderClient: SecretVaultBuilderClient,
   collectionName: string,
   owned: boolean = false,
   schema: Record<string, unknown>
 ) {
+  assert(builderClient, "Builder client is required");
   assert(schema, "Schema is required");
   assert(collectionName, "Collection name is required");
   assert(owned !== undefined, "Owned is required");
 
-  const builderClient = await getBuilderClient();
   const collectionType = owned ? "owned" : "standard";
   const collectionId = randomUUID();
 
@@ -26,8 +27,7 @@ export async function createCollection(
   return newCollection;
 }
 
-export async function getCollections() {
-  const builderClient = await getBuilderClient();
+export async function getCollections(builderClient: SecretVaultBuilderClient) {
   const collections = await builderClient.readCollections();
   return collections;
 }

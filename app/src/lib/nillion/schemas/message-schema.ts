@@ -31,25 +31,3 @@ export const MessageSchema = {
     ],
   },
 };
-
-export const MockUserMessage = {
-  _id: "7a2d7fec-9b61-45dd-9842-35eb88f6ee85",
-  user_did: "did:key:user123",
-  conversation_id: 1,
-  idx: 0,
-  role: "user",
-  complete: false,
-  created_at: "2024-04-27T16:00:00.000Z",
-  content: { "%allot": "Hello, assistant!" },
-};
-
-export const MockAssistantMessage = {
-  _id: "9c6d1a42-3ff3-4e8e-9c1f-b769df0977ab",
-  user_did: "did:key:user123",
-  conversation_id: 1,
-  idx: 1,
-  role: "assistant",
-  complete: true,
-  created_at: "2024-04-27T16:00:05.000Z",
-  content: { "%allot": "Hello! How can I help?" },
-};
