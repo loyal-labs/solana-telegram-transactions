@@ -31,3 +31,21 @@ export async function getCollections(builderClient: SecretVaultBuilderClient) {
   const collections = await builderClient.readCollections();
   return collections;
 }
+export async function getCollectionRecords(
+  builderClient: SecretVaultBuilderClient,
+  collectionId: string
+) {
+  const records = await builderClient.findData({
+    collection: collectionId,
+    filter: {},
+  });
+  return records;
+}
+
+export async function deleteCollection(
+  builderClient: SecretVaultBuilderClient,
+  collectionId: string
+) {
+  const collection = await builderClient.deleteCollection(collectionId);
+  return collection;
+}

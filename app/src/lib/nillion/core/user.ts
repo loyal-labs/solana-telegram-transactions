@@ -7,17 +7,15 @@ import {
   ReadDataRequestParams,
   SecretVaultUserClient,
 } from "@nillion/secretvaults";
+import { Wallet } from "ethers";
 
+import { getEip712Signer } from "./adapter";
 import { NODE_DB_URLS } from "./constants";
-import { USER_KEY } from "./constants";
 
-let userSigner: Signer | null = null;
-let userClient: SecretVaultUserClient | null = null;
-
-export const getUserSigner = (): Signer => {
-  if (!userSigner) {
-    userSigner = Signer.fromPrivateKey(USER_KEY);
-  }
+export const getUserSigner = (secretKey: string): Signer => {
+  assert(secretKey, "Secret key is required");
+  const wallet = new Wallet(secretKey);
+  const userSigner = getEip712Signer(wallet);
   return userSigner;
 };
 
@@ -25,13 +23,12 @@ export const getUserClient = async (
   userSigner: Signer
 ): Promise<SecretVaultUserClient> => {
   assert(userSigner, "User signer is required");
-  if (!userClient) {
-    userClient = await SecretVaultUserClient.from({
-      signer: userSigner,
-      baseUrls: NODE_DB_URLS,
-      blindfold: { operation: "store" },
-    });
-  }
+  const userClient = await SecretVaultUserClient.from({
+    signer: userSigner,
+    baseUrls: NODE_DB_URLS,
+    blindfold: { operation: "store" },
+  });
+
   return userClient;
 };
 
