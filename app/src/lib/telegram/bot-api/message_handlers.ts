@@ -2,27 +2,14 @@ import type { Bot, Context } from "grammy";
 
 const POSITIVE_REACTIONS = [
   "❤",
-  "👍",
   "🔥",
-  "🥰",
-  "👏",
-  "😁",
   "🎉",
   "🤩",
   "🙏",
-  "👌",
-  "🕊",
   "😍",
   "❤‍🔥",
   "💯",
-  "🤣",
   "⚡",
-  "🍓",
-  "🍾",
-  "💘",
-  "🦄",
-  "😘",
-  "😎",
 ] as const;
 
 const GLOYAL_TRIGGER = "gloyal";
