@@ -42,7 +42,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files 
+# env files
 .env*
 /frontend/.env*
 
@@ -67,3 +67,5 @@ test-ledger-magicblock/
 
 /app/testing.ts
 .vercel
+
+CHANGELOG-*.md
