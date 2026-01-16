@@ -1,11 +1,4 @@
 export { chatCompletion, chatCompletionStream } from "./chat";
-export {
-  fetchAttestation,
-  fetchSignature,
-  generateNonce,
-  verifyResponse,
-  verifySignature,
-} from "./verification";
 export type {
   AttestationReport,
   ChatCompletionRequest,
@@ -14,3 +7,10 @@ export type {
   SignatureResponse,
   VerificationResult,
 } from "./types";
+export {
+  fetchAttestation,
+  fetchSignature,
+  generateNonce,
+  verifyResponse,
+  verifySignature,
+} from "./verification";

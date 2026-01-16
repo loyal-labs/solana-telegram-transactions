@@ -111,7 +111,9 @@ export async function verifyResponse(
       valid: addressMatch && attestation.verified,
       attestation,
       signerAddress: sigResult.signerAddress,
-      error: !addressMatch ? "Signer address mismatch with attestation" : undefined,
+      error: !addressMatch
+        ? "Signer address mismatch with attestation"
+        : undefined,
     };
   } catch (error) {
     return { valid: false, error: String(error) };

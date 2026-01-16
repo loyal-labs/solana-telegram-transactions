@@ -14,11 +14,14 @@ const getHeaders = () => {
 export async function chatCompletion(
   request: ChatCompletionRequest
 ): Promise<ChatCompletionResponse> {
-  return fetchJson<ChatCompletionResponse>(`${REDPILL_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: getHeaders(),
-    body: JSON.stringify(request),
-  });
+  return fetchJson<ChatCompletionResponse>(
+    `${REDPILL_BASE_URL}/chat/completions`,
+    {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(request),
+    }
+  );
 }
 
 export async function* chatCompletionStream(
