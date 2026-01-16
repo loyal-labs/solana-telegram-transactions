@@ -3,13 +3,21 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
+import { useSummaries } from "@/components/summaries/SummariesContext";
 import SummaryFeed from "@/components/summaries/SummaryFeed";
 
 function SummaryFeedContent() {
   const searchParams = useSearchParams();
   const chatId = searchParams.get("chatId") || undefined;
+  const { summaries } = useSummaries();
 
-  return <SummaryFeed initialChatId={chatId} />;
+  // Pass cached summaries if available, otherwise SummaryFeed will fetch
+  return (
+    <SummaryFeed
+      initialChatId={chatId}
+      summaries={summaries.length > 0 ? summaries : undefined}
+    />
+  );
 }
 
 export default function SummaryFeedPage() {
