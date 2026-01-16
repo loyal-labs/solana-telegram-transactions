@@ -3,12 +3,16 @@ import { webhookCallback } from "grammy";
 
 import { getBot } from "@/lib/telegram/bot-api/bot";
 import {
+  handleActivateCommunityCommand,
   handleCaCommand,
   handleStartCommand,
 } from "@/lib/telegram/bot-api/commands";
 import { sendBusinessConnectionMessage } from "@/lib/telegram/bot-api/handle-business-connection";
 import { handleInlineQuery } from "@/lib/telegram/bot-api/inline";
-import { handleGLoyalReaction } from "@/lib/telegram/bot-api/message_handlers";
+import {
+  handleCommunityMessage,
+  handleGLoyalReaction,
+} from "@/lib/telegram/bot-api/message_handlers";
 
 const bot = await getBot();
 
@@ -18,6 +22,10 @@ bot.command("start", async (ctx: CommandContext<Context>) => {
 
 bot.command("ca", async (ctx: CommandContext<Context>) => {
   await handleCaCommand(ctx, bot);
+});
+
+bot.command("activate_community", async (ctx: CommandContext<Context>) => {
+  await handleActivateCommunityCommand(ctx, bot);
 });
 
 bot.on("inline_query", async (ctx) => {
@@ -33,7 +41,10 @@ bot.on("business_connection:is_enabled", async (ctx) => {
 });
 
 bot.on("message:text", async (ctx) => {
-  await handleGLoyalReaction(ctx, bot);
+  await Promise.all([
+    handleGLoyalReaction(ctx, bot),
+    handleCommunityMessage(ctx),
+  ]);
 });
 
 export const POST = webhookCallback(bot, "std/http");

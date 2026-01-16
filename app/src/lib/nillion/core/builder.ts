@@ -11,6 +11,8 @@ import {
 import { Wallet } from "ethers";
 import { ethers } from "ethers";
 
+import { getEip712Signer } from "./adapter";
+import { getNilauthClient } from "./auth";
 import { BUILDER_KEY, BUILDER_NAME, NODE_DB_URLS } from "./constants";
 
 let builderClient: SecretVaultBuilderClient | null = null;
@@ -108,3 +110,11 @@ export async function createDelegationToken(
 
   return delegationToken;
 }
+
+export const getReadyBuilderClient =
+  async (): Promise<SecretVaultBuilderClient> => {
+    const wallet = getBuilderWallet();
+    const signer = getEip712Signer(wallet);
+    const authClient = await getNilauthClient();
+    return getBuilderClient(signer, authClient);
+  };

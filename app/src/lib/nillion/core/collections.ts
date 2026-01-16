@@ -31,6 +31,7 @@ export async function getCollections(builderClient: SecretVaultBuilderClient) {
   const collections = await builderClient.readCollections();
   return collections;
 }
+
 export async function getCollectionRecords(
   builderClient: SecretVaultBuilderClient,
   collectionId: string

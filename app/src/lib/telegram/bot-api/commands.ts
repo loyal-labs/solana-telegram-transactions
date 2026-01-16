@@ -1,5 +1,10 @@
+import { randomUUID } from "node:crypto";
+
 import type { CommandContext, Context } from "grammy";
 import { Bot, InlineKeyboard } from "grammy";
+
+import { getReadyBuilderClient } from "@/lib/nillion/core/builder";
+import { COMMUNITY_CHATS_COLLECTION_ID } from "@/lib/nillion/schemas/community-chats-schema";
 
 import { MINI_APP_LINK } from "./constants";
 
@@ -99,4 +104,42 @@ export const handleCaCommand = async (
       reply_markup: keyboard,
     }
   );
+};
+
+export const handleActivateCommunityCommand = async (
+  ctx: CommandContext<Context>,
+  bot: Bot
+) => {
+  if (!ctx.from || !ctx.chat) return;
+
+  if (ctx.chat.type !== "group" && ctx.chat.type !== "supergroup") {
+    await ctx.reply("This command can only be used in group chats.");
+    return;
+  }
+
+  const member = await bot.api.getChatMember(ctx.chat.id, ctx.from.id);
+  if (member.status !== "creator" && member.status !== "administrator") {
+    await ctx.reply("Only admins can activate community tracking.");
+    return;
+  }
+
+  const builderClient = await getReadyBuilderClient();
+  const now = new Date().toISOString();
+
+  await builderClient.createStandardData({
+    collection: COMMUNITY_CHATS_COLLECTION_ID,
+    data: [
+      {
+        _id: randomUUID(),
+        chat_id: String(ctx.chat.id),
+        chat_title: ctx.chat.title || "Untitled",
+        activated_by: String(ctx.from.id),
+        settings: {},
+        activated_at: now,
+        updated_at: now,
+      },
+    ],
+  });
+
+  await ctx.reply("Community activated for message tracking!");
 };
