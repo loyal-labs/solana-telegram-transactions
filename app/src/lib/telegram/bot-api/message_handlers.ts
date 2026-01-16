@@ -63,7 +63,12 @@ const SUMMARY_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const handleCommunityMessage = async (ctx: Context) => {
   const chat = ctx.chat;
   if (!chat) return;
-  if (chat.type !== "group" && chat.type !== "supergroup") return;
+  if (
+    chat.type !== "group" &&
+    chat.type !== "supergroup" &&
+    chat.type !== "channel"
+  )
+    return;
 
   const chatId = String(chat.id);
   const message = ctx.message;
@@ -129,8 +134,7 @@ export const handleCommunityMessage = async (ctx: Context) => {
   }
 
   // Check if summary is needed
-  const chatTitle =
-    "title" in chat ? (chat.title as string) : `Chat ${chatId}`;
+  const chatTitle = "title" in chat ? (chat.title as string) : `Chat ${chatId}`;
   checkAndTriggerSummary(chatId, chatTitle);
 };
 

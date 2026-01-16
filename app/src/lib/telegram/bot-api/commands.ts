@@ -112,7 +112,11 @@ export const handleActivateCommunityCommand = async (
 ) => {
   if (!ctx.from || !ctx.chat) return;
 
-  if (ctx.chat.type !== "group" && ctx.chat.type !== "supergroup") {
+  if (
+    ctx.chat.type !== "group" &&
+    ctx.chat.type !== "supergroup" &&
+    ctx.chat.type !== "channel"
+  ) {
     await ctx.reply("This command can only be used in group chats.");
     return;
   }
