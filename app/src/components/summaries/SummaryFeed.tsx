@@ -13,7 +13,6 @@ import { ArrowUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-// Mock chat data - will be passed as props later
 export type ChatSummary = {
   id: string;
   title: string;
@@ -25,122 +24,6 @@ export type ChatSummary = {
     sources: string[];
   }>;
 };
-
-// Mock data for demo - matches the chat list in summaries/page.tsx
-const MOCK_SUMMARIES: ChatSummary[] = [
-  {
-    id: "1",
-    title: "The Loyal Community",
-    messageCount: 1247,
-    topics: [
-      {
-        id: "1-1",
-        title: "Blockchain Coordination",
-        content:
-          "Blockchain technology offers a way to coordinate many independent actors around a single, append-only record of events. It combines cryptography with distributed systems.",
-        sources: ["Alice", "Bob", "Charlie"],
-      },
-      {
-        id: "1-2",
-        title: "Community Growth",
-        content:
-          "The community has grown significantly over the past month. New members are joining daily and contributing to discussions about decentralization. Several community events are planned for next month including a hackathon and developer meetup. Several community events are planned for next month including a hackathon and developer meetup.",
-        sources: ["David", "Eve", "Frank"],
-      },
-      {
-        id: "1-3",
-        title: "Upcoming Events",
-        content:
-          "Several community events are planned for next month including a hackathon and developer meetup. Several community events are planned for next month including a hackathon and developer meetup. Several community events are planned for next month including a hackathon and developer meetup. Several community events are planned for next month including a hackathon and developer meetup.",
-        sources: ["Grace", "Henry"],
-      },
-    ],
-  },
-  {
-    id: "2",
-    title: "X Live classic",
-    messageCount: 892,
-    topics: [
-      {
-        id: "2-1",
-        title: "Live Performances",
-        content:
-          "Latest updates about upcoming live performances and discussions about classical music in the digital age.",
-        sources: ["Grace", "Henry"],
-      },
-      {
-        id: "2-2",
-        title: "Artist Collaborations",
-        content:
-          "New collaborations between traditional musicians and digital artists are creating unique experiences for audiences worldwide.",
-        sources: ["Ivan", "Julia"],
-      },
-    ],
-  },
-  {
-    id: "3",
-    title: "Gift Concepts",
-    messageCount: 654,
-    topics: [
-      {
-        id: "3-1",
-        title: "Digital Collectibles",
-        content:
-          "Creative ideas for digital gifts and collectibles that combine traditional gift-giving with blockchain technology.",
-        sources: ["Kevin", "Laura"],
-      },
-      {
-        id: "3-2",
-        title: "NFT Gift Ideas",
-        content:
-          "Community members shared innovative ways to use NFTs as meaningful gifts for special occasions.",
-        sources: ["Mike", "Nancy"],
-      },
-    ],
-  },
-  {
-    id: "4",
-    title: "TON Community",
-    messageCount: 4521,
-    topics: [
-      {
-        id: "4-1",
-        title: "Smart Contract Development",
-        content:
-          "New tooling for FunC development was released, including improved IDE support and better debugging capabilities.",
-        sources: ["Kevin", "Laura"],
-      },
-      {
-        id: "4-2",
-        title: "Community Projects",
-        content:
-          "Community projects showcased innovative use cases for TON blockchain including decentralized social features.",
-        sources: ["Mike", "Nancy"],
-      },
-    ],
-  },
-  {
-    id: "5",
-    title: "Solana Developers",
-    messageCount: 3298,
-    topics: [
-      {
-        id: "5-1",
-        title: "Network Performance",
-        content:
-          "Recent network upgrades have improved transaction throughput significantly. The community reported faster confirmation times.",
-        sources: ["Grace", "Henry"],
-      },
-      {
-        id: "5-2",
-        title: "Priority Fees",
-        content:
-          "Discussions around the new priority fee system and how developers should adjust their applications to optimize for both speed and cost.",
-        sources: ["Ivan", "Julia"],
-      },
-    ],
-  },
-];
 
 // Generate a consistent color based on name
 function getAvatarColor(name: string): string {
@@ -386,13 +269,42 @@ function NextChatIndicator({
 
 export type SummaryFeedProps = {
   initialChatId?: string;
+  summaries?: ChatSummary[];
 };
 
-export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
+export default function SummaryFeed({ initialChatId, summaries: initialSummaries }: SummaryFeedProps) {
   const router = useRouter();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [currentSummaryIndex, setCurrentSummaryIndex] = useState(0);
   const [scrollY, setScrollY] = useState(0);
+  const [summaries, setSummaries] = useState<ChatSummary[]>(initialSummaries || []);
+  const [isLoading, setIsLoading] = useState(!initialSummaries);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch summaries from API if not provided
+  useEffect(() => {
+    if (initialSummaries) return;
+
+    const fetchSummaries = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await fetch("/api/summaries");
+        if (!response.ok) {
+          throw new Error("Failed to fetch summaries");
+        }
+        const data = await response.json();
+        setSummaries(data.summaries || []);
+      } catch (err) {
+        console.error("Failed to fetch summaries:", err);
+        setError("Failed to load summaries");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSummaries();
+  }, [initialSummaries]);
 
   // Animation state machine
   const [transitionPhase, setTransitionPhase] =
@@ -442,18 +354,18 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
 
   // Find initial summary index based on chatId
   useEffect(() => {
-    if (initialChatId) {
-      const index = MOCK_SUMMARIES.findIndex((s) => s.id === initialChatId);
+    if (initialChatId && summaries.length > 0) {
+      const index = summaries.findIndex((s) => s.id === initialChatId);
       if (index !== -1) {
         setCurrentSummaryIndex(index);
       }
     }
-  }, [initialChatId]);
+  }, [initialChatId, summaries]);
 
-  const currentSummary = MOCK_SUMMARIES[currentSummaryIndex];
-  const nextSummary = MOCK_SUMMARIES[currentSummaryIndex + 1];
-  const prevSummary = MOCK_SUMMARIES[currentSummaryIndex - 1];
-  const remainingCount = MOCK_SUMMARIES.length - currentSummaryIndex;
+  const currentSummary = summaries[currentSummaryIndex];
+  const nextSummary = summaries[currentSummaryIndex + 1];
+  const prevSummary = summaries[currentSummaryIndex - 1];
+  const remainingCount = summaries.length - currentSummaryIndex;
 
   // Calculate collapse progress (0 = expanded, 1 = collapsed)
   const collapseProgress = Math.min(1, Math.max(0, scrollY / 60));
@@ -518,7 +430,7 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
       return;
 
     // Check if this is the last summary - navigate to chats list instead
-    const isLastSummary = currentSummaryIndex >= MOCK_SUMMARIES.length - 1;
+    const isLastSummary = currentSummaryIndex >= summaries.length - 1;
 
     if (isLastSummary) {
       // On last summary, just navigate to chats list
@@ -551,7 +463,7 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
       setCurrentSummaryIndex((prev) => {
         const nextIndex = prev + 1;
         // Safety check: don't exceed array bounds
-        if (nextIndex >= MOCK_SUMMARIES.length) {
+        if (nextIndex >= summaries.length) {
           return prev;
         }
         return nextIndex;
@@ -567,7 +479,7 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
       // Unlock transition
       transitionLockRef.current = false;
     }, 800); // 300ms hold + 500ms slide
-  }, [currentSummaryIndex, setPhase, setProgress, router]);
+  }, [currentSummaryIndex, summaries.length, setPhase, setProgress, router]);
 
   // Go to previous summary (simpler animation)
   const goToPrevSummary = useCallback(() => {
@@ -767,6 +679,34 @@ export default function SummaryFeed({ initialChatId }: SummaryFeedProps) {
     }, 700); // 500ms animation + 150ms max delay + buffer
     return () => clearTimeout(timer);
   }, []);
+
+  if (isLoading) {
+    return (
+      <div
+        className="fixed inset-0 flex items-center justify-center"
+        style={{ background: "#16161a" }}
+      >
+        <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        className="fixed inset-0 flex flex-col items-center justify-center gap-4"
+        style={{ background: "#16161a" }}
+      >
+        <p className="text-white/60">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-white/10 rounded-lg text-white text-sm"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   if (!currentSummary) {
     return (

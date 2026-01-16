@@ -6,38 +6,15 @@ import { CircleHelp, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useSummaries } from "@/components/summaries/SummariesContext";
 import { ConnectBotBanner } from "@/components/telegram/ChatBanners";
 import ConnectBotModal from "@/components/telegram/ConnectBotModal";
 
-// Mock chat data for Groups tab - matches the summaries in SummaryFeed.tsx
-const MOCK_GROUP_CHATS = [
-  {
-    id: "1",
-    title: "The Loyal Community",
-    subtitle:
-      "Blockchain technology offers a way to coordinate many independent actors around a single, append-only record of events.",
-  },
-  {
-    id: "2",
-    title: "X Live classic",
-    subtitle: "Latest updates and discussions about live performances",
-  },
-  {
-    id: "3",
-    title: "Gift Concepts",
-    subtitle: "Creative ideas for digital gifts and collectibles",
-  },
-  {
-    id: "4",
-    title: "TON Community",
-    subtitle: "The Open Network community discussions and updates",
-  },
-  {
-    id: "5",
-    title: "Solana Developers",
-    subtitle: "Building on Solana blockchain",
-  },
-];
+type GroupChat = {
+  id: string;
+  title: string;
+  subtitle: string;
+};
 
 // Mock chat data for Direct tab - personal conversations
 const MOCK_DIRECT_CHATS = [
@@ -229,9 +206,9 @@ interface Tab {
   hasDividerBefore?: boolean;
 }
 
-// Tab data will be computed dynamically based on mock data
-const getTabsData = (): Tab[] => [
-  { id: "groups", label: "Groups", count: MOCK_GROUP_CHATS.length },
+// Tab data will be computed dynamically
+const getTabsData = (groupCount: number): Tab[] => [
+  { id: "groups", label: "Groups", count: groupCount },
   { id: "direct", label: "Direct", count: MOCK_DIRECT_CHATS.length, hasDividerBefore: true },
   { id: "spam", label: "Spam", count: MOCK_SPAM_CHATS.length },
 ];
@@ -336,11 +313,57 @@ export default function SummariesPage() {
       return "#2990ff";
     }
   });
+  const [groupChats, setGroupChats] = useState<GroupChat[]>([]);
+  const [isGroupsLoading, setIsGroupsLoading] = useState(true);
+  const { summaries: cachedSummaries, setSummaries, hasCachedData } = useSummaries();
+
+  // Transform summaries to group chats format
+  const transformToGroupChats = (summaries: Array<{ id: string; title: string; topics?: Array<{ content: string }> }>) =>
+    summaries.map((s) => ({
+      id: s.id,
+      title: s.title,
+      subtitle: s.topics?.[0]?.content || "",
+    }));
+
+  // Initialize from cached data immediately
+  useEffect(() => {
+    if (hasCachedData && cachedSummaries.length > 0) {
+      setGroupChats(transformToGroupChats(cachedSummaries));
+      setIsGroupsLoading(false);
+    }
+  }, [hasCachedData, cachedSummaries]);
+
+  // Fetch fresh data (in background if we have cache)
+  useEffect(() => {
+    const fetchGroupChats = async () => {
+      // Only show loading if no cached data
+      if (!hasCachedData) {
+        setIsGroupsLoading(true);
+      }
+      try {
+        const response = await fetch("/api/summaries");
+        if (!response.ok) return;
+        const data = await response.json();
+        const summaries = data.summaries || [];
+
+        // Update context (persists to sessionStorage)
+        setSummaries(summaries);
+
+        // Update list view
+        setGroupChats(transformToGroupChats(summaries));
+      } catch {
+        // Silently fail - will show cached or empty state
+      } finally {
+        setIsGroupsLoading(false);
+      }
+    };
+    fetchGroupChats();
+  }, [setSummaries, hasCachedData]);
 
   // Get tabs data and current chat list based on active tab
-  const tabs = getTabsData();
+  const tabs = getTabsData(groupChats.length);
   const currentChatList = activeTab === "groups"
-    ? MOCK_GROUP_CHATS
+    ? groupChats
     : activeTab === "direct"
       ? MOCK_DIRECT_CHATS
       : MOCK_SPAM_CHATS;
@@ -350,14 +373,17 @@ export default function SummariesPage() {
     localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
   }, [activeTab]);
 
-  // Simulate loading state when tab changes (replace with real data fetching)
+  // Loading state: use real loading for groups, brief delay for other tabs
   useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800); // Simulated loading delay
-    return () => clearTimeout(timer);
-  }, [activeTab]);
+    if (activeTab === "groups") {
+      setIsLoading(isGroupsLoading);
+    } else {
+      // Brief delay for mock data tabs for smooth transition
+      setIsLoading(true);
+      const timer = setTimeout(() => setIsLoading(false), 150);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, isGroupsLoading]);
 
   // Handle swipe to switch tabs
   const handleSwipe = useCallback(
