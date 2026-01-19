@@ -34,6 +34,15 @@ const result = await client.deposit({
 
 console.log("Transaction:", result.signature);
 console.log("Deposited:", result.deposit.amount, "lamports");
+
+// Refund some of the deposit
+const refundResult = await client.refund({
+  username: "alice",
+  amountLamports: solToLamports(0.05), // 0.05 SOL
+});
+
+console.log("Refunded:", refundResult.signature);
+console.log("Remaining:", refundResult.deposit.amount, "lamports");
 ```
 
 ## Usage
@@ -144,6 +153,35 @@ interface DepositResult {
   signature: string;          // Transaction signature
   deposit: DepositData;       // Updated deposit account data
 }
+```
+
+##### `refund(params): Promise<RefundResult>`
+
+Refund SOL from a deposit back to the depositor's wallet.
+
+```typescript
+interface RefundParams {
+  username: string;           // Telegram username (5-32 chars, without @)
+  amountLamports: number | bigint;  // Amount in lamports to refund
+  commitment?: Commitment;    // Optional, defaults to 'confirmed'
+}
+
+interface RefundResult {
+  signature: string;          // Transaction signature
+  deposit: DepositData;       // Updated deposit account data
+}
+```
+
+Example:
+
+```typescript
+const result = await client.refund({
+  username: "alice",
+  amountLamports: solToLamports(0.05),
+});
+
+console.log("Refunded:", result.signature);
+console.log("Remaining balance:", result.deposit.amount);
 ```
 
 ##### `getDeposit(depositor, username): Promise<DepositData | null>`
@@ -275,7 +313,9 @@ try {
 
 Common errors:
 - `"Username must be between 5 and 32 characters"` - Invalid username length
-- `"Amount must be greater than 0"` - Invalid deposit amount
+- `"Amount must be greater than 0"` - Invalid amount
+- `"No deposit found for this username"` - Deposit doesn't exist (refund only)
+- `"Insufficient deposit"` - Refund amount exceeds deposit balance
 - `"Failed to fetch deposit account after transaction"` - Network/confirmation issue
 
 ## Development

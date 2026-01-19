@@ -9,6 +9,8 @@ import type {
   WalletLike,
   DepositParams,
   DepositResult,
+  RefundParams,
+  RefundResult,
   DepositData,
 } from "./types";
 
@@ -159,6 +161,76 @@ export class LoyalTransactionsClient {
       .accounts({
         payer: depositor,
         depositor: depositor,
+      })
+      .rpc({ commitment });
+    console.log("Transaction:", signature);
+
+    // Fetch updated deposit data
+    const deposit = await this.getDeposit(depositor, username);
+    console.log("Deposit:", deposit);
+    if (!deposit) {
+      throw new Error("Failed to fetch deposit account after transaction");
+    }
+
+    return {
+      signature,
+      deposit,
+    };
+  }
+
+  /**
+   * Refund SOL from a deposit
+   *
+   * Withdraws the specified amount from the deposit back to the depositor's wallet.
+   * Only the original depositor can refund their deposit.
+   *
+   * @param params - Refund parameters
+   * @returns Transaction signature and updated deposit data
+   *
+   * @example
+   * const result = await client.refund({
+   *   username: 'alice',
+   *   amountLamports: 50_000_000, // 0.05 SOL
+   * });
+   *
+   * console.log('Signature:', result.signature);
+   * console.log('Remaining deposit:', result.deposit.amount);
+   */
+  async refund(params: RefundParams): Promise<RefundResult> {
+    const { username, amountLamports, commitment = "confirmed" } = params;
+
+    // Validate params
+    if (!username || username.length < 5 || username.length > 32) {
+      throw new Error("Username must be between 5 and 32 characters");
+    }
+    if (amountLamports <= 0) {
+      throw new Error("Amount must be greater than 0");
+    }
+
+    const depositor = this.wallet.publicKey;
+
+    // Fetch current deposit to validate sufficient balance
+    const currentDeposit = await this.getDeposit(depositor, username);
+    if (!currentDeposit) {
+      throw new Error("No deposit found for this username");
+    }
+    if (currentDeposit.amount < amountLamports) {
+      throw new Error("Insufficient deposit");
+    }
+
+    const [depositPda] = findDepositPda(depositor, username);
+    const [vaultPda] = findVaultPda();
+    const amountBN = new BN(amountLamports.toString());
+
+    // Execute the refund transaction
+    // Note: vault and deposit are PDAs that Anchor derives, but deposit has a
+    // self-referencing seed (deposit.username) so we provide it explicitly
+    const signature = await this.program.methods
+      .refundDeposit(amountBN)
+      .accountsPartial({
+        depositor,
+        vault: vaultPda,
+        deposit: depositPda,
       })
       .rpc({ commitment });
     console.log("Transaction:", signature);

@@ -1,7 +1,7 @@
 import { Connection, PublicKey, Keypair } from "@solana/web3.js";
 import { AnchorProvider, Program } from "@coral-xyz/anchor";
 import { type TelegramTransfer } from "./idl";
-import type { WalletSigner, WalletLike, DepositParams, DepositResult, DepositData } from "./types";
+import type { WalletSigner, WalletLike, DepositParams, DepositResult, RefundParams, RefundResult, DepositData } from "./types";
 /**
  * LoyalTransactionsClient - SDK for interacting with the Telegram Transfer program
  *
@@ -82,6 +82,25 @@ export declare class LoyalTransactionsClient {
      * console.log('Deposit amount:', result.deposit.amount);
      */
     deposit(params: DepositParams): Promise<DepositResult>;
+    /**
+     * Refund SOL from a deposit
+     *
+     * Withdraws the specified amount from the deposit back to the depositor's wallet.
+     * Only the original depositor can refund their deposit.
+     *
+     * @param params - Refund parameters
+     * @returns Transaction signature and updated deposit data
+     *
+     * @example
+     * const result = await client.refund({
+     *   username: 'alice',
+     *   amountLamports: 50_000_000, // 0.05 SOL
+     * });
+     *
+     * console.log('Signature:', result.signature);
+     * console.log('Remaining deposit:', result.deposit.amount);
+     */
+    refund(params: RefundParams): Promise<RefundResult>;
     /**
      * Get deposit data for a specific depositor and username
      *

@@ -55,6 +55,31 @@ export interface DepositResult {
 }
 
 /**
+ * Parameters for refunding SOL from a deposit
+ */
+export interface RefundParams {
+  /** Telegram username (without @, 5-32 characters) */
+  username: string;
+
+  /** Amount in lamports to refund */
+  amountLamports: number | bigint;
+
+  /** Transaction commitment level (default: 'confirmed') */
+  commitment?: Commitment;
+}
+
+/**
+ * Result of a successful refund transaction
+ */
+export interface RefundResult {
+  /** Transaction signature */
+  signature: string;
+
+  /** Updated deposit account data */
+  deposit: DepositData;
+}
+
+/**
  * Deposit account data structure
  */
 export interface DepositData {

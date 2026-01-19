@@ -40,7 +40,7 @@
  * const client = LoyalTransactionsClient.fromProvider(provider);
  */
 export { LoyalTransactionsClient } from "./src/LoyalTransactionsClient";
-export type { WalletSigner, WalletLike, DepositParams, DepositResult, DepositData, } from "./src/types";
+export type { WalletSigner, WalletLike, DepositParams, DepositResult, RefundParams, RefundResult, DepositData, } from "./src/types";
 export { isKeypair, isAnchorProvider, isWalletLike } from "./src/types";
 export { PROGRAM_ID, DEPOSIT_SEED, VAULT_SEED, LAMPORTS_PER_SOL, solToLamports, lamportsToSol, } from "./src/constants";
 export { findDepositPda, findVaultPda } from "./src/pda";
