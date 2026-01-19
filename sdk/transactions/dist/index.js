@@ -473,6 +473,41 @@ class LoyalTransactionsClient {
       deposit
     };
   }
+  async refund(params) {
+    const { username, amountLamports, commitment = "confirmed" } = params;
+    if (!username || username.length < 5 || username.length > 32) {
+      throw new Error("Username must be between 5 and 32 characters");
+    }
+    if (amountLamports <= 0) {
+      throw new Error("Amount must be greater than 0");
+    }
+    const depositor = this.wallet.publicKey;
+    const currentDeposit = await this.getDeposit(depositor, username);
+    if (!currentDeposit) {
+      throw new Error("No deposit found for this username");
+    }
+    if (currentDeposit.amount < amountLamports) {
+      throw new Error("Insufficient deposit");
+    }
+    const [depositPda] = findDepositPda(depositor, username);
+    const [vaultPda] = findVaultPda();
+    const amountBN = new BN(amountLamports.toString());
+    const signature = await this.program.methods.refundDeposit(amountBN).accountsPartial({
+      depositor,
+      vault: vaultPda,
+      deposit: depositPda
+    }).rpc({ commitment });
+    console.log("Transaction:", signature);
+    const deposit = await this.getDeposit(depositor, username);
+    console.log("Deposit:", deposit);
+    if (!deposit) {
+      throw new Error("Failed to fetch deposit account after transaction");
+    }
+    return {
+      signature,
+      deposit
+    };
+  }
   async getDeposit(depositor, username) {
     const [depositPda] = findDepositPda(depositor, username);
     try {

@@ -49,6 +49,8 @@ export type {
   WalletLike,
   DepositParams,
   DepositResult,
+  RefundParams,
+  RefundResult,
   DepositData,
 } from "./src/types";
 
