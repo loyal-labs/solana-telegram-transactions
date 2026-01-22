@@ -209,8 +209,9 @@ interface Tab {
 // Tab data will be computed dynamically
 const getTabsData = (groupCount: number): Tab[] => [
   { id: "groups", label: "Groups", count: groupCount },
-  { id: "direct", label: "Direct", count: MOCK_DIRECT_CHATS.length, hasDividerBefore: true },
-  { id: "spam", label: "Spam", count: MOCK_SPAM_CHATS.length },
+  // TEMPORARILY HIDDEN - Re-enable when real data is available
+  // { id: "direct", label: "Direct", count: MOCK_DIRECT_CHATS.length, hasDividerBefore: true },
+  // { id: "spam", label: "Spam", count: MOCK_SPAM_CHATS.length },
 ];
 
 
@@ -292,14 +293,16 @@ export default function SummariesPage() {
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>(() => {
-    // Initialize from localStorage, default to "direct"
+    // Initialize from localStorage, default to "groups"
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
-      if (saved === "groups" || saved === "direct" || saved === "spam") {
+      // TEMPORARILY SIMPLIFIED - Re-enable when Direct/Spam are back
+      // if (saved === "groups" || saved === "direct" || saved === "spam") {
+      if (saved === "groups") {
         return saved;
       }
     }
-    return "direct";
+    return "groups";
   });
   const [isConnectBotModalOpen, setIsConnectBotModalOpen] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<1 | -1>(1); // 1 = from right, -1 = from left
@@ -362,11 +365,13 @@ export default function SummariesPage() {
 
   // Get tabs data and current chat list based on active tab
   const tabs = getTabsData(groupChats.length);
-  const currentChatList = activeTab === "groups"
-    ? groupChats
-    : activeTab === "direct"
-      ? MOCK_DIRECT_CHATS
-      : MOCK_SPAM_CHATS;
+  // TEMPORARILY SIMPLIFIED - Re-enable when Direct/Spam are back
+  const currentChatList = groupChats;
+  // const currentChatList = activeTab === "groups"
+  //   ? groupChats
+  //   : activeTab === "direct"
+  //     ? MOCK_DIRECT_CHATS
+  //     : MOCK_SPAM_CHATS;
 
   // Save active tab to localStorage when it changes
   useEffect(() => {
@@ -389,7 +394,9 @@ export default function SummariesPage() {
   const handleSwipe = useCallback(
     (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
       const SWIPE_THRESHOLD = 50;
-      const tabOrder: TabId[] = ["groups", "direct", "spam"];
+      // TEMPORARILY SIMPLIFIED - Re-enable when Direct/Spam are back
+      const tabOrder: TabId[] = ["groups"];
+      // const tabOrder: TabId[] = ["groups", "direct", "spam"];
       const currentIndex = tabOrder.indexOf(activeTab);
 
       if (info.offset.x < -SWIPE_THRESHOLD && currentIndex < tabOrder.length - 1) {
@@ -520,7 +527,9 @@ export default function SummariesPage() {
                   if (hapticFeedback.impactOccurred.isAvailable()) {
                     hapticFeedback.impactOccurred("light");
                   }
-                  const tabOrder: TabId[] = ["groups", "direct", "spam"];
+                  // TEMPORARILY SIMPLIFIED - Re-enable when Direct/Spam are back
+                  const tabOrder: TabId[] = ["groups"];
+                  // const tabOrder: TabId[] = ["groups", "direct", "spam"];
                   const currentIndex = tabOrder.indexOf(activeTab);
                   const targetIndex = tabOrder.indexOf(tab.id);
                   setSwipeDirection(targetIndex > currentIndex ? 1 : -1);
@@ -566,10 +575,10 @@ export default function SummariesPage() {
       >
         {isLoading ? (
           <div className="flex-1 flex flex-col pt-2 pb-4">
-            {/* Direct and Spam tab banner skeleton placeholder */}
-            {(activeTab === "direct" || activeTab === "spam") && (
+            {/* TEMPORARILY HIDDEN - Re-enable when Direct/Spam are back */}
+            {/* {(activeTab === "direct" || activeTab === "spam") && (
               <ConnectBotBanner onConnectBot={handleConnectBot} />
-            )}
+            )} */}
 
             <ChatListSkeleton count={5} />
 
@@ -587,10 +596,10 @@ export default function SummariesPage() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col pt-2 pb-4">
-            {/* Direct and Spam tab banner */}
-            {(activeTab === "direct" || activeTab === "spam") && (
+            {/* TEMPORARILY HIDDEN - Re-enable when Direct/Spam are back */}
+            {/* {(activeTab === "direct" || activeTab === "spam") && (
               <ConnectBotBanner onConnectBot={handleConnectBot} />
-            )}
+            )} */}
 
             {currentChatList.map((chat, index) => (
               <ChatItem
