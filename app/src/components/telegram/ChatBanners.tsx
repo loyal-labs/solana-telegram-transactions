@@ -1,8 +1,7 @@
 "use client";
 
 import { hapticFeedback } from "@telegram-apps/sdk-react";
-import { CloudOff, DatabaseBackup } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { CloudOff } from "lucide-react";
 
 interface ConnectBotBannerProps {
   onConnectBot: () => void;
@@ -88,61 +87,6 @@ export function BotDisconnectedBanner({ onReconnect }: BotDisconnectedBannerProp
             >
               <span className="text-sm font-medium text-white leading-5">
                 Reconnect Loyal Bot
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Banner shown when Cloud Storage permission is required.
- * Links to the Settings page with a highlight parameter to show which setting needs attention.
- */
-export function PermissionRequiredBanner() {
-  const router = useRouter();
-
-  const handleGoToSettings = () => {
-    if (hapticFeedback.impactOccurred.isAvailable()) {
-      hapticFeedback.impactOccurred("medium");
-    }
-    // Navigate to settings with highlight parameter
-    router.push("/telegram/profile?highlight=cloud-storage");
-  };
-
-  return (
-    <div className="px-3 py-2">
-      <div
-        className="flex items-start px-3 py-1 rounded-2xl"
-        style={{ backgroundColor: "rgba(255, 165, 0, 0.14)" }}
-      >
-        {/* Left - Icon */}
-        <div className="flex items-center pl-0 pr-3 py-2">
-          <DatabaseBackup size={24} strokeWidth={1.5} className="text-white" />
-        </div>
-
-        {/* Content Middle */}
-        <div className="flex-1 flex flex-col gap-3 items-start justify-center py-2.5">
-          {/* Text Layout */}
-          <div className="flex flex-col gap-0.5 w-full">
-            <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
-              Permission required
-            </p>
-            <p className="text-[13px] text-white/60 leading-4">
-              Cloud Storage permission is turned off, please enable it in Settings so Loyal bot can process your messages and update summaries.
-            </p>
-          </div>
-
-          {/* Button */}
-          <div>
-            <button
-              onClick={handleGoToSettings}
-              className="bg-white/[0.06] mix-blend-lighten rounded-full px-4 py-2 active:opacity-80 transition-opacity"
-            >
-              <span className="text-sm font-medium text-white leading-5">
-                Go to Settings
               </span>
             </button>
           </div>

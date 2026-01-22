@@ -142,27 +142,3 @@
 [data-vaul-overlay] {
   background-color: rgba(0, 0, 0, 0.3) !important;
 }
-
-/* Highlight border animation for settings cells */
-@keyframes highlight-border {
-  0% {
-    box-shadow: 0 0 0 0 rgba(41, 144, 255, 0);
-  }
-  25% {
-    box-shadow: 0 0 0 2px rgba(41, 144, 255, 0.8);
-  }
-  50% {
-    box-shadow: 0 0 0 2px rgba(41, 144, 255, 0.4);
-  }
-  75% {
-    box-shadow: 0 0 0 2px rgba(41, 144, 255, 0.8);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(41, 144, 255, 0);
-  }
-}
-
-.animate-highlight-border {
-  animation: highlight-border 1s ease-in-out;
-  border-radius: 16px;
-}
