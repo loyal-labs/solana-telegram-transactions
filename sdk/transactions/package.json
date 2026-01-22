@@ -1,6 +1,6 @@
 {
   "name": "@loyal-labs/transactions",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "SDK for Telegram-based Solana deposits",
   "type": "module",
   "main": "./dist/index.js",
