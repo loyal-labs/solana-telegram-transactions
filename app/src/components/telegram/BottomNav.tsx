@@ -2,8 +2,6 @@
 
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import {
-  Brain,
-  LayoutGrid,
   MessageCircleMore,
   User,
   Wallet
@@ -17,10 +15,8 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/telegram/overview", icon: LayoutGrid },
   { href: "/telegram/summaries", icon: MessageCircleMore },
   { href: "/telegram/wallet", icon: Wallet },
-  { href: "/telegram/agents", icon: Brain },
   { href: "/telegram/profile", icon: User }
 ];
 
