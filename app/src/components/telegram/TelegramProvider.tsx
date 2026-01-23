@@ -87,12 +87,16 @@ function TelegramProviderInner({ children }: PropsWithChildren) {
   useEffect(() => {
     const restorePage = async () => {
       try {
-        const lastPage = await getCloudValue(LAST_PAGE_CACHE_KEY);
+        let lastPage = await getCloudValue(LAST_PAGE_CACHE_KEY);
         if (
           typeof lastPage === 'string' &&
           lastPage.startsWith('/telegram') &&
           lastPage !== pathname
         ) {
+          // Redirect profile to wallet
+          if (lastPage === '/telegram/profile') {
+            lastPage = '/telegram/wallet';
+          }
           router.replace(lastPage);
         }
       } catch (e) {
