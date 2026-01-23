@@ -53,21 +53,17 @@ export async function GET(request: Request) {
     const solText = formatSol(solAmount) || "+15.0988 SOL";
     const usdText = formatUsd(usdAmount) || "≈$2,869.77";
 
-    const allText = `You received${solText}${usdText}FromTo${sender}${receiver}`;
+    const allText = `You receivedLoyal${solText}${usdText}FromTo${sender}${receiver}`;
 
-    const [fontRegular, fontMedium, fontSemiBold, backgroundData, iconData, logoData] =
+    const [fontRegular, fontMedium, fontSemiBold, backgroundData] =
       await Promise.all([
         loadGoogleFont("Geist", 400, allText),
         loadGoogleFont("Geist", 500, allText),
         loadGoogleFont("Geist", 600, allText),
-        readFile(join(process.cwd(), "public/share/Background-Filter.png")),
-        readFile(join(process.cwd(), "public/share/Icon.svg")),
-        readFile(join(process.cwd(), "public/share/Logo.svg")),
+        readFile(join(process.cwd(), "public/share/BG.png")),
       ]);
 
     const backgroundBase64 = `data:image/png;base64,${backgroundData.toString("base64")}`;
-    const iconBase64 = `data:image/svg+xml;base64,${iconData.toString("base64")}`;
-    const logoBase64 = `data:image/svg+xml;base64,${logoData.toString("base64")}`;
 
     return new ImageResponse(
       (
@@ -79,7 +75,7 @@ export async function GET(request: Request) {
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            padding: 64,
+            padding: "56px 56px 60px 56px",
             fontFamily: "Geist",
           }}
         >
@@ -96,18 +92,6 @@ export async function GET(request: Request) {
             }}
           />
 
-          {/* Background overlay filter */}
-          <div
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: 1200,
-              height: 630,
-              background: "rgba(22, 22, 26, 0.8)",
-            }}
-          />
-
           {/* Top section */}
           <div
             style={{
@@ -121,132 +105,175 @@ export async function GET(request: Request) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "24px",
+                gap: "20px",
               }}
             >
-              <img
-                src={iconBase64}
-                alt=""
+              {/* Red circle icon with arrow */}
+              <div
                 style={{
-                  width: "96px",
-                  height: "96px",
+                  width: 72,
+                  height: 72,
+                  background: "#FF3347",
+                  borderRadius: 120,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 16,
                 }}
-              />
+              >
+                <svg
+                  width="40"
+                  height="40"
+                  viewBox="0 0 47 47"
+                  fill="none"
+                >
+                  <path
+                    d="M23.4424 39.0708L23.4424 7.81372"
+                    stroke="white"
+                    stroke-width="4.69"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M35.0713 27.4424L23.4427 39.0711L11.814 27.4424"
+                    stroke="white"
+                    stroke-width="4.69"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
               <span
                 style={{
                   fontWeight: 500,
-                  fontSize: "64px",
+                  fontSize: "47px",
                   lineHeight: 1,
-                  color: "white",
-                  letterSpacing: "-0.64px",
+                  color: "black",
+                  letterSpacing: "-0.47px",
                 }}
               >
                 You received
               </span>
             </div>
-            <img
-              src={logoBase64}
-              alt="Loyal"
+            <span
               style={{
-                height: "96px",
+                fontWeight: 500,
+                fontSize: "57px",
+                lineHeight: 1,
+                color: "black",
+                letterSpacing: "-0.57px",
               }}
-            />
+            >
+              Loyal
+            </span>
           </div>
 
-          {/* Amount section */}
+          {/* Bottom section */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: "28px",
+              gap: "44px",
               zIndex: 1,
             }}
           >
+            {/* Amount section */}
             <div
               style={{
-                fontWeight: 600,
-                fontSize: "96px",
-                lineHeight: 1,
-                color: "white",
-                letterSpacing: "-0.96px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "24px",
               }}
             >
-              {solText}
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontSize: "86px",
+                  lineHeight: 1,
+                  color: "black",
+                  letterSpacing: "-0.86px",
+                }}
+              >
+                {solText}
+              </div>
+              <div
+                style={{
+                  fontSize: "40px",
+                  lineHeight: 1,
+                  color: "black",
+                  opacity: 0.5,
+                }}
+              >
+                {usdText}
+              </div>
             </div>
-            <div
-              style={{
-                fontSize: "48px",
-                lineHeight: 1,
-                color: "rgba(255, 255, 255, 0.6)",
-              }}
-            >
-              {usdText}
-            </div>
-          </div>
 
-          {/* From/To section */}
-          <div
-            style={{
-              display: "flex",
-              zIndex: 1,
-            }}
-          >
+            {/* From/To section - stacked vertically */}
             <div
               style={{
-                flex: 1,
                 display: "flex",
                 flexDirection: "column",
-                gap: "14px",
+                gap: "28px",
+                maxWidth: 640,
               }}
             >
               <div
                 style={{
-                  fontWeight: 500,
-                  fontSize: "36px",
-                  lineHeight: 1,
-                  color: "rgba(255, 255, 255, 0.6)",
-                  letterSpacing: "-0.36px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
                 }}
               >
-                From
+                <div
+                  style={{
+                    fontWeight: 500,
+                    fontSize: "32px",
+                    lineHeight: 1,
+                    color: "black",
+                    opacity: 0.5,
+                    letterSpacing: "-0.32px",
+                  }}
+                >
+                  From
+                </div>
+                <div
+                  style={{
+                    fontSize: "44px",
+                    lineHeight: 1,
+                    color: "black",
+                  }}
+                >
+                  {sender}
+                </div>
               </div>
               <div
                 style={{
-                  fontSize: "56px",
-                  lineHeight: 1,
-                  color: "white",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
                 }}
               >
-                {sender}
-              </div>
-            </div>
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                gap: "14px",
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 500,
-                  fontSize: "36px",
-                  lineHeight: 1,
-                  color: "rgba(255, 255, 255, 0.6)",
-                  letterSpacing: "-0.36px",
-                }}
-              >
-                To
-              </div>
-              <div
-                style={{
-                  fontSize: "56px",
-                  lineHeight: 1,
-                  color: "white",
-                }}
-              >
-                {receiver}
+                <div
+                  style={{
+                    fontWeight: 500,
+                    fontSize: "32px",
+                    lineHeight: 1,
+                    color: "black",
+                    opacity: 0.5,
+                    letterSpacing: "-0.32px",
+                  }}
+                >
+                  To
+                </div>
+                <div
+                  style={{
+                    fontSize: "44px",
+                    lineHeight: 1,
+                    color: "black",
+                  }}
+                >
+                  {receiver}
+                </div>
               </div>
             </div>
           </div>
