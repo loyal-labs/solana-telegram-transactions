@@ -33,12 +33,13 @@ cn(...inputs) // Merges classes, resolves conflicts
 
 ## `/core`
 
-HTTP utilities for API calls.
+HTTP utilities and database connections.
 
 | File | Exports | Description |
 |------|---------|-------------|
 | `http.ts` | `fetchJson()`, `fetchStream()` | Typed fetch wrappers |
 | `api.ts` | `resolveEndpoint()` | Builds URLs from `NEXT_PUBLIC_SERVER_HOST` |
+| `database.ts` | `getDatabase()` | Neon PostgreSQL connection via Drizzle ORM |
 
 ---
 
