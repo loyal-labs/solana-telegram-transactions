@@ -7,7 +7,10 @@
     "dev:http": "next dev --experimental-https",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
@@ -50,6 +53,7 @@
     "lightningcss-linux-x64-gnu": "^1.30.0"
   },
   "devDependencies": {
+    "drizzle-kit": "^0.30.0",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
