@@ -1,3 +1,5 @@
+export type SolanaEnv = "mainnet" | "devnet" | "localnet";
+
 export type WalletTransfer = {
   signature: string;
   slot: number;

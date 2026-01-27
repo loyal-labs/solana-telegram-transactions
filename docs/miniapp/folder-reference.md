@@ -49,16 +49,22 @@ Solana blockchain integration.
 
 ### `/solana/rpc/`
 
-RPC connection management using Helius endpoints.
+RPC connection management using Helius endpoints (mainnet/devnet) or local validator (localnet).
 
 | Constant | Source | Value |
 |----------|--------|-------|
 | `SECURE_MAINNET_RPC_URL` | Hardcoded | Helius mainnet endpoint |
 | `SECURE_DEVNET_RPC_URL` | Hardcoded | Helius devnet endpoint |
+| `LOCALNET_RPC_URL` | Hardcoded | `http://127.0.0.1:8899` |
 
-Selected by `NEXT_PUBLIC_SOLANA_ENV` (defaults to `devnet`).
+Selected by `NEXT_PUBLIC_SOLANA_ENV`:
+- `"mainnet"` - Production (Helius)
+- `"devnet"` - Testing (Helius, default)
+- `"localnet"` - Local development (`solana-test-validator`)
 
-**Key exports:** `getConnection()`, `getWebsocketConnection()`
+**Key exports:** `getConnection()`, `getWebsocketConnection()`, `getSolanaEnv()`
+
+**Type exports:** `SolanaEnv` - Union type for valid environment values
 
 ### `/solana/wallet/`
 
@@ -129,6 +135,8 @@ MagicBlock integration for live SOL/USD price via Pyth Lazer oracle.
 | `SOLANA_PYTH_LAZER_ID` | Hardcoded | `6` (SOL/USD feed) |
 
 **Key export:** `fetchSolUsdPrice()` - Returns current SOL price in USD
+
+Note: On localnet, MagicBlock uses devnet as a fallback for price data.
 
 ---
 
