@@ -1,36 +1,35 @@
-import { randomUUID } from "node:crypto";
+import { and, asc, eq, gte } from "drizzle-orm";
 
-import { getReadyBuilderClient } from "@/lib/nillion/core/builder";
-import { COMMUNITY_CHAT_MESSAGES_COLLECTION_ID } from "@/lib/nillion/schemas/community-chat-messages-schema";
-import { COMMUNITY_CHAT_SUMMARIES_COLLECTION_ID } from "@/lib/nillion/schemas/community-chat-summaries-schema";
+import { getDatabase } from "@/lib/core/database";
+import { messages, summaries, type Topic } from "@/lib/core/schema";
 import { chatCompletion } from "@/lib/redpill";
+import { SUMMARY_INTERVAL_MS } from "@/lib/telegram/utils";
 
-export async function generateChatSummary(chatId: string, chatTitle: string) {
-  const builderClient = await getReadyBuilderClient();
+export async function generateChatSummary(
+  communityId: string,
+  chatTitle: string
+) {
+  const db = getDatabase();
 
   // Get messages from last 24h
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const result = await builderClient.findData({
-    collection: COMMUNITY_CHAT_MESSAGES_COLLECTION_ID,
-    filter: { chat_id: chatId },
+  const oneDayAgo = new Date(Date.now() - SUMMARY_INTERVAL_MS);
+
+  const recentMessages = await db.query.messages.findMany({
+    where: and(
+      eq(messages.communityId, communityId),
+      gte(messages.createdAt, oneDayAgo)
+    ),
+    with: {
+      user: true,
+    },
+    orderBy: [asc(messages.telegramMessageId)],
   });
 
-  type MessageRecord = {
-    created_at: string;
-    message_id: number;
-    sender_name: string;
-    content: string;
-  };
-
-  const messages = ((result?.data || []) as MessageRecord[])
-    .filter((m) => m.created_at >= oneDayAgo)
-    .sort((a, b) => a.message_id - b.message_id);
-
-  if (messages.length < 5) return; // Not enough to summarize
+  if (recentMessages.length < 5) return; // Not enough to summarize
 
   // Format messages for LLM
-  const formattedMessages = messages
-    .map((m) => `${m.sender_name}: ${m.content}`)
+  const formattedMessages = recentMessages
+    .map((m) => `${m.user.displayName}: ${m.content}`)
     .join("\n");
 
   // Generate summary via RedPill
@@ -51,23 +50,37 @@ Keep summaries concise. List 1-5 topics. Sources are participant names who contr
     temperature: 0.3,
   });
 
-  const summaryText = response.choices[0].message.content;
-  const parsed = JSON.parse(summaryText);
+  // Safely extract and parse LLM response
+  const summaryText = response.choices?.[0]?.message?.content;
+  if (!summaryText) {
+    throw new Error("Empty response from LLM");
+  }
+
+  let parsed: { topics: Topic[] };
+  try {
+    parsed = JSON.parse(summaryText);
+  } catch {
+    throw new Error(`Invalid JSON from LLM: ${summaryText.slice(0, 100)}...`);
+  }
+
+  if (!parsed.topics || !Array.isArray(parsed.topics)) {
+    throw new Error("Invalid summary format: missing topics array");
+  }
+
+  // Validate topic structure
+  for (const topic of parsed.topics) {
+    if (!topic.title || !topic.content || !Array.isArray(topic.sources)) {
+      throw new Error("Invalid topic structure in summary");
+    }
+  }
 
   // Store summary
-  await builderClient.createStandardData({
-    collection: COMMUNITY_CHAT_SUMMARIES_COLLECTION_ID,
-    data: [
-      {
-        _id: randomUUID(),
-        chat_id: chatId,
-        chat_title: chatTitle,
-        message_count: messages.length,
-        from_message_id: messages[0].message_id,
-        to_message_id: messages[messages.length - 1].message_id,
-        topics: parsed.topics,
-        created_at: new Date().toISOString(),
-      },
-    ],
+  await db.insert(summaries).values({
+    communityId,
+    chatTitle,
+    messageCount: recentMessages.length,
+    fromMessageId: recentMessages[0].telegramMessageId,
+    toMessageId: recentMessages[recentMessages.length - 1].telegramMessageId,
+    topics: parsed.topics,
   });
 }
