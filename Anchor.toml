@@ -34,3 +34,13 @@ upgradeable = false
 address = "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
 program = "tests/fixtures/dlp.so"
 upgradeable = false
+
+[[test.genesis]]
+address = "4ewpzEPF5xrVAHeRkoe7XS1yKFGQBekD7PgFwEz9SaxY"
+program = "target/deploy/telegram_transfer.so"
+upgradeable = false
+
+[[test.genesis]]
+address = "9yiphKYd4b69tR1ZPP8rNwtMeUwWgjYXaXdEzyNziNhz"
+program = "target/deploy/telegram_verification.so"
+upgradeable = false
