@@ -7,7 +7,7 @@ All environment variables used by `/app/src/lib/`.
 | Variable | Used By | Description |
 |----------|---------|-------------|
 | `NEXT_PUBLIC_TELEGRAM_BOT_ID` | `constants.ts` | Telegram bot ID |
-| `NEXT_PUBLIC_SOLANA_ENV` | `solana/rpc/` | `"mainnet"` or `"devnet"` (defaults to devnet) |
+| `NEXT_PUBLIC_SOLANA_ENV` | `solana/rpc/` | `"mainnet"`, `"devnet"`, or `"localnet"` (defaults to devnet) |
 | `ASKLOYAL_TGBOT_KEY` | `telegram/bot-api/` | Telegram bot token from BotFather |
 | `REDPILL_AI_API_KEY` | `redpill/` | API key for RedPill AI service |
 | `DATABASE_URL` | `core/database.ts` | Neon PostgreSQL connection string |
@@ -27,7 +27,7 @@ All environment variables used by `/app/src/lib/`.
 NEXT_PUBLIC_TELEGRAM_BOT_ID=your_bot_id
 ASKLOYAL_TGBOT_KEY=your_bot_token
 
-# Solana
+# Solana - use "mainnet", "devnet", or "localnet"
 NEXT_PUBLIC_SOLANA_ENV=devnet
 
 # AI
@@ -39,3 +39,23 @@ DATABASE_URL=postgresql://user:password@ep-xxx.aws.neon.tech/dbname?sslmode=requ
 # Optional - API host
 NEXT_PUBLIC_SERVER_HOST=https://your-api.com
 ```
+
+## Localnet Setup
+
+To use localnet for local testing:
+
+```bash
+# Terminal 1 - Start local validator
+solana-test-validator
+
+# Terminal 2 - Run app with localnet
+NEXT_PUBLIC_SOLANA_ENV=localnet bun dev
+```
+
+| Environment | RPC Endpoint | WebSocket |
+|-------------|--------------|-----------|
+| `mainnet` | Helius mainnet | Helius WSS |
+| `devnet` | Helius devnet | Helius WSS |
+| `localnet` | `http://127.0.0.1:8899` | `ws://127.0.0.1:8900` |
+
+Note: On localnet, MagicBlock price feeds fall back to devnet.
