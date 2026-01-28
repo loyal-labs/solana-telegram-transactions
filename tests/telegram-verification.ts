@@ -151,6 +151,7 @@ describe.only("telegram-verification test suite", () => {
         payer: user,
         depositor: user,
       })
+      .signers([userKp])
       .rpc({ commitment: "confirmed" });
 
     [depositPda] = PublicKey.findProgramAddressSync(
@@ -203,6 +204,7 @@ describe.only("telegram-verification test suite", () => {
         payer: user,
         depositor: user,
       })
+      .signers([userKp])
       .rpc({ commitment: "confirmed" });
 
     const deposit = await transferProgram.account.deposit.fetch(depositPda);
@@ -225,6 +227,7 @@ describe.only("telegram-verification test suite", () => {
         vault: vaultPda,
         deposit: depositPda,
       })
+      .signers([userKp])
       .rpc({ commitment: "confirmed" });
 
     const deposit = await transferProgram.account.deposit.fetch(depositPda);
