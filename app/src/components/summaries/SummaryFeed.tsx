@@ -4,7 +4,10 @@ import {
   backButton,
   hapticFeedback,
   swipeBehavior,
+  useSignal,
+  viewport,
 } from "@telegram-apps/sdk-react";
+import type { Signal } from "@telegram-apps/signals";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -134,6 +137,12 @@ export default function SummaryFeed({
   groupTitle: initialGroupTitle,
 }: SummaryFeedProps) {
   const router = useRouter();
+  const safeAreaInsetTop = useSignal(
+    viewport.safeAreaInsetTop as Signal<number>
+  );
+  // Calculate header height to determine available space
+  const headerHeight = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [summaries, setSummaries] = useState<ChatSummary[]>(
     initialSummaries || []
@@ -483,8 +492,11 @@ export default function SummaryFeed({
 
   return (
     <main
-      className="h-full text-white font-sans overflow-hidden relative flex flex-col"
-      style={{ background: "#16161a" }}
+      className="text-white font-sans overflow-hidden relative flex flex-col"
+      style={{
+        background: "#16161a",
+        height: `calc(100vh - ${headerHeight}px)`,
+      }}
     >
       {/* Header Section - Fixed */}
       <div

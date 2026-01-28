@@ -6,7 +6,10 @@ import {
   openTelegramLink,
   swipeBehavior,
   themeParams,
+  useSignal,
+  viewport,
 } from "@telegram-apps/sdk-react";
+import type { Signal } from "@telegram-apps/signals";
 import { CheckCheck, MessageCircleWarning, Undo2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -226,6 +229,11 @@ const EASE_OUT = "cubic-bezier(0.0, 0.0, 0.2, 1)";
 
 function DirectFeedContent() {
   const router = useRouter();
+  const safeAreaInsetTop = useSignal(
+    viewport.safeAreaInsetTop as Signal<number>
+  );
+  const headerHeight = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
+
   const searchParams = useSearchParams();
   const initialChatId = searchParams.get("chatId");
   const tab = searchParams.get("tab");
@@ -513,8 +521,8 @@ function DirectFeedContent() {
 
   return (
     <main
-      className="h-full text-white font-sans overflow-hidden relative flex flex-col"
-      style={{ background: "#16161a" }}
+      className="text-white font-sans overflow-hidden relative flex flex-col"
+      style={{ background: "#16161a", height: `calc(100vh - ${headerHeight}px)` }}
     >
       {/* Header */}
       <div

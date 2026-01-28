@@ -1769,7 +1769,7 @@ export default function Home() {
                 }}
                 className="active:scale-[0.98] transition-transform"
               >
-                <div className="flex items-center leading-[48px] gap-2">
+                <div className="flex items-center gap-2">
                   <NumberFlow
                     value={
                       displayCurrency === "USD"

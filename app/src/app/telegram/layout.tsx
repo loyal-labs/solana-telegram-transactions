@@ -28,12 +28,12 @@ export default function TelegramLayout({
 
   return (
     <div
-      className="flex flex-col overflow-hidden"
-      style={{ background: "#16161a", height: "100vh" }}
+      className="flex flex-col"
+      style={{ background: "#16161a", minHeight: "100vh" }}
     >
       <Header />
       <div
-        className="flex-1 overflow-hidden"
+        className="flex-1"
         style={{ paddingTop: headerHeight }}
       >
         {children}

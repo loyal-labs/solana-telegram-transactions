@@ -1,6 +1,12 @@
 "use client";
 
-import { hapticFeedback, themeParams } from "@telegram-apps/sdk-react";
+import {
+  hapticFeedback,
+  themeParams,
+  useSignal,
+  viewport,
+} from "@telegram-apps/sdk-react";
+import type { Signal } from "@telegram-apps/signals";
 import { motion, type PanInfo } from "framer-motion";
 import { CircleHelp, X } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -206,6 +212,11 @@ const ACTIVE_TAB_STORAGE_KEY = "summaries_active_tab";
 
 export default function SummariesPage() {
   const router = useRouter();
+  const safeAreaInsetTop = useSignal(
+    viewport.safeAreaInsetTop as Signal<number>
+  );
+  const headerHeight = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
+
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>(() => {
@@ -414,8 +425,8 @@ export default function SummariesPage() {
 
   return (
     <main
-      className="h-full text-white font-sans overflow-y-auto relative flex flex-col"
-      style={{ background: "#16161a" }}
+      className="text-white font-sans overflow-y-auto relative flex flex-col"
+      style={{ background: "#16161a", height: `calc(100vh - ${headerHeight}px)` }}
     >
       {/* Header - fixed at top */}
       <div
