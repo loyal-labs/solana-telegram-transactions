@@ -6,10 +6,7 @@ import {
   openTelegramLink,
   swipeBehavior,
   themeParams,
-  useSignal,
-  viewport,
 } from "@telegram-apps/sdk-react";
-import type { Signal } from "@telegram-apps/signals";
 import { CheckCheck, MessageCircleWarning, Undo2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -277,11 +274,6 @@ function DirectFeedContent() {
     }
   });
 
-  // Get safe area inset
-  const safeAreaInsetTop = useSignal(
-    viewport.safeAreaInsetTop as Signal<number>
-  );
-
   const currentChat = summaries[currentIndex];
   const nextChat = summaries[currentIndex + 1];
   const remainingCount = summaries.length - currentIndex;
@@ -521,14 +513,13 @@ function DirectFeedContent() {
 
   return (
     <main
-      className="h-screen text-white font-sans overflow-hidden relative flex flex-col"
+      className="h-full text-white font-sans overflow-hidden relative flex flex-col"
       style={{ background: "#16161a" }}
     >
       {/* Header */}
       <div
         className="relative flex items-center justify-center shrink-0 z-20 py-3"
         style={{
-          paddingTop: `${Math.max(safeAreaInsetTop || 0, 12) + 10}px`,
           opacity: isPageMounted ? 1 : 0,
           transform: isPageMounted ? "translateY(0)" : "translateY(-10px)",
           transition: isPageMounted ? `all 400ms ${EASE_OUT}` : "none",
@@ -776,7 +767,7 @@ export default function DirectFeedPage() {
     <Suspense
       fallback={
         <div
-          className="h-screen flex items-center justify-center"
+          className="h-full flex items-center justify-center"
           style={{ background: "#16161a" }}
         >
           <p className="text-white/60">Loading...</p>

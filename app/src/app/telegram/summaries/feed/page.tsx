@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 
 import { useSummaries } from "@/components/summaries/SummariesContext";
 import SummaryFeed from "@/components/summaries/SummaryFeed";
@@ -9,13 +9,27 @@ import SummaryFeed from "@/components/summaries/SummaryFeed";
 function SummaryFeedContent() {
   const searchParams = useSearchParams();
   const chatId = searchParams.get("chatId") || undefined;
-  const { summaries } = useSummaries();
+  const { summaries: allSummaries } = useSummaries();
 
-  // Pass cached summaries if available, otherwise SummaryFeed will fetch
+  // Find the group title from the selected summary
+  const groupTitle = useMemo(() => {
+    if (!chatId || allSummaries.length === 0) return undefined;
+    const selectedSummary = allSummaries.find((s) => s.id === chatId);
+    return selectedSummary?.title;
+  }, [chatId, allSummaries]);
+
+  // Filter summaries to only include those from the same group
+  const groupSummaries = useMemo(() => {
+    if (!groupTitle || allSummaries.length === 0) return undefined;
+    return allSummaries.filter((s) => s.title === groupTitle);
+  }, [groupTitle, allSummaries]);
+
+  // Pass filtered summaries for the specific group
   return (
     <SummaryFeed
       initialChatId={chatId}
-      summaries={summaries.length > 0 ? summaries : undefined}
+      summaries={groupSummaries}
+      groupTitle={groupTitle}
     />
   );
 }

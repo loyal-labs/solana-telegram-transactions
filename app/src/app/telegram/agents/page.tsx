@@ -1,13 +1,8 @@
 "use client";
 
-import { useSignal, viewport } from "@telegram-apps/sdk-react";
-import type { Signal } from "@telegram-apps/signals";
 import { Bot } from "lucide-react";
 
 export default function AgentsPage() {
-  const safeAreaInsetTop = useSignal(viewport.safeAreaInsetTop as Signal<number>);
-  const contentSafeAreaInsetTop = useSignal(viewport.contentSafeAreaInsetTop as Signal<number>);
-
   return (
     <main className="min-h-screen text-white font-sans selection:bg-teal-500/30 overflow-hidden relative">
       <div
@@ -18,10 +13,7 @@ export default function AgentsPage() {
         }}
       />
 
-      <div
-        className="relative z-10 px-6 pt-6 pb-20 max-w-md mx-auto flex flex-col min-h-screen"
-        style={{ paddingTop: `${Math.max((safeAreaInsetTop || 0) + (contentSafeAreaInsetTop || 0), 20) + 16}px` }}
-      >
+      <div className="relative z-10 px-6 pt-6 pb-20 max-w-md mx-auto flex flex-col min-h-screen">
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
             <Bot className="w-8 h-8 text-zinc-500" />

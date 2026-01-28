@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getAvatarColor, getFirstLetter } from "@/components/summaries/avatar-utils";
+import { MOCK_SUMMARIES } from "@/components/summaries/mock-data";
 import { useSummaries } from "@/components/summaries/SummariesContext";
 import ConnectBotModal from "@/components/telegram/ConnectBotModal";
 
@@ -235,13 +236,23 @@ export default function SummariesPage() {
   const [isGroupsLoading, setIsGroupsLoading] = useState(true);
   const { summaries: cachedSummaries, setSummaries, hasCachedData } = useSummaries();
 
-  // Transform summaries to group chats format
-  const transformToGroupChats = (summaries: Array<{ id: string; title: string; topics?: Array<{ content: string }> }>) =>
-    summaries.map((s) => ({
-      id: s.id,
-      title: s.title,
-      subtitle: s.topics?.[0]?.content || "",
-    }));
+  // Transform summaries to unique group chats format (deduplicate by title)
+  const transformToGroupChats = (summaries: Array<{ id: string; title: string; topics?: Array<{ content: string }> }>) => {
+    const groupMap = new Map<string, GroupChat>();
+
+    for (const summary of summaries) {
+      // Only keep the first (most recent) summary for each group
+      if (!groupMap.has(summary.title)) {
+        groupMap.set(summary.title, {
+          id: summary.id,
+          title: summary.title,
+          subtitle: summary.topics?.[0]?.content || "",
+        });
+      }
+    }
+
+    return Array.from(groupMap.values());
+  };
 
   // Initialize from cached data immediately
   useEffect(() => {
@@ -254,6 +265,14 @@ export default function SummariesPage() {
   // Fetch fresh data (in background if we have cache)
   useEffect(() => {
     const fetchGroupChats = async () => {
+      // Use mock data in development when flag is set
+      if (process.env.NEXT_PUBLIC_USE_MOCK_SUMMARIES === "true") {
+        setSummaries(MOCK_SUMMARIES);
+        setGroupChats(transformToGroupChats(MOCK_SUMMARIES));
+        setIsGroupsLoading(false);
+        return;
+      }
+
       // Only show loading if no cached data
       if (!hasCachedData) {
         setIsGroupsLoading(true);
@@ -395,14 +414,13 @@ export default function SummariesPage() {
 
   return (
     <main
-      className="h-screen text-white font-sans overflow-y-auto relative flex flex-col"
+      className="h-full text-white font-sans overflow-y-auto relative flex flex-col"
       style={{ background: "#16161a" }}
     >
       {/* Header - fixed at top */}
       <div
         className="sticky top-0 z-10"
         style={{
-          paddingTop: "calc(var(--app-safe-top, 20px) + 4px)",
           background: "#16161a",
         }}
       >

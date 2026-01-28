@@ -1718,14 +1718,9 @@ export default function Home() {
         </AnimatePresence>
 
         {/* Main Content */}
-        <div
-          className="relative flex-1 flex flex-col w-full"
-          style={{
-            paddingTop: `${Math.max(safeAreaInsetTop || 0, 12) + 15}px`,
-          }}
-        >
+        <div className="relative flex-1 flex flex-col w-full">
           {/* Balance Section */}
-          <div className="flex flex-col items-center pb-6 px-6">
+          <div className="flex flex-col items-center pb-6 px-6 pt-5">
             {/* Wallet Address */}
             {isLoading || !walletAddress ? (
               <div className="flex items-center gap-1">
@@ -1759,7 +1754,7 @@ export default function Home() {
             )}
 
             {/* Balance Display */}
-            <div ref={balanceRef} className="flex flex-col items-center gap-1.5 mt-12">
+            <div ref={balanceRef} className="flex flex-col items-center gap-1.5 mt-1.5">
               <button
                 onClick={() => {
                   if (hapticFeedback.selectionChanged.isAvailable()) {

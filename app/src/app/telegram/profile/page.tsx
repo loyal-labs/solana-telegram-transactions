@@ -5,10 +5,7 @@ import {
   hapticFeedback,
   openTelegramLink,
   retrieveLaunchParams,
-  useSignal,
-  viewport,
 } from "@telegram-apps/sdk-react";
-import type { Signal } from "@telegram-apps/signals";
 import { ChevronRight, CircleHelp, CirclePlus, Smile } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -184,13 +181,6 @@ function SettingsSection({ children }: { children: React.ReactNode }) {
 }
 
 export default function ProfilePage() {
-  const safeAreaInsetTop = useSignal(
-    viewport.safeAreaInsetTop as Signal<number>
-  );
-  const contentSafeAreaInsetTop = useSignal(
-    viewport.contentSafeAreaInsetTop as Signal<number>
-  );
-
   const { userData, cachedAvatar, isAvatarLoading } = useTelegramUser();
 
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
@@ -275,15 +265,7 @@ export default function ProfilePage() {
         }}
       />
 
-      <div
-        className="relative z-10 pb-32 max-w-md mx-auto flex flex-col min-h-screen"
-        style={{
-          paddingTop: `${Math.max(
-            (safeAreaInsetTop || 0) + (contentSafeAreaInsetTop || 0),
-            20
-          )}px`,
-        }}
-      >
+      <div className="relative z-10 pb-32 max-w-md mx-auto flex flex-col min-h-screen">
         {/* Avatar and Name Section */}
         <div className="flex flex-col gap-4 items-center justify-center pt-8 pb-6 px-8">
           {/* Avatar */}

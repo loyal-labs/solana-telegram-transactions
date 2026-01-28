@@ -24,6 +24,10 @@
 .DS_Store
 *.pem
 
+# claude code artifacts (prevents nested app/ folder issue)
+/app/
+.claude/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
