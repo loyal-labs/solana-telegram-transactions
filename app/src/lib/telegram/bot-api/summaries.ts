@@ -5,9 +5,9 @@ import { messages, summaries, type Topic } from "@/lib/core/schema";
 import { chatCompletion } from "@/lib/redpill";
 import { SUMMARY_INTERVAL_MS } from "@/lib/telegram/utils";
 
-const MIN_MESSAGES_FOR_SUMMARY = 5;
+export const MIN_MESSAGES_FOR_SUMMARY = 5;
 
-const SYSTEM_PROMPT = `You summarize group chat conversations into topics. Output JSON:
+export const SYSTEM_PROMPT = `You summarize group chat conversations into topics. Output JSON:
 {"topics":[{"title":"Topic Name","content":"Summary paragraph","sources":["Name1","Name2"]}]}
 Keep summaries concise. List 1-5 topics. Sources are participant names who contributed to each topic.`;
 
@@ -59,7 +59,7 @@ export async function generateChatSummary(
   });
 }
 
-function parseAndValidateTopics(summaryText: string): Topic[] {
+export function parseAndValidateTopics(summaryText: string): Topic[] {
   let parsed: { topics: unknown };
   try {
     parsed = JSON.parse(summaryText);
