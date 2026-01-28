@@ -78,7 +78,7 @@ pub mod telegram_transfer {
 
     // 2b) Claim: recipient gets SOL if the username is verified
     pub fn claim_deposit(
-        ctx: Context<ClaimDeposit>, 
+        ctx: Context<ClaimDeposit>,
         amount: u64,
     ) -> Result<()> {
         let deposit = &mut ctx.accounts.deposit;
@@ -86,7 +86,7 @@ pub mod telegram_transfer {
         let vault   = &mut ctx.accounts.vault;
         let vault_ai = vault.to_account_info();
         let recipient_ai = ctx.accounts.recipient.to_account_info();
-        
+
         // --- verification ---
         require!(session.verified, ErrorCode::NotVerified);
         require!(session.username == deposit.username, ErrorCode::InvalidUsername);
@@ -122,7 +122,7 @@ pub struct DepositForUsername<'info> {
         init_if_needed,
         payer = payer,
         space = 8 + Vault::INIT_SPACE,
-        seeds = [VAULT_SEED], 
+        seeds = [VAULT_SEED],
         bump
     )]
     pub vault: Account<'info, Vault>,

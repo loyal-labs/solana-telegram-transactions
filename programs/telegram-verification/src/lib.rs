@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{
     sysvar::instructions::{load_current_index_checked, load_instruction_at_checked},
 };
-use core::str::FromStr; 
+use core::str::FromStr;
 use hex_literal::hex;
 
 declare_id!("9yiphKYd4b69tR1ZPP8rNwtMeUwWgjYXaXdEzyNziNhz");
@@ -47,7 +47,7 @@ pub mod telegram_verification {
         session.validation_bytes = validation_bytes;
         session.verified = false;
         session.verified_at = None;
-        
+
         Ok(())
     }
 
