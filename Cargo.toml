@@ -1,5 +1,9 @@
 [workspace]
-members = ["programs/telegram-transfer", "programs/telegram-verification"]
+members = [
+    "programs/telegram-private-transfer",
+    "programs/telegram-transfer",
+    "programs/telegram-verification",
+]
 resolver = "2"
 
 [profile.release]

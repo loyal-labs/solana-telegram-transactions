@@ -1339,6 +1339,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "telegram-private-transfer"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+]
+
+[[package]]
 name = "telegram-transfer"
 version = "0.1.0"
 dependencies = [
