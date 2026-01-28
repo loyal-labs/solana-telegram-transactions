@@ -12,6 +12,7 @@ telegram-transfer = "4ewpzEPF5xrVAHeRkoe7XS1yKFGQBekD7PgFwEz9SaxY"
 telegram-verification = "9yiphKYd4b69tR1ZPP8rNwtMeUwWgjYXaXdEzyNziNhz"
 
 [programs.localnet]
+telegram-private-transfer = "97FzQdWi26mFNR21AbQNg4KqofiCLqQydQfAvRQMcXhV"
 telegram-transfer = "4ewpzEPF5xrVAHeRkoe7XS1yKFGQBekD7PgFwEz9SaxY"
 telegram-verification = "9yiphKYd4b69tR1ZPP8rNwtMeUwWgjYXaXdEzyNziNhz"
 
@@ -24,6 +25,7 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "bun run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test_private_transfer = "bun run ts-mocha -p ./tsconfig.json -t 1000000 tests/telegram-private-transfer.ts"
 
 [test]
 startup_wait = 5000
