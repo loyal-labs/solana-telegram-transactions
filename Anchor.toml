@@ -30,19 +30,21 @@ test_private_transfer = "bun run ts-mocha -p ./tsconfig.json -t 1000000 tests/te
 [test]
 startup_wait = 5000
 shutdown_wait = 2000
-upgradeable = false
+upgradeable = true
 
+# MagicBlock's Delegation Program
+# https://docs.magicblock.gg/pages/ephemeral-rollups-ers/how-to-guide/rust-program
 [[test.genesis]]
 address = "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
 program = "tests/fixtures/dlp.so"
-upgradeable = false
+upgradeable = true
 
 [[test.genesis]]
 address = "4ewpzEPF5xrVAHeRkoe7XS1yKFGQBekD7PgFwEz9SaxY"
 program = "target/deploy/telegram_transfer.so"
-upgradeable = false
+upgradeable = true
 
 [[test.genesis]]
 address = "9yiphKYd4b69tR1ZPP8rNwtMeUwWgjYXaXdEzyNziNhz"
 program = "target/deploy/telegram_verification.so"
-upgradeable = false
+upgradeable = true
