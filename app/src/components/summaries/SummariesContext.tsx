@@ -1,7 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import type { ChatSummary } from "./SummaryFeed";
 
@@ -33,7 +40,6 @@ export function SummariesProvider({ children }: { children: ReactNode }) {
   const [summaries, setSummariesState] = useState<ChatSummary[]>([]);
   const [hasCachedData, setHasCachedData] = useState(false);
 
-  // Load from sessionStorage on mount
   useEffect(() => {
     const cached = loadFromSession();
     if (cached.length > 0) {
@@ -42,7 +48,6 @@ export function SummariesProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Persist to sessionStorage and update state
   const setSummaries = useCallback((newSummaries: ChatSummary[]) => {
     setSummariesState(newSummaries);
     setHasCachedData(newSummaries.length > 0);
@@ -53,11 +58,18 @@ export function SummariesProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const value = useMemo(
+    () => ({ summaries, setSummaries, hasCachedData }),
+    [summaries, setSummaries, hasCachedData]
+  );
+
   return (
-    <SummariesContext.Provider value={{ summaries, setSummaries, hasCachedData }}>
+    <SummariesContext.Provider value={value}>
       {children}
     </SummariesContext.Provider>
   );
 }
 
-export const useSummaries = () => useContext(SummariesContext);
+export function useSummaries(): SummariesContextType {
+  return useContext(SummariesContext);
+}

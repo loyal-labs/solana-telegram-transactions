@@ -12,7 +12,7 @@ import { handleInlineQuery } from "@/lib/telegram/bot-api/inline";
 import {
   handleCommunityMessage,
   handleGLoyalReaction,
-} from "@/lib/telegram/bot-api/message_handlers";
+} from "@/lib/telegram/bot-api/message-handlers";
 
 const bot = await getBot();
 

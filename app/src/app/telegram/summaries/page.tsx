@@ -6,8 +6,8 @@ import { CircleHelp, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { getAvatarColor, getFirstLetter } from "@/components/summaries/avatar-utils";
 import { useSummaries } from "@/components/summaries/SummariesContext";
-import { ConnectBotBanner } from "@/components/telegram/ChatBanners";
 import ConnectBotModal from "@/components/telegram/ConnectBotModal";
 
 type GroupChat = {
@@ -15,91 +15,6 @@ type GroupChat = {
   title: string;
   subtitle: string;
 };
-
-// Mock chat data for Direct tab - personal conversations
-const MOCK_DIRECT_CHATS = [
-  {
-    id: "d1",
-    title: "Alice Johnson",
-    subtitle: "Hey! Did you see the latest update on the project?",
-    messageCount: 47,
-  },
-  {
-    id: "d2",
-    title: "Bob Smith",
-    subtitle: "Thanks for helping with that bug yesterday",
-    messageCount: 23,
-  },
-  {
-    id: "d3",
-    title: "Charlie Davis",
-    subtitle: "Can we schedule a call for tomorrow?",
-    messageCount: 156,
-  },
-  {
-    id: "d4",
-    title: "Diana Wilson",
-    subtitle: "The design looks great! Just a few small tweaks...",
-    messageCount: 89,
-  },
-];
-
-// Mock chat data for Spam tab
-const MOCK_SPAM_CHATS = [
-  {
-    id: "s1",
-    title: "Crypto Giveaway Bot",
-    subtitle: "Congratulations! You've won 10 ETH! Click here to claim...",
-    messageCount: 12,
-  },
-  {
-    id: "s2",
-    title: "Investment Guru",
-    subtitle: "Make $10,000 daily with this secret trading strategy!",
-    messageCount: 34,
-  },
-  {
-    id: "s3",
-    title: "Lucky Winner",
-    subtitle: "You have been selected for an exclusive NFT airdrop...",
-    messageCount: 8,
-  },
-];
-
-// Generate a consistent color based on the chat title
-function getAvatarColor(title: string): string {
-  const colors = [
-    "#FF6B6B", // Red
-    "#4ECDC4", // Teal
-    "#45B7D1", // Blue
-    "#96CEB4", // Green
-    "#FFEAA7", // Yellow
-    "#DDA0DD", // Plum
-    "#98D8C8", // Mint
-    "#F7DC6F", // Gold
-    "#BB8FCE", // Purple
-    "#85C1E9", // Light Blue
-  ];
-
-  let hash = 0;
-  for (let i = 0; i < title.length; i++) {
-    hash = title.charCodeAt(i) + ((hash << 5) - hash);
-  }
-
-  return colors[Math.abs(hash) % colors.length];
-}
-
-// Get the first letter of the title (skip emojis)
-function getFirstLetter(title: string): string {
-  // Remove emojis and get first alphanumeric character
-  const cleaned = title
-    .replace(
-      /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu,
-      ""
-    )
-    .trim();
-  return cleaned.charAt(0).toUpperCase() || title.charAt(0).toUpperCase();
-}
 
 interface ChatItemSkeletonProps {
   showDivider?: boolean;

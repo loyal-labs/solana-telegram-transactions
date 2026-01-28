@@ -17,8 +17,6 @@
     "@irys/upload": "^0.0.15",
     "@irys/upload-solana": "^0.1.8",
     "@neondatabase/serverless": "^1.0.2",
-    "@nillion/nuc": "^1.1.1",
-    "@nillion/secretvaults": "^1.1.0",
     "@noble/ed25519": "^3.0.0",
     "@number-flow/react": "^0.5.10",
     "@solana/wallet-adapter-react": "^0.15.39",

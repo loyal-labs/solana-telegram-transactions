@@ -1,60 +1,37 @@
-"use server";
-
+import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { getReadyBuilderClient } from "@/lib/nillion/core/builder";
-import { COMMUNITY_CHAT_SUMMARIES_COLLECTION_ID } from "@/lib/nillion/schemas/community-chat-summaries-schema";
+import { getDatabase } from "@/lib/core/database";
+import { communities, summaries, type Summary } from "@/lib/core/schema";
 
-type SummaryRecord = {
-  _id: string;
-  chat_id: string;
-  chat_title: string;
-  message_count?: number;
-  topics: Array<{
-    title: string;
-    content: string;
-    sources: string[];
-  }>;
-  created_at: string;
-};
-
-export async function GET(req: Request) {
+export async function GET(req: Request): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(req.url);
     const chatId = searchParams.get("chatId");
+    const db = getDatabase();
 
-    const builderClient = await getReadyBuilderClient();
+    const result = chatId
+      ? await fetchSummariesByChatId(db, chatId)
+      : await db.query.summaries.findMany({
+          with: { community: true },
+          orderBy: [desc(summaries.createdAt)],
+        });
 
-    const filter = chatId ? { chat_id: chatId } : {};
-
-    const result = await builderClient.findData({
-      collection: COMMUNITY_CHAT_SUMMARIES_COLLECTION_ID,
-      filter,
-    });
-
-    const rawData = (result?.data || []) as SummaryRecord[];
-
-    // Transform the data to match the expected format
-    const summaries = rawData.map((item) => ({
-      id: item._id,
-      chatId: item.chat_id,
-      title: item.chat_title,
-      messageCount: item.message_count,
+    const transformedSummaries = result.map((item) => ({
+      id: item.id,
+      chatId: String(item.community.chatId),
+      title: item.chatTitle,
+      messageCount: item.messageCount,
       topics: item.topics.map((topic, index) => ({
-        id: `${item._id}-${index}`,
+        id: `${item.id}-${index}`,
         title: topic.title,
         content: topic.content,
         sources: topic.sources,
       })),
-      createdAt: item.created_at,
+      createdAt: item.createdAt.toISOString(),
     }));
 
-    // Sort by created_at descending
-    summaries.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-
-    return NextResponse.json({ summaries });
+    return NextResponse.json({ summaries: transformedSummaries });
   } catch (error) {
     console.error("[api/summaries] Failed to fetch summaries:", error);
     return NextResponse.json(
@@ -62,4 +39,26 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
+}
+
+type SummaryWithCommunity = Summary & {
+  community: { chatId: bigint };
+};
+
+async function fetchSummariesByChatId(
+  db: ReturnType<typeof getDatabase>,
+  chatId: string
+): Promise<SummaryWithCommunity[]> {
+  const community = await db.query.communities.findFirst({
+    where: eq(communities.chatId, BigInt(chatId)),
+  });
+
+  if (!community) return [];
+
+  const summaryResults = await db.query.summaries.findMany({
+    where: eq(summaries.communityId, community.id),
+    orderBy: [desc(summaries.createdAt)],
+  });
+
+  return summaryResults.map((s) => ({ ...s, community }));
 }

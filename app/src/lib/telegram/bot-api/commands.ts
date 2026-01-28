@@ -1,10 +1,11 @@
-import { randomUUID } from "node:crypto";
-
+import { eq } from "drizzle-orm";
 import type { CommandContext, Context } from "grammy";
 import { Bot, InlineKeyboard } from "grammy";
 
-import { getReadyBuilderClient } from "@/lib/nillion/core/builder";
-import { COMMUNITY_CHATS_COLLECTION_ID } from "@/lib/nillion/schemas/community-chats-schema";
+import { getDatabase } from "@/lib/core/database";
+import { admins, communities } from "@/lib/core/schema";
+import { getOrCreateUser } from "@/lib/telegram/user-service";
+import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
 
 import { MINI_APP_LINK } from "./constants";
 
@@ -39,11 +40,7 @@ export const handleCaCommand = async (
   const caAddressMarkdown = `\`${caAddress}\``;
   const cmcEndpoint =
     "https://api.coinmarketcap.com/data-api/v3.3/cryptocurrency/detail/chart?id=39037&interval=3h&convertId=2781&range=All";
-  const priceFormatter = new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
-  });
-  const marketCapFormatter = new Intl.NumberFormat("en-US", {
+  const currencyFormatter = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 3,
     maximumFractionDigits: 3,
   });
@@ -85,10 +82,10 @@ export const handleCaCommand = async (
       : NaN;
 
     if (Number.isFinite(latestPrice)) {
-      priceValue = `$${priceFormatter.format(latestPrice)}`;
+      priceValue = `$${currencyFormatter.format(latestPrice)}`;
     }
     if (Number.isFinite(latestMarketCap)) {
-      marketCapValue = `$${marketCapFormatter.format(latestMarketCap)}`;
+      marketCapValue = `$${currencyFormatter.format(latestMarketCap)}`;
     }
   } catch (error) {
     console.error("Failed to fetch CMC data for ca command", error);
@@ -112,38 +109,77 @@ export const handleActivateCommunityCommand = async (
 ) => {
   if (!ctx.from || !ctx.chat) return;
 
-  if (
-    ctx.chat.type !== "group" &&
-    ctx.chat.type !== "supergroup" &&
-    ctx.chat.type !== "channel"
-  ) {
+  if (!isCommunityChat(ctx.chat.type)) {
     await ctx.reply("This command can only be used in group chats.");
     return;
   }
 
-  const member = await bot.api.getChatMember(ctx.chat.id, ctx.from.id);
-  if (member.status !== "creator" && member.status !== "administrator") {
-    await ctx.reply("Only admins can activate community tracking.");
-    return;
+  const telegramUserId = BigInt(ctx.from.id);
+
+  try {
+    const db = getDatabase();
+
+    // Check if user is in admin whitelist
+    const admin = await db.query.admins.findFirst({
+      where: eq(admins.telegramId, telegramUserId),
+    });
+
+    if (!admin) {
+      await ctx.reply(
+        "You are not authorized to activate communities. Contact an administrator to be added to the whitelist."
+      );
+      return;
+    }
+
+    // Check if user is a Telegram group admin
+    const member = await bot.api.getChatMember(ctx.chat.id, ctx.from.id);
+    if (member.status !== "creator" && member.status !== "administrator") {
+      await ctx.reply("Only group admins can activate community tracking.");
+      return;
+    }
+
+    const chatId = BigInt(ctx.chat.id);
+
+    // Check if community already exists
+    const existingCommunity = await db.query.communities.findFirst({
+      where: eq(communities.chatId, chatId),
+    });
+
+    if (existingCommunity) {
+      if (existingCommunity.isActive) {
+        await ctx.reply(
+          "This community is already activated for message tracking."
+        );
+        return;
+      }
+      // Reactivate the community
+      await db
+        .update(communities)
+        .set({ isActive: true, updatedAt: new Date() })
+        .where(eq(communities.id, existingCommunity.id));
+      await ctx.reply("Community reactivated for message tracking!");
+      return;
+    }
+
+    // Ensure user exists in the users table
+    const displayName = getTelegramDisplayName(ctx.from);
+    await getOrCreateUser(telegramUserId, {
+      username: ctx.from.username || null,
+      displayName,
+    });
+
+    // Create new community
+    await db.insert(communities).values({
+      chatId,
+      chatTitle: ctx.chat.title || "Untitled",
+      activatedBy: telegramUserId,
+    });
+
+    await ctx.reply("Community activated for message tracking!");
+  } catch (error) {
+    console.error("Failed to activate community", error);
+    await ctx.reply(
+      "An error occurred while activating the community. Please try again."
+    );
   }
-
-  const builderClient = await getReadyBuilderClient();
-  const now = new Date().toISOString();
-
-  await builderClient.createStandardData({
-    collection: COMMUNITY_CHATS_COLLECTION_ID,
-    data: [
-      {
-        _id: randomUUID(),
-        chat_id: String(ctx.chat.id),
-        chat_title: ctx.chat.title || "Untitled",
-        activated_by: String(ctx.from.id),
-        settings: {},
-        activated_at: now,
-        updated_at: now,
-      },
-    ],
-  });
-
-  await ctx.reply("Community activated for message tracking!");
 };

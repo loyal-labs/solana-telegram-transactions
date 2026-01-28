@@ -13,6 +13,8 @@ import { ArrowUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { getAvatarColor, getFirstLetter } from "./avatar-utils";
+
 export type ChatSummary = {
   id: string;
   title: string;
@@ -24,38 +26,6 @@ export type ChatSummary = {
     sources: string[];
   }>;
 };
-
-// Generate a consistent color based on name
-function getAvatarColor(name: string): string {
-  const colors = [
-    "#FF6B6B",
-    "#4ECDC4",
-    "#45B7D1",
-    "#96CEB4",
-    "#FFEAA7",
-    "#DDA0DD",
-    "#98D8C8",
-    "#F7DC6F",
-    "#BB8FCE",
-    "#85C1E9",
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-}
-
-// Get first letter of name
-function getFirstLetter(name: string): string {
-  const cleaned = name
-    .replace(
-      /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu,
-      ""
-    )
-    .trim();
-  return cleaned.charAt(0).toUpperCase() || name.charAt(0).toUpperCase();
-}
 
 // Source avatars component (overlapping circles)
 function SourceAvatars({ sources }: { sources: string[] }) {
