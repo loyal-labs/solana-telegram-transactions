@@ -5,13 +5,17 @@ import { messages, summaries, type Topic } from "@/lib/core/schema";
 import { chatCompletion } from "@/lib/redpill";
 import { SUMMARY_INTERVAL_MS } from "@/lib/telegram/utils";
 
+const MIN_MESSAGES_FOR_SUMMARY = 5;
+
+const SYSTEM_PROMPT = `You summarize group chat conversations into topics. Output JSON:
+{"topics":[{"title":"Topic Name","content":"Summary paragraph","sources":["Name1","Name2"]}]}
+Keep summaries concise. List 1-5 topics. Sources are participant names who contributed to each topic.`;
+
 export async function generateChatSummary(
   communityId: string,
   chatTitle: string
-) {
+): Promise<void> {
   const db = getDatabase();
-
-  // Get messages from last 24h
   const oneDayAgo = new Date(Date.now() - SUMMARY_INTERVAL_MS);
 
   const recentMessages = await db.query.messages.findMany({
@@ -19,44 +23,44 @@ export async function generateChatSummary(
       eq(messages.communityId, communityId),
       gte(messages.createdAt, oneDayAgo)
     ),
-    with: {
-      user: true,
-    },
+    with: { user: true },
     orderBy: [asc(messages.telegramMessageId)],
   });
 
-  if (recentMessages.length < 5) return; // Not enough to summarize
+  if (recentMessages.length < MIN_MESSAGES_FOR_SUMMARY) return;
 
-  // Format messages for LLM
   const formattedMessages = recentMessages
     .map((m) => `${m.user.displayName}: ${m.content}`)
     .join("\n");
 
-  // Generate summary via RedPill
   const response = await chatCompletion({
     model: "phala/gpt-oss-120b",
     messages: [
-      {
-        role: "system",
-        content: `You summarize group chat conversations into topics. Output JSON:
-{"topics":[{"title":"Topic Name","content":"Summary paragraph","sources":["Name1","Name2"]}]}
-Keep summaries concise. List 1-5 topics. Sources are participant names who contributed to each topic.`,
-      },
-      {
-        role: "user",
-        content: `Summarize this chat:\n\n${formattedMessages}`,
-      },
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: `Summarize this chat:\n\n${formattedMessages}` },
     ],
     temperature: 0.3,
   });
 
-  // Safely extract and parse LLM response
   const summaryText = response.choices?.[0]?.message?.content;
   if (!summaryText) {
     throw new Error("Empty response from LLM");
   }
 
-  let parsed: { topics: Topic[] };
+  const topics = parseAndValidateTopics(summaryText);
+
+  await db.insert(summaries).values({
+    communityId,
+    chatTitle,
+    messageCount: recentMessages.length,
+    fromMessageId: recentMessages[0].telegramMessageId,
+    toMessageId: recentMessages[recentMessages.length - 1].telegramMessageId,
+    topics,
+  });
+}
+
+function parseAndValidateTopics(summaryText: string): Topic[] {
+  let parsed: { topics: unknown };
   try {
     parsed = JSON.parse(summaryText);
   } catch {
@@ -67,20 +71,21 @@ Keep summaries concise. List 1-5 topics. Sources are participant names who contr
     throw new Error("Invalid summary format: missing topics array");
   }
 
-  // Validate topic structure
   for (const topic of parsed.topics) {
-    if (!topic.title || !topic.content || !Array.isArray(topic.sources)) {
+    if (!isValidTopic(topic)) {
       throw new Error("Invalid topic structure in summary");
     }
   }
 
-  // Store summary
-  await db.insert(summaries).values({
-    communityId,
-    chatTitle,
-    messageCount: recentMessages.length,
-    fromMessageId: recentMessages[0].telegramMessageId,
-    toMessageId: recentMessages[recentMessages.length - 1].telegramMessageId,
-    topics: parsed.topics,
-  });
+  return parsed.topics as Topic[];
+}
+
+function isValidTopic(topic: unknown): topic is Topic {
+  if (typeof topic !== "object" || topic === null) return false;
+  const t = topic as Record<string, unknown>;
+  return (
+    typeof t.title === "string" &&
+    typeof t.content === "string" &&
+    Array.isArray(t.sources)
+  );
 }
