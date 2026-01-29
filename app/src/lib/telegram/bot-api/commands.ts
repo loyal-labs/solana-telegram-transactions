@@ -224,3 +224,78 @@ export async function handleSummaryCommand(
     );
   }
 }
+
+export async function handleDeactivateCommunityCommand(
+  ctx: CommandContext<Context>,
+  bot: Bot
+): Promise<void> {
+  if (!ctx.from || !ctx.chat) return;
+
+  if (!isCommunityChat(ctx.chat.type)) {
+    await ctx.reply("This command can only be used in group chats.");
+    return;
+  }
+
+  const telegramUserId = BigInt(ctx.from.id);
+
+  try {
+    const db = getDatabase();
+
+    // Check if user is in admin whitelist
+    const admin = await db.query.admins.findFirst({
+      where: eq(admins.telegramId, telegramUserId),
+    });
+
+    if (!admin) {
+      await ctx.reply(
+        "You are not authorized to deactivate communities. Contact an administrator."
+      );
+      return;
+    }
+
+    // Check if user is a Telegram group admin
+    let member;
+    try {
+      member = await bot.api.getChatMember(ctx.chat.id, ctx.from.id);
+    } catch {
+      await ctx.reply(
+        "Unable to verify admin status. Ensure the bot has permission to view chat members."
+      );
+      return;
+    }
+    if (member.status !== "creator" && member.status !== "administrator") {
+      await ctx.reply("Only group admins can deactivate community tracking.");
+      return;
+    }
+
+    const chatId = BigInt(ctx.chat.id);
+
+    // Find the community
+    const existingCommunity = await db.query.communities.findFirst({
+      where: eq(communities.chatId, chatId),
+    });
+
+    if (!existingCommunity) {
+      await ctx.reply("This community is not activated.");
+      return;
+    }
+
+    if (!existingCommunity.isActive) {
+      await ctx.reply("This community is already deactivated.");
+      return;
+    }
+
+    // Deactivate the community
+    await db
+      .update(communities)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(communities.id, existingCommunity.id));
+
+    await ctx.reply("Community deactivated. Message tracking has been disabled.");
+  } catch (error) {
+    console.error("Failed to deactivate community", error);
+    await ctx.reply(
+      "An error occurred while deactivating the community. Please try again."
+    );
+  }
+}
