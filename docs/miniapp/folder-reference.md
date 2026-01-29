@@ -43,6 +43,45 @@ HTTP utilities and database connections.
 
 ---
 
+## `/encryption`
+
+Server-side AES-256-GCM encryption for personal messages.
+
+| File | Exports | Description |
+|------|---------|-------------|
+| `encrypt.ts` | `encrypt()` | Encrypts plaintext, returns `{ ciphertext, iv }` |
+| `decrypt.ts` | `decrypt()` | Decrypts data, returns plaintext or `null` on failure |
+| `types.ts` | `EncryptedData` | TypeScript interface for encrypted payload |
+
+**Configuration:**
+
+| Item | Source | Description |
+|------|--------|-------------|
+| Algorithm | Hardcoded | AES-256-GCM via Web Crypto API |
+| Key | Env var | `MESSAGE_ENCRYPTION_KEY` (base64-encoded 32 bytes) |
+| IV | Generated | Random 12 bytes per encryption |
+
+**Usage:**
+
+```typescript
+import { encrypt, decrypt } from "@/lib/encryption";
+
+// Encrypt
+const encrypted = await encrypt("secret message");
+// { ciphertext: "base64...", iv: "base64..." }
+
+// Decrypt
+const plaintext = await decrypt(encrypted);
+// "secret message" or null if tampered/invalid
+```
+
+**Security features:**
+- Unique IV per encryption (same plaintext produces different ciphertext)
+- GCM authentication tag detects tampering
+- Returns `null` on any failure (no error details exposed)
+
+---
+
 ## `/solana`
 
 Solana blockchain integration.
