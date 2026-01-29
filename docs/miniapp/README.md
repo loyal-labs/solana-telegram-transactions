@@ -7,6 +7,7 @@ Quick reference for `/app/src/lib/`.
 | Folder | Purpose | Key Exports |
 |--------|---------|-------------|
 | `/core` | HTTP utilities, database | `fetchJson()`, `resolveEndpoint()`, `getDatabase()` |
+| `/encryption` | Message encryption | `encrypt()`, `decrypt()` |
 | `/solana` | Blockchain integration | RPC connections, wallet, deposits |
 | `/telegram` | Telegram SDK integration | Mini app utils, bot API |
 | `/magicblock` | SOL/USD price feed | `fetchSolUsdPrice()` |
