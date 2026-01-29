@@ -12,7 +12,7 @@ import { chatCompletion } from "@/lib/redpill";
 import { SUMMARY_INTERVAL_MS } from "@/lib/telegram/utils";
 
 import { buildSummaryMessageWithPreview } from "./build-summary-og-url";
-import { MINI_APP_LINK } from "./constants";
+import { MINI_APP_FEED_LINK } from "./constants";
 
 export const MIN_MESSAGES_FOR_SUMMARY = 5;
 
@@ -158,7 +158,7 @@ export async function sendLatestSummary(
     latestSummary.createdAt
   );
 
-  const keyboard = new InlineKeyboard().url("Read in full", MINI_APP_LINK);
+  const keyboard = new InlineKeyboard().url("Read in full", MINI_APP_FEED_LINK);
 
   const messageOptions = {
     parse_mode: "HTML" as const,

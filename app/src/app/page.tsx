@@ -1,18 +1,35 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
+import { getStartParamRoute } from "@/hooks/useStartParam";
 import { getCloudValue } from "@/lib/telegram/mini-app/cloud-storage";
 
 const LAST_PAGE_CACHE_KEY = "last_visited_page";
 const SPLASH_DURATION = 2400; // ms - time before redirect
+const DEEPLINK_DELAY = 400; // ms - shorter delay for deeplinks
 
 export default function SplashPage() {
   const router = useRouter();
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
+    if (hasRedirected.current) return;
+
     const redirect = async () => {
+      // 1. Check startParam first (highest priority - deeplinks)
+      const deeplinkRoute = getStartParamRoute();
+
+      if (deeplinkRoute) {
+        hasRedirected.current = true;
+        setTimeout(() => {
+          router.replace(deeplinkRoute);
+        }, DEEPLINK_DELAY);
+        return;
+      }
+
+      // 2. Fall back to saved page from cloud storage
       let targetPage = "/telegram/wallet";
 
       try {
@@ -28,6 +45,7 @@ export default function SplashPage() {
         // Use default
       }
 
+      hasRedirected.current = true;
       // Wait for animation to complete
       setTimeout(() => {
         router.replace(targetPage);
