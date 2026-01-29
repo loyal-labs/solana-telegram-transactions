@@ -6,6 +6,7 @@ import {
   handleActivateCommunityCommand,
   handleCaCommand,
   handleStartCommand,
+  handleSummaryCommand,
 } from "@/lib/telegram/bot-api/commands";
 import { sendBusinessConnectionMessage } from "@/lib/telegram/bot-api/handle-business-connection";
 import { handleInlineQuery } from "@/lib/telegram/bot-api/inline";
@@ -26,6 +27,10 @@ bot.command("ca", async (ctx: CommandContext<Context>) => {
 
 bot.command("activate_community", async (ctx: CommandContext<Context>) => {
   await handleActivateCommunityCommand(ctx, bot);
+});
+
+bot.command("summary", async (ctx: CommandContext<Context>) => {
+  await handleSummaryCommand(ctx, bot);
 });
 
 bot.on("inline_query", async (ctx) => {
