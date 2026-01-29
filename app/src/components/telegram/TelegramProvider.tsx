@@ -1,6 +1,6 @@
 'use client';
 
-import { init } from '@telegram-apps/sdk';
+import { init, postEvent } from '@telegram-apps/sdk';
 import { useRawInitData } from '@telegram-apps/sdk-react';
 import { usePathname } from 'next/navigation';
 import {
@@ -79,6 +79,13 @@ function TelegramProviderInner({ children }: PropsWithChildren) {
       init();
     } catch (error) {
       console.error('Failed to initialize Telegram SDK:', error);
+    }
+
+    // Disable vertical swipes to prevent conflict with app's swipe gestures (Bot API 7.7+)
+    try {
+      postEvent('web_app_setup_swipe_behavior', { allow_vertical_swipe: false });
+    } catch (error) {
+      console.error('Failed to disable vertical swipes:', error);
     }
   }, []);
 
