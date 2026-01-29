@@ -232,6 +232,17 @@ export default function SummaryFeed({
     [summariesByDate, selectedDate]
   );
 
+  // Get adjacent dates' topics for peek effect during swipe
+  const { prevTopics, nextTopics } = useMemo(() => {
+    const currentIndex = availableDates.indexOf(selectedDate);
+    const prevDate = currentIndex < availableDates.length - 1 ? availableDates[currentIndex + 1] : null;
+    const nextDate = currentIndex > 0 ? availableDates[currentIndex - 1] : null;
+    return {
+      prevTopics: prevDate ? getTopicsForDate(summariesByDate, prevDate) : [],
+      nextTopics: nextDate ? getTopicsForDate(summariesByDate, nextDate) : [],
+    };
+  }, [availableDates, selectedDate, summariesByDate]);
+
   // Setup Telegram back button and disable vertical swipe to close
   useEffect(() => {
     // Disable vertical swipe to close the app
@@ -291,6 +302,7 @@ export default function SummaryFeed({
   // Swipe detection for content area
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const isSwipingRef = useRef(false);
+  const [swipeX, setSwipeX] = useState(0); // Track horizontal drag offset
 
   // Date picker collapse state based on scroll
   const [isDatePickerCollapsed, setIsDatePickerCollapsed] = useState(false);
@@ -337,7 +349,10 @@ export default function SummaryFeed({
     [availableDates, selectedDate, topics]
   );
 
-  // Handle touch events for swipe detection
+  // Swipe threshold to trigger date change
+  const SWIPE_THRESHOLD = 50;
+
+  // Handle touch events for swipe detection with visual feedback
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartRef.current = {
       x: e.touches[0].clientX,
@@ -356,7 +371,34 @@ export default function SummaryFeed({
     if (!isSwipingRef.current && Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
       isSwipingRef.current = true;
     }
-  }, []);
+
+    // Apply visual feedback during horizontal swipe
+    if (isSwipingRef.current) {
+      // Check if we can navigate in this direction
+      const currentIndex = availableDates.indexOf(selectedDate);
+      const canGoNext = currentIndex > 0; // newer date
+      const canGoPrev = currentIndex < availableDates.length - 1; // older date
+
+      // Apply resistance if can't go in that direction
+      let adjustedDelta = deltaX;
+      if ((deltaX < 0 && !canGoNext) || (deltaX > 0 && !canGoPrev)) {
+        // Rubber band effect - stronger resistance when can't navigate
+        adjustedDelta = deltaX * 0.15;
+      } else {
+        // Subtle movement - enough to hint but not reveal too much
+        adjustedDelta = deltaX * 0.35;
+      }
+
+      setSwipeX(adjustedDelta);
+
+      // Haptic feedback at threshold
+      if (Math.abs(deltaX) >= SWIPE_THRESHOLD && Math.abs(deltaX - (deltaX > 0 ? 5 : -5)) < SWIPE_THRESHOLD) {
+        if (hapticFeedback.selectionChanged.isAvailable()) {
+          hapticFeedback.selectionChanged();
+        }
+      }
+    }
+  }, [availableDates, selectedDate]);
 
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
@@ -365,8 +407,8 @@ export default function SummaryFeed({
       const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
       const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
 
-      // Only trigger if it was a horizontal swipe
-      if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+      // Only trigger if it was a horizontal swipe past threshold
+      if (Math.abs(deltaX) > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
         if (deltaX < 0) {
           // Swipe left = go to newer date
           navigateToAdjacentDate("next");
@@ -376,6 +418,8 @@ export default function SummaryFeed({
         }
       }
 
+      // Reset swipe position (animate back if no navigation)
+      setSwipeX(0);
       touchStartRef.current = null;
       isSwipingRef.current = false;
     },
@@ -622,8 +666,50 @@ export default function SummaryFeed({
           }}
         />
 
-        {/* Sliding container wrapper */}
-        <div className="h-full relative overflow-hidden">
+        {/* Sliding container wrapper - carousel with peek */}
+        <div
+          className="h-full relative"
+          style={{
+            transform: swipeX !== 0 ? `translateX(${swipeX}px)` : undefined,
+            transition: swipeX === 0 ? "transform 200ms ease-out" : "none",
+          }}
+        >
+          {/* Previous day's content - peeking from left */}
+          {prevTopics.length > 0 && !isSliding && (
+            <div
+              className="absolute top-0 bottom-0 px-4 pt-2 pb-8 overflow-hidden pointer-events-none"
+              style={{
+                width: "100%",
+                right: "100%",
+                marginRight: -20, // Peek amount
+              }}
+            >
+              <div className="flex flex-col gap-3 opacity-60">
+                {prevTopics.slice(0, 2).map((topic) => (
+                  <TopicCard key={`prev-${topic.id}`} topic={topic} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Next day's content - peeking from right */}
+          {nextTopics.length > 0 && !isSliding && (
+            <div
+              className="absolute top-0 bottom-0 px-4 pt-2 pb-8 overflow-hidden pointer-events-none"
+              style={{
+                width: "100%",
+                left: "100%",
+                marginLeft: -20, // Peek amount
+              }}
+            >
+              <div className="flex flex-col gap-3 opacity-60">
+                {nextTopics.slice(0, 2).map((topic) => (
+                  <TopicCard key={`next-${topic.id}`} topic={topic} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Old content - slides out */}
           {isSliding && (
             <div
@@ -651,7 +737,7 @@ export default function SummaryFeed({
             </div>
           )}
 
-          {/* New content - slides in */}
+          {/* Current content */}
           <div
             ref={scrollContainerRef}
             onScroll={handleContentScroll}
