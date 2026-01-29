@@ -8,6 +8,13 @@
       "when": 1769502523349,
       "tag": "0000_jazzy_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769657160531,
+      "tag": "0001_curved_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }

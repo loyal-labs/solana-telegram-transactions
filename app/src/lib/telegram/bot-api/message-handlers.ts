@@ -16,7 +16,8 @@ import {
   SUMMARY_INTERVAL_MS,
 } from "@/lib/telegram/utils";
 
-import { generateChatSummary } from "./summaries";
+import { getBot } from "./bot";
+import { generateChatSummary, sendLatestSummary } from "./summaries";
 
 const POSITIVE_REACTIONS = [
   "❤",
@@ -32,12 +33,12 @@ const POSITIVE_REACTIONS = [
 
 const GLOYAL_TRIGGER = "gloyal";
 
-const pickRandomReaction = () => {
+function pickRandomReaction(): (typeof POSITIVE_REACTIONS)[number] {
   const index = Math.floor(Math.random() * POSITIVE_REACTIONS.length);
   return POSITIVE_REACTIONS[index];
-};
+}
 
-export const handleGLoyalReaction = async (ctx: Context, bot: Bot) => {
+export async function handleGLoyalReaction(ctx: Context, bot: Bot): Promise<void> {
   const text = ctx.message?.text;
   if (!text) return;
   if (!text.toLowerCase().includes(GLOYAL_TRIGGER)) return;
@@ -58,14 +59,14 @@ export const handleGLoyalReaction = async (ctx: Context, bot: Bot) => {
       emoji,
     },
   ]);
-};
+}
 
 // Cache of active community IDs (chatId string -> communityUUID)
 const activeCommunities = new Map<string, string>();
 // Cache last summary timestamps (communityUUID -> ISO date string)
 const lastSummaryTimestamps = new Map<string, string>();
 
-export const handleCommunityMessage = async (ctx: Context) => {
+export async function handleCommunityMessage(ctx: Context): Promise<void> {
   const chat = ctx.chat;
   if (!chat) return;
   if (!isCommunityChat(chat.type)) return;
@@ -124,13 +125,17 @@ export const handleCommunityMessage = async (ctx: Context) => {
     // Check if summary is needed
     const chatTitle =
       "title" in chat ? (chat.title as string) : `Chat ${chatIdStr}`;
-    triggerSummaryIfNeeded(communityId, chatTitle);
+    triggerSummaryIfNeeded(communityId, chatTitle, chatId);
   } catch (error) {
     console.error("Failed to handle community message", error);
   }
-};
+}
 
-function triggerSummaryIfNeeded(communityId: string, chatTitle: string) {
+function triggerSummaryIfNeeded(
+  communityId: string,
+  chatTitle: string,
+  chatId: bigint
+) {
   const now = Date.now();
 
   // Check cache first
@@ -141,7 +146,7 @@ function triggerSummaryIfNeeded(communityId: string, chatTitle: string) {
   }
 
   // Check DB for last summary if not cached (async, fire-and-forget style)
-  checkAndTriggerSummary(communityId, chatTitle, cachedTimestamp).catch(
+  checkAndTriggerSummary(communityId, chatTitle, cachedTimestamp, chatId).catch(
     console.error
   );
 }
@@ -149,7 +154,8 @@ function triggerSummaryIfNeeded(communityId: string, chatTitle: string) {
 async function checkAndTriggerSummary(
   communityId: string,
   chatTitle: string,
-  cachedTimestamp: string | undefined
+  cachedTimestamp: string | undefined,
+  chatId: bigint
 ) {
   const now = Date.now();
   const db = getDatabase();
@@ -173,6 +179,14 @@ async function checkAndTriggerSummary(
   try {
     await generateChatSummary(communityId, chatTitle);
     lastSummaryTimestamps.set(communityId, new Date().toISOString());
+
+    // Auto-post the summary to the chat
+    try {
+      const bot = await getBot();
+      await sendLatestSummary(bot, chatId);
+    } catch (postError) {
+      console.error("Failed to auto-post summary", postError);
+    }
   } catch (error) {
     console.error("Summary generation failed, will retry later", error);
     // Don't update timestamp on failure - allows retry on next message

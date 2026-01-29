@@ -1,15 +1,21 @@
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, desc, eq, gte } from "drizzle-orm";
+import type { Bot } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
-import { messages, summaries, type Topic } from "@/lib/core/schema";
+import { communities, messages, summaries, type Topic } from "@/lib/core/schema";
 import { chatCompletion } from "@/lib/redpill";
 import { SUMMARY_INTERVAL_MS } from "@/lib/telegram/utils";
+
+import { buildSummaryMessageWithPreview } from "./build-summary-og-url";
+import { MINI_APP_LINK } from "./constants";
 
 export const MIN_MESSAGES_FOR_SUMMARY = 5;
 
 export const SYSTEM_PROMPT = `You summarize group chat conversations into topics. Output JSON:
 {"topics":[{"title":"Topic Name","content":"Summary paragraph","sources":["Name1","Name2"]}]}
 Keep summaries concise. List 1-5 topics. Sources are participant names who contributed to each topic.`;
+
+export const ONELINER_PROMPT = `Given these discussion topics from a group chat, write a single catchy sentence (max 110 characters) that captures the essence of the day's conversation. Output only the sentence, no quotes or formatting.`;
 
 export async function generateChatSummary(
   communityId: string,
@@ -48,6 +54,7 @@ export async function generateChatSummary(
   }
 
   const topics = parseAndValidateTopics(summaryText);
+  const oneliner = await generateOneliner(topics);
 
   await db.insert(summaries).values({
     communityId,
@@ -56,7 +63,26 @@ export async function generateChatSummary(
     fromMessageId: recentMessages[0].telegramMessageId,
     toMessageId: recentMessages[recentMessages.length - 1].telegramMessageId,
     topics,
+    oneliner,
   });
+}
+
+export async function generateOneliner(topics: Topic[]): Promise<string> {
+  const topicsSummary = topics
+    .map((t) => `${t.title}: ${t.content}`)
+    .join("\n");
+
+  const response = await chatCompletion({
+    model: "phala/gpt-oss-120b",
+    messages: [
+      { role: "system", content: ONELINER_PROMPT },
+      { role: "user", content: topicsSummary },
+    ],
+    temperature: 0.5,
+  });
+
+  const oneliner = response.choices?.[0]?.message?.content?.trim() ?? "";
+  return oneliner.slice(0, 110);
 }
 
 export function parseAndValidateTopics(summaryText: string): Topic[] {
@@ -88,4 +114,58 @@ function isValidTopic(topic: unknown): topic is Topic {
     typeof t.content === "string" &&
     Array.isArray(t.sources)
   );
+}
+
+export type SendSummaryResult =
+  | { sent: true }
+  | { sent: false; reason: "not_activated" | "no_summaries" };
+
+export async function sendLatestSummary(
+  bot: Bot,
+  chatId: bigint
+): Promise<SendSummaryResult> {
+  const db = getDatabase();
+
+  const community = await db.query.communities.findFirst({
+    where: and(
+      eq(communities.chatId, chatId),
+      eq(communities.isActive, true)
+    ),
+  });
+
+  if (!community) {
+    return { sent: false, reason: "not_activated" };
+  }
+
+  const latestSummary = await db.query.summaries.findFirst({
+    where: eq(summaries.communityId, community.id),
+    orderBy: [desc(summaries.createdAt)],
+  });
+
+  if (!latestSummary) {
+    return { sent: false, reason: "no_summaries" };
+  }
+
+  const safeOneliner = escapeTelegramHtml(latestSummary.oneliner);
+  const messageBody = `<b>${community.chatTitle} Daily Summary</b>\n\n${safeOneliner}\n\n<a href="${MINI_APP_LINK}">View full summary in Loyal</a>`;
+
+  const messageWithPreview = buildSummaryMessageWithPreview(
+    messageBody,
+    latestSummary.oneliner,
+    latestSummary.createdAt
+  );
+
+  await bot.api.sendMessage(Number(chatId), messageWithPreview, {
+    parse_mode: "HTML",
+    link_preview_options: { prefer_large_media: true },
+  });
+
+  return { sent: true };
+}
+
+function escapeTelegramHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
