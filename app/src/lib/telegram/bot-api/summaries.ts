@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gte } from "drizzle-orm";
-import type { Bot } from "grammy";
+import { type Bot,InlineKeyboard } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
 import {
@@ -12,6 +12,7 @@ import { chatCompletion } from "@/lib/redpill";
 import { SUMMARY_INTERVAL_MS } from "@/lib/telegram/utils";
 
 import { buildSummaryMessageWithPreview } from "./build-summary-og-url";
+import { MINI_APP_LINK } from "./constants";
 
 export const MIN_MESSAGES_FOR_SUMMARY = 5;
 
@@ -156,9 +157,12 @@ export async function sendLatestSummary(
     latestSummary.createdAt
   );
 
+  const keyboard = new InlineKeyboard().url("Read in full", MINI_APP_LINK);
+
   await bot.api.sendMessage(Number(chatId), messageWithPreview, {
     parse_mode: "HTML",
     link_preview_options: { prefer_large_media: true },
+    reply_markup: keyboard,
   });
 
   return { sent: true };
