@@ -22,6 +22,7 @@ export async function GET(req: Request): Promise<NextResponse> {
       chatId: String(item.community.chatId),
       title: item.chatTitle,
       messageCount: item.messageCount,
+      oneliner: item.oneliner,
       topics: item.topics.map((topic, index) => ({
         id: `${item.id}-${index}`,
         title: topic.title,

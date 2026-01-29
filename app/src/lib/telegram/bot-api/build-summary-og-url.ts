@@ -8,7 +8,7 @@ function formatDate(date: Date): string {
 
 export function buildSummaryOgImageUrl(text: string, date: Date): string {
   const endpoint = resolveEndpoint("api/og/share-summary");
-  const url = new URL(endpoint);
+  const url = new URL(endpoint, "http://localhost");
   url.searchParams.set("text", text);
   url.searchParams.set("date", formatDate(date));
   return url.toString();

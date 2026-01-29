@@ -146,7 +146,8 @@ export async function sendLatestSummary(
     return { sent: false, reason: "no_summaries" };
   }
 
-  const messageBody = `<b>${community.chatTitle} Daily Summary</b>\n\n${latestSummary.oneliner}\n\n<a href="${MINI_APP_LINK}">View full summary in Loyal</a>`;
+  const safeOneliner = escapeTelegramHtml(latestSummary.oneliner);
+  const messageBody = `<b>${community.chatTitle} Daily Summary</b>\n\n${safeOneliner}\n\n<a href="${MINI_APP_LINK}">View full summary in Loyal</a>`;
 
   const messageWithPreview = buildSummaryMessageWithPreview(
     messageBody,
@@ -160,4 +161,11 @@ export async function sendLatestSummary(
   });
 
   return { sent: true };
+}
+
+function escapeTelegramHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }

@@ -168,6 +168,7 @@ export const summaries = pgTable(
     topics: jsonb("topics")
       .$type<{ title: string; content: string; sources: string[] }[]>()
       .notNull(),
+    oneliner: text("oneliner").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
