@@ -1,6 +1,6 @@
 [toolchain]
 anchor_version = "0.32.1"
-solana_version = "2.1.0"
+solana_version = "3.1.8"
 package_manager = "bun"
 
 [features]
@@ -37,6 +37,13 @@ upgradeable = true
 [[test.genesis]]
 address = "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
 program = "tests/fixtures/dlp.so"
+upgradeable = true
+
+# MagicBlock’s Permission Program
+# https://docs.magicblock.gg/pages/private-ephemeral-rollups-pers/how-to-guide/quickstart#step-by-step-guide
+[[test.genesis]]
+address = "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
+program = "tests/fixtures/permission.so"
 upgradeable = true
 
 [[test.genesis]]
