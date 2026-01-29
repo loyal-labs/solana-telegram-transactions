@@ -5,6 +5,7 @@ import { getBot } from "@/lib/telegram/bot-api/bot";
 import {
   handleActivateCommunityCommand,
   handleCaCommand,
+  handleDeactivateCommunityCommand,
   handleStartCommand,
   handleSummaryCommand,
 } from "@/lib/telegram/bot-api/commands";
@@ -27,6 +28,10 @@ bot.command("ca", async (ctx: CommandContext<Context>) => {
 
 bot.command("activate_community", async (ctx: CommandContext<Context>) => {
   await handleActivateCommunityCommand(ctx, bot);
+});
+
+bot.command("deactivate_community", async (ctx: CommandContext<Context>) => {
+  await handleDeactivateCommunityCommand(ctx, bot);
 });
 
 bot.command("summary", async (ctx: CommandContext<Context>) => {
