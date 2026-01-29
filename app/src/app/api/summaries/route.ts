@@ -17,20 +17,28 @@ export async function GET(req: Request): Promise<NextResponse> {
           orderBy: [desc(summaries.createdAt)],
         });
 
-    const transformedSummaries = result.map((item) => ({
-      id: item.id,
-      chatId: String(item.community.chatId),
-      title: item.chatTitle,
-      messageCount: item.messageCount,
-      oneliner: item.oneliner,
-      topics: item.topics.map((topic, index) => ({
-        id: `${item.id}-${index}`,
-        title: topic.title,
-        content: topic.content,
-        sources: topic.sources,
-      })),
-      createdAt: item.createdAt.toISOString(),
-    }));
+    const transformedSummaries = result.map((item) => {
+      const settings = item.community.settings as {
+        photoBase64?: string;
+        photoMimeType?: string;
+      } | null;
+      return {
+        id: item.id,
+        chatId: String(item.community.chatId),
+        title: item.chatTitle,
+        messageCount: item.messageCount,
+        oneliner: item.oneliner,
+        photoBase64: settings?.photoBase64,
+        photoMimeType: settings?.photoMimeType,
+        topics: item.topics.map((topic, index) => ({
+          id: `${item.id}-${index}`,
+          title: topic.title,
+          content: topic.content,
+          sources: topic.sources,
+        })),
+        createdAt: item.createdAt.toISOString(),
+      };
+    });
 
     return NextResponse.json({ summaries: transformedSummaries });
   } catch (error) {
@@ -43,7 +51,7 @@ export async function GET(req: Request): Promise<NextResponse> {
 }
 
 type SummaryWithCommunity = Summary & {
-  community: { chatId: bigint };
+  community: { chatId: bigint; settings: unknown };
 };
 
 async function fetchSummariesByChatId(

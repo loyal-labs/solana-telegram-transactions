@@ -21,6 +21,8 @@ type GroupChat = {
   id: string;
   title: string;
   subtitle: string;
+  photoBase64?: string;
+  photoMimeType?: string;
 };
 
 interface ChatItemSkeletonProps {
@@ -78,7 +80,7 @@ function ChatListSkeleton({ count = 5 }: { count?: number }) {
 }
 
 interface ChatItemProps {
-  chat: { id: string; title: string; subtitle?: string };
+  chat: { id: string; title: string; subtitle?: string; photoBase64?: string; photoMimeType?: string };
   onClick: () => void;
   showDivider?: boolean;
 }
@@ -95,12 +97,20 @@ function ChatItem({ chat, onClick, showDivider = true }: ChatItemProps) {
       >
         {/* Avatar */}
         <div className="pr-3">
-          <div
-            className="w-14 h-14 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: avatarColor }}
-          >
-            <span className="text-xl font-medium text-white">{firstLetter}</span>
-          </div>
+          {chat.photoBase64 ? (
+            <img
+              src={`data:${chat.photoMimeType || "image/jpeg"};base64,${chat.photoBase64}`}
+              alt={chat.title}
+              className="w-14 h-14 rounded-full object-cover"
+            />
+          ) : (
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: avatarColor }}
+            >
+              <span className="text-xl font-medium text-white">{firstLetter}</span>
+            </div>
+          )}
         </div>
 
         {/* Title and Subtitle */}
@@ -248,7 +258,7 @@ export default function SummariesPage() {
   const { summaries: cachedSummaries, setSummaries, hasCachedData } = useSummaries();
 
   // Transform summaries to unique group chats format (deduplicate by title)
-  const transformToGroupChats = (summaries: Array<{ id: string; title: string; topics?: Array<{ content: string }> }>) => {
+  const transformToGroupChats = (summaries: Array<{ id: string; title: string; photoBase64?: string; photoMimeType?: string; topics?: Array<{ content: string }> }>) => {
     const groupMap = new Map<string, GroupChat>();
 
     for (const summary of summaries) {
@@ -258,6 +268,8 @@ export default function SummariesPage() {
           id: summary.id,
           title: summary.title,
           subtitle: summary.topics?.[0]?.content || "",
+          photoBase64: summary.photoBase64,
+          photoMimeType: summary.photoMimeType,
         });
       }
     }
