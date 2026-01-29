@@ -7,7 +7,7 @@ import { admins, communities } from "@/lib/core/schema";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
 
-import { MINI_APP_LINK } from "./constants";
+import { CA_COMMAND_CHAT_ID, MINI_APP_LINK } from "./constants";
 
 export const handleStartCommand = async (
   ctx: CommandContext<Context>,
@@ -54,6 +54,11 @@ export const handleCaCommand = async (
   const chatId = ctx.chat?.id;
   if (!chatId) {
     console.error("Chat ID not found in ca command");
+    return;
+  }
+
+  // Only respond in the designated community chat
+  if (chatId !== Number(CA_COMMAND_CHAT_ID)) {
     return;
   }
 
