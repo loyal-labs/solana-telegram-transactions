@@ -2,7 +2,7 @@
 
 import { init } from '@telegram-apps/sdk';
 import { useRawInitData } from '@telegram-apps/sdk-react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   createContext,
   type PropsWithChildren,
@@ -69,7 +69,6 @@ export const useTelegramUser = () => useContext(TelegramUserContext);
 function TelegramProviderInner({ children }: PropsWithChildren) {
   const rawInitData = useRawInitData();
   const pathname = usePathname();
-  const router = useRouter();
   const [cachedAvatar, setCachedAvatar] = useState<string | null>(null);
   const [isAvatarLoading, setIsAvatarLoading] = useState(true);
   const [isRestored, setIsRestored] = useState(false);
@@ -83,30 +82,9 @@ function TelegramProviderInner({ children }: PropsWithChildren) {
     }
   }, []);
 
-  // Restore last page
+  // Mark as restored immediately - splash screen handles initial navigation
   useEffect(() => {
-    const restorePage = async () => {
-      try {
-        let lastPage = await getCloudValue(LAST_PAGE_CACHE_KEY);
-        if (
-          typeof lastPage === 'string' &&
-          lastPage.startsWith('/telegram') &&
-          lastPage !== pathname
-        ) {
-          // Redirect profile to wallet
-          if (lastPage === '/telegram/profile') {
-            lastPage = '/telegram/wallet';
-          }
-          router.replace(lastPage);
-        }
-      } catch (e) {
-        console.error('Failed to restore page', e);
-      } finally {
-        setIsRestored(true);
-      }
-    };
-    restorePage();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setIsRestored(true);
   }, []);
 
   // Save page
