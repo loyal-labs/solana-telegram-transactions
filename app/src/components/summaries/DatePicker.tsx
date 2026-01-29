@@ -1,7 +1,7 @@
 "use client";
 
 import { hapticFeedback } from "@telegram-apps/sdk-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 export type DatePickerProps = {
   /** Dates that have summaries available (ISO date strings: YYYY-MM-DD) */
@@ -63,25 +63,22 @@ export default function DatePicker({
   collapsed = false,
 }: DatePickerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [dates] = useState(() => generateDateRange(30, 7)); // 30 days past + 7 days future
   const availableDateSet = new Set(availableDates);
+
+  // Find the latest date with data (not in future) - this is our scroll boundary
+  const latestDateWithData = useMemo(() => {
+    const validDates = availableDates.filter(d => !isFutureDate(d));
+    if (validDates.length === 0) return new Date().toISOString().split("T")[0];
+    return validDates.sort().pop()!;
+  }, [availableDates]);
+
+  // Generate all dates including future placeholders
+  const dates = useMemo(() => generateDateRange(30, 7), []);
   const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const isScrollingRef = useRef(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastScrollLeftRef = useRef(0); // Track scroll direction
   const lastCenteredDateRef = useRef<string | null>(null); // Track centered date for haptics
-
-  // Find today's date element position for scroll boundary
-  const getTodayScrollBoundary = useCallback(() => {
-    const today = new Date().toISOString().split("T")[0];
-    const todayElement = itemRefs.current.get(today);
-    if (todayElement && scrollContainerRef.current) {
-      const container = scrollContainerRef.current;
-      // Max scroll is when today is centered
-      return todayElement.offsetLeft - container.offsetWidth / 2 + todayElement.offsetWidth / 2;
-    }
-    return Infinity;
-  }, []);
 
   // Scroll to selected date on mount and when selection changes
   useEffect(() => {
@@ -100,36 +97,6 @@ export default function DatePicker({
       });
     }
   }, [selectedDate]);
-
-  // Prevent scrolling past today
-  const handleScrollBoundary = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const maxScroll = getTodayScrollBoundary();
-    if (container.scrollLeft > maxScroll) {
-      container.scrollTo({ left: maxScroll, behavior: "smooth" });
-    }
-  }, [getTodayScrollBoundary]);
-
-  // Add touch end handler to enforce boundaries
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const handleTouchEnd = () => {
-      // Small delay to let momentum scrolling settle
-      setTimeout(handleScrollBoundary, 100);
-    };
-
-    container.addEventListener("touchend", handleTouchEnd);
-    container.addEventListener("mouseup", handleTouchEnd);
-
-    return () => {
-      container.removeEventListener("touchend", handleTouchEnd);
-      container.removeEventListener("mouseup", handleTouchEnd);
-    };
-  }, [handleScrollBoundary]);
 
   // Handle date click - only allow dates with data, not future
   const handleDateClick = useCallback(
@@ -370,6 +337,26 @@ export default function DatePicker({
             const hasData = availableDateSet.has(date);
             const isFuture = isFutureDate(date);
             const isDisabled = !hasData || isFuture;
+            const isPastLatestWithData = date > latestDateWithData;
+
+            // Future placeholder - inactive circle with day number, no snap point
+            if (isPastLatestWithData) {
+              return (
+                <div
+                  key={date}
+                  className="shrink-0 flex items-center justify-center w-14 h-10"
+                >
+                  <div
+                    className="flex items-center justify-center rounded-full size-9"
+                    style={{ backgroundColor: "rgba(255, 255, 255, 0.03)" }}
+                  >
+                    <span className="text-sm leading-5 font-normal text-white/20">
+                      {getDayNumber(date)}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
 
             return (
               <button
@@ -380,7 +367,7 @@ export default function DatePicker({
                 className="shrink-0 flex items-center justify-center w-14 h-10 relative"
                 style={{
                   scrollSnapAlign: "center",
-                  scrollSnapStop: "always", // Force stop at each item for snappier feel
+                  scrollSnapStop: "always",
                 }}
               >
                 {/* Date circle */}
