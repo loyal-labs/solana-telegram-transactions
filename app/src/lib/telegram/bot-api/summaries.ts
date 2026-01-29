@@ -2,12 +2,16 @@ import { and, asc, desc, eq, gte } from "drizzle-orm";
 import type { Bot } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
-import { communities, messages, summaries, type Topic } from "@/lib/core/schema";
+import {
+  communities,
+  messages,
+  summaries,
+  type Topic,
+} from "@/lib/core/schema";
 import { chatCompletion } from "@/lib/redpill";
 import { SUMMARY_INTERVAL_MS } from "@/lib/telegram/utils";
 
 import { buildSummaryMessageWithPreview } from "./build-summary-og-url";
-import { MINI_APP_LINK } from "./constants";
 
 export const MIN_MESSAGES_FOR_SUMMARY = 5;
 
@@ -127,10 +131,7 @@ export async function sendLatestSummary(
   const db = getDatabase();
 
   const community = await db.query.communities.findFirst({
-    where: and(
-      eq(communities.chatId, chatId),
-      eq(communities.isActive, true)
-    ),
+    where: and(eq(communities.chatId, chatId), eq(communities.isActive, true)),
   });
 
   if (!community) {
@@ -147,7 +148,7 @@ export async function sendLatestSummary(
   }
 
   const safeOneliner = escapeTelegramHtml(latestSummary.oneliner);
-  const messageBody = `<b>${community.chatTitle} Daily Summary</b>\n\n${safeOneliner}\n\n<a href="${MINI_APP_LINK}">View full summary in Loyal</a>`;
+  const messageBody = `Summary: ${safeOneliner}`;
 
   const messageWithPreview = buildSummaryMessageWithPreview(
     messageBody,
