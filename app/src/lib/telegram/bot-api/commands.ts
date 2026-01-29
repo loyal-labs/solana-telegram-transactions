@@ -8,7 +8,43 @@ import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
 
 import { CA_COMMAND_CHAT_ID, MINI_APP_LINK } from "./constants";
+import { getChat } from "./get-chat";
+import { getFileUrl } from "./get-file";
 import { sendLatestSummary } from "./summaries";
+
+interface CommunityPhoto {
+  base64: string;
+  mimeType: string;
+}
+
+/**
+ * Fetches community profile photo and converts to base64.
+ * Returns undefined if photo is unavailable or fetch fails.
+ */
+async function fetchCommunityPhoto(
+  chatId: number | string
+): Promise<CommunityPhoto | undefined> {
+  try {
+    const chatInfo = await getChat(chatId);
+    if (!chatInfo.photo?.small_file_id) {
+      return undefined;
+    }
+    const photoUrl = await getFileUrl(chatInfo.photo.small_file_id);
+    const response = await fetch(photoUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch photo: ${response.status}`);
+    }
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    const buffer = await response.arrayBuffer();
+    return {
+      base64: Buffer.from(buffer).toString("base64"),
+      mimeType: contentType,
+    };
+  } catch (error) {
+    console.warn("Failed to fetch community photo:", error);
+    return undefined;
+  }
+}
 
 export async function handleStartCommand(
   ctx: CommandContext<Context>,
@@ -153,22 +189,51 @@ export async function handleActivateCommunityCommand(
 
     const chatId = BigInt(ctx.chat.id);
 
+    // Fetch community photo (non-blocking on failure)
+    const photo = await fetchCommunityPhoto(ctx.chat.id);
+    const settings = photo
+      ? {
+          photoBase64: photo.base64,
+          photoMimeType: photo.mimeType,
+          photoUpdatedAt: new Date().toISOString(),
+        }
+      : {};
+
     // Check if community already exists
     const existingCommunity = await db.query.communities.findFirst({
       where: eq(communities.chatId, chatId),
     });
 
     if (existingCommunity) {
+      // Merge new settings with existing settings
+      const mergedSettings = {
+        ...((existingCommunity.settings as object) || {}),
+        ...settings,
+      };
+
       if (existingCommunity.isActive) {
-        await ctx.reply(
-          "This community is already activated for message tracking."
-        );
+        // Update community data even if already active
+        await db
+          .update(communities)
+          .set({
+            chatTitle: ctx.chat.title || "Untitled",
+            settings: mergedSettings,
+            updatedAt: new Date(),
+          })
+          .where(eq(communities.id, existingCommunity.id));
+        await ctx.reply("Community is already activated. Data updated!");
         return;
       }
-      // Reactivate the community
+
+      // Reactivate the community with updated data
       await db
         .update(communities)
-        .set({ isActive: true, updatedAt: new Date() })
+        .set({
+          isActive: true,
+          chatTitle: ctx.chat.title || "Untitled",
+          settings: mergedSettings,
+          updatedAt: new Date(),
+        })
         .where(eq(communities.id, existingCommunity.id));
       await ctx.reply("Community reactivated for message tracking!");
       return;
@@ -186,6 +251,7 @@ export async function handleActivateCommunityCommand(
       chatId,
       chatTitle: ctx.chat.title || "Untitled",
       activatedBy: telegramUserId,
+      settings,
     });
 
     await ctx.reply("Community activated for message tracking!");
