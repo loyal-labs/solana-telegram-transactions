@@ -254,7 +254,15 @@ export async function handleDeactivateCommunityCommand(
     }
 
     // Check if user is a Telegram group admin
-    const member = await bot.api.getChatMember(ctx.chat.id, ctx.from.id);
+    let member;
+    try {
+      member = await bot.api.getChatMember(ctx.chat.id, ctx.from.id);
+    } catch {
+      await ctx.reply(
+        "Unable to verify admin status. Ensure the bot has permission to view chat members."
+      );
+      return;
+    }
     if (member.status !== "creator" && member.status !== "administrator") {
       await ctx.reply("Only group admins can deactivate community tracking.");
       return;
