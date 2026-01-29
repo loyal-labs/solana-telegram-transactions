@@ -19,6 +19,8 @@ export type ChatSummary = {
   title: string;
   messageCount?: number;
   createdAt?: string;
+  photoBase64?: string;
+  photoMimeType?: string;
   topics: Array<{
     id: string;
     title: string;
@@ -181,6 +183,19 @@ export default function SummaryFeed({
     if (summaries.length > 0) return summaries[0].title;
     return "Chat Summary";
   }, [initialGroupTitle, summaries]);
+
+  // Get group photo from summaries (all summaries share the same community photo)
+  const groupPhoto = useMemo(() => {
+    if (summaries.length === 0) return null;
+    const first = summaries[0];
+    if (first.photoBase64) {
+      return {
+        base64: first.photoBase64,
+        mimeType: first.photoMimeType || "image/jpeg",
+      };
+    }
+    return null;
+  }, [summaries]);
 
   // Group summaries by date
   const summariesByDate = useMemo(
@@ -517,19 +532,33 @@ export default function SummaryFeed({
           }}
         >
           {/* Avatar */}
-          <div
-            className="rounded-full flex items-center justify-center font-medium text-white shrink-0"
-            style={{
-              backgroundColor: avatarColor,
-              width: isDatePickerCollapsed ? 24 : 32,
-              height: isDatePickerCollapsed ? 24 : 32,
-              fontSize: isDatePickerCollapsed ? 11 : 14,
-              marginRight: isDatePickerCollapsed ? 8 : 12,
-              transition: `all 300ms ${EASE_OUT}`,
-            }}
-          >
-            {firstLetter}
-          </div>
+          {groupPhoto ? (
+            <img
+              src={`data:${groupPhoto.mimeType};base64,${groupPhoto.base64}`}
+              alt={groupTitle}
+              className="rounded-full object-cover shrink-0"
+              style={{
+                width: isDatePickerCollapsed ? 24 : 32,
+                height: isDatePickerCollapsed ? 24 : 32,
+                marginRight: isDatePickerCollapsed ? 8 : 12,
+                transition: `all 300ms ${EASE_OUT}`,
+              }}
+            />
+          ) : (
+            <div
+              className="rounded-full flex items-center justify-center font-medium text-white shrink-0"
+              style={{
+                backgroundColor: avatarColor,
+                width: isDatePickerCollapsed ? 24 : 32,
+                height: isDatePickerCollapsed ? 24 : 32,
+                fontSize: isDatePickerCollapsed ? 11 : 14,
+                marginRight: isDatePickerCollapsed ? 8 : 12,
+                transition: `all 300ms ${EASE_OUT}`,
+              }}
+            >
+              {firstLetter}
+            </div>
+          )}
 
           {/* Text */}
           <div className="flex flex-col justify-center overflow-hidden">
