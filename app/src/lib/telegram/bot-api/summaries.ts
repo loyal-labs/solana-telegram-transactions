@@ -127,7 +127,8 @@ export type SendSummaryResult =
 
 export async function sendLatestSummary(
   bot: Bot,
-  chatId: bigint
+  chatId: bigint,
+  replyToMessageId?: number
 ): Promise<SendSummaryResult> {
   const db = getDatabase();
 
@@ -159,12 +160,25 @@ export async function sendLatestSummary(
 
   const keyboard = new InlineKeyboard().url("Read in full", MINI_APP_LINK);
 
-  await bot.api.sendMessage(Number(chatId), messageWithPreview, {
-    parse_mode: "HTML",
+  const messageOptions = {
+    parse_mode: "HTML" as const,
     link_preview_options: { prefer_large_media: true },
     reply_markup: keyboard,
-  });
+  };
 
+  if (replyToMessageId) {
+    try {
+      await bot.api.sendMessage(Number(chatId), messageWithPreview, {
+        ...messageOptions,
+        reply_parameters: { message_id: replyToMessageId },
+      });
+      return { sent: true };
+    } catch (error) {
+      console.log("Failed to send summary as reply, sending without reply", error);
+    }
+  }
+
+  await bot.api.sendMessage(Number(chatId), messageWithPreview, messageOptions);
   return { sent: true };
 }
 

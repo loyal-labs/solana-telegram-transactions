@@ -115,6 +115,13 @@ export async function handleActivateCommunityCommand(
 ): Promise<void> {
   if (!ctx.from || !ctx.chat) return;
 
+  // Delete the command message to keep chat clean
+  try {
+    await ctx.deleteMessage();
+  } catch (error) {
+    console.warn("Failed to delete /activate_community command message", error);
+  }
+
   if (!isCommunityChat(ctx.chat.type)) {
     await ctx.reply("This command can only be used in group chats.");
     return;
@@ -204,7 +211,7 @@ export async function handleSummaryCommand(
   const chatId = BigInt(ctx.chat.id);
 
   try {
-    const result = await sendLatestSummary(bot, chatId);
+    const result = await sendLatestSummary(bot, chatId, ctx.msg?.message_id);
 
     if (!result.sent) {
       if (result.reason === "not_activated") {
@@ -230,6 +237,16 @@ export async function handleDeactivateCommunityCommand(
   bot: Bot
 ): Promise<void> {
   if (!ctx.from || !ctx.chat) return;
+
+  // Delete the command message to keep chat clean
+  try {
+    await ctx.deleteMessage();
+  } catch (error) {
+    console.warn(
+      "Failed to delete /deactivate_community command message",
+      error
+    );
+  }
 
   if (!isCommunityChat(ctx.chat.type)) {
     await ctx.reply("This command can only be used in group chats.");
