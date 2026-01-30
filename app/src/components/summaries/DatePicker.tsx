@@ -300,7 +300,7 @@ export default function DatePicker({
           className="absolute left-0 top-0 h-10 w-9 z-10 pointer-events-none"
           style={{
             background:
-              "linear-gradient(to right, #16161a, rgba(22, 22, 26, 0))",
+              "linear-gradient(to right, #000, rgba(0, 0, 0, 0))",
           }}
         />
 
@@ -309,7 +309,7 @@ export default function DatePicker({
           className="absolute right-0 top-0 h-10 w-9 z-10 pointer-events-none"
           style={{
             background:
-              "linear-gradient(to left, #16161a, rgba(22, 22, 26, 0))",
+              "linear-gradient(to left, #000, rgba(0, 0, 0, 0))",
           }}
         />
 

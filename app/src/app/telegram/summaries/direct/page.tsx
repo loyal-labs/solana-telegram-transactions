@@ -509,7 +509,7 @@ function DirectFeedContent() {
     return (
       <div
         className="fixed inset-0 flex items-center justify-center"
-        style={{ background: "#16161a" }}
+        style={{ background: "#000" }}
       >
         <p className="text-white/60">No chats available</p>
       </div>
@@ -522,7 +522,7 @@ function DirectFeedContent() {
   return (
     <main
       className="text-white font-sans overflow-hidden relative flex flex-col"
-      style={{ background: "#16161a", height: `calc(100vh - ${headerHeight}px)` }}
+      style={{ background: "#000", height: `calc(100vh - ${headerHeight}px)` }}
     >
       {/* Header */}
       <div
@@ -776,7 +776,7 @@ export default function DirectFeedPage() {
       fallback={
         <div
           className="h-full flex items-center justify-center"
-          style={{ background: "#16161a" }}
+          style={{ background: "#000" }}
         >
           <p className="text-white/60">Loading...</p>
         </div>

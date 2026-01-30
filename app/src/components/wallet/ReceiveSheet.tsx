@@ -325,10 +325,7 @@ export default function ReceiveSheet({
     >
       <div
         style={{
-          background: "rgba(38, 38, 38, 0.55)",
-          backgroundBlendMode: "luminosity",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
+          background: "#1c1c1e",
           paddingBottom: Math.max(safeBottom, 80),
         }}
         className="flex flex-col text-white relative overflow-hidden min-h-[500px] rounded-t-3xl"

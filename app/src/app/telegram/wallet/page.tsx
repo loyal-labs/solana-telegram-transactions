@@ -1688,7 +1688,7 @@ export default function Home() {
       )}
       <main
         className="min-h-screen text-white font-sans overflow-hidden relative flex flex-col"
-        style={{ background: "#16161a" }}
+        style={{ background: "#000" }}
       >
         {/* Sticky Balance Pill */}
         <AnimatePresence>
@@ -2259,15 +2259,12 @@ export default function Home() {
         </div>
 
         {/* Bottom Fade Gradient */}
-        <div className="fixed bottom-0 left-0 right-0 h-32 z-40 pointer-events-none">
-          <Image
-            src="/icons/fade-up.png"
-            alt=""
-            fill
-            className="object-cover object-bottom"
-            priority
-          />
-        </div>
+        <div
+          className="fixed bottom-0 left-0 right-0 h-32 z-40 pointer-events-none"
+          style={{
+            background: "linear-gradient(to bottom, transparent, #000)",
+          }}
+        />
       </main>
 
       <SendSheet

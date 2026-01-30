@@ -119,6 +119,8 @@
   html {
     touch-action: manipulation;
     -webkit-text-size-adjust: 100%;
+    background: #000 !important;
+    background-color: #000 !important;
   }
   body {
     @apply bg-background text-foreground;
@@ -126,7 +128,29 @@
     -webkit-user-select: none;
     -webkit-touch-callout: none;
     overscroll-behavior: none;
+    background: #000 !important;
+    background-color: #000 !important;
   }
+}
+
+/* Override telegram-ui AppRoot and ALL its children backgrounds */
+.tgui-root,
+.tgui-root > *,
+.tgui-root > * > *,
+[class^="tgui"],
+[class*=" tgui"],
+[class*="AppRoot"],
+[class*="appRoot"] {
+  --tgui--bg_color: #000 !important;
+  --tg-theme-bg-color: #000 !important;
+  --tg-bg-color: #000 !important;
+  background: #000 !important;
+  background-color: #000 !important;
+}
+
+/* But allow modal content to have its own background */
+[data-vaul-drawer] [class*="rounded"] {
+  background: inherit;
 }
 
 /* Ensure modals/sheets appear above page content */
@@ -141,4 +165,21 @@
 /* Make modal overlay more subtle */
 [data-vaul-overlay] {
   background-color: rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Fix vaul drawer wrapper backgrounds - prevent gray during modal open */
+[data-vaul-drawer-wrapper],
+body[data-vaul-drawer-wrapper],
+html[data-vaul-drawer-wrapper],
+[vaul-drawer-wrapper] {
+  background: #000 !important;
+  background-color: #000 !important;
+}
+
+/* Make drawer container transparent so modal content shows through */
+[data-vaul-drawer],
+[data-vaul-drawer] > div:not([class]),
+[data-vaul-drawer-content] {
+  background: transparent !important;
+  background-color: transparent !important;
 }

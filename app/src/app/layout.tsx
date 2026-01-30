@@ -1,5 +1,5 @@
-import "./globals.css";
 import "@telegram-apps/telegram-ui/dist/styles.css";
+import "./globals.css";
 
 import { AppRoot } from "@telegram-apps/telegram-ui";
 import type { Metadata } from "next";
