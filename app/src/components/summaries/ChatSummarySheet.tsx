@@ -338,7 +338,7 @@ const ChatSummarySheet = forwardRef<ChatSummarySheetRef, ChatSummarySheetProps>(
     >
       <div
         style={{
-          background: "#16161a",
+          background: "#000",
           paddingBottom: Math.max(safeBottom, 80),
           height: "100%",
           maxHeight: "100%",

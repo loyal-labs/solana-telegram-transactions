@@ -256,16 +256,11 @@ export default function ProfilePage() {
   }, []);
 
   return (
-    <main className="min-h-screen text-white font-sans selection:bg-teal-500/30 overflow-hidden relative">
-      {/* Background */}
-      <div
-        className="fixed inset-0 z-0 pointer-events-none"
-        style={{
-          background: "#16161a",
-        }}
-      />
-
-      <div className="relative z-10 pb-32 max-w-md mx-auto flex flex-col min-h-screen">
+    <main
+      className="min-h-screen text-white font-sans selection:bg-teal-500/30 overflow-hidden relative"
+      style={{ background: "#000" }}
+    >
+      <div className="pb-32 max-w-md mx-auto flex flex-col min-h-screen">
         {/* Avatar and Name Section */}
         <div className="flex flex-col gap-4 items-center justify-center pt-8 pb-6 px-8">
           {/* Avatar */}

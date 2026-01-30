@@ -29,7 +29,7 @@ export default function TelegramLayout({
   return (
     <div
       className="flex flex-col"
-      style={{ background: "#16161a", minHeight: "100vh" }}
+      style={{ background: "#000", minHeight: "100vh" }}
     >
       <Header />
       <div

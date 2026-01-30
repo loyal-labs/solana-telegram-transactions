@@ -306,6 +306,7 @@ export default function SummaryFeed({
 
   // Date picker collapse state based on scroll
   const [isDatePickerCollapsed, setIsDatePickerCollapsed] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const lastScrollTopRef = useRef(0);
   const scrollThresholdRef = useRef(0); // Accumulate scroll delta before triggering
 
@@ -335,6 +336,7 @@ export default function SummaryFeed({
         setIsSliding(true);
         setSelectedDate(targetDate);
         prevDateRef.current = targetDate;
+        setIsScrolled(false);
 
         if (scrollContainerRef.current) {
           scrollContainerRef.current.scrollTop = 0;
@@ -431,6 +433,9 @@ export default function SummaryFeed({
     const target = e.currentTarget;
     const scrollTop = target.scrollTop;
 
+    // Track if content is scrolled (for top fade gradient)
+    setIsScrolled(scrollTop > 5);
+
     // Only enable collapse behavior if content is actually scrollable
     const isScrollable = target.scrollHeight > target.clientHeight + 50;
     if (!isScrollable) {
@@ -482,6 +487,7 @@ export default function SummaryFeed({
       // Update selected date
       setSelectedDate(date);
       prevDateRef.current = date;
+      setIsScrolled(false);
 
       // Reset scroll position
       if (scrollContainerRef.current) {
@@ -511,7 +517,7 @@ export default function SummaryFeed({
     return (
       <div
         className="fixed inset-0 flex items-center justify-center"
-        style={{ background: "#16161a" }}
+        style={{ background: "#000" }}
       >
         <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
       </div>
@@ -522,7 +528,7 @@ export default function SummaryFeed({
     return (
       <div
         className="fixed inset-0 flex flex-col items-center justify-center gap-4"
-        style={{ background: "#16161a" }}
+        style={{ background: "#000" }}
       >
         <p className="text-white/60">{error}</p>
         <button
@@ -539,7 +545,7 @@ export default function SummaryFeed({
     return (
       <div
         className="fixed inset-0 flex items-center justify-center"
-        style={{ background: "#16161a" }}
+        style={{ background: "#000" }}
       >
         <p className="text-white/60">No summaries available</p>
       </div>
@@ -553,7 +559,7 @@ export default function SummaryFeed({
     <main
       className="text-white font-sans overflow-hidden relative flex flex-col"
       style={{
-        background: "#16161a",
+        background: "#000",
         height: `calc(100vh - ${headerHeight}px)`,
       }}
     >
@@ -657,12 +663,13 @@ export default function SummaryFeed({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Fade gradient at top */}
+        {/* Fade gradient at top - only show when scrolled */}
         <div
-          className="absolute top-0 left-0 right-0 h-6 z-10 pointer-events-none"
+          className="absolute top-0 left-0 right-0 h-2 z-10 pointer-events-none transition-opacity duration-150"
           style={{
             background:
-              "linear-gradient(to bottom, #16161a 0%, transparent 100%)",
+              "linear-gradient(to bottom, #000 0%, transparent 100%)",
+            opacity: isScrolled ? 1 : 0,
           }}
         />
 

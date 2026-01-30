@@ -438,14 +438,12 @@ export default function SummariesPage() {
   return (
     <main
       className="text-white font-sans overflow-y-auto relative flex flex-col"
-      style={{ background: "#16161a", height: `calc(100vh - ${headerHeight}px)` }}
+      style={{ background: "#000", height: `calc(100vh - ${headerHeight}px)` }}
     >
       {/* Header - fixed at top */}
       <div
         className="sticky top-0 z-10"
-        style={{
-          background: "#16161a",
-        }}
+        style={{ background: "#000" }}
       >
         <div className="flex items-center pl-4 pr-1.5">
           <div className="flex-1 py-3 pr-3">

@@ -26,7 +26,7 @@ export default function Header() {
       style={{
         paddingTop: Math.max(safeAreaInsetTop || 0, 12) + 10,
         paddingBottom: 16,
-        background: "#16161a",
+        background: "#000",
         borderBottom: "none",
         boxShadow: "none",
       }}
@@ -36,9 +36,18 @@ export default function Header() {
       <div
         className="absolute left-0 right-0 pointer-events-none transition-opacity duration-150"
         style={{
-          bottom: -12,
-          height: 12,
-          background: "linear-gradient(to bottom, #16161a, transparent)",
+          bottom: -6,
+          height: 6,
+          background: "linear-gradient(to bottom, #000, transparent)",
+          opacity: isScrolled ? 1 : 0,
+        }}
+      />
+      {/* Bottom border line - only visible when scrolled */}
+      <div
+        className="absolute left-0 right-0 bottom-0 pointer-events-none transition-opacity duration-150"
+        style={{
+          height: 1,
+          background: "rgba(255, 255, 255, 0.08)",
           opacity: isScrolled ? 1 : 0,
         }}
       />
