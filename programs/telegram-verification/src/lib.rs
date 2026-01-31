@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
-use anchor_lang::solana_program::{
-    sysvar::instructions::{load_current_index_checked, load_instruction_at_checked},
+use anchor_lang::solana_program::sysvar::instructions::{
+    load_current_index_checked, load_instruction_at_checked,
 };
 use core::str::FromStr;
 use hex_literal::hex;
@@ -15,7 +15,7 @@ const MAX_USERNAME_LEN: usize = 32;
 const USERNAME_PATTERN: &str = "\"username\":\"";
 const AUTH_DATE_PREFIX: &str = "\nauth_date=";
 
-const ED25519_HEADER_LEN: usize = 2;   // [sig_count: u8, padding: u8]
+const ED25519_HEADER_LEN: usize = 2; // [sig_count: u8, padding: u8]
 const ED25519_OFFSETS_LEN: usize = 14; // 7 * u16 (LE)
 const SIG_LEN: usize = 64;
 const PUBKEY_LEN: usize = 32;
@@ -30,13 +30,18 @@ pub mod telegram_verification {
     use super::*;
 
     pub fn store(ctx: Context<StoreTelegramInitData>, validation_bytes: Vec<u8>) -> Result<()> {
-        require!(validation_bytes.len() <= MAX_VALIDATION_LEN, ErrorCode::InvalidValidationBytesLength);
+        require!(
+            validation_bytes.len() <= MAX_VALIDATION_LEN,
+            ErrorCode::InvalidValidationBytesLength
+        );
 
         let session = &mut ctx.accounts.session;
 
         let username = extract_username(&validation_bytes)?;
-        require!(username.len() > MIN_USERNAME_LEN, ErrorCode::InvalidTelegramUsername);
-        require!(username.len() < MAX_USERNAME_LEN, ErrorCode::InvalidTelegramUsername);
+        require!(
+            (MIN_USERNAME_LEN..=MAX_USERNAME_LEN).contains(&username.len()),
+            ErrorCode::InvalidTelegramUsername
+        );
 
         let auth_at = extract_auth_date(&validation_bytes)?;
         require!(auth_at > 0, ErrorCode::InvalidTelegramAuthDate);
@@ -54,10 +59,7 @@ pub mod telegram_verification {
     pub fn verify_telegram_init_data(ctx: Context<VerifyTelegramInitData>) -> Result<()> {
         let expected = &ctx.accounts.session.validation_bytes;
 
-        verify_previous_ed25519_ix(
-            &ctx.accounts.instructions,
-            expected,
-        )?;
+        verify_previous_ed25519_ix(&ctx.accounts.instructions, expected)?;
         let session = &mut ctx.accounts.session;
         session.verified = true;
         session.verified_at = Some(Clock::get()?.unix_timestamp as u64);
@@ -113,10 +115,7 @@ pub struct TelegramSession {
 }
 
 // ---- Helpers ----
-fn verify_previous_ed25519_ix(
-    instructions_ai: &AccountInfo,
-    expected_msg: &[u8],
-) -> Result<()> {
+fn verify_previous_ed25519_ix(instructions_ai: &AccountInfo, expected_msg: &[u8]) -> Result<()> {
     // 1) Load previous ix
     let cur = load_current_index_checked(instructions_ai)
         .map_err(|_| error!(ErrorCode::NotVerified))? as usize;
@@ -144,40 +143,50 @@ fn verify_previous_ed25519_ix(
         .get(ED25519_HEADER_LEN..ED25519_HEADER_LEN + need)
         .ok_or_else(|| error!(ErrorCode::InvalidEd25519))?;
 
-    let read_u16 = |i: usize| -> u16 {
-        (offs[i] as u16) | ((offs[i + 1] as u16) << 8)
-    };
+    let read_u16 = |i: usize| -> u16 { (offs[i] as u16) | ((offs[i + 1] as u16) << 8) };
 
-    let signature_offset              = read_u16(0)  as usize;
-    let signature_instruction_index   = read_u16(2);
-    let public_key_offset             = read_u16(4)  as usize;
-    let public_key_instruction_index  = read_u16(6);
-    let message_data_offset           = read_u16(8)  as usize;
-    let message_data_size             = read_u16(10) as usize;
-    let message_instruction_index     = read_u16(12);
+    let signature_offset = read_u16(0) as usize;
+    let signature_instruction_index = read_u16(2);
+    let public_key_offset = read_u16(4) as usize;
+    let public_key_instruction_index = read_u16(6);
+    let message_data_offset = read_u16(8) as usize;
+    let message_data_size = read_u16(10) as usize;
+    let message_instruction_index = read_u16(12);
 
     // All instruction indices must be 0xFFFF (relative to this instruction)
     require!(
-        signature_instruction_index  == u16::MAX &&
-        public_key_instruction_index == u16::MAX &&
-        message_instruction_index    == u16::MAX,
+        signature_instruction_index == u16::MAX
+            && public_key_instruction_index == u16::MAX
+            && message_instruction_index == u16::MAX,
         ErrorCode::InvalidEd25519
     );
 
     // Compute absolute slices and bounds-check
     let sig_abs = signature_offset;
-    let pk_abs  = public_key_offset;
+    let pk_abs = public_key_offset;
     let msg_abs = message_data_offset;
 
-    require!(sig_abs >= ED25519_HEADER_LEN + ED25519_OFFSETS_LEN, ErrorCode::InvalidEd25519);
-    require!(pk_abs  >= ED25519_HEADER_LEN + ED25519_OFFSETS_LEN, ErrorCode::InvalidEd25519);
-    require!(msg_abs >= ED25519_HEADER_LEN + ED25519_OFFSETS_LEN, ErrorCode::InvalidEd25519);
+    require!(
+        sig_abs >= ED25519_HEADER_LEN + ED25519_OFFSETS_LEN,
+        ErrorCode::InvalidEd25519
+    );
+    require!(
+        pk_abs >= ED25519_HEADER_LEN + ED25519_OFFSETS_LEN,
+        ErrorCode::InvalidEd25519
+    );
+    require!(
+        msg_abs >= ED25519_HEADER_LEN + ED25519_OFFSETS_LEN,
+        ErrorCode::InvalidEd25519
+    );
 
-    require!(sig_abs + SIG_LEN      <= data.len(), ErrorCode::InvalidEd25519);
-    require!(pk_abs  + PUBKEY_LEN   <= data.len(), ErrorCode::InvalidEd25519);
-    require!(msg_abs + message_data_size <= data.len(), ErrorCode::InvalidEd25519);
+    require!(sig_abs + SIG_LEN <= data.len(), ErrorCode::InvalidEd25519);
+    require!(pk_abs + PUBKEY_LEN <= data.len(), ErrorCode::InvalidEd25519);
+    require!(
+        msg_abs + message_data_size <= data.len(),
+        ErrorCode::InvalidEd25519
+    );
 
-    let pk_bytes  = &data[pk_abs..pk_abs + PUBKEY_LEN];
+    let pk_bytes = &data[pk_abs..pk_abs + PUBKEY_LEN];
     let msg_bytes = &data[msg_abs..msg_abs + message_data_size];
 
     // 4) Use hardcoded telegram pk
@@ -192,17 +201,28 @@ fn verify_previous_ed25519_ix(
 
 fn extract_username(bytes: &[u8]) -> Result<String> {
     // We expect ASCII only.
-    let s = core::str::from_utf8(bytes)
-        .map_err(|_| error!(ErrorCode::InvalidTelegramMessage))?;
+    let s = core::str::from_utf8(bytes).map_err(|_| error!(ErrorCode::InvalidTelegramMessage))?;
 
-    // Look for `"username":"`
-    let start = s
+    // Scope to the `user=` payload to avoid matching other `username` keys.
+    let user_start = if let Some(idx) = s.find("\nuser=") {
+        idx + "\nuser=".len()
+    } else if s.starts_with("user=") {
+        "user=".len()
+    } else {
+        return Err(error!(ErrorCode::InvalidTelegramMessage));
+    };
+
+    let user_rest = &s[user_start..];
+    let user_end_rel = user_rest.find('\n').unwrap_or(user_rest.len());
+    let user_payload = &user_rest[..user_end_rel];
+
+    // Look for `"username":"` within the user payload
+    let start = user_payload
         .find(USERNAME_PATTERN)
         .ok_or_else(|| error!(ErrorCode::InvalidTelegramMessage))?
         + USERNAME_PATTERN.len();
 
-    // Read until the next `"`
-    let rest = &s[start..];
+    let rest = &user_payload[start..];
     let end_rel = rest
         .find('"')
         .ok_or_else(|| error!(ErrorCode::InvalidTelegramMessage))?;
@@ -214,12 +234,10 @@ fn extract_username(bytes: &[u8]) -> Result<String> {
         ErrorCode::InvalidTelegramUsername
     );
     require!(
-        username
-            .bytes()
-            .all(|b| (b'A'..=b'Z').contains(&b)
-                || (b'a'..=b'z').contains(&b)
-                || (b'0'..=b'9').contains(&b)
-                || b == b'_'),
+        username.bytes().all(|b| (b'A'..=b'Z').contains(&b)
+            || (b'a'..=b'z').contains(&b)
+            || (b'0'..=b'9').contains(&b)
+            || b == b'_'),
         ErrorCode::InvalidTelegramUsername
     );
 
@@ -227,8 +245,7 @@ fn extract_username(bytes: &[u8]) -> Result<String> {
 }
 
 fn extract_auth_date(bytes: &[u8]) -> Result<u64> {
-    let s = core::str::from_utf8(bytes)
-        .map_err(|_| error!(ErrorCode::InvalidTelegramMessage))?;
+    let s = core::str::from_utf8(bytes).map_err(|_| error!(ErrorCode::InvalidTelegramMessage))?;
 
     let start = if let Some(idx) = s.find(AUTH_DATE_PREFIX) {
         idx + AUTH_DATE_PREFIX.len()
