@@ -35,6 +35,7 @@
 *.pem
 /frontend/refs/
 .claude/
+/scripts/.state/
 
 # debug
 npm-debug.log*

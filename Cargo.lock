@@ -3662,6 +3662,7 @@ dependencies = [
  "anchor-spl",
  "ephemeral-rollups-sdk",
  "session-keys",
+ "telegram-verification",
 ]
 
 [[package]]
