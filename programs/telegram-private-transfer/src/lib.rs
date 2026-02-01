@@ -32,13 +32,18 @@ pub mod telegram_private_transfer {
     /// Initializes a deposit account for a user and token mint if it does not exist.
     ///
     /// Sets up a new deposit account with zero balance for the user and token mint.
+    /// If the account is already initialized, this instruction is a no-op.
     pub fn initialize_deposit(ctx: Context<InitializeDeposit>) -> Result<()> {
         let deposit = &mut ctx.accounts.deposit;
-        deposit.set_inner(Deposit {
-            user: ctx.accounts.user.key(),
-            token_mint: ctx.accounts.token_mint.key(),
-            amount: 0,
-        });
+
+        // Only initialize if account is fresh (uninitialized)
+        if deposit.user == Pubkey::default() {
+            deposit.set_inner(Deposit {
+                user: ctx.accounts.user.key(),
+                token_mint: ctx.accounts.token_mint.key(),
+                amount: 0,
+            });
+        }
 
         Ok(())
     }
