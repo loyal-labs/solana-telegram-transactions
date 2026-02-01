@@ -123,6 +123,46 @@ On-chain Telegram signature verification using Ed25519.
 
 **Key exports:** `verifyInitData()`, `storeInitData()`, `fetchSessionData()`
 
+### `/solana/token-holdings/`
+
+Fetches all fungible token holdings (SPL tokens + native SOL) with USD prices via Helius DAS API.
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `CACHE_TTL_MS` | `30000` | Cache duration (30 seconds) |
+| `NATIVE_SOL_MINT` | `So111...112` | Native SOL mint address |
+| `NATIVE_SOL_DECIMALS` | `9` | SOL decimal places |
+
+**Key exports:** `fetchTokenHoldings(publicKey, forceRefresh?)`
+
+**Type exports:** `TokenHolding`
+
+```typescript
+type TokenHolding = {
+  mint: string;           // Token mint address
+  symbol: string;         // e.g. "SOL", "USDC"
+  name: string;           // e.g. "Solana", "USD Coin"
+  balance: number;        // Human-readable balance
+  decimals: number;       // Token decimals
+  priceUsd: number | null;  // Price per token (null if unavailable)
+  valueUsd: number | null;  // Total value (null if unavailable)
+};
+```
+
+**Usage:**
+
+```typescript
+import { fetchTokenHoldings } from "@/lib/solana/token-holdings";
+
+const holdings = await fetchTokenHoldings("ADDRESS");
+const totalValue = holdings.reduce((sum, h) => sum + (h.valueUsd ?? 0), 0);
+```
+
+**Notes:**
+- Returns cached data for 30s (use `forceRefresh: true` to bypass)
+- Returns empty array on localnet (DAS API unavailable)
+- Price data available for top 10k tokens by volume
+
 ### `solana-helpers.ts`
 
 Anchor program initialization and PDA derivation.
