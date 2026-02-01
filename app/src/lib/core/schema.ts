@@ -13,6 +13,26 @@ import {
 } from "drizzle-orm/pg-core";
 
 // ============================================================================
+// TYPES
+// ============================================================================
+
+/**
+ * Telegram Business Bot Rights - permissions granted to the bot.
+ * All fields are optional booleans.
+ */
+export type BusinessBotRights = {
+  can_reply?: boolean;
+  can_read_messages?: boolean;
+  can_delete_sent_messages?: boolean;
+  can_delete_all_messages?: boolean;
+  can_edit_name?: boolean;
+  can_edit_bio?: boolean;
+  can_edit_profile_photo?: boolean;
+  can_edit_username?: boolean;
+  can_manage_stories?: boolean;
+};
+
+// ============================================================================
 // TABLES
 // ============================================================================
 
@@ -182,13 +202,45 @@ export const summaries = pgTable(
   ]
 );
 
+/**
+ * Telegram Business connections - tracks bot connections to user business accounts.
+ * One connection per user; soft-deleted by setting isEnabled to false.
+ */
+export const businessConnections = pgTable(
+  "business_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    businessConnectionId: text("business_connection_id").notNull(),
+    userChatId: bigint("user_chat_id", { mode: "bigint" }).notNull(),
+    isEnabled: boolean("is_enabled").default(true).notNull(),
+    rights: jsonb("rights").$type<BusinessBotRights>().default({}).notNull(),
+    connectedAt: timestamp("connected_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // One business connection per user
+    uniqueIndex("business_connections_user_id_idx").on(table.userId),
+    // Filter by active/inactive connections
+    index("business_connections_is_enabled_idx").on(table.isEnabled),
+  ]
+);
+
 // ============================================================================
 // RELATIONS (for type-safe queries with Drizzle)
 // ============================================================================
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   messages: many(messages),
   communityMemberships: many(communityMembers),
+  businessConnection: one(businessConnections),
 }));
 
 export const communitiesRelations = relations(communities, ({ many }) => ({
@@ -229,6 +281,16 @@ export const summariesRelations = relations(summaries, ({ one }) => ({
   }),
 }));
 
+export const businessConnectionsRelations = relations(
+  businessConnections,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [businessConnections.userId],
+      references: [users.id],
+    }),
+  })
+);
+
 // ============================================================================
 // TYPE EXPORTS
 // ============================================================================
@@ -250,5 +312,8 @@ export type InsertMessage = typeof messages.$inferInsert;
 
 export type Summary = typeof summaries.$inferSelect;
 export type InsertSummary = typeof summaries.$inferInsert;
+
+export type BusinessConnection = typeof businessConnections.$inferSelect;
+export type InsertBusinessConnection = typeof businessConnections.$inferInsert;
 
 export type Topic = { title: string; content: string; sources: string[] };

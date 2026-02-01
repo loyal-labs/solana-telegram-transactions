@@ -15,6 +15,13 @@
       "when": 1769657160531,
       "tag": "0001_curved_johnny_blaze",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769913050781,
+      "tag": "0002_strong_marvel_boy",
+      "breakpoints": true
     }
   ]
 }
