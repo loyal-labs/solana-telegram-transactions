@@ -8,7 +8,7 @@ Quick reference for `/app/src/lib/`.
 |--------|---------|-------------|
 | `/core` | HTTP utilities, database | `fetchJson()`, `resolveEndpoint()`, `getDatabase()` |
 | `/encryption` | Message encryption | `encrypt()`, `decrypt()` |
-| `/solana` | Blockchain integration | RPC connections, wallet, deposits |
+| `/solana` | Blockchain integration | RPC connections, wallet, deposits, token holdings |
 | `/telegram` | Telegram SDK integration | Mini app utils, bot API |
 | `/magicblock` | SOL/USD price feed | `fetchSolUsdPrice()` |
 | `/redpill` | AI chat summaries | `chatCompletion()` |
