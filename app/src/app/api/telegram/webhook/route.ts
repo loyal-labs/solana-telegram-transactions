@@ -9,7 +9,7 @@ import {
   handleStartCommand,
   handleSummaryCommand,
 } from "@/lib/telegram/bot-api/commands";
-import { sendBusinessConnectionMessage } from "@/lib/telegram/bot-api/handle-business-connection";
+import { handleBusinessConnection } from "@/lib/telegram/bot-api/handle-business-connection";
 import { handleInlineQuery } from "@/lib/telegram/bot-api/inline";
 import {
   handleCommunityMessage,
@@ -42,12 +42,12 @@ bot.on("inline_query", async (ctx) => {
   await handleInlineQuery(ctx as InlineQueryContext<Context>);
 });
 
-bot.on("business_connection:is_enabled", async (ctx) => {
-  const connectionId = ctx.update.business_connection.id;
-  const connectionEnabled = ctx.update.business_connection.is_enabled;
-  const userId = ctx.businessConnection.user_chat_id;
-
-  await sendBusinessConnectionMessage(connectionId, connectionEnabled, userId);
+bot.on("business_connection", async (ctx) => {
+  try {
+    await handleBusinessConnection(ctx.update.business_connection);
+  } catch (error) {
+    console.error("Failed to handle business connection", error);
+  }
 });
 
 bot.on("message:text", async (ctx) => {
