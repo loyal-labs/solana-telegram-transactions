@@ -15,7 +15,14 @@ import {
   viewport,
 } from "@telegram-apps/sdk-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDown, ArrowUp, ChevronRight, Clock, Copy } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronRight,
+  Clock,
+  Copy,
+  RefreshCcw,
+} from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Confetti from "react-confetti";
@@ -29,6 +36,7 @@ import SendSheet, {
   isValidSolanaAddress,
   isValidTelegramUsername,
 } from "@/components/wallet/SendSheet";
+import SwapSheet from "@/components/wallet/SwapSheet";
 import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
@@ -232,6 +240,14 @@ export default function Home() {
   // Get device safe area only (not content safe area) to align with native header buttons
   const safeAreaInsetTop = useSignal(viewport.safeAreaInsetTop);
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
+  const [isSwapSheetOpen, setSwapSheetOpen] = useState(false);
+  const [swapActiveTab, setSwapActiveTab] = useState<"swap" | "secure">("swap");
+  const [swapView, setSwapView] = useState<"main" | "selectFrom" | "selectTo" | "selectSecure" | "result">("main");
+  const [swapError, setSwapError] = useState<string | null>(null);
+  const [swappedFromAmount, setSwappedFromAmount] = useState<number | undefined>(undefined);
+  const [swappedFromSymbol, setSwappedFromSymbol] = useState<string | undefined>(undefined);
+  const [swappedToAmount, setSwappedToAmount] = useState<number | undefined>(undefined);
+  const [swappedToSymbol, setSwappedToSymbol] = useState<string | undefined>(undefined);
   const [sendStep, setSendStep] = useState<1 | 2 | 3 | 4>(1);
   const [sentAmountSol, setSentAmountSol] = useState<number | undefined>(
     undefined
@@ -284,6 +300,7 @@ export default function Home() {
   const [selectedIncomingTransaction, setSelectedIncomingTransaction] =
     useState<IncomingTransaction | null>(null);
   const [isSendFormValid, setIsSendFormValid] = useState(false);
+  const [isSwapFormValid, setIsSwapFormValid] = useState(false);
   const [isClaimingTransaction, setIsClaimingTransaction] = useState(false);
   const [sendFormValues, setSendFormValues] = useState<{
     amount: string;
@@ -1514,6 +1531,43 @@ export default function Home() {
           });
         }
       }
+    } else if (isSwapSheetOpen) {
+      hideSecondaryButton();
+      if (swapView === "result") {
+        // Result view - show Done button
+        showMainButton({
+          text: "Done",
+          onClick: () => {
+            hapticFeedback.impactOccurred("light");
+            setSwapSheetOpen(false);
+            // Reset swap state
+            setSwapView("main");
+            setSwapActiveTab("swap");
+            setSwapError(null);
+            setSwappedFromAmount(undefined);
+            setSwappedFromSymbol(undefined);
+            setSwappedToAmount(undefined);
+            setSwappedToSymbol(undefined);
+          },
+          isEnabled: true,
+          showLoader: false,
+        });
+      } else if (swapView === "main") {
+        // Main view - show button based on active tab
+        const buttonText = swapActiveTab === "swap" ? "Confirm Swap" : "Secure";
+        showMainButton({
+          text: buttonText,
+          onClick: () => {
+            // TODO: Implement swap/secure transaction
+            hapticFeedback.impactOccurred("medium");
+          },
+          isEnabled: isSwapFormValid,
+          showLoader: false,
+        });
+      } else {
+        // Token selection views - hide main button
+        hideMainButton();
+      }
     } else if (isReceiveSheetOpen) {
       hideSecondaryButton();
       showReceiveShareButton({ onShare: handleShareAddress });
@@ -1529,8 +1583,10 @@ export default function Home() {
   }, [
     isTransactionDetailsSheetOpen,
     isSendSheetOpen,
+    isSwapSheetOpen,
     isReceiveSheetOpen,
     isSendFormValid,
+    isSwapFormValid,
     isSendingTransaction,
     selectedTransaction,
     selectedIncomingTransaction,
@@ -1550,6 +1606,8 @@ export default function Home() {
     sendError,
     rawInitData,
     solPriceUsd,
+    swapView,
+    swapActiveTab,
   ]);
 
   const formattedUsdBalance = formatUsdValue(balance, solPriceUsd);
@@ -1823,6 +1881,14 @@ export default function Home() {
                 icon={<ArrowDown />}
                 label="Receive"
                 onClick={handleOpenReceiveSheet}
+              />
+              <ActionButton
+                icon={<RefreshCcw />}
+                label="Swap"
+                onClick={() => {
+                  hapticFeedback.impactOccurred("light");
+                  setSwapSheetOpen(true);
+                }}
               />
               <ActionButton
                 icon={<ScanIcon />}
@@ -2284,6 +2350,35 @@ export default function Home() {
         isSolPriceLoading={isSolPriceLoading}
         sentAmountSol={sentAmountSol}
         sendError={sendError}
+      />
+      <SwapSheet
+        open={isSwapSheetOpen}
+        onOpenChange={(open) => {
+          setSwapSheetOpen(open);
+          if (!open) {
+            // Reset swap state when closing
+            setSwapView("main");
+            setSwapActiveTab("swap");
+            setSwapError(null);
+            setSwappedFromAmount(undefined);
+            setSwappedFromSymbol(undefined);
+            setSwappedToAmount(undefined);
+            setSwappedToSymbol(undefined);
+          }
+        }}
+        balanceSol={balance ? balance / LAMPORTS_PER_SOL : 0}
+        balanceUsdt={0}
+        solPriceUsd={solPriceUsd}
+        onValidationChange={setIsSwapFormValid}
+        activeTab={swapActiveTab}
+        onTabChange={setSwapActiveTab}
+        view={swapView}
+        onViewChange={setSwapView}
+        swapError={swapError}
+        swappedFromAmount={swappedFromAmount}
+        swappedFromSymbol={swappedFromSymbol}
+        swappedToAmount={swappedToAmount}
+        swappedToSymbol={swappedToSymbol}
       />
       <ReceiveSheet
         open={isReceiveSheetOpen}
