@@ -241,7 +241,8 @@ export default function Home() {
   const safeAreaInsetTop = useSignal(viewport.safeAreaInsetTop);
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
   const [isSwapSheetOpen, setSwapSheetOpen] = useState(false);
-  const [swapView, setSwapView] = useState<"main" | "selectFrom" | "selectTo" | "result">("main");
+  const [swapActiveTab, setSwapActiveTab] = useState<"swap" | "secure">("swap");
+  const [swapView, setSwapView] = useState<"main" | "selectFrom" | "selectTo" | "selectSecure" | "result">("main");
   const [swapError, setSwapError] = useState<string | null>(null);
   const [swappedFromAmount, setSwappedFromAmount] = useState<number | undefined>(undefined);
   const [swappedFromSymbol, setSwappedFromSymbol] = useState<string | undefined>(undefined);
@@ -1541,6 +1542,7 @@ export default function Home() {
             setSwapSheetOpen(false);
             // Reset swap state
             setSwapView("main");
+            setSwapActiveTab("swap");
             setSwapError(null);
             setSwappedFromAmount(undefined);
             setSwappedFromSymbol(undefined);
@@ -1551,11 +1553,12 @@ export default function Home() {
           showLoader: false,
         });
       } else if (swapView === "main") {
-        // Main view - show Confirm Swap button
+        // Main view - show button based on active tab
+        const buttonText = swapActiveTab === "swap" ? "Confirm Swap" : "Secure";
         showMainButton({
-          text: "Confirm Swap",
+          text: buttonText,
           onClick: () => {
-            // TODO: Implement swap transaction
+            // TODO: Implement swap/secure transaction
             hapticFeedback.impactOccurred("medium");
           },
           isEnabled: isSwapFormValid,
@@ -1604,6 +1607,7 @@ export default function Home() {
     rawInitData,
     solPriceUsd,
     swapView,
+    swapActiveTab,
   ]);
 
   const formattedUsdBalance = formatUsdValue(balance, solPriceUsd);
@@ -2354,6 +2358,7 @@ export default function Home() {
           if (!open) {
             // Reset swap state when closing
             setSwapView("main");
+            setSwapActiveTab("swap");
             setSwapError(null);
             setSwappedFromAmount(undefined);
             setSwappedFromSymbol(undefined);
@@ -2365,6 +2370,8 @@ export default function Home() {
         balanceUsdt={0}
         solPriceUsd={solPriceUsd}
         onValidationChange={setIsSwapFormValid}
+        activeTab={swapActiveTab}
+        onTabChange={setSwapActiveTab}
         view={swapView}
         onViewChange={setSwapView}
         swapError={swapError}
