@@ -36,8 +36,9 @@ import SendSheet, {
   isValidSolanaAddress,
   isValidTelegramUsername,
 } from "@/components/wallet/SendSheet";
-import SwapSheet from "@/components/wallet/SwapSheet";
+import SwapSheet, { type SwapFormValues } from "@/components/wallet/SwapSheet";
 import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
+import { useSwap } from "@/hooks/useSwap";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
   DISPLAY_CURRENCY_KEY,
@@ -59,6 +60,10 @@ import {
 } from "@/lib/solana/rpc/get-account-txn-history";
 import type { WalletTransfer } from "@/lib/solana/rpc/types";
 import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
+import {
+  fetchTokenHoldings,
+  type TokenHolding,
+} from "@/lib/solana/token-holdings";
 import { prepareStoreInitDataTxn, sendStoreInitDataTxn, verifyAndClaimDeposit } from "@/lib/solana/verify-and-claim-deposit";
 import {
   formatAddress,
@@ -248,6 +253,8 @@ export default function Home() {
   const [swappedFromSymbol, setSwappedFromSymbol] = useState<string | undefined>(undefined);
   const [swappedToAmount, setSwappedToAmount] = useState<number | undefined>(undefined);
   const [swappedToSymbol, setSwappedToSymbol] = useState<string | undefined>(undefined);
+  const [swapFormValues, setSwapFormValues] = useState<SwapFormValues | null>(null);
+  const [isSwapping, setIsSwapping] = useState(false);
   const [sendStep, setSendStep] = useState<1 | 2 | 3 | 4>(1);
   const [sentAmountSol, setSentAmountSol] = useState<number | undefined>(
     undefined
@@ -265,6 +272,7 @@ export default function Home() {
   const [balance, setBalance] = useState<number | null>(() =>
     cachedWalletAddress ? getCachedWalletBalance(cachedWalletAddress) : null
   );
+  const [tokenHoldings, setTokenHoldings] = useState<TokenHolding[]>([]);
   const [starsBalance, setStarsBalance] = useState<number>(() =>
     cachedWalletAddress ? getCachedStarsBalance(cachedWalletAddress) ?? 0 : 0
   );
@@ -492,6 +500,46 @@ export default function Home() {
       setSendError(null); // Reset send error
     }
   }, []);
+
+  const handleSwapParamsChange = useCallback((params: SwapFormValues) => {
+    setSwapFormValues(params);
+  }, []);
+
+  const { executeSwap } = useSwap(getWalletKeypair);
+
+  const handleSubmitSwap = useCallback(async () => {
+    if (!swapFormValues || !isSwapFormValid || isSwapping) {
+      return;
+    }
+
+    setIsSwapping(true);
+    hapticFeedback.impactOccurred("medium");
+
+    try {
+      const result = await executeSwap(swapFormValues);
+
+      if (result.success) {
+        setSwappedFromAmount(result.fromAmount);
+        setSwappedFromSymbol(result.fromSymbol);
+        setSwappedToAmount(result.toAmount);
+        setSwappedToSymbol(result.toSymbol);
+        setSwapError(null);
+        setSwapView("result");
+        // Refresh balance after successful swap
+        void refreshWalletBalance(true);
+      } else {
+        setSwapError(result.error || "Swap failed");
+        setSwapView("result");
+      }
+    } catch (error) {
+      console.error("[swap] Error:", error);
+      setSwapError(error instanceof Error ? error.message : "Swap failed");
+      setSwapView("result");
+    } finally {
+      setIsSwapping(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swapFormValues, isSwapFormValid, isSwapping, executeSwap]);
 
   const refreshWalletBalance = useCallback(
     async (forceRefresh = false) => {
@@ -1355,6 +1403,44 @@ export default function Home() {
     };
   }, [walletAddress]);
 
+  // Fetch token holdings
+  useEffect(() => {
+    if (!walletAddress) return;
+
+    let isMounted = true;
+
+    const loadHoldings = async () => {
+      try {
+        const holdings = await fetchTokenHoldings(walletAddress);
+        if (isMounted) {
+          setTokenHoldings(holdings);
+        }
+      } catch (error) {
+        console.error("Failed to fetch token holdings:", error);
+      }
+    };
+
+    void loadHoldings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [walletAddress]);
+
+  // Refresh token holdings when balance changes (transaction completed)
+  useEffect(() => {
+    if (!walletAddress || balance === null) return;
+
+    // Debounce the refresh to avoid rapid refetches
+    const timer = setTimeout(() => {
+      void fetchTokenHoldings(walletAddress, true)
+        .then(setTokenHoldings)
+        .catch(console.error);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [balance, walletAddress]);
+
   useEffect(() => {
     if (!walletAddress) return;
 
@@ -1558,11 +1644,15 @@ export default function Home() {
         showMainButton({
           text: buttonText,
           onClick: () => {
-            // TODO: Implement swap/secure transaction
-            hapticFeedback.impactOccurred("medium");
+            if (swapActiveTab === "swap") {
+              void handleSubmitSwap();
+            } else {
+              // TODO: Implement secure transaction
+              hapticFeedback.impactOccurred("medium");
+            }
           },
-          isEnabled: isSwapFormValid,
-          showLoader: false,
+          isEnabled: isSwapFormValid && !isSwapping,
+          showLoader: isSwapping,
         });
       } else {
         // Token selection views - hide main button
@@ -1608,6 +1698,8 @@ export default function Home() {
     solPriceUsd,
     swapView,
     swapActiveTab,
+    handleSubmitSwap,
+    isSwapping,
   ]);
 
   const formattedUsdBalance = formatUsdValue(balance, solPriceUsd);
@@ -2366,10 +2458,10 @@ export default function Home() {
             setSwappedToSymbol(undefined);
           }
         }}
-        balanceSol={balance ? balance / LAMPORTS_PER_SOL : 0}
-        balanceUsdt={0}
+        tokenHoldings={tokenHoldings}
         solPriceUsd={solPriceUsd}
         onValidationChange={setIsSwapFormValid}
+        onSwapParamsChange={handleSwapParamsChange}
         activeTab={swapActiveTab}
         onTabChange={setSwapActiveTab}
         view={swapView}
