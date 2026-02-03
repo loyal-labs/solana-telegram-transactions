@@ -6,6 +6,7 @@ export type TokenHolding = {
   decimals: number;
   priceUsd: number | null;
   valueUsd: number | null;
+  imageUrl: string | null;
 };
 
 export type HeliusAsset = {
@@ -24,6 +25,9 @@ export type HeliusAsset = {
     metadata?: {
       name: string;
       symbol: string;
+    };
+    links?: {
+      image?: string;
     };
   };
 };

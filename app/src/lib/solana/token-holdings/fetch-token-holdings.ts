@@ -41,6 +41,7 @@ function mapAssetToHolding(asset: HeliusAsset): TokenHolding | null {
     decimals,
     priceUsd: price_info?.price_per_token ?? null,
     valueUsd: price_info?.total_price ?? null,
+    imageUrl: asset.content?.links?.image ?? null,
   };
 }
 
@@ -57,6 +58,7 @@ function mapNativeBalance(nativeBalance: HeliusNativeBalance | undefined): Token
     decimals: NATIVE_SOL_DECIMALS,
     priceUsd: price_per_sol ?? null,
     valueUsd: total_price ?? null,
+    imageUrl: null,
   };
 }
 

@@ -26,6 +26,12 @@ import {
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import { SOL_PRICE_USD } from "@/lib/constants";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
+import {
+  DEFAULT_TOKEN_ICON,
+  KNOWN_TOKEN_ICONS,
+  NATIVE_SOL_MINT,
+  type TokenHolding,
+} from "@/lib/solana/token-holdings";
 
 // Token type definition
 export type Token = {
@@ -35,18 +41,41 @@ export type Token = {
   decimals: number;
   balance: number;
   priceUsd: number;
+  mint?: string;
 };
 
-// Default tokens
-const TOKENS: Token[] = [
-  {
-    symbol: "USDT",
-    name: "Tether USD",
-    icon: "/USDT.png",
-    decimals: 6,
-    balance: 0,
-    priceUsd: 1,
-  },
+// Helpers
+
+function getTokenIcon(holding: TokenHolding): string {
+  return holding.imageUrl ?? KNOWN_TOKEN_ICONS[holding.mint] ?? DEFAULT_TOKEN_ICON;
+}
+
+function getMaxDecimals(symbol: string): number {
+  return symbol === "SOL" ? 6 : 2;
+}
+
+function parseAmountInput(value: string, maxDecimals: number): string | null {
+  const normalized = value.replace(",", ".");
+  if (!/^[0-9]*\.?[0-9]*$/.test(normalized)) return null;
+  if (normalized.includes(".")) {
+    const [, dec] = normalized.split(".");
+    if (dec && dec.length > maxDecimals) return null;
+  }
+  return normalized;
+}
+
+export type SwapFormValues = {
+  fromMint: string;
+  toMint: string;
+  fromAmount: number;
+  fromDecimals: number;
+  toDecimals: number;
+  fromSymbol: string;
+  toSymbol: string;
+};
+
+// Fallback tokens when user has insufficient holdings
+const FALLBACK_TOKENS: Token[] = [
   {
     symbol: "SOL",
     name: "Solana",
@@ -54,17 +83,160 @@ const TOKENS: Token[] = [
     decimals: 9,
     balance: 0,
     priceUsd: SOL_PRICE_USD,
+    mint: NATIVE_SOL_MINT,
+  },
+  {
+    symbol: "USDT",
+    name: "Tether USD",
+    icon: "/USDT.png",
+    decimals: 6,
+    balance: 0,
+    priceUsd: 1,
+    mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
   },
 ];
+
+function holdingToToken(holding: TokenHolding): Token {
+  return {
+    symbol: holding.symbol,
+    name: holding.name,
+    icon: getTokenIcon(holding),
+    decimals: holding.decimals,
+    balance: holding.balance,
+    priceUsd: holding.priceUsd ?? 0,
+    mint: holding.mint,
+  };
+}
+
+// Shared token list item component
+type TokenListItemProps = {
+  token: Token;
+  onSelect: (token: Token) => void;
+};
+
+function TokenListItem({ token, onSelect }: TokenListItemProps): React.ReactElement {
+  const balanceUsd = token.balance * token.priceUsd;
+
+  return (
+    <button
+      onClick={() => onSelect(token)}
+      className="w-full flex items-center px-3 rounded-2xl active:bg-white/[0.03] transition-colors"
+    >
+      <div className="py-1.5 pr-3">
+        <div className="w-12 h-12 rounded-full overflow-hidden bg-white/10">
+          <Image src={token.icon} alt={token.symbol} width={48} height={48} />
+        </div>
+      </div>
+      <div className="flex-1 flex flex-col gap-0.5 py-2.5">
+        <p className="text-base text-white text-left leading-5">{token.symbol}</p>
+        <p className="text-[13px] text-white/60 text-left leading-4">{token.name}</p>
+      </div>
+      <div className="flex flex-col gap-0.5 items-end py-2.5 pl-3">
+        <p className="text-base leading-5 text-white/60 text-right">
+          {token.balance.toLocaleString("en-US", {
+            maximumFractionDigits: token.decimals > 6 ? 4 : 2,
+          })}
+        </p>
+        <p className="text-[13px] leading-4 text-white/60 text-right">
+          ${balanceUsd.toFixed(2)}
+        </p>
+      </div>
+      <div className="pl-3 py-2 flex items-center justify-center h-10">
+        <ChevronRight size={16} strokeWidth={1.5} className="text-white/40" />
+      </div>
+    </button>
+  );
+}
+
+// Shared token select view component
+type TokenSelectViewProps = {
+  title: string;
+  viewKey: "selectFrom" | "selectTo" | "selectSecure";
+  currentView: "main" | "selectFrom" | "selectTo" | "selectSecure" | "result";
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  tokens: Token[];
+  onSelectToken: (token: Token) => void;
+  onBack: () => void;
+};
+
+function TokenSelectView({
+  title,
+  viewKey,
+  currentView,
+  searchQuery,
+  onSearchChange,
+  tokens,
+  onSelectToken,
+  onBack,
+}: TokenSelectViewProps): React.ReactElement {
+  const isActive = currentView === viewKey;
+
+  return (
+    <div
+      className="absolute inset-0 flex flex-col transition-all duration-300 ease-out"
+      style={{
+        background: "#1c1c1e",
+        transform: `translateX(${isActive ? 0 : 100}%)`,
+        opacity: isActive ? 1 : 0,
+        pointerEvents: isActive ? "auto" : "none",
+      }}
+    >
+      {/* Header */}
+      <div className="relative h-[52px] flex items-center justify-center shrink-0">
+        <button
+          onClick={onBack}
+          className="absolute left-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 active:bg-white/10 transition-all duration-150"
+          style={{ background: "rgba(255, 255, 255, 0.06)" }}
+        >
+          <ArrowLeft size={22} strokeWidth={1.5} className="text-white/60" />
+        </button>
+        <span className="text-base font-medium text-white tracking-[-0.176px]">
+          {title}
+        </span>
+      </div>
+
+      {/* Search Input */}
+      <div className="px-4 py-2">
+        <div
+          className="flex items-center rounded-[75px] overflow-hidden px-3"
+          style={{ background: "rgba(255, 255, 255, 0.06)" }}
+        >
+          <div className="pr-3 py-3 flex items-center justify-center">
+            <Search size={24} strokeWidth={1.5} className="text-white/40" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search token"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="flex-1 py-3.5 bg-transparent text-base text-white placeholder:text-white/40 focus:outline-none"
+          />
+        </div>
+      </div>
+
+      {/* Token List */}
+      <div className="flex-1 overflow-y-auto">
+        {tokens.map((token) => (
+          <TokenListItem
+            key={token.mint ?? token.symbol}
+            token={token}
+            onSelect={onSelectToken}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export type SwapSheetProps = {
   trigger?: ReactNode | null;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  balanceSol?: number; // Balance in SOL
-  balanceUsdt?: number; // Balance in USDT
+  tokenHoldings?: TokenHolding[];
   solPriceUsd?: number | null;
   onValidationChange?: (isValid: boolean) => void;
+  onSwapParamsChange?: (params: SwapFormValues) => void;
   // Tab control
   activeTab?: "swap" | "secure";
   onTabChange?: (tab: "swap" | "secure") => void;
@@ -82,10 +254,10 @@ export default function SwapSheet({
   trigger,
   open,
   onOpenChange,
-  balanceSol = 0,
-  balanceUsdt = 0,
+  tokenHoldings = [],
   solPriceUsd: solPriceUsdProp,
   onValidationChange,
+  onSwapParamsChange,
   activeTab: activeTabProp,
   onTabChange,
   view: viewProp,
@@ -139,23 +311,38 @@ export default function SwapSheet({
     [onViewChange]
   );
 
+  // Compute available tokens from holdings or use fallback
+  const availableTokens = useMemo(() => {
+    // Use fallback if 1 or fewer tokens
+    if (tokenHoldings.length <= 1) {
+      // If user has 1 token (likely SOL), merge it with fallback
+      if (tokenHoldings.length === 1) {
+        const userToken = holdingToToken(tokenHoldings[0]);
+        const fallbackWithoutUserToken = FALLBACK_TOKENS.filter(
+          (t) => t.mint !== userToken.mint
+        );
+        return [userToken, ...fallbackWithoutUserToken];
+      }
+      return FALLBACK_TOKENS;
+    }
+
+    return tokenHoldings.map(holdingToToken);
+  }, [tokenHoldings]);
+
   // Secure mode state - token to secure
-  const [secureToken, setSecureToken] = useState<Token>({
-    ...TOKENS[0],
-    balance: balanceUsdt,
-  });
+  const [secureToken, setSecureToken] = useState<Token>(
+    () => availableTokens[0] ?? FALLBACK_TOKENS[0]
+  );
   const [secureAmountStr, setSecureAmountStr] = useState("");
   const secureAmountInputRef = useRef<HTMLInputElement>(null);
   const secureAmountTextRef = useRef<HTMLParagraphElement>(null);
   const [secureCaretLeft, setSecureCaretLeft] = useState(0);
-  const [fromToken, setFromToken] = useState<Token>({
-    ...TOKENS[0],
-    balance: balanceUsdt,
-  });
-  const [toToken, setToToken] = useState<Token>({
-    ...TOKENS[1],
-    balance: balanceSol,
-  });
+  const [fromToken, setFromToken] = useState<Token>(
+    () => availableTokens[0] ?? FALLBACK_TOKENS[0]
+  );
+  const [toToken, setToToken] = useState<Token>(
+    () => availableTokens[1] ?? FALLBACK_TOKENS[1]
+  );
   const [amountStr, setAmountStr] = useState("");
   const [solPriceUsdState, setSolPriceUsdState] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -167,28 +354,17 @@ export default function SwapSheet({
   // Use prop price or fetch
   const solPriceUsd = solPriceUsdProp ?? solPriceUsdState;
 
-  // Update token balances when props change
-  useEffect(() => {
-    setFromToken((prev) =>
-      prev.symbol === "USDT"
-        ? { ...prev, balance: balanceUsdt }
-        : { ...prev, balance: balanceSol }
-    );
-    setToToken((prev) =>
-      prev.symbol === "SOL"
-        ? { ...prev, balance: balanceSol }
-        : { ...prev, balance: balanceUsdt }
-    );
-  }, [balanceSol, balanceUsdt]);
-
   // Update SOL price in tokens when available
   useEffect(() => {
     if (solPriceUsd) {
       setFromToken((prev) =>
-        prev.symbol === "SOL" ? { ...prev, priceUsd: solPriceUsd } : prev
+        prev.mint === NATIVE_SOL_MINT ? { ...prev, priceUsd: solPriceUsd } : prev
       );
       setToToken((prev) =>
-        prev.symbol === "SOL" ? { ...prev, priceUsd: solPriceUsd } : prev
+        prev.mint === NATIVE_SOL_MINT ? { ...prev, priceUsd: solPriceUsd } : prev
+      );
+      setSecureToken((prev) =>
+        prev.mint === NATIVE_SOL_MINT ? { ...prev, priceUsd: solPriceUsd } : prev
       );
     }
   }, [solPriceUsd]);
@@ -220,27 +396,37 @@ export default function SwapSheet({
       setSearchQuery("");
       setInternalView("main");
       setInternalActiveTab("swap");
-      // Reset to default tokens with updated balances
-      setFromToken({ ...TOKENS[0], balance: balanceUsdt });
-      setToToken({
-        ...TOKENS[1],
-        balance: balanceSol,
-        priceUsd: solPriceUsd ?? SOL_PRICE_USD,
-      });
-      setSecureToken({ ...TOKENS[0], balance: balanceUsdt });
-    }
-  }, [open, balanceSol, balanceUsdt, solPriceUsd]);
 
-  // Update secure token balance when props change
-  useEffect(() => {
-    setSecureToken((prev) =>
-      prev.symbol === "USDT"
-        ? { ...prev, balance: balanceUsdt }
-        : prev.symbol === "SOL"
-          ? { ...prev, balance: balanceSol, priceUsd: solPriceUsd ?? SOL_PRICE_USD }
-          : prev
-    );
-  }, [balanceSol, balanceUsdt, solPriceUsd]);
+      // Reset to first available tokens
+      const firstToken = availableTokens[0] ?? FALLBACK_TOKENS[0];
+      const secondToken =
+        availableTokens[1] ??
+        availableTokens.find((t) => t.mint !== firstToken.mint) ??
+        FALLBACK_TOKENS[1];
+
+      setFromToken({
+        ...firstToken,
+        priceUsd:
+          firstToken.mint === NATIVE_SOL_MINT
+            ? (solPriceUsd ?? SOL_PRICE_USD)
+            : firstToken.priceUsd,
+      });
+      setToToken({
+        ...secondToken,
+        priceUsd:
+          secondToken.mint === NATIVE_SOL_MINT
+            ? (solPriceUsd ?? SOL_PRICE_USD)
+            : secondToken.priceUsd,
+      });
+      setSecureToken({
+        ...firstToken,
+        priceUsd:
+          firstToken.mint === NATIVE_SOL_MINT
+            ? (solPriceUsd ?? SOL_PRICE_USD)
+            : firstToken.priceUsd,
+      });
+    }
+  }, [open, availableTokens, solPriceUsd]);
 
   // Focus amount input when sheet opens or returns to main view
   useEffect(() => {
@@ -330,6 +516,22 @@ export default function SwapSheet({
     }
   }, [open, view, activeTab, isSwapValid, isSecureValid, onValidationChange]);
 
+  // Report swap params to parent
+  useEffect(() => {
+    if (open && activeTab === "swap" && fromToken.mint && toToken.mint) {
+      const amount = parseFloat(amountStr);
+      onSwapParamsChange?.({
+        fromMint: fromToken.mint,
+        toMint: toToken.mint,
+        fromAmount: isNaN(amount) ? 0 : amount,
+        fromDecimals: fromToken.decimals,
+        toDecimals: toToken.decimals,
+        fromSymbol: fromToken.symbol,
+        toSymbol: toToken.symbol,
+      });
+    }
+  }, [open, activeTab, fromToken, toToken, amountStr, onSwapParamsChange]);
+
   // Determine if in result view (for hiding main view during result)
   const isResultView = view === "result";
 
@@ -367,54 +569,42 @@ export default function SwapSheet({
       const currentFrom = fromToken;
       const currentTo = toToken;
 
+      // Apply SOL price if needed
+      const tokenWithPrice = {
+        ...token,
+        priceUsd:
+          token.mint === NATIVE_SOL_MINT
+            ? (solPriceUsd ?? SOL_PRICE_USD)
+            : token.priceUsd,
+      };
+
       if (type === "from") {
         // If selecting same as "to", swap them
-        if (token.symbol === currentTo.symbol) {
+        if (token.mint === currentTo.mint) {
           setToToken(currentFrom);
         }
-        setFromToken({
-          ...token,
-          balance:
-            token.symbol === "USDT"
-              ? balanceUsdt
-              : token.symbol === "SOL"
-                ? balanceSol
-                : 0,
-          priceUsd:
-            token.symbol === "SOL" ? solPriceUsd ?? SOL_PRICE_USD : token.priceUsd,
-        });
+        setFromToken(tokenWithPrice);
       } else {
         // If selecting same as "from", swap them
-        if (token.symbol === currentFrom.symbol) {
+        if (token.mint === currentFrom.mint) {
           setFromToken(currentTo);
         }
-        setToToken({
-          ...token,
-          balance:
-            token.symbol === "USDT"
-              ? balanceUsdt
-              : token.symbol === "SOL"
-                ? balanceSol
-                : 0,
-          priceUsd:
-            token.symbol === "SOL" ? solPriceUsd ?? SOL_PRICE_USD : token.priceUsd,
-        });
+        setToToken(tokenWithPrice);
       }
 
       // Go back to main view
       setView("main");
     },
-    [fromToken, toToken, balanceUsdt, balanceSol, solPriceUsd, setView]
+    [fromToken, toToken, solPriceUsd, setView]
   );
 
   // Handle preset percentage
   const handlePresetPercentage = useCallback(
     (percentage: number) => {
       hapticFeedback.impactOccurred("light");
-      const maxAmount = fromToken.balance;
-      const amount = maxAmount * (percentage / 100);
-      const decimals = fromToken.symbol === "SOL" ? 6 : 2;
-      setAmountStr(amount.toFixed(decimals).replace(/\.?0+$/, "") || "0");
+      const amount = fromToken.balance * (percentage / 100);
+      const formatted = amount.toFixed(getMaxDecimals(fromToken.symbol)).replace(/\.?0+$/, "") || "0";
+      setAmountStr(formatted);
       amountInputRef.current?.focus({ preventScroll: true });
     },
     [fromToken.balance, fromToken.symbol]
@@ -433,43 +623,55 @@ export default function SwapSheet({
       hapticFeedback.impactOccurred("light");
       setSecureToken({
         ...token,
-        balance:
-          token.symbol === "USDT"
-            ? balanceUsdt
-            : token.symbol === "SOL"
-              ? balanceSol
-              : 0,
         priceUsd:
-          token.symbol === "SOL" ? solPriceUsd ?? SOL_PRICE_USD : token.priceUsd,
+          token.mint === NATIVE_SOL_MINT
+            ? (solPriceUsd ?? SOL_PRICE_USD)
+            : token.priceUsd,
       });
       setView("main");
     },
-    [balanceUsdt, balanceSol, solPriceUsd, setView]
+    [solPriceUsd, setView]
   );
 
   // Handle secure preset percentage
   const handleSecurePresetPercentage = useCallback(
     (percentage: number) => {
       hapticFeedback.impactOccurred("light");
-      const maxAmount = secureToken.balance;
-      const amount = maxAmount * (percentage / 100);
-      const decimals = secureToken.symbol === "SOL" ? 6 : 2;
-      setSecureAmountStr(amount.toFixed(decimals).replace(/\.?0+$/, "") || "0");
+      const amount = secureToken.balance * (percentage / 100);
+      const formatted = amount.toFixed(getMaxDecimals(secureToken.symbol)).replace(/\.?0+$/, "") || "0";
+      setSecureAmountStr(formatted);
       secureAmountInputRef.current?.focus({ preventScroll: true });
     },
     [secureToken.balance, secureToken.symbol]
   );
 
+  // Handler for going back from token select views
+  const handleBackToMain = useCallback(() => {
+    hapticFeedback.impactOccurred("light");
+    setView("main");
+  }, [setView]);
+
+  // Handler wrappers for TokenSelectView callbacks
+  const handleSelectFromToken = useCallback(
+    (token: Token) => handleSelectToken(token, "from"),
+    [handleSelectToken]
+  );
+
+  const handleSelectToToken = useCallback(
+    (token: Token) => handleSelectToken(token, "to"),
+    [handleSelectToken]
+  );
+
   // Filter tokens based on search
   const filteredTokens = useMemo(() => {
-    if (!searchQuery) return TOKENS;
+    if (!searchQuery) return availableTokens;
     const query = searchQuery.toLowerCase();
-    return TOKENS.filter(
+    return availableTokens.filter(
       (t) =>
         t.symbol.toLowerCase().includes(query) ||
         t.name.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [searchQuery, availableTokens]);
 
   const modalStyle = useMemo(
     () =>
@@ -577,14 +779,12 @@ export default function SwapSheet({
                         inputMode="decimal"
                         value={amountStr}
                         onChange={(e) => {
-                          const val = e.target.value.replace(",", ".");
-                          if (/^[0-9]*\.?[0-9]*$/.test(val)) {
-                            const decimals = fromToken.symbol === "SOL" ? 6 : 2;
-                            if (val.includes(".")) {
-                              const [, dec] = val.split(".");
-                              if (dec && dec.length > decimals) return;
-                            }
-                            setAmountStr(val);
+                          const parsed = parseAmountInput(
+                            e.target.value,
+                            getMaxDecimals(fromToken.symbol)
+                          );
+                          if (parsed !== null) {
+                            setAmountStr(parsed);
                           }
                         }}
                         placeholder="0"
@@ -781,14 +981,12 @@ export default function SwapSheet({
                         inputMode="decimal"
                         value={secureAmountStr}
                         onChange={(e) => {
-                          const val = e.target.value.replace(",", ".");
-                          if (/^[0-9]*\.?[0-9]*$/.test(val)) {
-                            const decimals = secureToken.symbol === "SOL" ? 6 : 2;
-                            if (val.includes(".")) {
-                              const [, dec] = val.split(".");
-                              if (dec && dec.length > decimals) return;
-                            }
-                            setSecureAmountStr(val);
+                          const parsed = parseAmountInput(
+                            e.target.value,
+                            getMaxDecimals(secureToken.symbol)
+                          );
+                          if (parsed !== null) {
+                            setSecureAmountStr(parsed);
                           }
                         }}
                         placeholder="0"
@@ -963,365 +1161,37 @@ export default function SwapSheet({
             )}
           </div>
 
-          {/* TOKEN SELECT VIEW (FROM) */}
-          <div
-            className="absolute inset-0 flex flex-col transition-all duration-300 ease-out"
-            style={{
-              background: "#1c1c1e",
-              transform: `translateX(${view === "selectFrom" ? 0 : 100}%)`,
-              opacity: view === "selectFrom" ? 1 : 0,
-              pointerEvents: view === "selectFrom" ? "auto" : "none",
-            }}
-          >
-            {/* Header */}
-            <div className="relative h-[52px] flex items-center justify-center shrink-0">
-              {/* Back Button */}
-              <button
-                onClick={() => {
-                  hapticFeedback.impactOccurred("light");
-                  setView("main");
-                }}
-                className="absolute left-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 active:bg-white/10 transition-all duration-150"
-                style={{
-                  background: "rgba(255, 255, 255, 0.06)",
-                }}
-              >
-                <ArrowLeft size={22} strokeWidth={1.5} className="text-white/60" />
-              </button>
-
-              <span className="text-base font-medium text-white tracking-[-0.176px]">
-                You swap
-              </span>
-            </div>
-
-            {/* Search Input */}
-            <div className="px-4 py-2">
-              <div
-                className="flex items-center rounded-[75px] overflow-hidden px-3"
-                style={{ background: "rgba(255, 255, 255, 0.06)" }}
-              >
-                <div className="pr-3 py-3 flex items-center justify-center">
-                  <Search size={24} strokeWidth={1.5} className="text-white/40" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search token"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 py-3.5 bg-transparent text-base text-white placeholder:text-white/40 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Token List */}
-            <div className="flex-1 overflow-y-auto">
-              {filteredTokens.map((token) => {
-                const tokenBalance =
-                  token.symbol === "USDT"
-                    ? balanceUsdt
-                    : token.symbol === "SOL"
-                      ? balanceSol
-                      : 0;
-                const tokenPrice =
-                  token.symbol === "SOL"
-                    ? solPriceUsd ?? SOL_PRICE_USD
-                    : token.priceUsd;
-                const balanceUsd = tokenBalance * tokenPrice;
-
-                return (
-                  <button
-                    key={token.symbol}
-                    onClick={() =>
-                      handleSelectToken(
-                        {
-                          ...token,
-                          balance: tokenBalance,
-                          priceUsd: tokenPrice,
-                        },
-                        "from"
-                      )
-                    }
-                    className="w-full flex items-center px-3 rounded-2xl active:bg-white/[0.03] transition-colors"
-                  >
-                    <div className="py-1.5 pr-3">
-                      <div className="w-12 h-12 rounded-full overflow-hidden">
-                        <Image
-                          src={token.icon}
-                          alt={token.symbol}
-                          width={48}
-                          height={48}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                      <p className="text-base text-white text-left leading-5">
-                        {token.symbol}
-                      </p>
-                      <p className="text-[13px] text-white/60 text-left leading-4">
-                        {token.name}
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-0.5 items-end py-2.5 pl-3">
-                      <p className="text-base leading-5 text-white/60 text-right">
-                        {tokenBalance.toLocaleString("en-US", {
-                          maximumFractionDigits: token.symbol === "SOL" ? 4 : 2,
-                        })}
-                      </p>
-                      <p className="text-[13px] leading-4 text-white/60 text-right">
-                        ${balanceUsd.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="pl-3 py-2 flex items-center justify-center h-10">
-                      <ChevronRight
-                        size={16}
-                        strokeWidth={1.5}
-                        className="text-white/40"
-                      />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* TOKEN SELECT VIEW (TO) */}
-          <div
-            className="absolute inset-0 flex flex-col transition-all duration-300 ease-out"
-            style={{
-              background: "#1c1c1e",
-              transform: `translateX(${view === "selectTo" ? 0 : 100}%)`,
-              opacity: view === "selectTo" ? 1 : 0,
-              pointerEvents: view === "selectTo" ? "auto" : "none",
-            }}
-          >
-            {/* Header */}
-            <div className="relative h-[52px] flex items-center justify-center shrink-0">
-              {/* Back Button */}
-              <button
-                onClick={() => {
-                  hapticFeedback.impactOccurred("light");
-                  setView("main");
-                }}
-                className="absolute left-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 active:bg-white/10 transition-all duration-150"
-                style={{
-                  background: "rgba(255, 255, 255, 0.06)",
-                }}
-              >
-                <ArrowLeft size={22} strokeWidth={1.5} className="text-white/60" />
-              </button>
-
-              <span className="text-base font-medium text-white tracking-[-0.176px]">
-                You receive
-              </span>
-            </div>
-
-            {/* Search Input */}
-            <div className="px-4 py-2">
-              <div
-                className="flex items-center rounded-[75px] overflow-hidden px-3"
-                style={{ background: "rgba(255, 255, 255, 0.06)" }}
-              >
-                <div className="pr-3 py-3 flex items-center justify-center">
-                  <Search size={24} strokeWidth={1.5} className="text-white/40" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search token"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 py-3.5 bg-transparent text-base text-white placeholder:text-white/40 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Token List */}
-            <div className="flex-1 overflow-y-auto">
-              {filteredTokens.map((token) => {
-                const tokenBalance =
-                  token.symbol === "USDT"
-                    ? balanceUsdt
-                    : token.symbol === "SOL"
-                      ? balanceSol
-                      : 0;
-                const tokenPrice =
-                  token.symbol === "SOL"
-                    ? solPriceUsd ?? SOL_PRICE_USD
-                    : token.priceUsd;
-                const balanceUsd = tokenBalance * tokenPrice;
-
-                return (
-                  <button
-                    key={token.symbol}
-                    onClick={() =>
-                      handleSelectToken(
-                        {
-                          ...token,
-                          balance: tokenBalance,
-                          priceUsd: tokenPrice,
-                        },
-                        "to"
-                      )
-                    }
-                    className="w-full flex items-center px-3 rounded-2xl active:bg-white/[0.03] transition-colors"
-                  >
-                    <div className="py-1.5 pr-3">
-                      <div className="w-12 h-12 rounded-full overflow-hidden">
-                        <Image
-                          src={token.icon}
-                          alt={token.symbol}
-                          width={48}
-                          height={48}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                      <p className="text-base text-white text-left leading-5">
-                        {token.symbol}
-                      </p>
-                      <p className="text-[13px] text-white/60 text-left leading-4">
-                        {token.name}
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-0.5 items-end py-2.5 pl-3">
-                      <p className="text-base leading-5 text-white/60 text-right">
-                        {tokenBalance.toLocaleString("en-US", {
-                          maximumFractionDigits: token.symbol === "SOL" ? 4 : 2,
-                        })}
-                      </p>
-                      <p className="text-[13px] leading-4 text-white/60 text-right">
-                        ${balanceUsd.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="pl-3 py-2 flex items-center justify-center h-10">
-                      <ChevronRight
-                        size={16}
-                        strokeWidth={1.5}
-                        className="text-white/40"
-                      />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* TOKEN SELECT VIEW (SECURE) */}
-          <div
-            className="absolute inset-0 flex flex-col transition-all duration-300 ease-out"
-            style={{
-              background: "#1c1c1e",
-              transform: `translateX(${view === "selectSecure" ? 0 : 100}%)`,
-              opacity: view === "selectSecure" ? 1 : 0,
-              pointerEvents: view === "selectSecure" ? "auto" : "none",
-            }}
-          >
-            {/* Header */}
-            <div className="relative h-[52px] flex items-center justify-center shrink-0">
-              {/* Back Button */}
-              <button
-                onClick={() => {
-                  hapticFeedback.impactOccurred("light");
-                  setView("main");
-                }}
-                className="absolute left-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 active:bg-white/10 transition-all duration-150"
-                style={{
-                  background: "rgba(255, 255, 255, 0.06)",
-                }}
-              >
-                <ArrowLeft size={22} strokeWidth={1.5} className="text-white/60" />
-              </button>
-
-              <span className="text-base font-medium text-white tracking-[-0.176px]">
-                You secure
-              </span>
-            </div>
-
-            {/* Search Input */}
-            <div className="px-4 py-2">
-              <div
-                className="flex items-center rounded-[75px] overflow-hidden px-3"
-                style={{ background: "rgba(255, 255, 255, 0.06)" }}
-              >
-                <div className="pr-3 py-3 flex items-center justify-center">
-                  <Search size={24} strokeWidth={1.5} className="text-white/40" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search token"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 py-3.5 bg-transparent text-base text-white placeholder:text-white/40 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Token List */}
-            <div className="flex-1 overflow-y-auto">
-              {filteredTokens.map((token) => {
-                const tokenBalance =
-                  token.symbol === "USDT"
-                    ? balanceUsdt
-                    : token.symbol === "SOL"
-                      ? balanceSol
-                      : 0;
-                const tokenPrice =
-                  token.symbol === "SOL"
-                    ? solPriceUsd ?? SOL_PRICE_USD
-                    : token.priceUsd;
-                const balanceUsd = tokenBalance * tokenPrice;
-
-                return (
-                  <button
-                    key={token.symbol}
-                    onClick={() =>
-                      handleSelectSecureToken({
-                        ...token,
-                        balance: tokenBalance,
-                        priceUsd: tokenPrice,
-                      })
-                    }
-                    className="w-full flex items-center px-3 rounded-2xl active:bg-white/[0.03] transition-colors"
-                  >
-                    <div className="py-1.5 pr-3">
-                      <div className="w-12 h-12 rounded-full overflow-hidden">
-                        <Image
-                          src={token.icon}
-                          alt={token.symbol}
-                          width={48}
-                          height={48}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                      <p className="text-base text-white text-left leading-5">
-                        {token.symbol}
-                      </p>
-                      <p className="text-[13px] text-white/60 text-left leading-4">
-                        {token.name}
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-0.5 items-end py-2.5 pl-3">
-                      <p className="text-base leading-5 text-white/60 text-right">
-                        {tokenBalance.toLocaleString("en-US", {
-                          maximumFractionDigits: token.symbol === "SOL" ? 4 : 2,
-                        })}
-                      </p>
-                      <p className="text-[13px] leading-4 text-white/60 text-right">
-                        ${balanceUsd.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="pl-3 py-2 flex items-center justify-center h-10">
-                      <ChevronRight
-                        size={16}
-                        strokeWidth={1.5}
-                        className="text-white/40"
-                      />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* Token Select Views */}
+          <TokenSelectView
+            title="You swap"
+            viewKey="selectFrom"
+            currentView={view}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            tokens={filteredTokens}
+            onSelectToken={handleSelectFromToken}
+            onBack={handleBackToMain}
+          />
+          <TokenSelectView
+            title="You receive"
+            viewKey="selectTo"
+            currentView={view}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            tokens={filteredTokens}
+            onSelectToken={handleSelectToToken}
+            onBack={handleBackToMain}
+          />
+          <TokenSelectView
+            title="You secure"
+            viewKey="selectSecure"
+            currentView={view}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            tokens={filteredTokens}
+            onSelectToken={handleSelectSecureToken}
+            onBack={handleBackToMain}
+          />
 
           {/* RESULT VIEW (SUCCESS or ERROR) */}
           <div
