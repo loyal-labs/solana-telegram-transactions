@@ -15,6 +15,8 @@ import {
   handleCommunityMessage,
   handleGLoyalReaction,
 } from "@/lib/telegram/bot-api/message-handlers";
+import { handleDirectMessage } from "@/lib/telegram/conversation-service";
+import { isPrivateChat } from "@/lib/telegram/utils";
 
 const bot = await getBot();
 
@@ -51,6 +53,18 @@ bot.on("business_connection", async (ctx) => {
 });
 
 bot.on("message:text", async (ctx) => {
+  const chatType = ctx.chat?.type;
+
+  // Route private DMs to conversation handler (skip commands)
+  if (chatType && isPrivateChat(chatType)) {
+    // Commands are handled by bot.command() handlers above
+    if (!ctx.message?.text?.startsWith("/")) {
+      await handleDirectMessage(ctx, bot);
+    }
+    return;
+  }
+
+  // Handle group/community messages
   await Promise.all([
     handleGLoyalReaction(ctx, bot),
     handleCommunityMessage(ctx),
