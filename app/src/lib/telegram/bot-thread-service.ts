@@ -1,4 +1,4 @@
-import { and, asc, count, eq, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull } from "drizzle-orm";
 
 import { getDatabase } from "@/lib/core/database";
 import {
@@ -251,21 +251,24 @@ export async function addMessage(params: {
 
 /**
  * Retrieves decrypted messages for a thread.
- * Returns messages in chronological order.
+ * Returns messages in chronological order (oldest -> newest).
  *
  * @param threadId - Thread UUID
  * @param options.limit - Maximum number of messages to return
+ * @param options.latest - When true, selects the most recent N messages
  * @returns Array of decrypted messages
  */
 export async function getThreadMessages(
   threadId: string,
-  options?: { limit?: number }
+  options?: { limit?: number; latest?: boolean }
 ): Promise<DecryptedMessage[]> {
   const db = getDatabase();
 
   const messages = await db.query.botMessages.findMany({
     where: eq(botMessages.threadId, threadId),
-    orderBy: [asc(botMessages.createdAt)],
+    orderBy: [
+      options?.latest ? desc(botMessages.createdAt) : asc(botMessages.createdAt),
+    ],
     limit: options?.limit,
   });
 
@@ -298,6 +301,10 @@ export async function getThreadMessages(
     }
   }
 
+  if (options?.latest) {
+    decrypted.reverse();
+  }
+
   return decrypted;
 }
 
@@ -325,7 +332,10 @@ export async function getThreadMessagesForAI(
   threadId: string,
   options?: { limit?: number }
 ): Promise<ChatMessage[]> {
-  const messages = await getThreadMessages(threadId, options);
+  const messages = await getThreadMessages(threadId, {
+    limit: options?.limit,
+    latest: true,
+  });
 
   return messages
     .filter((msg) => msg.senderType !== "system")
