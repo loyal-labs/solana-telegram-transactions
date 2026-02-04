@@ -469,7 +469,7 @@ export default function Home() {
     null
   );
   const [isSwapping, setIsSwapping] = useState(false);
-  const [sendStep, setSendStep] = useState<1 | 2 | 3 | 4>(1);
+  const [sendStep, setSendStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [sentAmountSol, setSentAmountSol] = useState<number | undefined>(
     undefined
   );
@@ -983,22 +983,17 @@ export default function Home() {
       // Calculate and save the sent amount in SOL for the success screen
       const sentSolAmount = lamports / LAMPORTS_PER_SOL;
       setSentAmountSol(sentSolAmount);
-
-      // Transition to success step instead of closing
-      setSendStep(4);
     } catch (error) {
       console.error("Failed to send transaction", error);
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred("error");
       }
 
-      // Set error message and transition to step 4
       const errorMessage =
         error instanceof Error
           ? error.message
           : "Something went wrong. Please try again.";
       setSendError(errorMessage);
-      setSendStep(4);
     } finally {
       setIsSendingTransaction(false);
     }
@@ -1799,17 +1794,11 @@ export default function Home() {
       hideSecondaryButton();
 
       if (sendStep === 1) {
-        showMainButton({
-          text: "Next",
-          onClick: () => {
-            if (isSendFormValid) setSendStep(2);
-          },
-          isEnabled: isSendFormValid,
-          showLoader: false,
-        });
+        // Token selection — no main button, token click auto-advances
+        hideMainButton();
       } else if (sendStep === 2) {
         showMainButton({
-          text: "Review",
+          text: "Next",
           onClick: () => {
             if (isSendFormValid) setSendStep(3);
           },
@@ -1818,14 +1807,28 @@ export default function Home() {
         });
       } else if (sendStep === 3) {
         showMainButton({
-          text: "Confirm and Send",
-          onClick: handleSubmitSend,
-          isEnabled: isSendFormValid && !isSendingTransaction,
-          showLoader: isSendingTransaction,
+          text: "Review",
+          onClick: () => {
+            if (isSendFormValid) setSendStep(4);
+          },
+          isEnabled: isSendFormValid,
+          showLoader: false,
         });
       } else if (sendStep === 4) {
-        if (sendError) {
-          // Error step - show Done button to close
+        showMainButton({
+          text: "Confirm and Send",
+          onClick: () => {
+            setSendStep(5);
+            handleSubmitSend();
+          },
+          isEnabled: isSendFormValid && !isSendingTransaction,
+          showLoader: false,
+        });
+      } else if (sendStep === 5) {
+        if (isSendingTransaction) {
+          // In-progress — hide button while spinner shows
+          hideMainButton();
+        } else if (sendError) {
           showMainButton({
             text: "Done",
             onClick: () => {
@@ -1835,11 +1838,9 @@ export default function Home() {
             showLoader: false,
           });
         } else {
-          // Success step - share the details of the transaction
           showMainButton({
             text: "Share transaction",
             onClick: async () => {
-              // Close send sheet and open transaction details
               setSendSheetOpen(false);
               const recipientUsername = sendFormValues.recipient
                 .trim()
@@ -2881,7 +2882,6 @@ export default function Home() {
       <SendSheet
         open={isSendSheetOpen}
         onOpenChange={handleSendSheetChange}
-        trigger={null}
         initialRecipient={selectedRecipient}
         onValidationChange={handleSendValidationChange}
         onFormValuesChange={handleSendFormValuesChange}
@@ -2895,6 +2895,8 @@ export default function Home() {
         isSolPriceLoading={isSolPriceLoading}
         sentAmountSol={sentAmountSol}
         sendError={sendError}
+        isSending={isSendingTransaction}
+        tokenHoldings={tokenHoldings}
       />
       <SwapSheet
         open={isSwapSheetOpen}
