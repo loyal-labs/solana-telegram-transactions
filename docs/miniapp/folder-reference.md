@@ -53,6 +53,10 @@ Server-side AES-256-GCM encryption for personal messages.
 | `decrypt.ts` | `decrypt()` | Decrypts data, returns plaintext or `null` on failure |
 | `types.ts` | `EncryptedData` | TypeScript interface for encrypted payload |
 
+**JSONB storage type:** `EncryptedMessageContent` (defined in `schema.ts`) extends `EncryptedData` with:
+- `type`: Content discriminator (`"text"`, `"image"`, `"voice"`)
+- `metadata`: Optional metadata preserved unencrypted (file name, size, duration)
+
 **Configuration:**
 
 | Item | Source | Description |
@@ -200,6 +204,62 @@ For API routes. Requires `ASKLOYAL_TGBOT_KEY` env var.
 | `CUSTOM_EMOJI_ID` | `"5361803602862052361"` |
 
 **Key exports:** `getBot()`, `sendMessage()`, `createInvoiceLink()`
+
+### `/telegram/bot-thread-service.ts`
+
+Service layer for threaded bot conversations with encrypted message storage.
+
+| Export | Description |
+|--------|-------------|
+| `getOrCreateThread()` | Idempotent thread creation by Telegram context |
+| `addMessage()` | Store encrypted message with atomic thread update |
+| `getThreadMessages()` | Retrieve decrypted messages chronologically |
+| `getThreadMessagesForAI()` | Format messages for LLM context |
+| `getThread()` | Get thread by UUID |
+| `updateThread()` | Update title/status |
+| `getUserLatestThread()` | Get user's most recent thread |
+| `getThreadMessageCount()` | Efficient SQL COUNT |
+
+**Type exports:** `TextContent`, `ImageContent`, `VoiceContent`, `MessageContent`, `DecryptedMessage`
+
+**Usage:**
+
+```typescript
+import {
+  getOrCreateThread,
+  addMessage,
+  getThreadMessagesForAI
+} from "@/lib/telegram/bot-thread-service";
+import { chatCompletion } from "@/lib/redpill";
+
+// Create or find thread
+const threadId = await getOrCreateThread({
+  userId,
+  telegramChatId: BigInt(chatId),
+  telegramThreadId: ctx.message.message_thread_id,
+});
+
+// Store user message (encrypted)
+await addMessage({
+  threadId,
+  senderType: "user",
+  content: ctx.message.text,
+});
+
+// Get AI context and respond
+const history = await getThreadMessagesForAI(threadId);
+const response = await chatCompletion({
+  model: "phala/gpt-oss-120b",
+  messages: [{ role: "system", content: "..." }, ...history],
+});
+
+// Store bot response (encrypted)
+await addMessage({
+  threadId,
+  senderType: "bot",
+  content: response.choices[0].message.content,
+});
+```
 
 ---
 

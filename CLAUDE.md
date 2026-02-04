@@ -86,6 +86,7 @@ npm run lint:fix           # prettier -w
 | `solana/verification/` | On-chain Telegram signature verification |
 | `telegram/mini-app/` | Client-side SDK wrappers, Cloud Storage, auth |
 | `telegram/bot-api/` | Server-side bot API (grammy) |
+| `telegram/` | User service, bot thread service, bot API handlers |
 | `magicblock/` | SOL/USD price feed via Pyth oracle |
 | `redpill/` | AI chat summaries |
 
@@ -94,6 +95,49 @@ npm run lint:fix           # prettier -w
 - **PDAs**: Deposit accounts and vault use Program Derived Addresses with seeds `"deposit"`, `"vault"`, `"tg_session"`
 - **Keypair Storage**: User keypairs stored in Telegram Cloud Storage (not localStorage)
 - **Environment Selection**: `NEXT_PUBLIC_SOLANA_ENV` controls RPC endpoint (`mainnet`, `devnet`, `localnet`)
+
+### Database Patterns
+
+Schema conventions used in `/app/src/lib/core/schema.ts`:
+
+- **Primary Keys**: UUID with `defaultRandom()` for all tables
+- **Telegram IDs**: Use `bigint` with `{ mode: "bigint" }` for Telegram user/chat IDs
+- **Timestamps**: Always use `timestamp("...", { withTimezone: true })` with `.defaultNow().notNull()`
+- **Typed JSONB**: Use `.$type<T>()` for type-safe JSONB columns:
+  ```typescript
+  topics: jsonb("topics").$type<{ title: string; content: string }[]>().notNull()
+  encryptedContent: jsonb("encrypted_content").$type<EncryptedMessageContent>().notNull()
+  ```
+- **Relations**: Define separately from tables using `relations()`, enables type-safe `with:` queries
+- **Type Exports**: Export both `Table` (select) and `InsertTable` (insert) types using `$inferSelect`/`$inferInsert`
+- **Indexes**: Use `uniqueIndex` for unique constraints, `index` for query optimization
+
+Service layer patterns:
+
+- **getOrCreate Pattern**: Use `onConflictDoNothing` for race-condition-safe idempotent operations:
+  ```typescript
+  const result = await db.insert(table).values({...}).onConflictDoNothing().returning({ id: table.id });
+  if (result.length === 0) { /* query existing record */ }
+  ```
+- **Transactions**: Use `db.transaction()` when multiple operations must be atomic
+- **Query Builder**: Prefer `db.query.table.findFirst()` with `with:` for relations over raw SQL
+
+### Code Patterns
+
+- **Encryption**: Use `@/lib/encryption` for sensitive data (bot messages, personal info):
+  ```typescript
+  import { encrypt, decrypt } from "@/lib/encryption";
+  const encrypted = await encrypt(JSON.stringify(data)); // returns { ciphertext, iv }
+  const decrypted = await decrypt(encrypted); // returns plaintext or null
+  ```
+- **Drizzle Queries**: Use the query builder for type-safe operations:
+  ```typescript
+  const user = await db.query.users.findFirst({
+    where: eq(users.telegramId, telegramId),
+    with: { communityMemberships: true },
+  });
+  ```
+- **Idempotent Operations**: Use `onConflictDoNothing` or `onConflictDoUpdate` to handle duplicate inserts gracefully
 
 ## Tooling
 
@@ -112,6 +156,7 @@ NEXT_PUBLIC_SOLANA_ENV=devnet  # mainnet, devnet, or localnet
 ASKLOYAL_TGBOT_KEY=<bot_token>
 REDPILL_AI_API_KEY=<api_key>
 DATABASE_URL=postgresql://...
+MESSAGE_ENCRYPTION_KEY=<base64-32-bytes>  # For encrypted bot messages
 ```
 
 Optional:
