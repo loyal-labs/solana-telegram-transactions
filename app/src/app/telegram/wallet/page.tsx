@@ -36,7 +36,7 @@ import SendSheet, {
   isValidSolanaAddress,
   isValidTelegramUsername,
 } from "@/components/wallet/SendSheet";
-import SwapSheet, { type SwapFormValues } from "@/components/wallet/SwapSheet";
+import SwapSheet, { type SwapFormValues, type SwapView } from "@/components/wallet/SwapSheet";
 import TokensSheet from "@/components/wallet/TokensSheet";
 import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
 import { useSwap } from "@/hooks/useSwap";
@@ -139,7 +139,7 @@ const MOCK_TOKEN_HOLDINGS: import("@/lib/solana/token-holdings").TokenHolding[] 
       decimals: 6,
       priceUsd: 0.99,
       valueUsd: 1254.33,
-      imageUrl: "/bgs/usd-coin-usdc-logo.png",
+      imageUrl: "/tokens/USDT.png",
     },
     {
       mint: "sol",
@@ -149,7 +149,7 @@ const MOCK_TOKEN_HOLDINGS: import("@/lib/solana/token-holdings").TokenHolding[] 
       decimals: 9,
       priceUsd: 99.03,
       valueUsd: 125470.01,
-      imageUrl: "/bgs/avalanche-avax-logo.png",
+      imageUrl: "/tokens/solana-sol-logo.png",
     },
     {
       mint: "bnb",
@@ -159,7 +159,7 @@ const MOCK_TOKEN_HOLDINGS: import("@/lib/solana/token-holdings").TokenHolding[] 
       decimals: 8,
       priceUsd: 559.06,
       valueUsd: 708328.02,
-      imageUrl: "/bgs/bnb-bnb-logo.png",
+      imageUrl: "/tokens/bnb-bnb-logo.png",
     },
     {
       mint: "usdc",
@@ -169,7 +169,7 @@ const MOCK_TOKEN_HOLDINGS: import("@/lib/solana/token-holdings").TokenHolding[] 
       decimals: 6,
       priceUsd: 0.99,
       valueUsd: 1254.33,
-      imageUrl: "/bgs/usd-coin-usdc-logo.png",
+      imageUrl: "/tokens/usd-coin-usdc-logo.png",
     },
     {
       mint: "wbtc",
@@ -179,7 +179,7 @@ const MOCK_TOKEN_HOLDINGS: import("@/lib/solana/token-holdings").TokenHolding[] 
       decimals: 8,
       priceUsd: 76375.83,
       valueUsd: 96764126.61,
-      imageUrl: "/bgs/bitcoin-btc-logo.png",
+      imageUrl: "/tokens/bitcoin-btc-logo.png",
     },
     {
       mint: "avax",
@@ -189,7 +189,7 @@ const MOCK_TOKEN_HOLDINGS: import("@/lib/solana/token-holdings").TokenHolding[] 
       decimals: 18,
       priceUsd: 35.2,
       valueUsd: 17600,
-      imageUrl: "/bgs/avalanche-avax-logo.png",
+      imageUrl: "/tokens/avalanche-avax-logo.png",
     },
   ];
 
@@ -205,42 +205,42 @@ type MockActivityInfo = {
 const MOCK_ACTIVITY_INFO: Record<string, MockActivityInfo> = {
   "mock-1": {
     tokenSymbol: "SOL",
-    tokenIcon: "/bgs/avalanche-avax-logo.png",
+    tokenIcon: "/tokens/solana-sol-logo.png",
     displayAmount: "+0.25 SOL",
     subtitle: "USDC to SOL",
     label: "Swap",
   },
   "mock-2": {
     tokenSymbol: "USDC",
-    tokenIcon: "/bgs/usd-coin-usdc-logo.png",
+    tokenIcon: "/tokens/usd-coin-usdc-logo.png",
     displayAmount: "+200.00 USDC",
     subtitle: "from UQAt...qZir",
     label: "Received",
   },
   "mock-3": {
     tokenSymbol: "USDT",
-    tokenIcon: "/bgs/usd-coin-usdc-logo.png",
+    tokenIcon: "/tokens/USDT.png",
     displayAmount: "−0.5 USDT",
     subtitle: "to UQAt...qZir",
     label: "Sent",
   },
   "mock-4": {
     tokenSymbol: "SOL",
-    tokenIcon: "/bgs/avalanche-avax-logo.png",
+    tokenIcon: "/tokens/solana-sol-logo.png",
     displayAmount: "−0.25 SOL",
     subtitle: "by UQAt...qZir",
     label: "To be claimed",
   },
   "mock-5": {
     tokenSymbol: "BNB",
-    tokenIcon: "/bgs/bnb-bnb-logo.png",
+    tokenIcon: "/tokens/bnb-bnb-logo.png",
     displayAmount: "−0.5 BNB",
     subtitle: "to UQAt...qZir",
     label: "Sent",
   },
   "mock-6": {
     tokenSymbol: "USDC",
-    tokenIcon: "/bgs/usd-coin-usdc-logo.png",
+    tokenIcon: "/tokens/usd-coin-usdc-logo.png",
     displayAmount: "+200.00 USDC",
     subtitle: "from UQAt...qZir",
     label: "Received",
@@ -449,9 +449,7 @@ export default function Home() {
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
   const [isSwapSheetOpen, setSwapSheetOpen] = useState(false);
   const [swapActiveTab, setSwapActiveTab] = useState<"swap" | "secure">("swap");
-  const [swapView, setSwapView] = useState<
-    "main" | "selectFrom" | "selectTo" | "selectSecure" | "result"
-  >("main");
+  const [swapView, setSwapView] = useState<SwapView>("main");
   const [swapError, setSwapError] = useState<string | null>(null);
   const [swappedFromAmount, setSwappedFromAmount] = useState<
     number | undefined
@@ -1881,39 +1879,57 @@ export default function Home() {
     } else if (isSwapSheetOpen) {
       hideSecondaryButton();
       if (swapView === "result") {
-        // Result view - show Done button
+        if (isSwapping) {
+          // Swapping in progress - hide button
+          hideMainButton();
+        } else {
+          // Result view (success or error) - show Done button
+          showMainButton({
+            text: "Done",
+            onClick: () => {
+              hapticFeedback.impactOccurred("light");
+              setSwapSheetOpen(false);
+              // Reset swap state
+              setSwapView("main");
+              setSwapActiveTab("swap");
+              setSwapError(null);
+              setSwappedFromAmount(undefined);
+              setSwappedFromSymbol(undefined);
+              setSwappedToAmount(undefined);
+              setSwappedToSymbol(undefined);
+            },
+            isEnabled: true,
+            showLoader: false,
+          });
+        }
+      } else if (swapView === "confirm") {
+        // Confirm view - show "Confirm and Swap" button
         showMainButton({
-          text: "Done",
+          text: "Confirm and Swap",
           onClick: () => {
-            hapticFeedback.impactOccurred("light");
-            setSwapSheetOpen(false);
-            // Reset swap state
-            setSwapView("main");
-            setSwapActiveTab("swap");
-            setSwapError(null);
-            setSwappedFromAmount(undefined);
-            setSwappedFromSymbol(undefined);
-            setSwappedToAmount(undefined);
-            setSwappedToSymbol(undefined);
+            hapticFeedback.impactOccurred("medium");
+            setSwapView("result");
+            void handleSubmitSwap();
           },
-          isEnabled: true,
+          isEnabled: !isSwapping,
           showLoader: false,
         });
       } else if (swapView === "main") {
-        // Main view - show button based on active tab
-        const buttonText = swapActiveTab === "swap" ? "Confirm Swap" : "Secure";
+        // Main view - show "Review" button based on active tab
+        const buttonText = swapActiveTab === "swap" ? "Review" : "Secure";
         showMainButton({
           text: buttonText,
           onClick: () => {
             if (swapActiveTab === "swap") {
-              void handleSubmitSwap();
+              hapticFeedback.impactOccurred("light");
+              setSwapView("confirm");
             } else {
               // TODO: Implement secure transaction
               hapticFeedback.impactOccurred("medium");
             }
           },
           isEnabled: isSwapFormValid && !isSwapping,
-          showLoader: isSwapping,
+          showLoader: false,
         });
       } else {
         // Token selection views - hide main button
@@ -2329,7 +2345,7 @@ export default function Home() {
                       decimals: 9,
                       priceUsd: solPriceUsd,
                       valueUsd: 0,
-                      imageUrl: "/solana-sol-logo.png",
+                      imageUrl: "/tokens/solana-sol-logo.png",
                     },
                   ];
             return (
@@ -2926,6 +2942,7 @@ export default function Home() {
         swappedFromSymbol={swappedFromSymbol}
         swappedToAmount={swappedToAmount}
         swappedToSymbol={swappedToSymbol}
+        isSwapping={isSwapping}
       />
       <ReceiveSheet
         open={isReceiveSheetOpen}
