@@ -37,6 +37,7 @@ import SendSheet, {
   isValidTelegramUsername,
 } from "@/components/wallet/SendSheet";
 import SwapSheet, { type SwapFormValues } from "@/components/wallet/SwapSheet";
+import TokensSheet from "@/components/wallet/TokensSheet";
 import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
 import { useSwap } from "@/hooks/useSwap";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
@@ -122,7 +123,7 @@ import type {
 hashes.sha512 = sha512;
 
 // ─── Mock data for development ─────────────────────────────────────────────
-const USE_MOCK_DATA = false;
+const USE_MOCK_DATA = true;
 
 const MOCK_WALLET_ADDRESS = "UQAt7f8Kq9xZ3mNpR2vL5wYcD4bJ6hTgSoAeWnFqZir";
 const MOCK_BALANCE_LAMPORTS = 1_267_476_540_000; // ~1267.47654 SOL
@@ -475,6 +476,7 @@ export default function Home() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [isReceiveSheetOpen, setReceiveSheetOpen] = useState(false);
   const [isActivitySheetOpen, setActivitySheetOpen] = useState(false);
+  const [isTokensSheetOpen, setTokensSheetOpen] = useState(false);
   const [isTransactionDetailsSheetOpen, setTransactionDetailsSheetOpen] =
     useState(false);
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
@@ -559,7 +561,6 @@ export default function Home() {
   );
   const [showConfetti, setShowConfetti] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
-  const [showAllTokens, setShowAllTokens] = useState(false);
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
   const secondaryButtonAvailable = useSignal(
@@ -2338,10 +2339,7 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 items-center px-4 pb-4">
-                  {(showAllTokens
-                    ? displayTokens
-                    : displayTokens.slice(0, 5)
-                  ).map((token) => (
+                  {displayTokens.slice(0, 5).map((token) => (
                     <div
                       key={token.mint}
                       className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
@@ -2400,13 +2398,13 @@ export default function Home() {
                   ))}
 
                   {/* Show All button */}
-                  {tokenHoldings.length > 5 && !showAllTokens && (
+                  {tokenHoldings.length > 5 && (
                     <button
                       onClick={() => {
                         if (hapticFeedback.impactOccurred.isAvailable()) {
                           hapticFeedback.impactOccurred("light");
                         }
-                        setShowAllTokens(true);
+                        setTokensSheetOpen(true);
                       }}
                       className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium leading-5"
                       style={{
@@ -2959,6 +2957,11 @@ export default function Home() {
           (isFetchingTransactions && walletTransactions.length === 0) ||
           (isFetchingDeposits && incomingTransactions.length === 0)
         }
+      />
+      <TokensSheet
+        open={isTokensSheetOpen}
+        onOpenChange={setTokensSheetOpen}
+        tokenHoldings={tokenHoldings}
       />
     </>
   );
