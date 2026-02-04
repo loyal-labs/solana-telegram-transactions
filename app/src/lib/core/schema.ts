@@ -32,6 +32,32 @@ export type BusinessBotRights = {
   can_manage_stories?: boolean;
 };
 
+/**
+ * Sender type for bot conversation messages.
+ */
+export type SenderType = "user" | "bot" | "system";
+
+/**
+ * Thread status for bot conversations.
+ */
+export type ThreadStatus = "active" | "archived" | "closed";
+
+/**
+ * Encrypted message content stored as JSONB.
+ * Supports text now, extensible for images/voice later.
+ */
+export type EncryptedMessageContent = {
+  type: "text" | "image" | "voice";
+  ciphertext: string; // base64 encoded
+  iv: string; // base64 encoded (12 bytes)
+  metadata?: {
+    fileName?: string;
+    fileSize?: number;
+    duration?: number; // for voice messages
+    mimeType?: string;
+  };
+};
+
 // ============================================================================
 // TABLES
 // ============================================================================
@@ -233,6 +259,69 @@ export const businessConnections = pgTable(
   ]
 );
 
+/**
+ * Bot conversation threads - represents a conversation session between user and bot.
+ * Supports Telegram's threaded messages via message_thread_id.
+ */
+export const botThreads = pgTable(
+  "bot_threads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    telegramChatId: bigint("telegram_chat_id", { mode: "bigint" }).notNull(),
+    telegramThreadId: integer("telegram_thread_id"), // Telegram's message_thread_id
+    title: text("title"),
+    status: text("status").$type<ThreadStatus>().default("active").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // Primary query: find user's threads
+    index("bot_threads_user_id_idx").on(table.userId),
+    // Unique thread per telegram chat + thread combination
+    uniqueIndex("bot_threads_telegram_unique_idx").on(
+      table.telegramChatId,
+      table.telegramThreadId
+    ),
+    // Filter by status
+    index("bot_threads_status_idx").on(table.status),
+  ]
+);
+
+/**
+ * Individual messages within bot threads.
+ * Content is encrypted as JSONB with type discriminators for extensibility.
+ */
+export const botMessages = pgTable(
+  "bot_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    threadId: uuid("thread_id")
+      .notNull()
+      .references(() => botThreads.id, { onDelete: "cascade" }),
+    senderType: text("sender_type").$type<SenderType>().notNull(),
+    encryptedContent: jsonb("encrypted_content")
+      .$type<EncryptedMessageContent>()
+      .notNull(),
+    telegramMessageId: bigint("telegram_message_id", { mode: "bigint" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // Primary query: get thread messages in chronological order
+    index("bot_messages_thread_created_idx").on(table.threadId, table.createdAt),
+    // Lookup by telegram message ID (for deduplication)
+    index("bot_messages_telegram_id_idx").on(table.telegramMessageId),
+  ]
+);
+
 // ============================================================================
 // RELATIONS (for type-safe queries with Drizzle)
 // ============================================================================
@@ -241,6 +330,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   messages: many(messages),
   communityMemberships: many(communityMembers),
   businessConnection: one(businessConnections),
+  botThreads: many(botThreads),
 }));
 
 export const communitiesRelations = relations(communities, ({ many }) => ({
@@ -291,6 +381,21 @@ export const businessConnectionsRelations = relations(
   })
 );
 
+export const botThreadsRelations = relations(botThreads, ({ one, many }) => ({
+  user: one(users, {
+    fields: [botThreads.userId],
+    references: [users.id],
+  }),
+  messages: many(botMessages),
+}));
+
+export const botMessagesRelations = relations(botMessages, ({ one }) => ({
+  thread: one(botThreads, {
+    fields: [botMessages.threadId],
+    references: [botThreads.id],
+  }),
+}));
+
 // ============================================================================
 // TYPE EXPORTS
 // ============================================================================
@@ -315,5 +420,11 @@ export type InsertSummary = typeof summaries.$inferInsert;
 
 export type BusinessConnection = typeof businessConnections.$inferSelect;
 export type InsertBusinessConnection = typeof businessConnections.$inferInsert;
+
+export type BotThread = typeof botThreads.$inferSelect;
+export type InsertBotThread = typeof botThreads.$inferInsert;
+
+export type BotMessage = typeof botMessages.$inferSelect;
+export type InsertBotMessage = typeof botMessages.$inferInsert;
 
 export type Topic = { title: string; content: string; sources: string[] };
