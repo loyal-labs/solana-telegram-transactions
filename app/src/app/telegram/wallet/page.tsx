@@ -1825,6 +1825,7 @@ export default function Home() {
         showMainButton({
           text: "Confirm and Send",
           onClick: () => {
+            setIsSendingTransaction(true); // Set loading state BEFORE showing result view
             setSendStep(5);
             handleSubmitSend();
           },
@@ -1917,6 +1918,7 @@ export default function Home() {
           text: "Confirm and Swap",
           onClick: () => {
             hapticFeedback.impactOccurred("medium");
+            setIsSwapping(true); // Set loading state BEFORE showing result view
             setSwapView("result");
             void handleSubmitSwap();
           },
