@@ -2928,7 +2928,6 @@ export default function Home() {
       <ReceiveSheet
         open={isReceiveSheetOpen}
         onOpenChange={handleReceiveSheetChange}
-        trigger={null}
         walletAddress={walletAddress ?? undefined}
       />
       <TransactionDetailsSheet
