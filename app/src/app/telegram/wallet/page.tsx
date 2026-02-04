@@ -64,7 +64,11 @@ import {
   fetchTokenHoldings,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
-import { prepareStoreInitDataTxn, sendStoreInitDataTxn, verifyAndClaimDeposit } from "@/lib/solana/verify-and-claim-deposit";
+import {
+  prepareStoreInitDataTxn,
+  sendStoreInitDataTxn,
+  verifyAndClaimDeposit,
+} from "@/lib/solana/verify-and-claim-deposit";
 import {
   formatAddress,
   formatBalance,
@@ -103,7 +107,10 @@ import {
 import { parseUsernameFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
 import { openInvoice } from "@/lib/telegram/mini-app/invoice";
 import { openQrScanner } from "@/lib/telegram/mini-app/qr-code";
-import { createShareMessage, shareSavedInlineMessage } from "@/lib/telegram/mini-app/share-message";
+import {
+  createShareMessage,
+  shareSavedInlineMessage,
+} from "@/lib/telegram/mini-app/share-message";
 import { ensureTelegramTheme } from "@/lib/telegram/mini-app/theme";
 import type { TelegramDeposit } from "@/types/deposits";
 import type {
@@ -115,20 +122,75 @@ import type {
 hashes.sha512 = sha512;
 
 // ─── Mock data for development ─────────────────────────────────────────────
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 
 const MOCK_WALLET_ADDRESS = "UQAt7f8Kq9xZ3mNpR2vL5wYcD4bJ6hTgSoAeWnFqZir";
 const MOCK_BALANCE_LAMPORTS = 1_267_476_540_000; // ~1267.47654 SOL
 const MOCK_SOL_PRICE_USD = 132.05;
 
-const MOCK_TOKEN_HOLDINGS: import("@/lib/solana/token-holdings").TokenHolding[] = [
-  { mint: "usdt", symbol: "USDT", name: "Tether USD", balance: 1267, decimals: 6, priceUsd: 0.99, valueUsd: 1254.33, imageUrl: "/bgs/usd-coin-usdc-logo.png" },
-  { mint: "sol", symbol: "SOL", name: "Solana", balance: 1267, decimals: 9, priceUsd: 99.03, valueUsd: 125470.01, imageUrl: "/bgs/avalanche-avax-logo.png" },
-  { mint: "bnb", symbol: "BNB", name: "BNB", balance: 1267, decimals: 8, priceUsd: 559.06, valueUsd: 708328.02, imageUrl: "/bgs/bnb-bnb-logo.png" },
-  { mint: "usdc", symbol: "USDC", name: "USD Coin", balance: 1267, decimals: 6, priceUsd: 0.99, valueUsd: 1254.33, imageUrl: "/bgs/usd-coin-usdc-logo.png" },
-  { mint: "wbtc", symbol: "WBTC", name: "Wrapped Bitcoin", balance: 1267, decimals: 8, priceUsd: 76375.83, valueUsd: 96764126.61, imageUrl: "/bgs/bitcoin-btc-logo.png" },
-  { mint: "avax", symbol: "AVAX", name: "Avalanche", balance: 500, decimals: 18, priceUsd: 35.20, valueUsd: 17600, imageUrl: "/bgs/avalanche-avax-logo.png" },
-];
+const MOCK_TOKEN_HOLDINGS: import("@/lib/solana/token-holdings").TokenHolding[] =
+  [
+    {
+      mint: "usdt",
+      symbol: "USDT",
+      name: "Tether USD",
+      balance: 1267,
+      decimals: 6,
+      priceUsd: 0.99,
+      valueUsd: 1254.33,
+      imageUrl: "/bgs/usd-coin-usdc-logo.png",
+    },
+    {
+      mint: "sol",
+      symbol: "SOL",
+      name: "Solana",
+      balance: 1267,
+      decimals: 9,
+      priceUsd: 99.03,
+      valueUsd: 125470.01,
+      imageUrl: "/bgs/avalanche-avax-logo.png",
+    },
+    {
+      mint: "bnb",
+      symbol: "BNB",
+      name: "BNB",
+      balance: 1267,
+      decimals: 8,
+      priceUsd: 559.06,
+      valueUsd: 708328.02,
+      imageUrl: "/bgs/bnb-bnb-logo.png",
+    },
+    {
+      mint: "usdc",
+      symbol: "USDC",
+      name: "USD Coin",
+      balance: 1267,
+      decimals: 6,
+      priceUsd: 0.99,
+      valueUsd: 1254.33,
+      imageUrl: "/bgs/usd-coin-usdc-logo.png",
+    },
+    {
+      mint: "wbtc",
+      symbol: "WBTC",
+      name: "Wrapped Bitcoin",
+      balance: 1267,
+      decimals: 8,
+      priceUsd: 76375.83,
+      valueUsd: 96764126.61,
+      imageUrl: "/bgs/bitcoin-btc-logo.png",
+    },
+    {
+      mint: "avax",
+      symbol: "AVAX",
+      name: "Avalanche",
+      balance: 500,
+      decimals: 18,
+      priceUsd: 35.2,
+      valueUsd: 17600,
+      imageUrl: "/bgs/avalanche-avax-logo.png",
+    },
+  ];
 
 // Extended mock transaction info for activity display
 type MockActivityInfo = {
@@ -140,21 +202,117 @@ type MockActivityInfo = {
 };
 
 const MOCK_ACTIVITY_INFO: Record<string, MockActivityInfo> = {
-  "mock-1": { tokenSymbol: "SOL", tokenIcon: "/bgs/avalanche-avax-logo.png", displayAmount: "+0.25 SOL", subtitle: "USDC to SOL", label: "Swap" },
-  "mock-2": { tokenSymbol: "USDC", tokenIcon: "/bgs/usd-coin-usdc-logo.png", displayAmount: "+200.00 USDC", subtitle: "from UQAt...qZir", label: "Received" },
-  "mock-3": { tokenSymbol: "USDT", tokenIcon: "/bgs/usd-coin-usdc-logo.png", displayAmount: "−0.5 USDT", subtitle: "to UQAt...qZir", label: "Sent" },
-  "mock-4": { tokenSymbol: "SOL", tokenIcon: "/bgs/avalanche-avax-logo.png", displayAmount: "−0.25 SOL", subtitle: "by UQAt...qZir", label: "To be claimed" },
-  "mock-5": { tokenSymbol: "BNB", tokenIcon: "/bgs/bnb-bnb-logo.png", displayAmount: "−0.5 BNB", subtitle: "to UQAt...qZir", label: "Sent" },
-  "mock-6": { tokenSymbol: "USDC", tokenIcon: "/bgs/usd-coin-usdc-logo.png", displayAmount: "+200.00 USDC", subtitle: "from UQAt...qZir", label: "Received" },
+  "mock-1": {
+    tokenSymbol: "SOL",
+    tokenIcon: "/bgs/avalanche-avax-logo.png",
+    displayAmount: "+0.25 SOL",
+    subtitle: "USDC to SOL",
+    label: "Swap",
+  },
+  "mock-2": {
+    tokenSymbol: "USDC",
+    tokenIcon: "/bgs/usd-coin-usdc-logo.png",
+    displayAmount: "+200.00 USDC",
+    subtitle: "from UQAt...qZir",
+    label: "Received",
+  },
+  "mock-3": {
+    tokenSymbol: "USDT",
+    tokenIcon: "/bgs/usd-coin-usdc-logo.png",
+    displayAmount: "−0.5 USDT",
+    subtitle: "to UQAt...qZir",
+    label: "Sent",
+  },
+  "mock-4": {
+    tokenSymbol: "SOL",
+    tokenIcon: "/bgs/avalanche-avax-logo.png",
+    displayAmount: "−0.25 SOL",
+    subtitle: "by UQAt...qZir",
+    label: "To be claimed",
+  },
+  "mock-5": {
+    tokenSymbol: "BNB",
+    tokenIcon: "/bgs/bnb-bnb-logo.png",
+    displayAmount: "−0.5 BNB",
+    subtitle: "to UQAt...qZir",
+    label: "Sent",
+  },
+  "mock-6": {
+    tokenSymbol: "USDC",
+    tokenIcon: "/bgs/usd-coin-usdc-logo.png",
+    displayAmount: "+200.00 USDC",
+    subtitle: "from UQAt...qZir",
+    label: "Received",
+  },
 };
 
 const MOCK_WALLET_TRANSACTIONS: Transaction[] = [
-  { id: "mock-1", type: "outgoing", transferType: "transfer", amountLamports: 250_000_000, sender: undefined, recipient: "UQAt...qZir", timestamp: Date.now() - 86400000 * 2, status: "completed", signature: "mock-sig-1" },
-  { id: "mock-2", type: "incoming", transferType: "transfer", amountLamports: 500_000_000, sender: "UQAt...qZir", recipient: undefined, timestamp: Date.now() - 3600000, status: "completed", signature: "mock-sig-2" },
-  { id: "mock-3", type: "outgoing", transferType: "transfer", amountLamports: 500_000_000, sender: undefined, recipient: "UQAt...qZir", timestamp: Date.now() - 86400000, status: "completed", signature: "mock-sig-3" },
-  { id: "mock-4", type: "pending", transferType: "deposit_for_username", amountLamports: 250_000_000, sender: undefined, recipient: "UQAt...qZir", timestamp: Date.now() - 86400000 * 2, status: "pending", signature: "mock-sig-4" },
-  { id: "mock-5", type: "outgoing", transferType: "transfer", amountLamports: 500_000_000, sender: undefined, recipient: "UQAt...qZir", timestamp: Date.now() - 86400000, status: "completed", signature: "mock-sig-5" },
-  { id: "mock-6", type: "incoming", transferType: "transfer", amountLamports: 500_000_000, sender: "UQAt...qZir", recipient: undefined, timestamp: Date.now() - 3600000, status: "completed", signature: "mock-sig-6" },
+  {
+    id: "mock-1",
+    type: "outgoing",
+    transferType: "transfer",
+    amountLamports: 250_000_000,
+    sender: undefined,
+    recipient: "UQAt...qZir",
+    timestamp: Date.now() - 86400000 * 2,
+    status: "completed",
+    signature: "mock-sig-1",
+  },
+  {
+    id: "mock-2",
+    type: "incoming",
+    transferType: "transfer",
+    amountLamports: 500_000_000,
+    sender: "UQAt...qZir",
+    recipient: undefined,
+    timestamp: Date.now() - 3600000,
+    status: "completed",
+    signature: "mock-sig-2",
+  },
+  {
+    id: "mock-3",
+    type: "outgoing",
+    transferType: "transfer",
+    amountLamports: 500_000_000,
+    sender: undefined,
+    recipient: "UQAt...qZir",
+    timestamp: Date.now() - 86400000,
+    status: "completed",
+    signature: "mock-sig-3",
+  },
+  {
+    id: "mock-4",
+    type: "pending",
+    transferType: "deposit_for_username",
+    amountLamports: 250_000_000,
+    sender: undefined,
+    recipient: "UQAt...qZir",
+    timestamp: Date.now() - 86400000 * 2,
+    status: "pending",
+    signature: "mock-sig-4",
+  },
+  {
+    id: "mock-5",
+    type: "outgoing",
+    transferType: "transfer",
+    amountLamports: 500_000_000,
+    sender: undefined,
+    recipient: "UQAt...qZir",
+    timestamp: Date.now() - 86400000,
+    status: "completed",
+    signature: "mock-sig-5",
+  },
+  {
+    id: "mock-6",
+    type: "incoming",
+    transferType: "transfer",
+    amountLamports: 500_000_000,
+    sender: "UQAt...qZir",
+    recipient: undefined,
+    timestamp: Date.now() - 3600000,
+    status: "completed",
+    signature: "mock-sig-6",
+  },
 ];
 // ─── End mock data ─────────────────────────────────────────────────────────
 
@@ -256,8 +414,7 @@ const mapDepositToIncomingTransaction = (
   deposit: TelegramDeposit
 ): IncomingTransaction => {
   const senderBase58 =
-    typeof (deposit.user as { toBase58?: () => string }).toBase58 ===
-    "function"
+    typeof (deposit.user as { toBase58?: () => string }).toBase58 === "function"
       ? deposit.user.toBase58()
       : String(deposit.user);
 
@@ -291,13 +448,25 @@ export default function Home() {
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
   const [isSwapSheetOpen, setSwapSheetOpen] = useState(false);
   const [swapActiveTab, setSwapActiveTab] = useState<"swap" | "secure">("swap");
-  const [swapView, setSwapView] = useState<"main" | "selectFrom" | "selectTo" | "selectSecure" | "result">("main");
+  const [swapView, setSwapView] = useState<
+    "main" | "selectFrom" | "selectTo" | "selectSecure" | "result"
+  >("main");
   const [swapError, setSwapError] = useState<string | null>(null);
-  const [swappedFromAmount, setSwappedFromAmount] = useState<number | undefined>(undefined);
-  const [swappedFromSymbol, setSwappedFromSymbol] = useState<string | undefined>(undefined);
-  const [swappedToAmount, setSwappedToAmount] = useState<number | undefined>(undefined);
-  const [swappedToSymbol, setSwappedToSymbol] = useState<string | undefined>(undefined);
-  const [swapFormValues, setSwapFormValues] = useState<SwapFormValues | null>(null);
+  const [swappedFromAmount, setSwappedFromAmount] = useState<
+    number | undefined
+  >(undefined);
+  const [swappedFromSymbol, setSwappedFromSymbol] = useState<
+    string | undefined
+  >(undefined);
+  const [swappedToAmount, setSwappedToAmount] = useState<number | undefined>(
+    undefined
+  );
+  const [swappedToSymbol, setSwappedToSymbol] = useState<string | undefined>(
+    undefined
+  );
+  const [swapFormValues, setSwapFormValues] = useState<SwapFormValues | null>(
+    null
+  );
   const [isSwapping, setIsSwapping] = useState(false);
   const [sendStep, setSendStep] = useState<1 | 2 | 3 | 4>(1);
   const [sentAmountSol, setSentAmountSol] = useState<number | undefined>(
@@ -310,14 +479,18 @@ export default function Home() {
     useState(false);
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string | null>(
-    () => USE_MOCK_DATA ? MOCK_WALLET_ADDRESS : cachedWalletAddress
+  const [walletAddress, setWalletAddress] = useState<string | null>(() =>
+    USE_MOCK_DATA ? MOCK_WALLET_ADDRESS : cachedWalletAddress
   );
   const [balance, setBalance] = useState<number | null>(() =>
-    USE_MOCK_DATA ? MOCK_BALANCE_LAMPORTS : cachedWalletAddress ? getCachedWalletBalance(cachedWalletAddress) : null
+    USE_MOCK_DATA
+      ? MOCK_BALANCE_LAMPORTS
+      : cachedWalletAddress
+      ? getCachedWalletBalance(cachedWalletAddress)
+      : null
   );
-  const [tokenHoldings, setTokenHoldings] = useState<TokenHolding[]>(
-    () => USE_MOCK_DATA ? MOCK_TOKEN_HOLDINGS : []
+  const [tokenHoldings, setTokenHoldings] = useState<TokenHolding[]>(() =>
+    USE_MOCK_DATA ? MOCK_TOKEN_HOLDINGS : []
   );
   const [starsBalance, setStarsBalance] = useState<number>(() =>
     cachedWalletAddress ? getCachedStarsBalance(cachedWalletAddress) ?? 0 : 0
@@ -328,13 +501,17 @@ export default function Home() {
       getCachedStarsBalance(cachedWalletAddress) === null
   );
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
-  const [isLoading, setIsLoading] = useState(() => USE_MOCK_DATA ? false : !hasCachedWalletData());
+  const [isLoading, setIsLoading] = useState(() =>
+    USE_MOCK_DATA ? false : !hasCachedWalletData()
+  );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
   const [incomingTransactions, setIncomingTransactions] = useState<
     IncomingTransaction[]
   >(() => {
-    const cached = cachedUsername ? getCachedIncomingTransactions(cachedUsername) ?? [] : [];
+    const cached = cachedUsername
+      ? getCachedIncomingTransactions(cachedUsername) ?? []
+      : [];
     return cached;
   });
   const [walletTransactions, setWalletTransactions] = useState<Transaction[]>(
@@ -342,14 +519,16 @@ export default function Home() {
       USE_MOCK_DATA
         ? MOCK_WALLET_TRANSACTIONS
         : cachedWalletAddress
-          ? walletTransactionsCache.get(cachedWalletAddress) ?? []
-          : []
+        ? walletTransactionsCache.get(cachedWalletAddress) ?? []
+        : []
   );
   const [isFetchingTransactions, setIsFetchingTransactions] = useState(false);
   const [isFetchingDeposits, setIsFetchingDeposits] = useState(() => {
     if (USE_MOCK_DATA) return false;
     // Only show loading if we don't have cached deposits
-    return cachedUsername ? getCachedIncomingTransactions(cachedUsername) === null : true;
+    return cachedUsername
+      ? getCachedIncomingTransactions(cachedUsername) === null
+      : true;
   });
   const [selectedTransaction, setSelectedTransaction] =
     useState<TransactionDetailsData | null>(null);
@@ -375,8 +554,8 @@ export default function Home() {
   const [solPriceUsd, setSolPriceUsd] = useState<number | null>(() =>
     USE_MOCK_DATA ? MOCK_SOL_PRICE_USD : getCachedSolPrice()
   );
-  const [isSolPriceLoading, setIsSolPriceLoading] = useState(
-    () => USE_MOCK_DATA ? false : getCachedSolPrice() === null
+  const [isSolPriceLoading, setIsSolPriceLoading] = useState(() =>
+    USE_MOCK_DATA ? false : getCachedSolPrice() === null
   );
   const [showConfetti, setShowConfetti] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
@@ -419,7 +598,6 @@ export default function Home() {
     }
     setReceiveSheetOpen(true);
   }, []);
-
 
   const handleTopUpStars = useCallback(async () => {
     if (isCreatingInvoice) return;
@@ -495,12 +673,13 @@ export default function Home() {
       setSelectedIncomingTransaction(null);
       // Convert to TransactionDetailsData format
       // For deposit_for_username transactions, the recipient is the username
-      const isDepositTransaction = transaction.transferType === "deposit_for_username";
+      const isDepositTransaction =
+        transaction.transferType === "deposit_for_username";
       const recipientUsername = transaction.recipient?.startsWith("@")
         ? transaction.recipient
         : isDepositTransaction && transaction.recipient
-          ? `@${transaction.recipient}`
-          : undefined;
+        ? `@${transaction.recipient}`
+        : undefined;
 
       const detailsData: TransactionDetailsData = {
         id: transaction.id,
@@ -588,7 +767,7 @@ export default function Home() {
     } finally {
       setIsSwapping(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [swapFormValues, isSwapFormValid, isSwapping, executeSwap]);
 
   const refreshWalletBalance = useCallback(
@@ -775,7 +954,6 @@ export default function Home() {
     setIsSendingTransaction(true);
 
     try {
-
       let signature: string | null = null;
 
       if (isValidSolanaAddress(trimmedRecipient)) {
@@ -867,30 +1045,33 @@ export default function Home() {
   }, []);
 
   // Handle canceling (refunding) a deposit_for_username transaction
-  const handleCancelDeposit = useCallback(async (username: string, amount: number) => {
-    try {
-      const provider = await getWalletProvider();
-      const transferProgram = getTelegramTransferProgram(provider);
-      await refundDeposit(provider, transferProgram, username, amount);
+  const handleCancelDeposit = useCallback(
+    async (username: string, amount: number) => {
+      try {
+        const provider = await getWalletProvider();
+        const transferProgram = getTelegramTransferProgram(provider);
+        await refundDeposit(provider, transferProgram, username, amount);
 
-      if (hapticFeedback.notificationOccurred.isAvailable()) {
-        hapticFeedback.notificationOccurred("success");
+        if (hapticFeedback.notificationOccurred.isAvailable()) {
+          hapticFeedback.notificationOccurred("success");
+        }
+
+        // Close the modal and refresh data
+        setTransactionDetailsSheetOpen(false);
+        setSelectedTransaction(null);
+
+        // Refresh balance and transactions
+        void getWalletBalance(true).then(setBalance);
+      } catch (error) {
+        console.error("Failed to refund deposit:", error);
+        if (hapticFeedback.notificationOccurred.isAvailable()) {
+          hapticFeedback.notificationOccurred("error");
+        }
+        throw error; // Re-throw so the sheet can handle it
       }
-
-      // Close the modal and refresh data
-      setTransactionDetailsSheetOpen(false);
-      setSelectedTransaction(null);
-
-      // Refresh balance and transactions
-      void getWalletBalance(true).then(setBalance);
-    } catch (error) {
-      console.error("Failed to refund deposit:", error);
-      if (hapticFeedback.notificationOccurred.isAvailable()) {
-        hapticFeedback.notificationOccurred("error");
-      }
-      throw error; // Re-throw so the sheet can handle it
-    }
-  }, []);
+    },
+    []
+  );
 
   const handleShareAddress = useCallback(async () => {
     try {
@@ -948,14 +1129,19 @@ export default function Home() {
 
   const handleShareDepositTransaction = useCallback(async () => {
     if (!selectedTransaction || !rawInitData || !solPriceUsd) {
-      console.error("Failed to share deposit transaction: missing required data");
+      console.error(
+        "Failed to share deposit transaction: missing required data"
+      );
       return;
     }
 
     // Get recipient username from transaction (remove @ prefix if present)
-    const recipientUsername = selectedTransaction.recipientUsername?.replace(/^@/, "") || "";
+    const recipientUsername =
+      selectedTransaction.recipientUsername?.replace(/^@/, "") || "";
     if (!recipientUsername) {
-      console.error("Failed to share deposit transaction: missing recipient username");
+      console.error(
+        "Failed to share deposit transaction: missing recipient username"
+      );
       return;
     }
 
@@ -1082,7 +1268,12 @@ export default function Home() {
         setIsClaimingTransaction(false);
       }
     },
-    [incomingTransactions, rawInitData, refreshWalletBalance, loadWalletTransactions]
+    [
+      incomingTransactions,
+      rawInitData,
+      refreshWalletBalance,
+      loadWalletTransactions,
+    ]
   );
 
   useEffect(() => {
@@ -1191,7 +1382,9 @@ export default function Home() {
           return;
         }
 
-        const mappedTransactions = deposits.map(mapDepositToIncomingTransaction);
+        const mappedTransactions = deposits.map(
+          mapDepositToIncomingTransaction
+        );
 
         setCachedIncomingTransactions(username, mappedTransactions);
         setIncomingTransactions(mappedTransactions);
@@ -1205,9 +1398,7 @@ export default function Home() {
             }
             const mapped = mapDepositToIncomingTransaction(deposit);
             setIncomingTransactions((prev) => {
-              const existingIndex = prev.findIndex(
-                (tx) => tx.id === mapped.id
-              );
+              const existingIndex = prev.findIndex((tx) => tx.id === mapped.id);
               let next: IncomingTransaction[];
               if (existingIndex >= 0) {
                 next = [...prev];
@@ -1649,9 +1840,16 @@ export default function Home() {
             onClick: async () => {
               // Close send sheet and open transaction details
               setSendSheetOpen(false);
-              const recipientUsername = sendFormValues.recipient.trim().replace(/^@/, "");
+              const recipientUsername = sendFormValues.recipient
+                .trim()
+                .replace(/^@/, "");
 
-              if (sentAmountSol && recipientUsername && rawInitData && solPriceUsd) {
+              if (
+                sentAmountSol &&
+                recipientUsername &&
+                rawInitData &&
+                solPriceUsd
+              ) {
                 try {
                   const amountSol = sentAmountSol;
                   const amountUsd = amountSol * (solPriceUsd || 0);
@@ -1668,7 +1866,9 @@ export default function Home() {
                   console.error("Failed to share transaction", error);
                 }
               } else {
-                console.error("Failed to share transaction: missing required data");
+                console.error(
+                  "Failed to share transaction: missing required data"
+                );
               }
             },
             isEnabled: true,
@@ -1850,7 +2050,6 @@ export default function Home() {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  
   // Track balance visibility for sticky pill
   useEffect(() => {
     const balanceElement = balanceRef.current;
@@ -1863,7 +2062,9 @@ export default function Home() {
       },
       {
         threshold: 0,
-        rootMargin: `-${Math.max(safeAreaInsetTop || 0, 12) + 15}px 0px 0px 0px`,
+        rootMargin: `-${
+          Math.max(safeAreaInsetTop || 0, 12) + 15
+        }px 0px 0px 0px`,
       }
     );
 
@@ -1914,10 +2115,19 @@ export default function Home() {
                 background: "#fff",
               }}
             >
-              <span className="text-sm font-medium text-black" style={{ fontVariantNumeric: "tabular-nums" }}>
+              <span
+                className="text-sm font-medium text-black"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
                 {displayCurrency === "USD"
-                  ? `$${usdBalanceNumeric.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                  : `${solBalanceNumeric.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })} SOL`}
+                  ? `$${usdBalanceNumeric.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`
+                  : `${solBalanceNumeric.toLocaleString("en-US", {
+                      minimumFractionDigits: 4,
+                      maximumFractionDigits: 4,
+                    })} SOL`}
               </span>
             </motion.button>
           )}
@@ -1936,7 +2146,10 @@ export default function Home() {
               }}
             >
               {/* Card background layers */}
-              <div className="absolute inset-0 rounded-[26px]" style={{ background: "#f2f2f7" }} />
+              <div
+                className="absolute inset-0 rounded-[26px]"
+                style={{ background: "#f2f2f7" }}
+              />
               <Image
                 src="/bgs/balance-bg-02.png"
                 alt=""
@@ -1947,7 +2160,9 @@ export default function Home() {
               {/* Inner shadow overlay */}
               <div
                 className="absolute inset-0 rounded-[26px] pointer-events-none"
-                style={{ boxShadow: "inset 0px 0px 36px 0px rgba(255, 255, 255, 0.4)" }}
+                style={{
+                  boxShadow: "inset 0px 0px 36px 0px rgba(255, 255, 255, 0.4)",
+                }}
               />
 
               {/* Card content */}
@@ -2001,19 +2216,35 @@ export default function Home() {
                     className="active:scale-[0.98] transition-transform self-start"
                   >
                     {(() => {
-                      const value = displayCurrency === "USD" ? usdBalanceNumeric : solBalanceNumeric;
+                      const value =
+                        displayCurrency === "USD"
+                          ? usdBalanceNumeric
+                          : solBalanceNumeric;
                       const decimals = displayCurrency === "USD" ? 2 : 5;
                       const intPart = Math.trunc(value);
-                      const decimalDigits = Math.round(Math.abs(value - intPart) * Math.pow(10, decimals));
+                      const decimalDigits = Math.round(
+                        Math.abs(value - intPart) * Math.pow(10, decimals)
+                      );
                       const prefix = displayCurrency === "USD" ? "$" : "";
                       const suffix = displayCurrency === "SOL" ? " SOL" : "";
                       return (
-                        <span className="font-semibold text-white inline-flex items-baseline" style={{ fontVariantNumeric: "tabular-nums", lineHeight: "48px" }}>
-                          {prefix && <span className="text-[40px]">{prefix}</span>}
+                        <span
+                          className="font-semibold text-white inline-flex items-baseline"
+                          style={{
+                            fontVariantNumeric: "tabular-nums",
+                            lineHeight: "48px",
+                          }}
+                        >
+                          {prefix && (
+                            <span className="text-[40px]">{prefix}</span>
+                          )}
                           <NumberFlow
                             value={intPart}
                             style={{ fontSize: "40px" }}
-                            format={{ maximumFractionDigits: 0, useGrouping: true }}
+                            format={{
+                              maximumFractionDigits: 0,
+                              useGrouping: true,
+                            }}
                             willChange
                           />
                           <NumberFlow
@@ -2021,7 +2252,10 @@ export default function Home() {
                             prefix="."
                             suffix={suffix}
                             style={{ fontSize: "28px" }}
-                            format={{ minimumIntegerDigits: decimals, useGrouping: false }}
+                            format={{
+                              minimumIntegerDigits: decimals,
+                              useGrouping: false,
+                            }}
                             willChange
                           />
                         </span>
@@ -2030,10 +2264,19 @@ export default function Home() {
                   </button>
 
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[17px] text-white leading-[22px]" style={{ fontVariantNumeric: "tabular-nums" }}>
+                    <span
+                      className="text-[17px] text-white leading-[22px]"
+                      style={{ fontVariantNumeric: "tabular-nums" }}
+                    >
                       {displayCurrency === "USD"
-                        ? `${solBalanceNumeric.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })} SOL`
-                        : `$${usdBalanceNumeric.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        ? `${solBalanceNumeric.toLocaleString("en-US", {
+                            minimumFractionDigits: 4,
+                            maximumFractionDigits: 4,
+                          })} SOL`
+                        : `$${usdBalanceNumeric.toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}`}
                     </span>
                   </div>
                 </div>
@@ -2071,75 +2314,113 @@ export default function Home() {
           </div>
 
           {/* Tokens Section */}
-          {tokenHoldings.length > 0 && (
-            <>
-              <div className="px-3 pt-3 pb-2">
-                <p className="text-base font-medium text-black leading-5 tracking-[-0.176px]">
-                  Tokens
-                </p>
-              </div>
-              <div className="flex flex-col gap-2 items-center px-4 pb-4">
-                {(showAllTokens ? tokenHoldings : tokenHoldings.slice(0, 5)).map((token) => (
-                  <div
-                    key={token.mint}
-                    className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
-                    style={{ border: "2px solid #f2f2f7" }}
-                  >
-                    {/* Token icon */}
-                    <div className="py-1.5 pr-3">
-                      <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
-                        {token.imageUrl && (
-                          <Image
-                            src={token.imageUrl}
-                            alt={token.symbol}
-                            fill
-                            className="object-cover"
-                          />
-                        )}
+          {(() => {
+            const displayTokens =
+              tokenHoldings.length > 0
+                ? tokenHoldings
+                : [
+                    {
+                      mint: "SOL",
+                      symbol: "SOL",
+                      name: "Solana",
+                      balance: 0,
+                      decimals: 9,
+                      priceUsd: solPriceUsd,
+                      valueUsd: 0,
+                      imageUrl: "/solana-sol-logo.png",
+                    },
+                  ];
+            return (
+              <>
+                <div className="px-3 pt-3 pb-2">
+                  <p className="text-base font-medium text-black leading-5 tracking-[-0.176px]">
+                    Tokens
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 items-center px-4 pb-4">
+                  {(showAllTokens
+                    ? displayTokens
+                    : displayTokens.slice(0, 5)
+                  ).map((token) => (
+                    <div
+                      key={token.mint}
+                      className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
+                      style={{ border: "2px solid #f2f2f7" }}
+                    >
+                      {/* Token icon */}
+                      <div className="py-1.5 pr-3">
+                        <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                          {token.imageUrl && (
+                            <Image
+                              src={token.imageUrl}
+                              alt={token.symbol}
+                              fill
+                              className="object-cover"
+                            />
+                          )}
+                        </div>
+                      </div>
+                      {/* Token info */}
+                      <div className="flex-1 flex flex-col py-2.5 min-w-0">
+                        <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px]">
+                          {token.symbol}
+                        </p>
+                        <p
+                          className="text-[15px] leading-5"
+                          style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                        >
+                          {token.priceUsd !== null
+                            ? `$${token.priceUsd.toLocaleString("en-US", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}`
+                            : "—"}
+                        </p>
+                      </div>
+                      {/* Token amount */}
+                      <div className="flex flex-col items-end py-2.5 pl-3">
+                        <p className="text-[17px] text-black leading-[22px] text-right">
+                          {token.balance.toLocaleString("en-US", {
+                            maximumFractionDigits: 4,
+                          })}
+                        </p>
+                        <p
+                          className="text-[15px] leading-5 text-right"
+                          style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                        >
+                          {token.valueUsd !== null
+                            ? `$${token.valueUsd.toLocaleString("en-US", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}`
+                            : "—"}
+                        </p>
                       </div>
                     </div>
-                    {/* Token info */}
-                    <div className="flex-1 flex flex-col py-2.5 min-w-0">
-                      <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px]">
-                        {token.symbol}
-                      </p>
-                      <p className="text-[15px] leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
-                        {token.priceUsd !== null ? `$${token.priceUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
-                      </p>
-                    </div>
-                    {/* Token amount */}
-                    <div className="flex flex-col items-end py-2.5 pl-3">
-                      <p className="text-[17px] text-black leading-[22px] text-right">
-                        {token.balance.toLocaleString("en-US", { maximumFractionDigits: 4 })}
-                      </p>
-                      <p className="text-[15px] leading-5 text-right" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
-                        {token.valueUsd !== null ? `$${token.valueUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
 
-                {/* Show All button */}
-                {tokenHoldings.length > 5 && !showAllTokens && (
-                  <button
-                    onClick={() => {
-                      if (hapticFeedback.impactOccurred.isAvailable()) {
-                        hapticFeedback.impactOccurred("light");
-                      }
-                      setShowAllTokens(true);
-                    }}
-                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium leading-5"
-                    style={{
-                      background: "rgba(249, 54, 60, 0.14)",
-                      color: "#f9363c",
-                    }}
-                  >
-                    Show All
-                  </button>
-                )}
-              </div>
-            </>
-          )}
+                  {/* Show All button */}
+                  {tokenHoldings.length > 5 && !showAllTokens && (
+                    <button
+                      onClick={() => {
+                        if (hapticFeedback.impactOccurred.isAvailable()) {
+                          hapticFeedback.impactOccurred("light");
+                        }
+                        setShowAllTokens(true);
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium leading-5"
+                      style={{
+                        background: "rgba(249, 54, 60, 0.14)",
+                        color: "#f9363c",
+                      }}
+                    >
+                      Show All
+                    </button>
+                  )}
+                </div>
+              </>
+            );
+          })()}
 
           {/* Activity Section - conditionally rendered */}
           {(() => {
@@ -2207,9 +2488,18 @@ export default function Home() {
                     </p>
                   </div>
                   {/* Empty transactions state */}
-                  <div className="px-4 pb-4">
-                    <div className="flex items-center justify-center px-8 py-6 rounded-2xl bg-black/[0.03]">
-                      <p className="text-base leading-5 text-center" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                  <div className="px-4 pb-36">
+                    <div className="flex flex-col gap-4 items-center justify-center px-8 py-6 rounded-[20px]">
+                      <Image
+                        src="/dogs/dog-cry.png"
+                        alt=""
+                        width={60}
+                        height={48}
+                      />
+                      <p
+                        className="text-[17px] leading-[22px] text-center"
+                        style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                      >
                         You don&apos;t have any transactions yet
                       </p>
                     </div>
@@ -2290,8 +2580,15 @@ export default function Home() {
                                 <p className="text-base text-black leading-5">
                                   Receiving
                                 </p>
-                                <p className="text-[13px] leading-4" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
-                                  {formatTransactionAmount(transaction.amountLamports)} SOL from {formatSenderAddress(transaction.sender)}
+                                <p
+                                  className="text-[13px] leading-4"
+                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                >
+                                  {formatTransactionAmount(
+                                    transaction.amountLamports
+                                  )}{" "}
+                                  SOL from{" "}
+                                  {formatSenderAddress(transaction.sender)}
                                 </p>
                               </div>
 
@@ -2321,7 +2618,9 @@ export default function Home() {
                         const transaction = item.transaction;
                         const isIncoming = transaction.type === "incoming";
                         const isPending = transaction.type === "pending";
-                        const mockInfo = USE_MOCK_DATA ? MOCK_ACTIVITY_INFO[transaction.id] : undefined;
+                        const mockInfo = USE_MOCK_DATA
+                          ? MOCK_ACTIVITY_INFO[transaction.id]
+                          : undefined;
                         const transferTypeLabel =
                           transaction.transferType === "store"
                             ? "Store data"
@@ -2389,14 +2688,20 @@ export default function Home() {
                             >
                               {/* Left - Text */}
                               <div className="flex-1 flex items-center">
-                                <p className="text-sm leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                                <p
+                                  className="text-sm leading-5"
+                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                >
                                   {transferTypeLabel}
                                 </p>
                               </div>
 
                               {/* Right - Date only */}
                               <div className="pl-3">
-                                <p className="text-[13px] leading-4" style={{ color: "rgba(60, 60, 67, 0.4)" }}>
+                                <p
+                                  className="text-[13px] leading-4"
+                                  style={{ color: "rgba(60, 60, 67, 0.4)" }}
+                                >
                                   {timestamp.toLocaleDateString("en-US", {
                                     month: "short",
                                     day: "numeric",
@@ -2497,22 +2802,30 @@ export default function Home() {
                                   : "Sent"}
                               </p>
                               {mockInfo ? (
-                                <p className="text-[13px] leading-4" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                                <p
+                                  className="text-[13px] leading-4"
+                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                >
                                   {mockInfo.subtitle}
                                 </p>
-                              ) : !(
-                                isPending === false &&
-                                !isIncoming &&
-                                isUnknownRecipient
-                              ) && (
-                                <p className="text-[13px] leading-4" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
-                                  {isIncoming
-                                    ? "from"
-                                    : isPending
-                                    ? "by"
-                                    : "to"}{" "}
-                                  {formattedCounterparty}
-                                </p>
+                              ) : (
+                                !(
+                                  isPending === false &&
+                                  !isIncoming &&
+                                  isUnknownRecipient
+                                ) && (
+                                  <p
+                                    className="text-[13px] leading-4"
+                                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                  >
+                                    {isIncoming
+                                      ? "from"
+                                      : isPending
+                                      ? "by"
+                                      : "to"}{" "}
+                                    {formattedCounterparty}
+                                  </p>
+                                )
                               )}
                             </div>
 
@@ -2524,13 +2837,18 @@ export default function Home() {
                               >
                                 {mockInfo
                                   ? mockInfo.displayAmount
-                                  : `${amountPrefix}${isEffectivelyZero
-                                      ? "0"
-                                      : formatTransactionAmount(
-                                          transaction.amountLamports
-                                        )} SOL`}
+                                  : `${amountPrefix}${
+                                      isEffectivelyZero
+                                        ? "0"
+                                        : formatTransactionAmount(
+                                            transaction.amountLamports
+                                          )
+                                    } SOL`}
                               </p>
-                              <p className="text-[13px] leading-4" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                              <p
+                                className="text-[13px] leading-4"
+                                style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                              >
                                 {timestamp.toLocaleDateString("en-US", {
                                   month: "short",
                                   day: "numeric",
@@ -2623,7 +2941,11 @@ export default function Home() {
         showSuccess={showClaimSuccess}
         showError={claimError}
         solPriceUsd={solPriceUsd}
-        onShare={selectedTransaction?.transferType === "deposit_for_username" ? handleShareDepositTransaction : undefined}
+        onShare={
+          selectedTransaction?.transferType === "deposit_for_username"
+            ? handleShareDepositTransaction
+            : undefined
+        }
         onCancelDeposit={handleCancelDeposit}
       />
       <ActivitySheet

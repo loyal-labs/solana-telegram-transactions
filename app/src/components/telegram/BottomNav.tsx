@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
 
 type NavItem = {
   href: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number; style?: React.CSSProperties }>;
 };
 
 const navItems: NavItem[] = [
