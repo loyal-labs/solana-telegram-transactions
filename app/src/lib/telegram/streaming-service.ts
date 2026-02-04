@@ -50,7 +50,7 @@ const CHUNK_BUFFER = 100; // Buffer before max length for safety
 /**
  * Splits text at sentence boundaries to respect Telegram's character limit.
  */
-function splitAtSentenceBoundary(
+export function splitAtSentenceBoundary(
   text: string,
   maxLength: number = MAX_MESSAGE_LENGTH - CHUNK_BUFFER
 ): string[] {
@@ -156,7 +156,7 @@ export async function streamResponse(
           // Use sentence-aware splitting for clean message breaks
           const splitChunks = splitAtSentenceBoundary(currentChunkText);
           const finalText = splitChunks[0];
-          const remainingText = splitChunks.slice(1).join(" ");
+          const remainingText = splitChunks.slice(1).join("");
 
           if (fallbackMessageId) {
             // Edit existing message with final content
