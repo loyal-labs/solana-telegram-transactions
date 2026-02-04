@@ -1,78 +1,91 @@
-import { Connection, PublicKey, Keypair } from "@solana/web3.js";
-import type { Commitment, ConfirmOptions } from "@solana/web3.js";
+import {
+  Connection,
+  PublicKey,
+  Keypair,
+  SystemProgram,
+  type Commitment,
+} from "@solana/web3.js";
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
 import {
   getAssociatedTokenAddressSync,
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import {
-  MAGIC_CONTEXT_ID,
-  MAGIC_PROGRAM_ID,
-  PERMISSION_PROGRAM_ID,
-  getAuthToken,
-  permissionPdaFromAccount,
-} from "@magicblock-labs/ephemeral-rollups-sdk";
-import { sign } from "tweetnacl";
 import { IDL, type TelegramPrivateTransfer } from "./idl";
-import { PROGRAM_ID } from "./constants";
+import {
+  PROGRAM_ID,
+  DELEGATION_PROGRAM_ID,
+  PERMISSION_PROGRAM_ID,
+  MAGIC_PROGRAM_ID,
+  MAGIC_CONTEXT_ID,
+} from "./constants";
 import {
   findDepositPda,
   findUsernameDepositPda,
   findVaultPda,
+  findPermissionPda,
+  findDelegationRecordPda,
+  findDelegationMetadataPda,
+  findBufferPda,
 } from "./pda";
 import { InternalWalletAdapter } from "./wallet-adapter";
-import { isAnchorProvider, isKeypair } from "./types";
 import type {
   WalletSigner,
   WalletLike,
-  Amount,
-  SignMessage,
+  EphemeralClientConfig,
   DepositData,
   UsernameDepositData,
-  EphemeralProviderParams,
-  EphemeralProviderResult,
   InitializeDepositParams,
-  InitializeDepositResult,
   ModifyBalanceParams,
   ModifyBalanceResult,
-  TransferDepositParams,
-  TransferDepositResult,
-  TransferToUsernameDepositParams,
-  TransferToUsernameDepositResult,
   DepositForUsernameParams,
-  DepositForUsernameResult,
   ClaimUsernameDepositParams,
-  ClaimUsernameDepositResult,
   CreatePermissionParams,
-  CreatePermissionResult,
   CreateUsernamePermissionParams,
-  CreateUsernamePermissionResult,
   DelegateDepositParams,
   DelegateUsernameDepositParams,
   UndelegateDepositParams,
   UndelegateUsernameDepositParams,
+  TransferDepositParams,
+  TransferToUsernameDepositParams,
+  RpcOptions,
 } from "./types";
-
-const USERNAME_REGEX = /^[A-Za-z0-9_]{5,32}$/;
 
 /**
  * Create a typed Program instance from the IDL
  */
-function createProgram(provider: AnchorProvider): Program<TelegramPrivateTransfer> {
+function createProgram(
+  provider: AnchorProvider
+): Program<TelegramPrivateTransfer> {
   return new Program(IDL as TelegramPrivateTransfer, provider);
 }
 
 /**
  * LoyalPrivateTransactionsClient - SDK for interacting with the Telegram Private Transfer program
+ * with MagicBlock PER (Private Ephemeral Rollups) support
  *
  * @example
- * // Browser with wallet adapter
- * const client = LoyalPrivateTransactionsClient.fromWallet(connection, walletAdapter);
+ * // Base layer client with keypair
+ * const client = LoyalPrivateTransactionsClient.from(connection, keypair);
  *
- * @example
- * // Server-side with keypair
- * const client = LoyalPrivateTransactionsClient.fromKeypair(connection, keypair);
+ * // Ephemeral rollup client
+ * const ephemeralClient = await LoyalPrivateTransactionsClient.fromEphemeral({
+ *   signer: keypair,
+ *   rpcEndpoint: "http://localhost:7799",
+ *   wsEndpoint: "ws://localhost:7800",
+ * });
+ *
+ * // Deposit tokens and delegate to PER
+ * await client.initializeDeposit({ user, tokenMint, payer });
+ * await client.modifyBalance({ user, tokenMint, amount: 1000000, increase: true, ... });
+ * await client.createPermission({ user, tokenMint, payer });
+ * await client.delegateDeposit({ user, tokenMint, payer, validator });
+ *
+ * // Execute private transfers on ephemeral rollup
+ * await ephemeralClient.transferToUsernameDeposit({ username, tokenMint, amount, ... });
+ *
+ * // Commit and undelegate
+ * await ephemeralClient.undelegateDeposit({ user, tokenMint, ... });
  */
 export class LoyalPrivateTransactionsClient {
   private readonly program: Program<TelegramPrivateTransfer>;
@@ -103,7 +116,6 @@ export class LoyalPrivateTransactionsClient {
 
   /**
    * Create client from any supported signer type
-   * Automatically detects the signer type and creates the appropriate client
    */
   static from(
     connection: Connection,
@@ -138,451 +150,194 @@ export class LoyalPrivateTransactionsClient {
   }
 
   /**
-   * Build an AnchorProvider targeting the MagicBlock ephemeral RPC.
-   * Mirrors the flow used in tests/telegram-private-transfer.ts.
-   */
-  static async createEphemeralProvider(
-    params: EphemeralProviderParams
-  ): Promise<EphemeralProviderResult> {
-    const {
-      signer,
-      rpcEndpoint,
-      wsEndpoint,
-      commitment,
-      useAuth,
-      authToken,
-      signMessage,
-    } = params;
-
-    const resolvedRpc =
-      rpcEndpoint ??
-      LoyalPrivateTransactionsClient.getEnv("EPHEMERAL_PROVIDER_ENDPOINT") ??
-      "http://127.0.0.1:7799";
-    const resolvedWs =
-      wsEndpoint ??
-      LoyalPrivateTransactionsClient.getEnv("EPHEMERAL_WS_ENDPOINT") ??
-      (LoyalPrivateTransactionsClient.isLocalEndpoint(resolvedRpc)
-        ? "ws://127.0.0.1:7800"
-        : LoyalPrivateTransactionsClient.deriveWsEndpoint(resolvedRpc));
-    const resolvedCommitment = LoyalPrivateTransactionsClient.resolveCommitment(
-      commitment
-    );
-
-    const hasTokenInUrl =
-      LoyalPrivateTransactionsClient.hasToken(resolvedRpc) ||
-      LoyalPrivateTransactionsClient.hasToken(resolvedWs);
-    const hasAuthToken = hasTokenInUrl || Boolean(authToken);
-    const shouldUseAuth = LoyalPrivateTransactionsClient.shouldUseEphemeralAuth(
-      useAuth,
-      hasTokenInUrl,
-      resolvedRpc
-    );
-
-    let finalRpc = resolvedRpc;
-    let finalWs = resolvedWs;
-    let authResult: { token: string; expiresAt: number } | undefined;
-
-    if (authToken && !hasTokenInUrl) {
-      finalRpc = LoyalPrivateTransactionsClient.appendToken(
-        finalRpc,
-        authToken
-      );
-      finalWs = LoyalPrivateTransactionsClient.appendToken(
-        finalWs,
-        authToken
-      );
-    } else if (!hasAuthToken && shouldUseAuth) {
-      const signerFn = LoyalPrivateTransactionsClient.resolveSignMessage(
-        signer,
-        signMessage
-      );
-      if (!signerFn) {
-        throw new Error(
-          "signMessage is required to fetch MagicBlock auth token. Provide signMessage or authToken."
-        );
-      }
-      authResult = await getAuthToken(
-        resolvedRpc,
-        InternalWalletAdapter.getPublicKey(signer),
-        signerFn
-      );
-      finalRpc = LoyalPrivateTransactionsClient.appendToken(
-        finalRpc,
-        authResult.token
-      );
-      finalWs = LoyalPrivateTransactionsClient.appendToken(
-        finalWs,
-        authResult.token
-      );
-    }
-
-    const connection = new Connection(finalRpc, {
-      wsEndpoint: finalWs,
-      commitment: resolvedCommitment,
-    });
-    const provider = new AnchorProvider(
-      connection,
-      InternalWalletAdapter.from(signer),
-      {
-        commitment: resolvedCommitment,
-        preflightCommitment: resolvedCommitment,
-      }
-    );
-
-    return {
-      provider,
-      rpcEndpoint: finalRpc,
-      wsEndpoint: finalWs,
-      commitment: resolvedCommitment,
-      authToken: authResult?.token ?? authToken,
-      authExpiresAt: authResult?.expiresAt,
-    };
-  }
-
-  /**
-   * Create a client configured against the MagicBlock ephemeral RPC.
+   * Create client connected to an ephemeral rollup endpoint
+   * Use this for executing transactions on the Private Ephemeral Rollup
    */
   static async fromEphemeral(
-    params: EphemeralProviderParams
+    config: EphemeralClientConfig
   ): Promise<LoyalPrivateTransactionsClient> {
-    const { provider } =
-      await LoyalPrivateTransactionsClient.createEphemeralProvider(params);
-    return LoyalPrivateTransactionsClient.fromProvider(provider);
+    const { signer, rpcEndpoint, wsEndpoint, commitment = "confirmed" } = config;
+
+    const connection = new Connection(rpcEndpoint, {
+      wsEndpoint,
+      commitment,
+    });
+
+    return LoyalPrivateTransactionsClient.from(connection, signer);
   }
 
   // ============================================================
-  // Transaction Methods
+  // Deposit Operations
   // ============================================================
 
-  async initializeDeposit(
-    params: InitializeDepositParams
-  ): Promise<InitializeDepositResult> {
-    const {
-      tokenMint,
-      user = this.wallet.publicKey,
-      payer = this.wallet.publicKey,
-      tokenProgram = TOKEN_PROGRAM_ID,
-      commitment,
-      rpcOptions,
-    } = params;
+  /**
+   * Initialize a deposit account for a user and token mint
+   */
+  async initializeDeposit(params: InitializeDepositParams): Promise<string> {
+    const { user, tokenMint, payer, rpcOptions } = params;
 
-    const [depositPda] = findDepositPda(user, tokenMint);
     const signature = await this.program.methods
       .initializeDeposit()
       .accountsPartial({
         payer,
         user,
-        deposit: depositPda,
         tokenMint,
-        tokenProgram,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
       })
-      .rpc(LoyalPrivateTransactionsClient.resolveRpcOptions(commitment, rpcOptions));
+      .rpc(this.buildRpcOptions(rpcOptions));
 
-    const deposit = await this.getDeposit(user, tokenMint);
-    if (!deposit) {
-      throw new Error("Failed to fetch deposit account after transaction");
-    }
-
-    return { signature, deposit };
+    return signature;
   }
 
-  async modifyBalance(
-    params: ModifyBalanceParams
-  ): Promise<ModifyBalanceResult> {
+  /**
+   * Modify the balance of a user's deposit account
+   */
+  async modifyBalance(params: ModifyBalanceParams): Promise<ModifyBalanceResult> {
     const {
+      user,
       tokenMint,
       amount,
       increase,
-      user = this.wallet.publicKey,
-      payer = this.wallet.publicKey,
+      payer,
       userTokenAccount,
-      vault,
-      vaultTokenAccount,
-      tokenProgram = TOKEN_PROGRAM_ID,
-      associatedTokenProgram = ASSOCIATED_TOKEN_PROGRAM_ID,
-      commitment,
       rpcOptions,
     } = params;
 
-    LoyalPrivateTransactionsClient.assertPositiveAmount(amount);
-
     const [depositPda] = findDepositPda(user, tokenMint);
-    const [vaultPda] = vault ? [vault] : findVaultPda(tokenMint);
-    const userAta =
-      userTokenAccount ??
-      getAssociatedTokenAddressSync(
-        tokenMint,
-        user,
-        false,
-        tokenProgram,
-        associatedTokenProgram
-      );
-    const vaultAta =
-      vaultTokenAccount ??
-      getAssociatedTokenAddressSync(
-        tokenMint,
-        vaultPda,
-        true,
-        tokenProgram,
-        associatedTokenProgram
-      );
+    const [vaultPda] = findVaultPda(tokenMint);
+    const vaultTokenAccount = getAssociatedTokenAddressSync(
+      tokenMint,
+      vaultPda,
+      true,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
 
     const signature = await this.program.methods
-      .modifyBalance({
-        amount: LoyalPrivateTransactionsClient.toBN(amount),
-        increase,
-      })
+      .modifyBalance({ amount: new BN(amount.toString()), increase })
       .accountsPartial({
         payer,
         user,
-        deposit: depositPda,
         vault: vaultPda,
-        userTokenAccount: userAta,
-        vaultTokenAccount: vaultAta,
+        deposit: depositPda,
+        userTokenAccount,
+        vaultTokenAccount,
         tokenMint,
-        tokenProgram,
-        associatedTokenProgram,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
       })
-      .rpc(LoyalPrivateTransactionsClient.resolveRpcOptions(commitment, rpcOptions));
+      .rpc(this.buildRpcOptions(rpcOptions));
 
     const deposit = await this.getDeposit(user, tokenMint);
     if (!deposit) {
-      throw new Error("Failed to fetch deposit account after transaction");
+      throw new Error("Failed to fetch deposit after modification");
     }
 
     return { signature, deposit };
   }
 
-  async transferDeposit(
-    params: TransferDepositParams
-  ): Promise<TransferDepositResult> {
-    const {
-      tokenMint,
-      amount,
-      user = this.wallet.publicKey,
-      destinationUser,
-      sourceDeposit,
-      destinationDeposit,
-      sessionToken = null,
-      payer = this.wallet.publicKey,
-      commitment,
-      rpcOptions,
-    } = params;
-
-    if (!destinationUser && !destinationDeposit) {
-      throw new Error("Destination user or deposit is required");
-    }
-    LoyalPrivateTransactionsClient.assertPositiveAmount(amount);
-
-    const [sourcePda] = sourceDeposit
-      ? [sourceDeposit]
-      : findDepositPda(user, tokenMint);
-    const [destinationPda] = destinationDeposit
-      ? [destinationDeposit]
-      : findDepositPda(destinationUser as PublicKey, tokenMint);
-
-    const signature = await this.program.methods
-      .transferDeposit(LoyalPrivateTransactionsClient.toBN(amount))
-      .accountsPartial({
-        user,
-        payer,
-        sessionToken,
-        sourceDeposit: sourcePda,
-        destinationDeposit: destinationPda,
-        tokenMint,
-      })
-      .rpc(LoyalPrivateTransactionsClient.resolveRpcOptions(commitment, rpcOptions));
-
-    const source = await this.fetchDepositByAddress(sourcePda);
-    const destination = await this.fetchDepositByAddress(destinationPda);
-
-    if (!source || !destination) {
-      throw new Error("Failed to fetch deposit accounts after transaction");
-    }
-
-    return { signature, sourceDeposit: source, destinationDeposit: destination };
-  }
-
-  async transferToUsernameDeposit(
-    params: TransferToUsernameDepositParams
-  ): Promise<TransferToUsernameDepositResult> {
-    const {
-      tokenMint,
-      username,
-      amount,
-      user = this.wallet.publicKey,
-      sourceDeposit,
-      destinationDeposit,
-      sessionToken = null,
-      payer = this.wallet.publicKey,
-      commitment,
-      rpcOptions,
-    } = params;
-
-    LoyalPrivateTransactionsClient.validateUsername(username);
-    LoyalPrivateTransactionsClient.assertPositiveAmount(amount);
-
-    const [sourcePda] = sourceDeposit
-      ? [sourceDeposit]
-      : findDepositPda(user, tokenMint);
-    const [destinationPda] = destinationDeposit
-      ? [destinationDeposit]
-      : findUsernameDepositPda(username, tokenMint);
-
-    const signature = await this.program.methods
-      .transferToUsernameDeposit(LoyalPrivateTransactionsClient.toBN(amount))
-      .accountsPartial({
-        user,
-        payer,
-        sessionToken,
-        sourceDeposit: sourcePda,
-        destinationDeposit: destinationPda,
-        tokenMint,
-      })
-      .rpc(LoyalPrivateTransactionsClient.resolveRpcOptions(commitment, rpcOptions));
-
-    const source = await this.fetchDepositByAddress(sourcePda);
-    const destination = await this.fetchUsernameDepositByAddress(destinationPda);
-
-    if (!source || !destination) {
-      throw new Error("Failed to fetch deposit accounts after transaction");
-    }
-
-    return { signature, sourceDeposit: source, destinationDeposit: destination };
-  }
-
-  async depositForUsername(
-    params: DepositForUsernameParams
-  ): Promise<DepositForUsernameResult> {
+  /**
+   * Deposit tokens for a Telegram username
+   */
+  async depositForUsername(params: DepositForUsernameParams): Promise<string> {
     const {
       username,
       tokenMint,
       amount,
-      depositor = this.wallet.publicKey,
-      payer = this.wallet.publicKey,
+      depositor,
+      payer,
       depositorTokenAccount,
-      vault,
-      vaultTokenAccount,
-      tokenProgram = TOKEN_PROGRAM_ID,
-      associatedTokenProgram = ASSOCIATED_TOKEN_PROGRAM_ID,
-      commitment,
       rpcOptions,
     } = params;
 
-    LoyalPrivateTransactionsClient.validateUsername(username);
-    LoyalPrivateTransactionsClient.assertPositiveAmount(amount);
+    this.validateUsername(username);
 
     const [depositPda] = findUsernameDepositPda(username, tokenMint);
-    const [vaultPda] = vault ? [vault] : findVaultPda(tokenMint);
-    const depositorAta =
-      depositorTokenAccount ??
-      getAssociatedTokenAddressSync(
-        tokenMint,
-        depositor,
-        false,
-        tokenProgram,
-        associatedTokenProgram
-      );
-    const vaultAta =
-      vaultTokenAccount ??
-      getAssociatedTokenAddressSync(
-        tokenMint,
-        vaultPda,
-        true,
-        tokenProgram,
-        associatedTokenProgram
-      );
+    const [vaultPda] = findVaultPda(tokenMint);
+    const vaultTokenAccount = getAssociatedTokenAddressSync(
+      tokenMint,
+      vaultPda,
+      true,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
 
     const signature = await this.program.methods
-      .depositForUsername(username, LoyalPrivateTransactionsClient.toBN(amount))
+      .depositForUsername(username, new BN(amount.toString()))
       .accountsPartial({
         payer,
         depositor,
         deposit: depositPda,
         vault: vaultPda,
-        vaultTokenAccount: vaultAta,
-        depositorTokenAccount: depositorAta,
+        vaultTokenAccount,
+        depositorTokenAccount,
         tokenMint,
-        tokenProgram,
-        associatedTokenProgram,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
       })
-      .rpc(LoyalPrivateTransactionsClient.resolveRpcOptions(commitment, rpcOptions));
+      .rpc(this.buildRpcOptions(rpcOptions));
 
-    const deposit = await this.getUsernameDeposit(username, tokenMint);
-    if (!deposit) {
-      throw new Error("Failed to fetch username deposit after transaction");
-    }
-
-    return { signature, deposit };
+    return signature;
   }
 
+  /**
+   * Claim tokens from a username-based deposit
+   */
   async claimUsernameDeposit(
     params: ClaimUsernameDepositParams
-  ): Promise<ClaimUsernameDepositResult> {
+  ): Promise<string> {
     const {
       username,
       tokenMint,
       amount,
-      recipient = this.wallet.publicKey,
       recipientTokenAccount,
-      vault,
-      vaultTokenAccount,
       session,
-      tokenProgram = TOKEN_PROGRAM_ID,
-      commitment,
       rpcOptions,
     } = params;
 
-    LoyalPrivateTransactionsClient.validateUsername(username);
-    LoyalPrivateTransactionsClient.assertPositiveAmount(amount);
+    this.validateUsername(username);
 
     const [depositPda] = findUsernameDepositPda(username, tokenMint);
-    const [vaultPda] = vault ? [vault] : findVaultPda(tokenMint);
-    const recipientAta =
-      recipientTokenAccount ??
-      getAssociatedTokenAddressSync(tokenMint, recipient, false, tokenProgram);
-    const vaultAta =
-      vaultTokenAccount ??
-      getAssociatedTokenAddressSync(tokenMint, vaultPda, true, tokenProgram);
+    const [vaultPda] = findVaultPda(tokenMint);
+    const vaultTokenAccount = getAssociatedTokenAddressSync(
+      tokenMint,
+      vaultPda,
+      true,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
 
     const signature = await this.program.methods
-      .claimUsernameDeposit(LoyalPrivateTransactionsClient.toBN(amount))
+      .claimUsernameDeposit(new BN(amount.toString()))
       .accountsPartial({
-        recipientTokenAccount: recipientAta,
+        recipientTokenAccount,
         vault: vaultPda,
-        vaultTokenAccount: vaultAta,
+        vaultTokenAccount,
         deposit: depositPda,
         tokenMint,
         session,
-        tokenProgram,
+        tokenProgram: TOKEN_PROGRAM_ID,
       })
-      .rpc(LoyalPrivateTransactionsClient.resolveRpcOptions(commitment, rpcOptions));
+      .rpc(this.buildRpcOptions(rpcOptions));
 
-    const deposit = await this.getUsernameDeposit(username, tokenMint);
-    if (!deposit) {
-      throw new Error("Failed to fetch username deposit after transaction");
-    }
-
-    return { signature, deposit };
+    return signature;
   }
 
-  async createPermission(
-    params: CreatePermissionParams
-  ): Promise<CreatePermissionResult> {
-    const {
-      tokenMint,
-      user = this.wallet.publicKey,
-      payer = this.wallet.publicKey,
-      deposit,
-      permission,
-      permissionProgram = PERMISSION_PROGRAM_ID,
-      commitment,
-      rpcOptions,
-    } = params;
+  // ============================================================
+  // Permission Operations
+  // ============================================================
 
-    const [depositPda] = deposit ? [deposit] : findDepositPda(user, tokenMint);
-    const permissionPda =
-      permission ?? permissionPdaFromAccount(depositPda);
+  /**
+   * Create a permission for a deposit account (required for PER)
+   */
+  async createPermission(params: CreatePermissionParams): Promise<string> {
+    const { user, tokenMint, payer, rpcOptions } = params;
+
+    const [depositPda] = findDepositPda(user, tokenMint);
+    const [permissionPda] = findPermissionPda(depositPda);
 
     const signature = await this.program.methods
       .createPermission()
@@ -591,134 +346,161 @@ export class LoyalPrivateTransactionsClient {
         user,
         deposit: depositPda,
         permission: permissionPda,
-        permissionProgram,
+        permissionProgram: PERMISSION_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
       })
-      .rpc(LoyalPrivateTransactionsClient.resolveRpcOptions(commitment, rpcOptions));
+      .rpc(this.buildRpcOptions(rpcOptions));
 
-    return { signature, permission: permissionPda };
+    return signature;
   }
 
+  /**
+   * Create a permission for a username-based deposit account
+   */
   async createUsernamePermission(
     params: CreateUsernamePermissionParams
-  ): Promise<CreateUsernamePermissionResult> {
-    const {
-      username,
-      tokenMint,
-      session,
-      authority = this.wallet.publicKey,
-      payer = this.wallet.publicKey,
-      deposit,
-      permission,
-      permissionProgram = PERMISSION_PROGRAM_ID,
-      commitment,
-      rpcOptions,
-    } = params;
+  ): Promise<string> {
+    const { username, tokenMint, session, authority, payer, rpcOptions } =
+      params;
 
-    LoyalPrivateTransactionsClient.validateUsername(username);
+    this.validateUsername(username);
 
-    const [depositPda] = deposit
-      ? [deposit]
-      : findUsernameDepositPda(username, tokenMint);
-    const permissionPda =
-      permission ?? permissionPdaFromAccount(depositPda);
+    const [depositPda] = findUsernameDepositPda(username, tokenMint);
+    const [permissionPda] = findPermissionPda(depositPda);
 
     const signature = await this.program.methods
       .createUsernamePermission()
       .accountsPartial({
         payer,
         authority,
+        deposit: depositPda,
         session,
-        deposit: depositPda,
         permission: permissionPda,
-        permissionProgram,
+        permissionProgram: PERMISSION_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
       })
-      .rpc(LoyalPrivateTransactionsClient.resolveRpcOptions(commitment, rpcOptions));
+      .rpc(this.buildRpcOptions(rpcOptions));
 
-    return { signature, permission: permissionPda };
+    return signature;
   }
 
+  // ============================================================
+  // Delegation Operations
+  // ============================================================
+
+  /**
+   * Delegate a deposit account to the ephemeral rollup
+   */
   async delegateDeposit(params: DelegateDepositParams): Promise<string> {
-    const {
-      tokenMint,
-      user = this.wallet.publicKey,
-      payer = this.wallet.publicKey,
-      deposit,
-      validator,
-      commitment,
-      rpcOptions,
-    } = params;
+    const { user, tokenMint, payer, validator, rpcOptions } = params;
 
-    const [depositPda] = deposit ? [deposit] : findDepositPda(user, tokenMint);
+    const [depositPda] = findDepositPda(user, tokenMint);
+    const [bufferPda] = findBufferPda(depositPda);
+    const [delegationRecordPda] = findDelegationRecordPda(depositPda);
+    const [delegationMetadataPda] = findDelegationMetadataPda(depositPda);
 
-    return this.program.methods
+    const accounts: Record<string, PublicKey> = {
+      payer,
+      bufferDeposit: bufferPda,
+      delegationRecordDeposit: delegationRecordPda,
+      delegationMetadataDeposit: delegationMetadataPda,
+      deposit: depositPda,
+      ownerProgram: PROGRAM_ID,
+      delegationProgram: DELEGATION_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    };
+
+    if (validator) {
+      accounts.validator = validator;
+    }
+
+    const signature = await this.program.methods
       .delegate(user, tokenMint)
-      .accountsPartial({
-        payer,
-        deposit: depositPda,
-        validator: validator ?? null,
-      })
-      .rpc(LoyalPrivateTransactionsClient.resolveRpcOptions(commitment, rpcOptions));
+      .accountsPartial(accounts)
+      .rpc(this.buildRpcOptions(rpcOptions));
+
+    return signature;
   }
 
+  /**
+   * Delegate a username-based deposit account to the ephemeral rollup
+   */
   async delegateUsernameDeposit(
     params: DelegateUsernameDepositParams
   ): Promise<string> {
-    const {
-      username,
-      tokenMint,
+    const { username, tokenMint, session, payer, validator, rpcOptions } =
+      params;
+
+    this.validateUsername(username);
+
+    const [depositPda] = findUsernameDepositPda(username, tokenMint);
+    const [bufferPda] = findBufferPda(depositPda);
+    const [delegationRecordPda] = findDelegationRecordPda(depositPda);
+    const [delegationMetadataPda] = findDelegationMetadataPda(depositPda);
+
+    const accounts: Record<string, PublicKey> = {
+      payer,
       session,
-      payer = this.wallet.publicKey,
-      deposit,
-      validator,
-      commitment,
-      rpcOptions,
-    } = params;
+      bufferDeposit: bufferPda,
+      delegationRecordDeposit: delegationRecordPda,
+      delegationMetadataDeposit: delegationMetadataPda,
+      deposit: depositPda,
+      ownerProgram: PROGRAM_ID,
+      delegationProgram: DELEGATION_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    };
 
-    LoyalPrivateTransactionsClient.validateUsername(username);
+    if (validator) {
+      accounts.validator = validator;
+    }
 
-    const [depositPda] = deposit
-      ? [deposit]
-      : findUsernameDepositPda(username, tokenMint);
-
-    return this.program.methods
+    const signature = await this.program.methods
       .delegateUsernameDeposit(username, tokenMint)
-      .accountsPartial({
-        payer,
-        session,
-        deposit: depositPda,
-        validator: validator ?? null,
-      })
-      .rpc(LoyalPrivateTransactionsClient.resolveRpcOptions(commitment, rpcOptions));
+      .accountsPartial(accounts)
+      .rpc(this.buildRpcOptions(rpcOptions));
+
+    return signature;
   }
 
+  /**
+   * Undelegate a deposit account from the ephemeral rollup
+   */
   async undelegateDeposit(params: UndelegateDepositParams): Promise<string> {
     const {
+      user,
       tokenMint,
-      user = this.wallet.publicKey,
-      payer = this.wallet.publicKey,
-      deposit,
-      sessionToken = null,
-      magicProgram = MAGIC_PROGRAM_ID,
-      magicContext = MAGIC_CONTEXT_ID,
-      commitment,
+      payer,
+      sessionToken,
+      magicProgram,
+      magicContext,
       rpcOptions,
     } = params;
 
-    const [depositPda] = deposit ? [deposit] : findDepositPda(user, tokenMint);
+    const [depositPda] = findDepositPda(user, tokenMint);
 
-    return this.program.methods
+    const accounts: Record<string, PublicKey | null> = {
+      user,
+      payer,
+      deposit: depositPda,
+      magicProgram,
+      magicContext,
+    };
+
+    if (sessionToken !== undefined) {
+      accounts.sessionToken = sessionToken;
+    }
+
+    const signature = await this.program.methods
       .undelegate()
-      .accountsPartial({
-        user,
-        payer,
-        sessionToken,
-        deposit: depositPda,
-        magicProgram,
-        magicContext,
-      })
-      .rpc(LoyalPrivateTransactionsClient.resolveRpcOptions(commitment, rpcOptions));
+      .accountsPartial(accounts)
+      .rpc(this.buildRpcOptions(rpcOptions));
+
+    return signature;
   }
 
+  /**
+   * Undelegate a username-based deposit account from the ephemeral rollup
+   */
   async undelegateUsernameDeposit(
     params: UndelegateUsernameDepositParams
   ): Promise<string> {
@@ -726,21 +508,17 @@ export class LoyalPrivateTransactionsClient {
       username,
       tokenMint,
       session,
-      payer = this.wallet.publicKey,
-      deposit,
-      magicProgram = MAGIC_PROGRAM_ID,
-      magicContext = MAGIC_CONTEXT_ID,
-      commitment,
+      payer,
+      magicProgram,
+      magicContext,
       rpcOptions,
     } = params;
 
-    LoyalPrivateTransactionsClient.validateUsername(username);
+    this.validateUsername(username);
 
-    const [depositPda] = deposit
-      ? [deposit]
-      : findUsernameDepositPda(username, tokenMint);
+    const [depositPda] = findUsernameDepositPda(username, tokenMint);
 
-    return this.program.methods
+    const signature = await this.program.methods
       .undelegateUsernameDeposit(username, tokenMint)
       .accountsPartial({
         payer,
@@ -749,39 +527,161 @@ export class LoyalPrivateTransactionsClient {
         magicProgram,
         magicContext,
       })
-      .rpc(LoyalPrivateTransactionsClient.resolveRpcOptions(commitment, rpcOptions));
+      .rpc(this.buildRpcOptions(rpcOptions));
+
+    return signature;
+  }
+
+  // ============================================================
+  // Transfer Operations
+  // ============================================================
+
+  /**
+   * Transfer between two user deposits
+   */
+  async transferDeposit(params: TransferDepositParams): Promise<string> {
+    const {
+      user,
+      tokenMint,
+      destinationUser,
+      amount,
+      payer,
+      sessionToken,
+      rpcOptions,
+    } = params;
+
+    const [sourceDepositPda] = findDepositPda(user, tokenMint);
+    const [destinationDepositPda] = findDepositPda(destinationUser, tokenMint);
+
+    const accounts: Record<string, PublicKey | null> = {
+      user,
+      payer,
+      sourceDeposit: sourceDepositPda,
+      destinationDeposit: destinationDepositPda,
+      tokenMint,
+      systemProgram: SystemProgram.programId,
+    };
+
+    if (sessionToken !== undefined) {
+      accounts.sessionToken = sessionToken;
+    }
+
+    const signature = await this.program.methods
+      .transferDeposit(new BN(amount.toString()))
+      .accountsPartial(accounts)
+      .rpc(this.buildRpcOptions(rpcOptions));
+
+    return signature;
+  }
+
+  /**
+   * Transfer from a user deposit to a username deposit
+   */
+  async transferToUsernameDeposit(
+    params: TransferToUsernameDepositParams
+  ): Promise<string> {
+    const {
+      username,
+      tokenMint,
+      amount,
+      user,
+      payer,
+      sessionToken,
+      rpcOptions,
+    } = params;
+
+    this.validateUsername(username);
+
+    const [sourceDepositPda] = findDepositPda(user, tokenMint);
+    const [destinationDepositPda] = findUsernameDepositPda(username, tokenMint);
+
+    const accounts: Record<string, PublicKey | null> = {
+      user,
+      payer,
+      sourceDeposit: sourceDepositPda,
+      destinationDeposit: destinationDepositPda,
+      tokenMint,
+      systemProgram: SystemProgram.programId,
+    };
+
+    if (sessionToken !== undefined) {
+      accounts.sessionToken = sessionToken;
+    }
+
+    const signature = await this.program.methods
+      .transferToUsernameDeposit(new BN(amount.toString()))
+      .accountsPartial(accounts)
+      .rpc(this.buildRpcOptions(rpcOptions));
+
+    return signature;
   }
 
   // ============================================================
   // Query Methods
   // ============================================================
 
+  /**
+   * Get deposit data for a user and token mint
+   */
   async getDeposit(
     user: PublicKey,
     tokenMint: PublicKey
   ): Promise<DepositData | null> {
     const [depositPda] = findDepositPda(user, tokenMint);
 
-    return this.fetchDepositByAddress(depositPda);
+    try {
+      const account = await this.program.account.deposit.fetch(depositPda);
+      return {
+        user: account.user,
+        tokenMint: account.tokenMint,
+        amount: account.amount.toNumber(),
+        address: depositPda,
+      };
+    } catch {
+      return null;
+    }
   }
 
+  /**
+   * Get username deposit data
+   */
   async getUsernameDeposit(
     username: string,
     tokenMint: PublicKey
   ): Promise<UsernameDepositData | null> {
     const [depositPda] = findUsernameDepositPda(username, tokenMint);
 
-    return this.fetchUsernameDepositByAddress(depositPda);
+    try {
+      const account =
+        await this.program.account.usernameDeposit.fetch(depositPda);
+      return {
+        username: account.username,
+        tokenMint: account.tokenMint,
+        amount: account.amount.toNumber(),
+        address: depositPda,
+      };
+    } catch {
+      return null;
+    }
   }
 
   // ============================================================
   // PDA Helpers
   // ============================================================
 
-  findDepositPda(user: PublicKey, tokenMint: PublicKey): [PublicKey, number] {
+  /**
+   * Find the deposit PDA for a user and token mint
+   */
+  findDepositPda(
+    user: PublicKey,
+    tokenMint: PublicKey
+  ): [PublicKey, number] {
     return findDepositPda(user, tokenMint, PROGRAM_ID);
   }
 
+  /**
+   * Find the username deposit PDA
+   */
   findUsernameDepositPda(
     username: string,
     tokenMint: PublicKey
@@ -789,6 +689,9 @@ export class LoyalPrivateTransactionsClient {
     return findUsernameDepositPda(username, tokenMint, PROGRAM_ID);
   }
 
+  /**
+   * Find the vault PDA
+   */
   findVaultPda(tokenMint: PublicKey): [PublicKey, number] {
     return findVaultPda(tokenMint, PROGRAM_ID);
   }
@@ -797,176 +700,51 @@ export class LoyalPrivateTransactionsClient {
   // Accessors
   // ============================================================
 
+  /**
+   * Get the connected wallet's public key
+   */
   get publicKey(): PublicKey {
     return this.wallet.publicKey;
   }
 
+  /**
+   * Get the underlying Anchor program instance
+   */
   getProgram(): Program<TelegramPrivateTransfer> {
     return this.program;
   }
 
+  /**
+   * Get the program ID
+   */
   getProgramId(): PublicKey {
     return PROGRAM_ID;
   }
 
   // ============================================================
-  // Helpers
+  // Private Helpers
   // ============================================================
 
-  private static resolveRpcOptions(
-    commitment?: Commitment,
-    rpcOptions?: ConfirmOptions
-  ): ConfirmOptions {
-    const options: ConfirmOptions = {
-      commitment: commitment ?? rpcOptions?.commitment ?? "confirmed",
-    };
-    if (rpcOptions) {
-      Object.assign(options, rpcOptions);
+  private validateUsername(username: string): void {
+    if (!username || username.length < 5 || username.length > 32) {
+      throw new Error("Username must be between 5 and 32 characters");
     }
-    if (commitment) {
-      options.commitment = commitment;
-    }
-    return options;
-  }
-
-  private static toBN(amount: Amount): BN {
-    if (typeof amount === "bigint") {
-      return new BN(amount.toString());
-    }
-    return new BN(amount.toString());
-  }
-
-  private static assertPositiveAmount(amount: Amount): void {
-    if (typeof amount === "bigint") {
-      if (amount <= 0n) {
-        throw new Error("Amount must be greater than 0");
-      }
-      return;
-    }
-    if (amount <= 0) {
-      throw new Error("Amount must be greater than 0");
-    }
-  }
-
-  private static validateUsername(username: string): void {
-    if (!USERNAME_REGEX.test(username)) {
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       throw new Error(
-        "Username must be 5-32 characters and contain only letters, numbers, or underscores"
+        "Username can only contain alphanumeric characters and underscores"
       );
     }
   }
 
-  private static resolveCommitment(commitment?: Commitment): Commitment {
-    const envCommitment =
-      (LoyalPrivateTransactionsClient.getEnv("PROVIDER_COMMITMENT") as
-        | Commitment
-        | undefined) ??
-      (LoyalPrivateTransactionsClient.getEnv("COMMITMENT") as
-        | Commitment
-        | undefined);
-    return commitment ?? envCommitment ?? "confirmed";
-  }
-
-  private static deriveWsEndpoint(rpcEndpoint: string): string {
-    return rpcEndpoint.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
-  }
-
-  private static isLocalEndpoint(rpcEndpoint: string): boolean {
-    return (
-      rpcEndpoint.includes("localhost") || rpcEndpoint.includes("127.0.0.1")
-    );
-  }
-
-  private static hasToken(endpoint: string): boolean {
-    return endpoint.includes("token=");
-  }
-
-  private static appendToken(endpoint: string, token: string): string {
-    return endpoint.includes("?")
-      ? `${endpoint}&token=${token}`
-      : `${endpoint}?token=${token}`;
-  }
-
-  private static shouldUseEphemeralAuth(
-    useAuth: boolean | undefined,
-    hasToken: boolean,
-    rpcEndpoint: string
-  ): boolean {
-    if (typeof useAuth === "boolean") {
-      return useAuth;
-    }
-    const envAuth =
-      LoyalPrivateTransactionsClient.getEnv("EPHEMERAL_AUTH") === "true";
-    return (
-      envAuth ||
-      (!hasToken &&
-        (rpcEndpoint.includes("tee.magicblock.app") ||
-          rpcEndpoint.includes("magicblock.app")))
-    );
-  }
-
-  private static resolveSignMessage(
-    signer: WalletSigner,
-    override?: SignMessage
-  ): SignMessage | null {
-    if (override) {
-      return override;
-    }
-    if (isKeypair(signer)) {
-      return async (message) => sign.detached(message, signer.secretKey);
-    }
-    if (isAnchorProvider(signer)) {
-      const wallet = signer.wallet as WalletLike & {
-        signMessage?: SignMessage;
-      };
-      if (typeof wallet.signMessage === "function") {
-        return (message) => wallet.signMessage!(message);
-      }
-      return null;
-    }
-    const wallet = signer as WalletLike & { signMessage?: SignMessage };
-    if (typeof wallet.signMessage === "function") {
-      return (message) => wallet.signMessage!(message);
-    }
-    return null;
-  }
-
-  private static getEnv(key: string): string | undefined {
-    if (typeof process === "undefined" || !process.env) {
-      return undefined;
-    }
-    return process.env[key];
-  }
-
-  private async fetchDepositByAddress(
-    address: PublicKey
-  ): Promise<DepositData | null> {
-    try {
-      const account = await this.program.account.deposit.fetch(address);
-      return {
-        user: account.user,
-        tokenMint: account.tokenMint,
-        amount: account.amount.toNumber(),
-        address,
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  private async fetchUsernameDepositByAddress(
-    address: PublicKey
-  ): Promise<UsernameDepositData | null> {
-    try {
-      const account = await this.program.account.usernameDeposit.fetch(address);
-      return {
-        username: account.username,
-        tokenMint: account.tokenMint,
-        amount: account.amount.toNumber(),
-        address,
-      };
-    } catch {
-      return null;
-    }
+  private buildRpcOptions(options?: RpcOptions): {
+    skipPreflight?: boolean;
+    preflightCommitment?: Commitment;
+    maxRetries?: number;
+  } {
+    return {
+      skipPreflight: options?.skipPreflight,
+      preflightCommitment: options?.preflightCommitment,
+      maxRetries: options?.maxRetries,
+    };
   }
 }

@@ -1,17 +1,33 @@
 import { Connection, PublicKey, Keypair } from "@solana/web3.js";
 import { AnchorProvider, Program } from "@coral-xyz/anchor";
 import { type TelegramPrivateTransfer } from "./idl";
-import type { WalletSigner, WalletLike, DepositData, UsernameDepositData, EphemeralProviderParams, EphemeralProviderResult, InitializeDepositParams, InitializeDepositResult, ModifyBalanceParams, ModifyBalanceResult, TransferDepositParams, TransferDepositResult, TransferToUsernameDepositParams, TransferToUsernameDepositResult, DepositForUsernameParams, DepositForUsernameResult, ClaimUsernameDepositParams, ClaimUsernameDepositResult, CreatePermissionParams, CreatePermissionResult, CreateUsernamePermissionParams, CreateUsernamePermissionResult, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams } from "./types";
+import type { WalletSigner, WalletLike, EphemeralClientConfig, DepositData, UsernameDepositData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, DepositForUsernameParams, ClaimUsernameDepositParams, CreatePermissionParams, CreateUsernamePermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams, TransferDepositParams, TransferToUsernameDepositParams } from "./types";
 /**
  * LoyalPrivateTransactionsClient - SDK for interacting with the Telegram Private Transfer program
+ * with MagicBlock PER (Private Ephemeral Rollups) support
  *
  * @example
- * // Browser with wallet adapter
- * const client = LoyalPrivateTransactionsClient.fromWallet(connection, walletAdapter);
+ * // Base layer client with keypair
+ * const client = LoyalPrivateTransactionsClient.from(connection, keypair);
  *
- * @example
- * // Server-side with keypair
- * const client = LoyalPrivateTransactionsClient.fromKeypair(connection, keypair);
+ * // Ephemeral rollup client
+ * const ephemeralClient = await LoyalPrivateTransactionsClient.fromEphemeral({
+ *   signer: keypair,
+ *   rpcEndpoint: "http://localhost:7799",
+ *   wsEndpoint: "ws://localhost:7800",
+ * });
+ *
+ * // Deposit tokens and delegate to PER
+ * await client.initializeDeposit({ user, tokenMint, payer });
+ * await client.modifyBalance({ user, tokenMint, amount: 1000000, increase: true, ... });
+ * await client.createPermission({ user, tokenMint, payer });
+ * await client.delegateDeposit({ user, tokenMint, payer, validator });
+ *
+ * // Execute private transfers on ephemeral rollup
+ * await ephemeralClient.transferToUsernameDeposit({ username, tokenMint, amount, ... });
+ *
+ * // Commit and undelegate
+ * await ephemeralClient.undelegateDeposit({ user, tokenMint, ... });
  */
 export declare class LoyalPrivateTransactionsClient {
     private readonly program;
@@ -23,7 +39,6 @@ export declare class LoyalPrivateTransactionsClient {
     static fromProvider(provider: AnchorProvider): LoyalPrivateTransactionsClient;
     /**
      * Create client from any supported signer type
-     * Automatically detects the signer type and creates the appropriate client
      */
     static from(connection: Connection, signer: WalletSigner): LoyalPrivateTransactionsClient;
     /**
@@ -35,46 +50,90 @@ export declare class LoyalPrivateTransactionsClient {
      */
     static fromKeypair(connection: Connection, keypair: Keypair): LoyalPrivateTransactionsClient;
     /**
-     * Build an AnchorProvider targeting the MagicBlock ephemeral RPC.
-     * Mirrors the flow used in tests/telegram-private-transfer.ts.
+     * Create client connected to an ephemeral rollup endpoint
+     * Use this for executing transactions on the Private Ephemeral Rollup
      */
-    static createEphemeralProvider(params: EphemeralProviderParams): Promise<EphemeralProviderResult>;
+    static fromEphemeral(config: EphemeralClientConfig): Promise<LoyalPrivateTransactionsClient>;
     /**
-     * Create a client configured against the MagicBlock ephemeral RPC.
+     * Initialize a deposit account for a user and token mint
      */
-    static fromEphemeral(params: EphemeralProviderParams): Promise<LoyalPrivateTransactionsClient>;
-    initializeDeposit(params: InitializeDepositParams): Promise<InitializeDepositResult>;
+    initializeDeposit(params: InitializeDepositParams): Promise<string>;
+    /**
+     * Modify the balance of a user's deposit account
+     */
     modifyBalance(params: ModifyBalanceParams): Promise<ModifyBalanceResult>;
-    transferDeposit(params: TransferDepositParams): Promise<TransferDepositResult>;
-    transferToUsernameDeposit(params: TransferToUsernameDepositParams): Promise<TransferToUsernameDepositResult>;
-    depositForUsername(params: DepositForUsernameParams): Promise<DepositForUsernameResult>;
-    claimUsernameDeposit(params: ClaimUsernameDepositParams): Promise<ClaimUsernameDepositResult>;
-    createPermission(params: CreatePermissionParams): Promise<CreatePermissionResult>;
-    createUsernamePermission(params: CreateUsernamePermissionParams): Promise<CreateUsernamePermissionResult>;
+    /**
+     * Deposit tokens for a Telegram username
+     */
+    depositForUsername(params: DepositForUsernameParams): Promise<string>;
+    /**
+     * Claim tokens from a username-based deposit
+     */
+    claimUsernameDeposit(params: ClaimUsernameDepositParams): Promise<string>;
+    /**
+     * Create a permission for a deposit account (required for PER)
+     */
+    createPermission(params: CreatePermissionParams): Promise<string>;
+    /**
+     * Create a permission for a username-based deposit account
+     */
+    createUsernamePermission(params: CreateUsernamePermissionParams): Promise<string>;
+    /**
+     * Delegate a deposit account to the ephemeral rollup
+     */
     delegateDeposit(params: DelegateDepositParams): Promise<string>;
+    /**
+     * Delegate a username-based deposit account to the ephemeral rollup
+     */
     delegateUsernameDeposit(params: DelegateUsernameDepositParams): Promise<string>;
+    /**
+     * Undelegate a deposit account from the ephemeral rollup
+     */
     undelegateDeposit(params: UndelegateDepositParams): Promise<string>;
+    /**
+     * Undelegate a username-based deposit account from the ephemeral rollup
+     */
     undelegateUsernameDeposit(params: UndelegateUsernameDepositParams): Promise<string>;
+    /**
+     * Transfer between two user deposits
+     */
+    transferDeposit(params: TransferDepositParams): Promise<string>;
+    /**
+     * Transfer from a user deposit to a username deposit
+     */
+    transferToUsernameDeposit(params: TransferToUsernameDepositParams): Promise<string>;
+    /**
+     * Get deposit data for a user and token mint
+     */
     getDeposit(user: PublicKey, tokenMint: PublicKey): Promise<DepositData | null>;
+    /**
+     * Get username deposit data
+     */
     getUsernameDeposit(username: string, tokenMint: PublicKey): Promise<UsernameDepositData | null>;
+    /**
+     * Find the deposit PDA for a user and token mint
+     */
     findDepositPda(user: PublicKey, tokenMint: PublicKey): [PublicKey, number];
+    /**
+     * Find the username deposit PDA
+     */
     findUsernameDepositPda(username: string, tokenMint: PublicKey): [PublicKey, number];
+    /**
+     * Find the vault PDA
+     */
     findVaultPda(tokenMint: PublicKey): [PublicKey, number];
+    /**
+     * Get the connected wallet's public key
+     */
     get publicKey(): PublicKey;
+    /**
+     * Get the underlying Anchor program instance
+     */
     getProgram(): Program<TelegramPrivateTransfer>;
+    /**
+     * Get the program ID
+     */
     getProgramId(): PublicKey;
-    private static resolveRpcOptions;
-    private static toBN;
-    private static assertPositiveAmount;
-    private static validateUsername;
-    private static resolveCommitment;
-    private static deriveWsEndpoint;
-    private static isLocalEndpoint;
-    private static hasToken;
-    private static appendToken;
-    private static shouldUseEphemeralAuth;
-    private static resolveSignMessage;
-    private static getEnv;
-    private fetchDepositByAddress;
-    private fetchUsernameDepositByAddress;
+    private validateUsername;
+    private buildRpcOptions;
 }

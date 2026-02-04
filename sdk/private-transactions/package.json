@@ -1,7 +1,7 @@
 {
   "name": "@loyal-labs/private-transactions",
   "version": "0.1.1",
-  "description": "SDK for Telegram-based private Solana deposits",
+  "description": "SDK for private Solana token deposits using MagicBlock PER (Private Ephemeral Rollups)",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -16,7 +16,7 @@
     "dist"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "build": "bun run build:js && bun run build:types",
     "build:js": "bun build ./index.ts --outdir ./dist --target node --format esm --external @coral-xyz/anchor --external @solana/web3.js --external @solana/spl-token --external @magicblock-labs/ephemeral-rollups-sdk --external bn.js",
     "build:types": "tsc -p tsconfig.build.json",
@@ -32,7 +32,13 @@
     "crypto",
     "blockchain",
     "deposit",
-    "transfer"
+    "transfer",
+    "magicblock",
+    "ephemeral-rollups",
+    "per",
+    "tee",
+    "private",
+    "confidential"
   ],
   "author": "Loyal",
   "license": "MIT",
@@ -56,7 +62,9 @@
   },
   "devDependencies": {
     "@coral-xyz/anchor": "^0.32.1",
-    "@solana/web3.js": "^1.95.0",
+    "@magicblock-labs/ephemeral-rollups-sdk": "0.8.0",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.0",
     "@types/bun": "latest",
     "typescript": "^5"
   }
