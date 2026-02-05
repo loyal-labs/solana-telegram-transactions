@@ -25,3 +25,35 @@ export declare function findUsernameDepositPda(username: string, tokenMint: Publ
  * @returns [PDA address, bump seed]
  */
 export declare function findVaultPda(tokenMint: PublicKey, programId?: PublicKey): [PublicKey, number];
+/**
+ * Derive the permission PDA for an account
+ *
+ * @param account - The account to derive permission for
+ * @param permissionProgramId - Optional permission program ID (defaults to PERMISSION_PROGRAM_ID)
+ * @returns [PDA address, bump seed]
+ */
+export declare function findPermissionPda(account: PublicKey, permissionProgramId?: PublicKey): [PublicKey, number];
+/**
+ * Derive the delegation record PDA for an account
+ *
+ * @param account - The delegated account
+ * @param delegationProgramId - Optional delegation program ID (defaults to DELEGATION_PROGRAM_ID)
+ * @returns [PDA address, bump seed]
+ */
+export declare function findDelegationRecordPda(account: PublicKey, delegationProgramId?: PublicKey): [PublicKey, number];
+/**
+ * Derive the delegation metadata PDA for an account
+ *
+ * @param account - The delegated account
+ * @param delegationProgramId - Optional delegation program ID (defaults to DELEGATION_PROGRAM_ID)
+ * @returns [PDA address, bump seed]
+ */
+export declare function findDelegationMetadataPda(account: PublicKey, delegationProgramId?: PublicKey): [PublicKey, number];
+/**
+ * Derive the buffer PDA for an account (used in delegation)
+ *
+ * @param account - The account to derive buffer for
+ * @param delegationProgramId - Optional delegation program ID (defaults to DELEGATION_PROGRAM_ID)
+ * @returns [PDA address, bump seed]
+ */
+export declare function findBufferPda(account: PublicKey, ownerProgramId?: PublicKey): [PublicKey, number];

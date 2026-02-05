@@ -104,7 +104,7 @@ function patchProviderForMagicRouter(
       const signedTx = await wallet.signTransaction(tx);
       return sendAndConfirmRawTransaction(
         provider.connection,
-        signedTx.serialize(),
+        Buffer.from(signedTx.serialize()),
         options
       );
     }
@@ -117,18 +117,16 @@ function patchProviderForMagicRouter(
     }
 
     const blockhash =
-      options?.blockhash ??
-      (await provider.connection.getLatestBlockhashForTransaction(
-        tx,
-        options
-      ));
+      (opts as { blockhash?: BlockhashWithExpiryBlockHeight } | undefined)
+        ?.blockhash ??
+      (await provider.connection.getLatestBlockhash(options?.commitment));
     tx.recentBlockhash = blockhash.blockhash;
     tx.lastValidBlockHeight = blockhash.lastValidBlockHeight;
 
     const signedTx = await wallet.signTransaction(tx);
     return sendAndConfirmRawTransaction(
       provider.connection,
-      signedTx.serialize(),
+      Buffer.from(signedTx.serialize()),
       options
     );
   };

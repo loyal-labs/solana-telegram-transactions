@@ -1,5 +1,5 @@
 {
-  "name": "@loyal-labs/private-transactions",
+  "name": "@vladarbatov/private-transactions-test",
   "version": "0.1.1",
   "description": "SDK for Telegram-based private Solana deposits",
   "type": "module",
@@ -47,8 +47,8 @@
   "homepage": "https://github.com/loyal/solana-telegram-transactions/tree/main/sdk/private-transactions#readme",
   "peerDependencies": {
     "@coral-xyz/anchor": "^0.32.0",
-    "@magicblock-labs/ephemeral-rollups-sdk": "0.8.0",
-    "@solana/spl-token": "^0.4.13",
+    "@magicblock-labs/ephemeral-rollups-sdk": "^0.8.5",
+    "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.95.0"
   },
   "dependencies": {
