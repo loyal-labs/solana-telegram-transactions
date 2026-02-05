@@ -42,3 +42,4 @@ export const LAST_AMOUNT_KEY = "lastSendAmount";
 export const RECENT_RECIPIENTS_KEY = "recentRecipients";
 export const MAX_RECENT_RECIPIENTS = 10;
 export const DISPLAY_CURRENCY_KEY = "displayCurrency";
+export const BALANCE_BG_KEY = "balanceBg";
