@@ -124,10 +124,10 @@ export function findDelegationMetadataPda(
  */
 export function findBufferPda(
   account: PublicKey,
-  delegationProgramId: PublicKey = DELEGATION_PROGRAM_ID
+  ownerProgramId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("buffer"), account.toBuffer()],
-    delegationProgramId
+    ownerProgramId
   );
 }

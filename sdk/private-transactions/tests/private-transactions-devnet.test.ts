@@ -88,6 +88,7 @@ const shouldRetryTransfer = (error: unknown) => {
         message.includes("AccountClonerError") ||
         message.includes("FailedToGetSubscriptionSlot") ||
         message.includes("Timed out waiting for") ||
+        message.includes("Transaction was not confirmed") ||
         message.includes("Transaction") ||
         message.includes("Blockhash not found") ||
         message.includes("InvalidWritableAccount")
@@ -370,27 +371,31 @@ describe("private-transactions SDK (PER)", () => {
         const rpcOptions = { skipPreflight: true };
 
         console.log("[sdk-test] initialize deposit");
-        await clientUser.initializeDeposit({
-            tokenMint,
-            user,
-            payer: user,
-            rpcOptions,
-        });
+        await runWithRetries("initializeDeposit", () =>
+            clientUser.initializeDeposit({
+                tokenMint,
+                user,
+                payer: user,
+                rpcOptions,
+            }),
+        );
         console.log("[sdk-test] modify balance");
         const existingDeposit = await clientUser.getDeposit(user, tokenMint);
         const currentAmount = existingDeposit?.amount ?? 0;
         const delta = initialAmount - currentAmount;
         let depositResult = existingDeposit;
         if (delta !== 0) {
-            const adjustResult = await clientUser.modifyBalance({
-                tokenMint,
-                amount: Math.abs(delta),
-                increase: delta > 0,
-                user,
-                payer: user,
-                userTokenAccount,
-                rpcOptions,
-            });
+            const adjustResult = await runWithRetries("modifyBalance", () =>
+                clientUser.modifyBalance({
+                    tokenMint,
+                    amount: Math.abs(delta),
+                    increase: delta > 0,
+                    user,
+                    payer: user,
+                    userTokenAccount,
+                    rpcOptions,
+                }),
+            );
             depositResult = adjustResult.deposit;
         }
         expect(depositResult?.amount).toBe(initialAmount);

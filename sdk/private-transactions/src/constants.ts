@@ -56,7 +56,7 @@ export const VAULT_SEED_BYTES = Buffer.from(VAULT_SEED);
 /**
  * PDA seed for permission accounts
  */
-export const PERMISSION_SEED = "permission";
+export const PERMISSION_SEED = "permission:";
 export const PERMISSION_SEED_BYTES = Buffer.from(PERMISSION_SEED);
 
 /**

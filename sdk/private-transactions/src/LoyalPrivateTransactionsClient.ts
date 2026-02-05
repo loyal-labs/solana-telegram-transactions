@@ -3,7 +3,13 @@ import {
   PublicKey,
   Keypair,
   SystemProgram,
+  Transaction,
+  VersionedTransaction,
+  sendAndConfirmRawTransaction,
   type Commitment,
+  type BlockhashWithExpiryBlockHeight,
+  type ConfirmOptions,
+  type Signer,
 } from "@solana/web3.js";
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
 import {
@@ -60,6 +66,76 @@ function createProgram(
   return new Program(IDL as TelegramPrivateTransfer, provider);
 }
 
+type MagicRouterConnection = Connection & {
+  getLatestBlockhashForTransaction: (
+    transaction: Transaction,
+    options?: ConfirmOptions
+  ) => Promise<BlockhashWithExpiryBlockHeight>;
+};
+
+function isMagicRouterConnection(
+  connection: Connection
+): connection is MagicRouterConnection {
+  return (
+    typeof (connection as MagicRouterConnection)
+      .getLatestBlockhashForTransaction === "function"
+  );
+}
+
+function patchProviderForMagicRouter(
+  provider: AnchorProvider,
+  wallet: InternalWalletAdapter
+): AnchorProvider {
+  if (!isMagicRouterConnection(provider.connection)) {
+    return provider;
+  }
+
+  provider.sendAndConfirm = async (
+    tx: Transaction | VersionedTransaction,
+    signers?: Signer[],
+    opts?: ConfirmOptions & { blockhash?: BlockhashWithExpiryBlockHeight }
+  ): Promise<string> => {
+    const options = opts ?? provider.opts;
+
+    if (tx instanceof VersionedTransaction) {
+      if (signers) {
+        tx.sign(signers);
+      }
+      const signedTx = await wallet.signTransaction(tx);
+      return sendAndConfirmRawTransaction(
+        provider.connection,
+        signedTx.serialize(),
+        options
+      );
+    }
+
+    tx.feePayer = tx.feePayer ?? wallet.publicKey;
+    if (signers) {
+      for (const signer of signers) {
+        tx.partialSign(signer);
+      }
+    }
+
+    const blockhash =
+      options?.blockhash ??
+      (await provider.connection.getLatestBlockhashForTransaction(
+        tx,
+        options
+      ));
+    tx.recentBlockhash = blockhash.blockhash;
+    tx.lastValidBlockHeight = blockhash.lastValidBlockHeight;
+
+    const signedTx = await wallet.signTransaction(tx);
+    return sendAndConfirmRawTransaction(
+      provider.connection,
+      signedTx.serialize(),
+      options
+    );
+  };
+
+  return provider;
+}
+
 /**
  * LoyalPrivateTransactionsClient - SDK for interacting with the Telegram Private Transfer program
  * with MagicBlock PER (Private Ephemeral Rollups) support
@@ -109,8 +185,9 @@ export class LoyalPrivateTransactionsClient {
   static fromProvider(
     provider: AnchorProvider
   ): LoyalPrivateTransactionsClient {
-    const program = createProgram(provider);
     const wallet = InternalWalletAdapter.from(provider);
+    const patchedProvider = patchProviderForMagicRouter(provider, wallet);
+    const program = createProgram(patchedProvider);
     return new LoyalPrivateTransactionsClient(program, wallet);
   }
 
@@ -122,9 +199,12 @@ export class LoyalPrivateTransactionsClient {
     signer: WalletSigner
   ): LoyalPrivateTransactionsClient {
     const adapter = InternalWalletAdapter.from(signer);
-    const provider = new AnchorProvider(connection, adapter, {
-      commitment: "confirmed",
-    });
+    const provider = patchProviderForMagicRouter(
+      new AnchorProvider(connection, adapter, {
+        commitment: "confirmed",
+      }),
+      adapter
+    );
     const program = createProgram(provider);
     return new LoyalPrivateTransactionsClient(program, adapter);
   }
@@ -339,19 +419,30 @@ export class LoyalPrivateTransactionsClient {
     const [depositPda] = findDepositPda(user, tokenMint);
     const [permissionPda] = findPermissionPda(depositPda);
 
-    const signature = await this.program.methods
-      .createPermission()
-      .accountsPartial({
-        payer,
-        user,
-        deposit: depositPda,
-        permission: permissionPda,
-        permissionProgram: PERMISSION_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc(this.buildRpcOptions(rpcOptions));
+    if (await this.permissionAccountExists(permissionPda)) {
+      return "permission-exists";
+    }
 
-    return signature;
+    try {
+      const signature = await this.program.methods
+        .createPermission()
+        .accountsPartial({
+          payer,
+          user,
+          deposit: depositPda,
+          permission: permissionPda,
+          permissionProgram: PERMISSION_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc(this.buildRpcOptions(rpcOptions));
+
+      return signature;
+    } catch (err) {
+      if (this.isAccountAlreadyInUse(err)) {
+        return "permission-exists";
+      }
+      throw err;
+    }
   }
 
   /**
@@ -368,20 +459,31 @@ export class LoyalPrivateTransactionsClient {
     const [depositPda] = findUsernameDepositPda(username, tokenMint);
     const [permissionPda] = findPermissionPda(depositPda);
 
-    const signature = await this.program.methods
-      .createUsernamePermission()
-      .accountsPartial({
-        payer,
-        authority,
-        deposit: depositPda,
-        session,
-        permission: permissionPda,
-        permissionProgram: PERMISSION_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc(this.buildRpcOptions(rpcOptions));
+    if (await this.permissionAccountExists(permissionPda)) {
+      return "permission-exists";
+    }
 
-    return signature;
+    try {
+      const signature = await this.program.methods
+        .createUsernamePermission()
+        .accountsPartial({
+          payer,
+          authority,
+          deposit: depositPda,
+          session,
+          permission: permissionPda,
+          permissionProgram: PERMISSION_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc(this.buildRpcOptions(rpcOptions));
+
+      return signature;
+    } catch (err) {
+      if (this.isAccountAlreadyInUse(err)) {
+        return "permission-exists";
+      }
+      throw err;
+    }
   }
 
   // ============================================================
@@ -399,7 +501,7 @@ export class LoyalPrivateTransactionsClient {
     const [delegationRecordPda] = findDelegationRecordPda(depositPda);
     const [delegationMetadataPda] = findDelegationMetadataPda(depositPda);
 
-    const accounts: Record<string, PublicKey> = {
+    const accounts: Record<string, PublicKey | null> = {
       payer,
       bufferDeposit: bufferPda,
       delegationRecordDeposit: delegationRecordPda,
@@ -410,9 +512,7 @@ export class LoyalPrivateTransactionsClient {
       systemProgram: SystemProgram.programId,
     };
 
-    if (validator) {
-      accounts.validator = validator;
-    }
+    accounts.validator = validator ?? null;
 
     const signature = await this.program.methods
       .delegate(user, tokenMint)
@@ -438,7 +538,7 @@ export class LoyalPrivateTransactionsClient {
     const [delegationRecordPda] = findDelegationRecordPda(depositPda);
     const [delegationMetadataPda] = findDelegationMetadataPda(depositPda);
 
-    const accounts: Record<string, PublicKey> = {
+    const accounts: Record<string, PublicKey | null> = {
       payer,
       session,
       bufferDeposit: bufferPda,
@@ -450,9 +550,7 @@ export class LoyalPrivateTransactionsClient {
       systemProgram: SystemProgram.programId,
     };
 
-    if (validator) {
-      accounts.validator = validator;
-    }
+    accounts.validator = validator ?? null;
 
     const signature = await this.program.methods
       .delegateUsernameDeposit(username, tokenMint)
@@ -485,10 +583,7 @@ export class LoyalPrivateTransactionsClient {
       magicProgram,
       magicContext,
     };
-
-    if (sessionToken !== undefined) {
-      accounts.sessionToken = sessionToken;
-    }
+    accounts.sessionToken = sessionToken ?? null;
 
     const signature = await this.program.methods
       .undelegate()
@@ -561,10 +656,7 @@ export class LoyalPrivateTransactionsClient {
       tokenMint,
       systemProgram: SystemProgram.programId,
     };
-
-    if (sessionToken !== undefined) {
-      accounts.sessionToken = sessionToken;
-    }
+    accounts.sessionToken = sessionToken ?? null;
 
     const signature = await this.program.methods
       .transferDeposit(new BN(amount.toString()))
@@ -603,10 +695,7 @@ export class LoyalPrivateTransactionsClient {
       tokenMint,
       systemProgram: SystemProgram.programId,
     };
-
-    if (sessionToken !== undefined) {
-      accounts.sessionToken = sessionToken;
-    }
+    accounts.sessionToken = sessionToken ?? null;
 
     const signature = await this.program.methods
       .transferToUsernameDeposit(new BN(amount.toString()))
@@ -746,5 +835,27 @@ export class LoyalPrivateTransactionsClient {
       preflightCommitment: options?.preflightCommitment,
       maxRetries: options?.maxRetries,
     };
+  }
+
+  private async permissionAccountExists(permission: PublicKey): Promise<boolean> {
+    const info = await this.program.provider.connection.getAccountInfo(
+      permission
+    );
+    return !!info && info.owner.equals(PERMISSION_PROGRAM_ID);
+  }
+
+  private isAccountAlreadyInUse(error: unknown): boolean {
+    const message = (error as { message?: string })?.message ?? "";
+    if (message.includes("already in use")) {
+      return true;
+    }
+    const logs = (error as { logs?: string[]; transactionLogs?: string[] })
+      ?.logs ??
+      (error as { logs?: string[]; transactionLogs?: string[] })
+        ?.transactionLogs;
+    if (Array.isArray(logs)) {
+      return logs.some((log) => log.includes("already in use"));
+    }
+    return false;
   }
 }
