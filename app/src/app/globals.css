@@ -141,11 +141,11 @@
 [class*=" tgui"],
 [class*="AppRoot"],
 [class*="appRoot"] {
-  --tgui--bg_color: #000 !important;
-  --tg-theme-bg-color: #000 !important;
-  --tg-bg-color: #000 !important;
-  background: #000 !important;
-  background-color: #000 !important;
+  --tgui--bg_color: #fff !important;
+  --tg-theme-bg-color: #fff !important;
+  --tg-bg-color: #fff !important;
+  background: #fff !important;
+  background-color: #fff !important;
 }
 
 /* But allow modal content to have its own background */
@@ -172,8 +172,8 @@
 body[data-vaul-drawer-wrapper],
 html[data-vaul-drawer-wrapper],
 [vaul-drawer-wrapper] {
-  background: #000 !important;
-  background-color: #000 !important;
+  background: #fff !important;
+  background-color: #fff !important;
 }
 
 /* Make drawer container transparent so modal content shows through */
@@ -182,4 +182,10 @@ html[data-vaul-drawer-wrapper],
 [data-vaul-drawer-content] {
   background: transparent !important;
   background-color: transparent !important;
+}
+
+/* Caret blink animation for amount input */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }

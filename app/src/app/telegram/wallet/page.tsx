@@ -36,7 +36,11 @@ import SendSheet, {
   isValidSolanaAddress,
   isValidTelegramUsername,
 } from "@/components/wallet/SendSheet";
-import SwapSheet, { type SwapFormValues } from "@/components/wallet/SwapSheet";
+import SwapSheet, {
+  type SwapFormValues,
+  type SwapView,
+} from "@/components/wallet/SwapSheet";
+import TokensSheet from "@/components/wallet/TokensSheet";
 import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
 import { useSwap } from "@/hooks/useSwap";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
@@ -64,7 +68,11 @@ import {
   fetchTokenHoldings,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
-import { prepareStoreInitDataTxn, sendStoreInitDataTxn, verifyAndClaimDeposit } from "@/lib/solana/verify-and-claim-deposit";
+import {
+  prepareStoreInitDataTxn,
+  sendStoreInitDataTxn,
+  verifyAndClaimDeposit,
+} from "@/lib/solana/verify-and-claim-deposit";
 import {
   formatAddress,
   formatBalance,
@@ -103,7 +111,10 @@ import {
 import { parseUsernameFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
 import { openInvoice } from "@/lib/telegram/mini-app/invoice";
 import { openQrScanner } from "@/lib/telegram/mini-app/qr-code";
-import { createShareMessage, shareSavedInlineMessage } from "@/lib/telegram/mini-app/share-message";
+import {
+  createShareMessage,
+  shareSavedInlineMessage,
+} from "@/lib/telegram/mini-app/share-message";
 import { ensureTelegramTheme } from "@/lib/telegram/mini-app/theme";
 import type { TelegramDeposit } from "@/types/deposits";
 import type {
@@ -113,6 +124,205 @@ import type {
 } from "@/types/wallet";
 
 hashes.sha512 = sha512;
+
+// ─── Mock data for development ─────────────────────────────────────────────
+const USE_MOCK_DATA = false;
+
+const MOCK_WALLET_ADDRESS = "UQAt7f8Kq9xZ3mNpR2vL5wYcD4bJ6hTgSoAeWnFqZir";
+const MOCK_BALANCE_LAMPORTS = 1_267_476_540_000; // ~1267.47654 SOL
+const MOCK_SOL_PRICE_USD = 132.05;
+
+const MOCK_TOKEN_HOLDINGS: import("@/lib/solana/token-holdings").TokenHolding[] =
+  [
+    {
+      mint: "usdt",
+      symbol: "USDT",
+      name: "Tether USD",
+      balance: 1267,
+      decimals: 6,
+      priceUsd: 0.99,
+      valueUsd: 1254.33,
+      imageUrl: "/tokens/USDT.png",
+    },
+    {
+      mint: "sol",
+      symbol: "SOL",
+      name: "Solana",
+      balance: 1267,
+      decimals: 9,
+      priceUsd: 99.03,
+      valueUsd: 125470.01,
+      imageUrl: "/tokens/solana-sol-logo.png",
+    },
+    {
+      mint: "bnb",
+      symbol: "BNB",
+      name: "BNB",
+      balance: 1267,
+      decimals: 8,
+      priceUsd: 559.06,
+      valueUsd: 708328.02,
+      imageUrl: "/tokens/bnb-bnb-logo.png",
+    },
+    {
+      mint: "usdc",
+      symbol: "USDC",
+      name: "USD Coin",
+      balance: 1267,
+      decimals: 6,
+      priceUsd: 0.99,
+      valueUsd: 1254.33,
+      imageUrl: "/tokens/usd-coin-usdc-logo.png",
+    },
+    {
+      mint: "wbtc",
+      symbol: "WBTC",
+      name: "Wrapped Bitcoin",
+      balance: 1267,
+      decimals: 8,
+      priceUsd: 76375.83,
+      valueUsd: 96764126.61,
+      imageUrl: "/tokens/bitcoin-btc-logo.png",
+    },
+    {
+      mint: "avax",
+      symbol: "AVAX",
+      name: "Avalanche",
+      balance: 500,
+      decimals: 18,
+      priceUsd: 35.2,
+      valueUsd: 17600,
+      imageUrl: "/tokens/avalanche-avax-logo.png",
+    },
+  ];
+
+// Extended mock transaction info for activity display
+type MockActivityInfo = {
+  tokenSymbol: string;
+  tokenIcon: string;
+  displayAmount: string;
+  subtitle: string;
+  label: string;
+};
+
+const MOCK_ACTIVITY_INFO: Record<string, MockActivityInfo> = {
+  "mock-1": {
+    tokenSymbol: "SOL",
+    tokenIcon: "/tokens/solana-sol-logo.png",
+    displayAmount: "+0.25 SOL",
+    subtitle: "USDC to SOL",
+    label: "Swap",
+  },
+  "mock-2": {
+    tokenSymbol: "USDC",
+    tokenIcon: "/tokens/usd-coin-usdc-logo.png",
+    displayAmount: "+200.00 USDC",
+    subtitle: "from UQAt...qZir",
+    label: "Received",
+  },
+  "mock-3": {
+    tokenSymbol: "USDT",
+    tokenIcon: "/tokens/USDT.png",
+    displayAmount: "−0.5 USDT",
+    subtitle: "to UQAt...qZir",
+    label: "Sent",
+  },
+  "mock-4": {
+    tokenSymbol: "SOL",
+    tokenIcon: "/tokens/solana-sol-logo.png",
+    displayAmount: "−0.25 SOL",
+    subtitle: "by UQAt...qZir",
+    label: "To be claimed",
+  },
+  "mock-5": {
+    tokenSymbol: "BNB",
+    tokenIcon: "/tokens/bnb-bnb-logo.png",
+    displayAmount: "−0.5 BNB",
+    subtitle: "to UQAt...qZir",
+    label: "Sent",
+  },
+  "mock-6": {
+    tokenSymbol: "USDC",
+    tokenIcon: "/tokens/usd-coin-usdc-logo.png",
+    displayAmount: "+200.00 USDC",
+    subtitle: "from UQAt...qZir",
+    label: "Received",
+  },
+};
+
+const MOCK_WALLET_TRANSACTIONS: Transaction[] = [
+  {
+    id: "mock-1",
+    type: "incoming",
+    transferType: "swap",
+    amountLamports: 250_000_000,
+    sender: undefined,
+    recipient: undefined,
+    timestamp: Date.now() - 86400000 * 2,
+    status: "completed",
+    signature: "mock-sig-1",
+    swapFromSymbol: "USDC",
+    swapToSymbol: "SOL",
+    swapToAmount: 0.25,
+    swapToAmountUsd: 25.0,
+  },
+  {
+    id: "mock-2",
+    type: "incoming",
+    transferType: "transfer",
+    amountLamports: 500_000_000,
+    sender: "UQAt...qZir",
+    recipient: undefined,
+    timestamp: Date.now() - 3600000,
+    status: "completed",
+    signature: "mock-sig-2",
+  },
+  {
+    id: "mock-3",
+    type: "outgoing",
+    transferType: "transfer",
+    amountLamports: 500_000_000,
+    sender: undefined,
+    recipient: "UQAt...qZir",
+    timestamp: Date.now() - 86400000,
+    status: "completed",
+    signature: "mock-sig-3",
+  },
+  {
+    id: "mock-4",
+    type: "pending",
+    transferType: "deposit_for_username",
+    amountLamports: 250_000_000,
+    sender: undefined,
+    recipient: "UQAt...qZir",
+    timestamp: Date.now() - 86400000 * 2,
+    status: "pending",
+    signature: "mock-sig-4",
+  },
+  {
+    id: "mock-5",
+    type: "outgoing",
+    transferType: "transfer",
+    amountLamports: 500_000_000,
+    sender: undefined,
+    recipient: "UQAt...qZir",
+    timestamp: Date.now() - 86400000,
+    status: "completed",
+    signature: "mock-sig-5",
+  },
+  {
+    id: "mock-6",
+    type: "incoming",
+    transferType: "transfer",
+    amountLamports: 500_000_000,
+    sender: "UQAt...qZir",
+    recipient: undefined,
+    timestamp: Date.now() - 3600000,
+    status: "completed",
+    signature: "mock-sig-6",
+  },
+];
+// ─── End mock data ─────────────────────────────────────────────────────────
 
 const walletTransactionsCache = new Map<string, Transaction[]>();
 const walletBalanceCache = new Map<string, number>();
@@ -212,8 +422,7 @@ const mapDepositToIncomingTransaction = (
   deposit: TelegramDeposit
 ): IncomingTransaction => {
   const senderBase58 =
-    typeof (deposit.user as { toBase58?: () => string }).toBase58 ===
-    "function"
+    typeof (deposit.user as { toBase58?: () => string }).toBase58 === "function"
       ? deposit.user.toBase58()
       : String(deposit.user);
 
@@ -247,32 +456,49 @@ export default function Home() {
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
   const [isSwapSheetOpen, setSwapSheetOpen] = useState(false);
   const [swapActiveTab, setSwapActiveTab] = useState<"swap" | "secure">("swap");
-  const [swapView, setSwapView] = useState<"main" | "selectFrom" | "selectTo" | "selectSecure" | "result">("main");
+  const [swapView, setSwapView] = useState<SwapView>("main");
   const [swapError, setSwapError] = useState<string | null>(null);
-  const [swappedFromAmount, setSwappedFromAmount] = useState<number | undefined>(undefined);
-  const [swappedFromSymbol, setSwappedFromSymbol] = useState<string | undefined>(undefined);
-  const [swappedToAmount, setSwappedToAmount] = useState<number | undefined>(undefined);
-  const [swappedToSymbol, setSwappedToSymbol] = useState<string | undefined>(undefined);
-  const [swapFormValues, setSwapFormValues] = useState<SwapFormValues | null>(null);
+  const [swappedFromAmount, setSwappedFromAmount] = useState<
+    number | undefined
+  >(undefined);
+  const [swappedFromSymbol, setSwappedFromSymbol] = useState<
+    string | undefined
+  >(undefined);
+  const [swappedToAmount, setSwappedToAmount] = useState<number | undefined>(
+    undefined
+  );
+  const [swappedToSymbol, setSwappedToSymbol] = useState<string | undefined>(
+    undefined
+  );
+  const [swapFormValues, setSwapFormValues] = useState<SwapFormValues | null>(
+    null
+  );
   const [isSwapping, setIsSwapping] = useState(false);
-  const [sendStep, setSendStep] = useState<1 | 2 | 3 | 4>(1);
+  const [sendStep, setSendStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [sentAmountSol, setSentAmountSol] = useState<number | undefined>(
     undefined
   );
   const [sendError, setSendError] = useState<string | null>(null);
   const [isReceiveSheetOpen, setReceiveSheetOpen] = useState(false);
   const [isActivitySheetOpen, setActivitySheetOpen] = useState(false);
+  const [isTokensSheetOpen, setTokensSheetOpen] = useState(false);
   const [isTransactionDetailsSheetOpen, setTransactionDetailsSheetOpen] =
     useState(false);
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string | null>(
-    () => cachedWalletAddress
+  const [walletAddress, setWalletAddress] = useState<string | null>(() =>
+    USE_MOCK_DATA ? MOCK_WALLET_ADDRESS : cachedWalletAddress
   );
   const [balance, setBalance] = useState<number | null>(() =>
-    cachedWalletAddress ? getCachedWalletBalance(cachedWalletAddress) : null
+    USE_MOCK_DATA
+      ? MOCK_BALANCE_LAMPORTS
+      : cachedWalletAddress
+      ? getCachedWalletBalance(cachedWalletAddress)
+      : null
   );
-  const [tokenHoldings, setTokenHoldings] = useState<TokenHolding[]>([]);
+  const [tokenHoldings, setTokenHoldings] = useState<TokenHolding[]>(() =>
+    USE_MOCK_DATA ? MOCK_TOKEN_HOLDINGS : []
+  );
   const [starsBalance, setStarsBalance] = useState<number>(() =>
     cachedWalletAddress ? getCachedStarsBalance(cachedWalletAddress) ?? 0 : 0
   );
@@ -282,25 +508,34 @@ export default function Home() {
       getCachedStarsBalance(cachedWalletAddress) === null
   );
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
-  const [isLoading, setIsLoading] = useState(() => !hasCachedWalletData());
+  const [isLoading, setIsLoading] = useState(() =>
+    USE_MOCK_DATA ? false : !hasCachedWalletData()
+  );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
   const [incomingTransactions, setIncomingTransactions] = useState<
     IncomingTransaction[]
   >(() => {
-    const cached = cachedUsername ? getCachedIncomingTransactions(cachedUsername) ?? [] : [];
+    const cached = cachedUsername
+      ? getCachedIncomingTransactions(cachedUsername) ?? []
+      : [];
     return cached;
   });
   const [walletTransactions, setWalletTransactions] = useState<Transaction[]>(
     () =>
-      cachedWalletAddress
+      USE_MOCK_DATA
+        ? MOCK_WALLET_TRANSACTIONS
+        : cachedWalletAddress
         ? walletTransactionsCache.get(cachedWalletAddress) ?? []
         : []
   );
   const [isFetchingTransactions, setIsFetchingTransactions] = useState(false);
   const [isFetchingDeposits, setIsFetchingDeposits] = useState(() => {
+    if (USE_MOCK_DATA) return false;
     // Only show loading if we don't have cached deposits
-    return cachedUsername ? getCachedIncomingTransactions(cachedUsername) === null : true;
+    return cachedUsername
+      ? getCachedIncomingTransactions(cachedUsername) === null
+      : true;
   });
   const [selectedTransaction, setSelectedTransaction] =
     useState<TransactionDetailsData | null>(null);
@@ -324,10 +559,10 @@ export default function Home() {
   const [addressCopied, setAddressCopied] = useState(false);
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number | null>(() =>
-    getCachedSolPrice()
+    USE_MOCK_DATA ? MOCK_SOL_PRICE_USD : getCachedSolPrice()
   );
-  const [isSolPriceLoading, setIsSolPriceLoading] = useState(
-    () => getCachedSolPrice() === null
+  const [isSolPriceLoading, setIsSolPriceLoading] = useState(() =>
+    USE_MOCK_DATA ? false : getCachedSolPrice() === null
   );
   const [showConfetti, setShowConfetti] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
@@ -369,8 +604,6 @@ export default function Home() {
     }
     setReceiveSheetOpen(true);
   }, []);
-
-
   const handleTopUpStars = useCallback(async () => {
     if (isCreatingInvoice) return;
 
@@ -445,12 +678,13 @@ export default function Home() {
       setSelectedIncomingTransaction(null);
       // Convert to TransactionDetailsData format
       // For deposit_for_username transactions, the recipient is the username
-      const isDepositTransaction = transaction.transferType === "deposit_for_username";
+      const isDepositTransaction =
+        transaction.transferType === "deposit_for_username";
       const recipientUsername = transaction.recipient?.startsWith("@")
         ? transaction.recipient
         : isDepositTransaction && transaction.recipient
-          ? `@${transaction.recipient}`
-          : undefined;
+        ? `@${transaction.recipient}`
+        : undefined;
 
       const detailsData: TransactionDetailsData = {
         id: transaction.id,
@@ -469,6 +703,11 @@ export default function Home() {
         timestamp: transaction.timestamp,
         networkFeeLamports: transaction.networkFeeLamports,
         signature: transaction.signature,
+        // Swap transaction fields
+        swapFromSymbol: transaction.swapFromSymbol,
+        swapToSymbol: transaction.swapToSymbol,
+        swapToAmount: transaction.swapToAmount,
+        swapToAmountUsd: transaction.swapToAmountUsd,
       };
       setSelectedTransaction(detailsData);
       setTransactionDetailsSheetOpen(true);
@@ -538,7 +777,7 @@ export default function Home() {
     } finally {
       setIsSwapping(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [swapFormValues, isSwapFormValid, isSwapping, executeSwap]);
 
   const refreshWalletBalance = useCallback(
@@ -725,7 +964,6 @@ export default function Home() {
     setIsSendingTransaction(true);
 
     try {
-
       let signature: string | null = null;
 
       if (isValidSolanaAddress(trimmedRecipient)) {
@@ -754,22 +992,17 @@ export default function Home() {
       // Calculate and save the sent amount in SOL for the success screen
       const sentSolAmount = lamports / LAMPORTS_PER_SOL;
       setSentAmountSol(sentSolAmount);
-
-      // Transition to success step instead of closing
-      setSendStep(4);
     } catch (error) {
       console.error("Failed to send transaction", error);
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred("error");
       }
 
-      // Set error message and transition to step 4
       const errorMessage =
         error instanceof Error
           ? error.message
           : "Something went wrong. Please try again.";
       setSendError(errorMessage);
-      setSendStep(4);
     } finally {
       setIsSendingTransaction(false);
     }
@@ -817,30 +1050,33 @@ export default function Home() {
   }, []);
 
   // Handle canceling (refunding) a deposit_for_username transaction
-  const handleCancelDeposit = useCallback(async (username: string, amount: number) => {
-    try {
-      const provider = await getWalletProvider();
-      const transferProgram = getTelegramTransferProgram(provider);
-      await refundDeposit(provider, transferProgram, username, amount);
+  const handleCancelDeposit = useCallback(
+    async (username: string, amount: number) => {
+      try {
+        const provider = await getWalletProvider();
+        const transferProgram = getTelegramTransferProgram(provider);
+        await refundDeposit(provider, transferProgram, username, amount);
 
-      if (hapticFeedback.notificationOccurred.isAvailable()) {
-        hapticFeedback.notificationOccurred("success");
+        if (hapticFeedback.notificationOccurred.isAvailable()) {
+          hapticFeedback.notificationOccurred("success");
+        }
+
+        // Close the modal and refresh data
+        setTransactionDetailsSheetOpen(false);
+        setSelectedTransaction(null);
+
+        // Refresh balance and transactions
+        void getWalletBalance(true).then(setBalance);
+      } catch (error) {
+        console.error("Failed to refund deposit:", error);
+        if (hapticFeedback.notificationOccurred.isAvailable()) {
+          hapticFeedback.notificationOccurred("error");
+        }
+        throw error; // Re-throw so the sheet can handle it
       }
-
-      // Close the modal and refresh data
-      setTransactionDetailsSheetOpen(false);
-      setSelectedTransaction(null);
-
-      // Refresh balance and transactions
-      void getWalletBalance(true).then(setBalance);
-    } catch (error) {
-      console.error("Failed to refund deposit:", error);
-      if (hapticFeedback.notificationOccurred.isAvailable()) {
-        hapticFeedback.notificationOccurred("error");
-      }
-      throw error; // Re-throw so the sheet can handle it
-    }
-  }, []);
+    },
+    []
+  );
 
   const handleShareAddress = useCallback(async () => {
     try {
@@ -898,14 +1134,19 @@ export default function Home() {
 
   const handleShareDepositTransaction = useCallback(async () => {
     if (!selectedTransaction || !rawInitData || !solPriceUsd) {
-      console.error("Failed to share deposit transaction: missing required data");
+      console.error(
+        "Failed to share deposit transaction: missing required data"
+      );
       return;
     }
 
     // Get recipient username from transaction (remove @ prefix if present)
-    const recipientUsername = selectedTransaction.recipientUsername?.replace(/^@/, "") || "";
+    const recipientUsername =
+      selectedTransaction.recipientUsername?.replace(/^@/, "") || "";
     if (!recipientUsername) {
-      console.error("Failed to share deposit transaction: missing recipient username");
+      console.error(
+        "Failed to share deposit transaction: missing recipient username"
+      );
       return;
     }
 
@@ -1032,7 +1273,12 @@ export default function Home() {
         setIsClaimingTransaction(false);
       }
     },
-    [incomingTransactions, rawInitData, refreshWalletBalance, loadWalletTransactions]
+    [
+      incomingTransactions,
+      rawInitData,
+      refreshWalletBalance,
+      loadWalletTransactions,
+    ]
   );
 
   useEffect(() => {
@@ -1054,6 +1300,7 @@ export default function Home() {
   }, [rawInitData]);
 
   useEffect(() => {
+    if (USE_MOCK_DATA) return;
     let isMounted = true;
     let retryCount = 0;
     const MAX_RETRIES = 3;
@@ -1103,6 +1350,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (USE_MOCK_DATA) return;
     if (!rawInitData) {
       setIsFetchingDeposits(false);
       return;
@@ -1139,7 +1387,9 @@ export default function Home() {
           return;
         }
 
-        const mappedTransactions = deposits.map(mapDepositToIncomingTransaction);
+        const mappedTransactions = deposits.map(
+          mapDepositToIncomingTransaction
+        );
 
         setCachedIncomingTransactions(username, mappedTransactions);
         setIncomingTransactions(mappedTransactions);
@@ -1153,9 +1403,7 @@ export default function Home() {
             }
             const mapped = mapDepositToIncomingTransaction(deposit);
             setIncomingTransactions((prev) => {
-              const existingIndex = prev.findIndex(
-                (tx) => tx.id === mapped.id
-              );
+              const existingIndex = prev.findIndex((tx) => tx.id === mapped.id);
               let next: IncomingTransaction[];
               if (existingIndex >= 0) {
                 next = [...prev];
@@ -1286,6 +1534,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (USE_MOCK_DATA) return;
     if (ensuredWalletRef.current) return;
     ensuredWalletRef.current = true;
 
@@ -1324,11 +1573,13 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (USE_MOCK_DATA) return;
     if (!walletAddress) return;
     void loadWalletTransactions();
   }, [walletAddress, loadWalletTransactions]);
 
   useEffect(() => {
+    if (USE_MOCK_DATA) return;
     if (!walletAddress) return;
 
     let isCancelled = false;
@@ -1377,6 +1628,7 @@ export default function Home() {
 
   // Subscribe to websocket balance updates so inbound funds appear in real time
   useEffect(() => {
+    if (USE_MOCK_DATA) return;
     if (!walletAddress) return;
 
     let isCancelled = false;
@@ -1405,6 +1657,7 @@ export default function Home() {
 
   // Fetch token holdings
   useEffect(() => {
+    if (USE_MOCK_DATA) return;
     if (!walletAddress) return;
 
     let isMounted = true;
@@ -1429,6 +1682,7 @@ export default function Home() {
 
   // Refresh token holdings when balance changes (transaction completed)
   useEffect(() => {
+    if (USE_MOCK_DATA) return;
     if (!walletAddress || balance === null) return;
 
     // Debounce the refresh to avoid rapid refetches
@@ -1442,6 +1696,7 @@ export default function Home() {
   }, [balance, walletAddress]);
 
   useEffect(() => {
+    if (USE_MOCK_DATA) return;
     if (!walletAddress) return;
 
     let isCancelled = false;
@@ -1548,17 +1803,11 @@ export default function Home() {
       hideSecondaryButton();
 
       if (sendStep === 1) {
-        showMainButton({
-          text: "Next",
-          onClick: () => {
-            if (isSendFormValid) setSendStep(2);
-          },
-          isEnabled: isSendFormValid,
-          showLoader: false,
-        });
+        // Token selection — no main button, token click auto-advances
+        hideMainButton();
       } else if (sendStep === 2) {
         showMainButton({
-          text: "Review",
+          text: "Next",
           onClick: () => {
             if (isSendFormValid) setSendStep(3);
           },
@@ -1567,14 +1816,29 @@ export default function Home() {
         });
       } else if (sendStep === 3) {
         showMainButton({
-          text: "Confirm and Send",
-          onClick: handleSubmitSend,
-          isEnabled: isSendFormValid && !isSendingTransaction,
-          showLoader: isSendingTransaction,
+          text: "Review",
+          onClick: () => {
+            if (isSendFormValid) setSendStep(4);
+          },
+          isEnabled: isSendFormValid,
+          showLoader: false,
         });
       } else if (sendStep === 4) {
-        if (sendError) {
-          // Error step - show Done button to close
+        showMainButton({
+          text: "Confirm and Send",
+          onClick: () => {
+            setIsSendingTransaction(true); // Set loading state BEFORE showing result view
+            setSendStep(5);
+            handleSubmitSend();
+          },
+          isEnabled: isSendFormValid && !isSendingTransaction,
+          showLoader: false,
+        });
+      } else if (sendStep === 5) {
+        if (isSendingTransaction) {
+          // In-progress — hide button while spinner shows
+          hideMainButton();
+        } else if (sendError) {
           showMainButton({
             text: "Done",
             onClick: () => {
@@ -1584,15 +1848,20 @@ export default function Home() {
             showLoader: false,
           });
         } else {
-          // Success step - share the details of the transaction
           showMainButton({
             text: "Share transaction",
             onClick: async () => {
-              // Close send sheet and open transaction details
               setSendSheetOpen(false);
-              const recipientUsername = sendFormValues.recipient.trim().replace(/^@/, "");
+              const recipientUsername = sendFormValues.recipient
+                .trim()
+                .replace(/^@/, "");
 
-              if (sentAmountSol && recipientUsername && rawInitData && solPriceUsd) {
+              if (
+                sentAmountSol &&
+                recipientUsername &&
+                rawInitData &&
+                solPriceUsd
+              ) {
                 try {
                   const amountSol = sentAmountSol;
                   const amountUsd = amountSol * (solPriceUsd || 0);
@@ -1609,7 +1878,9 @@ export default function Home() {
                   console.error("Failed to share transaction", error);
                 }
               } else {
-                console.error("Failed to share transaction: missing required data");
+                console.error(
+                  "Failed to share transaction: missing required data"
+                );
               }
             },
             isEnabled: true,
@@ -1620,39 +1891,58 @@ export default function Home() {
     } else if (isSwapSheetOpen) {
       hideSecondaryButton();
       if (swapView === "result") {
-        // Result view - show Done button
+        if (isSwapping) {
+          // Swapping in progress - hide button
+          hideMainButton();
+        } else {
+          // Result view (success or error) - show Done button
+          showMainButton({
+            text: "Done",
+            onClick: () => {
+              hapticFeedback.impactOccurred("light");
+              setSwapSheetOpen(false);
+              // Reset swap state
+              setSwapView("main");
+              setSwapActiveTab("swap");
+              setSwapError(null);
+              setSwappedFromAmount(undefined);
+              setSwappedFromSymbol(undefined);
+              setSwappedToAmount(undefined);
+              setSwappedToSymbol(undefined);
+            },
+            isEnabled: true,
+            showLoader: false,
+          });
+        }
+      } else if (swapView === "confirm") {
+        // Confirm view - show "Confirm and Swap" button
         showMainButton({
-          text: "Done",
+          text: "Confirm and Swap",
           onClick: () => {
-            hapticFeedback.impactOccurred("light");
-            setSwapSheetOpen(false);
-            // Reset swap state
-            setSwapView("main");
-            setSwapActiveTab("swap");
-            setSwapError(null);
-            setSwappedFromAmount(undefined);
-            setSwappedFromSymbol(undefined);
-            setSwappedToAmount(undefined);
-            setSwappedToSymbol(undefined);
+            hapticFeedback.impactOccurred("medium");
+            setIsSwapping(true); // Set loading state BEFORE showing result view
+            setSwapView("result");
+            void handleSubmitSwap();
           },
-          isEnabled: true,
+          isEnabled: !isSwapping,
           showLoader: false,
         });
       } else if (swapView === "main") {
-        // Main view - show button based on active tab
-        const buttonText = swapActiveTab === "swap" ? "Confirm Swap" : "Secure";
+        // Main view - show "Review" button based on active tab
+        const buttonText = swapActiveTab === "swap" ? "Review" : "Secure";
         showMainButton({
           text: buttonText,
           onClick: () => {
             if (swapActiveTab === "swap") {
-              void handleSubmitSwap();
+              hapticFeedback.impactOccurred("light");
+              setSwapView("confirm");
             } else {
               // TODO: Implement secure transaction
               hapticFeedback.impactOccurred("medium");
             }
           },
           isEnabled: isSwapFormValid && !isSwapping,
-          showLoader: isSwapping,
+          showLoader: false,
         });
       } else {
         // Token selection views - hide main button
@@ -1791,7 +2081,6 @@ export default function Home() {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  
   // Track balance visibility for sticky pill
   useEffect(() => {
     const balanceElement = balanceRef.current;
@@ -1804,7 +2093,9 @@ export default function Home() {
       },
       {
         threshold: 0,
-        rootMargin: `-${Math.max(safeAreaInsetTop || 0, 12) + 15}px 0px 0px 0px`,
+        rootMargin: `-${
+          Math.max(safeAreaInsetTop || 0, 12) + 15
+        }px 0px 0px 0px`,
       }
     );
 
@@ -1837,31 +2128,37 @@ export default function Home() {
         />
       )}
       <main
-        className="min-h-screen text-white font-sans overflow-hidden relative flex flex-col"
-        style={{ background: "#000" }}
+        className="min-h-screen font-sans overflow-hidden relative flex flex-col"
+        style={{ background: "#fff" }}
       >
-        {/* Sticky Balance Pill */}
+        {/* Sticky Balance Pill — crossfades with logo in header */}
         <AnimatePresence>
           {showStickyBalance && !isLoading && (
             <motion.button
-              initial={{ opacity: 0, y: -20, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.9 }}
-              transition={{ duration: 0.2, ease: [0.34, 1.56, 0.64, 1] }}
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.7 }}
+              transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
               onClick={handleScrollToTop}
-              className="fixed left-1/2 -translate-x-1/2 z-50 flex items-center px-4 py-2 rounded-[54px] active:opacity-80 transition-opacity"
+              className="fixed left-1/2 -translate-x-1/2 z-[51] flex items-center px-4 py-1.5 rounded-[54px] active:opacity-80 transition-opacity"
               style={{
-                top: `${Math.max(safeAreaInsetTop || 0, 12) + 8}px`,
-                background: "rgba(255, 255, 255, 0.06)",
-                backdropFilter: "blur(20px)",
-                WebkitBackdropFilter: "blur(20px)",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+                top: `${Math.max(safeAreaInsetTop || 0, 12) + 4}px`,
+                background: "#fff",
               }}
             >
-              <span className="text-sm font-medium text-white" style={{ fontVariantNumeric: "tabular-nums" }}>
+              <span
+                className="text-sm font-medium text-black"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
                 {displayCurrency === "USD"
-                  ? `$${usdBalanceNumeric.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                  : `${solBalanceNumeric.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })} SOL`}
+                  ? `$${usdBalanceNumeric.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`
+                  : `${solBalanceNumeric.toLocaleString("en-US", {
+                      minimumFractionDigits: 4,
+                      maximumFractionDigits: 4,
+                    })} SOL`}
               </span>
             </motion.button>
           )}
@@ -1869,127 +2166,289 @@ export default function Home() {
 
         {/* Main Content */}
         <div className="relative flex-1 flex flex-col w-full">
-          {/* Balance Section */}
-          <div className="flex flex-col items-center pb-6 px-6 pt-5">
-            {/* Wallet Address */}
-            {isLoading || !walletAddress ? (
-              <div className="flex items-center gap-1">
-                <div className="w-4 h-4 bg-white/5 animate-pulse rounded" />
-                <div className="w-24 h-5 bg-white/5 animate-pulse rounded" />
-              </div>
-            ) : (
-              <button
-                onClick={() => {
-                  if (hapticFeedback.impactOccurred.isAvailable()) {
-                    hapticFeedback.impactOccurred("light");
-                  }
-                  if (walletAddress) {
-                    if (navigator?.clipboard?.writeText) {
-                      navigator.clipboard.writeText(walletAddress);
-                      setAddressCopied(true);
-                      setTimeout(() => setAddressCopied(false), 2000);
-                    }
-                    if (hapticFeedback.notificationOccurred.isAvailable()) {
-                      hapticFeedback.notificationOccurred("success");
-                    }
-                  }
+          {/* Balance Card */}
+          <div className="flex flex-col items-center pt-5 px-4">
+            <div
+              ref={balanceRef}
+              className="relative w-full overflow-hidden rounded-[26px]"
+              style={{
+                border: "2px solid rgba(255, 255, 255, 0.1)",
+                aspectRatio: "361 / 203",
+              }}
+            >
+              {/* Card background layers */}
+              <div
+                className="absolute inset-0 rounded-[26px]"
+                style={{ background: "#f2f2f7" }}
+              />
+              <Image
+                src="/bgs/balance-bg-02.png"
+                alt=""
+                fill
+                className="object-cover rounded-[26px]"
+                priority
+              />
+              {/* Inner shadow overlay */}
+              <div
+                className="absolute inset-0 rounded-[26px] pointer-events-none"
+                style={{
+                  boxShadow: "inset 0px 0px 36px 0px rgba(255, 255, 255, 0.4)",
                 }}
-                className="flex items-center gap-1 active:opacity-70 transition-opacity"
-              >
-                <Copy className="w-4 h-4 text-white/60" strokeWidth={1.5} />
-                <span className="text-base text-white/60 leading-5">
-                  {addressCopied ? "Copied!" : formatAddress(walletAddress)}
-                </span>
-              </button>
-            )}
+              />
 
-            {/* Balance Display */}
-            <div ref={balanceRef} className="flex flex-col items-center gap-1.5 mt-1.5">
-              <button
-                onClick={() => {
-                  if (hapticFeedback.selectionChanged.isAvailable()) {
-                    hapticFeedback.selectionChanged();
-                  }
-                  setDisplayCurrency((prev) => {
-                    const newCurrency = prev === "USD" ? "SOL" : "USD";
-                    cachedDisplayCurrency = newCurrency;
-                    void setCloudValue(DISPLAY_CURRENCY_KEY, newCurrency);
-                    return newCurrency;
-                  });
-                }}
-                className="active:scale-[0.98] transition-transform"
-              >
-                <div className="flex items-center gap-2">
-                  <NumberFlow
-                    value={
-                      displayCurrency === "USD"
-                        ? usdBalanceNumeric
-                        : solBalanceNumeric
-                    }
-                    format={{
-                      minimumFractionDigits: displayCurrency === "USD" ? 2 : 4,
-                      maximumFractionDigits: displayCurrency === "USD" ? 2 : 4,
+              {/* Card content */}
+              <div className="relative flex flex-col justify-between h-full p-4">
+                {/* Top: Wallet address */}
+                {isLoading || !walletAddress ? (
+                  <div className="flex items-center gap-1">
+                    <div className="w-4 h-4 bg-white/20 animate-pulse rounded" />
+                    <div className="w-24 h-5 bg-white/20 animate-pulse rounded" />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (hapticFeedback.impactOccurred.isAvailable()) {
+                        hapticFeedback.impactOccurred("light");
+                      }
+                      if (walletAddress) {
+                        if (navigator?.clipboard?.writeText) {
+                          navigator.clipboard.writeText(walletAddress);
+                          setAddressCopied(true);
+                          setTimeout(() => setAddressCopied(false), 2000);
+                        }
+                        if (hapticFeedback.notificationOccurred.isAvailable()) {
+                          hapticFeedback.notificationOccurred("success");
+                        }
+                      }
                     }}
-                    prefix={displayCurrency === "USD" ? "$" : undefined}
-                    suffix={displayCurrency === "SOL" ? " SOL" : undefined}
-                    className="text-[40px] font-semibold text-white [&::part(prefix)]:text-white/60 [&::part(suffix)]:text-white/60"
-                    style={{ fontVariantNumeric: "tabular-nums" }}
-                    transformTiming={{ duration: 500, easing: "ease-out" }}
-                    opacityTiming={{ duration: 300, easing: "ease-out" }}
-                  />
+                    className="flex items-center gap-1 active:opacity-70 transition-opacity self-start"
+                  >
+                    <Copy className="w-5 h-5 text-white" strokeWidth={1.5} />
+                    <span className="text-[17px] text-white leading-[22px]">
+                      {addressCopied ? "Copied!" : formatAddress(walletAddress)}
+                    </span>
+                  </button>
+                )}
+
+                {/* Bottom: Balance + USD value */}
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    onClick={() => {
+                      if (hapticFeedback.selectionChanged.isAvailable()) {
+                        hapticFeedback.selectionChanged();
+                      }
+                      setDisplayCurrency((prev) => {
+                        const newCurrency = prev === "USD" ? "SOL" : "USD";
+                        cachedDisplayCurrency = newCurrency;
+                        void setCloudValue(DISPLAY_CURRENCY_KEY, newCurrency);
+                        return newCurrency;
+                      });
+                    }}
+                    className="active:scale-[0.98] transition-transform self-start"
+                  >
+                    {(() => {
+                      const value =
+                        displayCurrency === "USD"
+                          ? usdBalanceNumeric
+                          : solBalanceNumeric;
+                      const decimals = displayCurrency === "USD" ? 2 : 5;
+                      const intPart = Math.trunc(value);
+                      const decimalDigits = Math.round(
+                        Math.abs(value - intPart) * Math.pow(10, decimals)
+                      );
+                      const prefix = displayCurrency === "USD" ? "$" : "";
+                      const suffix = displayCurrency === "SOL" ? " SOL" : "";
+                      return (
+                        <span
+                          className="font-semibold text-white inline-flex items-baseline"
+                          style={{
+                            fontVariantNumeric: "tabular-nums",
+                            lineHeight: "48px",
+                          }}
+                        >
+                          {prefix && (
+                            <span className="text-[40px]">{prefix}</span>
+                          )}
+                          <NumberFlow
+                            value={intPart}
+                            style={{ fontSize: "40px" }}
+                            format={{
+                              maximumFractionDigits: 0,
+                              useGrouping: true,
+                            }}
+                            willChange
+                          />
+                          <NumberFlow
+                            value={decimalDigits}
+                            prefix="."
+                            suffix={suffix}
+                            style={{ fontSize: "28px" }}
+                            format={{
+                              minimumIntegerDigits: decimals,
+                              useGrouping: false,
+                            }}
+                            willChange
+                          />
+                        </span>
+                      );
+                    })()}
+                  </button>
+
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="text-[17px] text-white leading-[22px]"
+                      style={{ fontVariantNumeric: "tabular-nums" }}
+                    >
+                      {displayCurrency === "USD"
+                        ? `${solBalanceNumeric.toLocaleString("en-US", {
+                            minimumFractionDigits: 4,
+                            maximumFractionDigits: 4,
+                          })} SOL`
+                        : `$${usdBalanceNumeric.toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}`}
+                    </span>
+                  </div>
                 </div>
-              </button>
-
-              {/* Secondary Amount */}
-              <div className="text-base text-white/60 leading-5">
-                <NumberFlow
-                  value={
-                    displayCurrency === "USD"
-                      ? solBalanceNumeric
-                      : usdBalanceNumeric
-                  }
-                  format={{
-                    minimumFractionDigits: displayCurrency === "USD" ? 4 : 2,
-                    maximumFractionDigits: displayCurrency === "USD" ? 4 : 2,
-                  }}
-                  prefix={displayCurrency === "SOL" ? "$" : undefined}
-                  suffix={displayCurrency === "USD" ? " SOL" : undefined}
-                  style={{ fontVariantNumeric: "tabular-nums" }}
-                  transformTiming={{ duration: 500, easing: "ease-out" }}
-                  opacityTiming={{ duration: 300, easing: "ease-out" }}
-                />
               </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 w-full px-6 mt-8">
-              <ActionButton
-                icon={<ArrowUp />}
-                label="Send"
-                onClick={() => handleOpenSendSheet()}
-                disabled={balance === null || balance === 0}
-              />
-              <ActionButton
-                icon={<ArrowDown />}
-                label="Receive"
-                onClick={handleOpenReceiveSheet}
-              />
-              <ActionButton
-                icon={<RefreshCcw />}
-                label="Swap"
-                onClick={() => {
-                  hapticFeedback.impactOccurred("light");
-                  setSwapSheetOpen(true);
-                }}
-              />
-              <ActionButton
-                icon={<ScanIcon />}
-                label={isMobilePlatform ? "Scan" : "Mobile only"}
-                onClick={handleScanQR}
-                disabled={!isMobilePlatform}
-              />
             </div>
           </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center px-4 pt-5 pb-4">
+            <ActionButton
+              icon={<ArrowUp />}
+              label="Send"
+              onClick={() => handleOpenSendSheet()}
+              disabled={balance === null || balance === 0}
+            />
+            <ActionButton
+              icon={<ArrowDown />}
+              label="Receive"
+              onClick={handleOpenReceiveSheet}
+            />
+            <ActionButton
+              icon={<RefreshCcw />}
+              label="Swap"
+              onClick={() => {
+                hapticFeedback.impactOccurred("light");
+                setSwapSheetOpen(true);
+              }}
+            />
+            <ActionButton
+              icon={<ScanIcon />}
+              label={isMobilePlatform ? "Scan" : "Mobile only"}
+              onClick={handleScanQR}
+              disabled={!isMobilePlatform}
+            />
+          </div>
+
+          {/* Tokens Section */}
+          {(() => {
+            const displayTokens =
+              tokenHoldings.length > 0
+                ? tokenHoldings
+                : [
+                    {
+                      mint: "SOL",
+                      symbol: "SOL",
+                      name: "Solana",
+                      balance: 0,
+                      decimals: 9,
+                      priceUsd: solPriceUsd,
+                      valueUsd: 0,
+                      imageUrl: "/tokens/solana-sol-logo.png",
+                    },
+                  ];
+            return (
+              <>
+                <div className="px-3 pt-3 pb-2">
+                  <p className="text-base font-medium text-black leading-5 tracking-[-0.176px]">
+                    Tokens
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 items-center px-4 pb-4">
+                  {displayTokens.slice(0, 5).map((token) => (
+                    <div
+                      key={token.mint}
+                      className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
+                      style={{ border: "2px solid #f2f2f7" }}
+                    >
+                      {/* Token icon */}
+                      <div className="py-1.5 pr-3">
+                        <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                          {token.imageUrl && (
+                            <Image
+                              src={token.imageUrl}
+                              alt={token.symbol}
+                              fill
+                              className="object-cover"
+                            />
+                          )}
+                        </div>
+                      </div>
+                      {/* Token info */}
+                      <div className="flex-1 flex flex-col py-2.5 min-w-0">
+                        <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px]">
+                          {token.symbol}
+                        </p>
+                        <p
+                          className="text-[15px] leading-5"
+                          style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                        >
+                          {token.priceUsd !== null
+                            ? `$${token.priceUsd.toLocaleString("en-US", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}`
+                            : "—"}
+                        </p>
+                      </div>
+                      {/* Token amount */}
+                      <div className="flex flex-col items-end py-2.5 pl-3">
+                        <p className="text-[17px] text-black leading-[22px] text-right">
+                          {token.balance.toLocaleString("en-US", {
+                            maximumFractionDigits: 4,
+                          })}
+                        </p>
+                        <p
+                          className="text-[15px] leading-5 text-right"
+                          style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                        >
+                          {token.valueUsd !== null
+                            ? `$${token.valueUsd.toLocaleString("en-US", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}`
+                            : "—"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Show All button */}
+                  {tokenHoldings.length > 5 && (
+                    <button
+                      onClick={() => {
+                        if (hapticFeedback.impactOccurred.isAvailable()) {
+                          hapticFeedback.impactOccurred("light");
+                        }
+                        setTokensSheetOpen(true);
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium leading-5"
+                      style={{
+                        background: "rgba(249, 54, 60, 0.14)",
+                        color: "#f9363c",
+                      }}
+                    >
+                      Show All
+                    </button>
+                  )}
+                </div>
+              </>
+            );
+          })()}
 
           {/* Activity Section - conditionally rendered */}
           {(() => {
@@ -2005,51 +2464,39 @@ export default function Home() {
             if (isActivityLoading) {
               return (
                 <>
-                  <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-                    <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
+                  <div className="px-3 pt-3 pb-2 flex items-center justify-between">
+                    <p className="text-base font-medium text-black leading-5 tracking-[-0.176px]">
                       Activity
                     </p>
                   </div>
                   <div className="flex-1 px-4 pb-4">
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col">
                       {/* Skeleton Transaction Card 1 */}
-                      <div
-                        className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
-                        style={{
-                          background: "rgba(255, 255, 255, 0.06)",
-                          mixBlendMode: "lighten",
-                        }}
-                      >
+                      <div className="flex items-center px-4 rounded-2xl overflow-hidden">
                         <div className="py-1.5 pr-3">
-                          <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
+                          <div className="w-12 h-12 rounded-full bg-black/5 animate-pulse" />
                         </div>
                         <div className="flex-1 py-2.5 flex flex-col gap-1.5">
-                          <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
-                          <div className="w-28 h-4 bg-white/5 animate-pulse rounded" />
+                          <div className="w-20 h-5 bg-black/5 animate-pulse rounded" />
+                          <div className="w-28 h-4 bg-black/5 animate-pulse rounded" />
                         </div>
                         <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
-                          <div className="w-16 h-5 bg-white/5 animate-pulse rounded" />
-                          <div className="w-12 h-4 bg-white/5 animate-pulse rounded" />
+                          <div className="w-16 h-5 bg-black/5 animate-pulse rounded" />
+                          <div className="w-12 h-4 bg-black/5 animate-pulse rounded" />
                         </div>
                       </div>
                       {/* Skeleton Transaction Card 2 */}
-                      <div
-                        className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
-                        style={{
-                          background: "rgba(255, 255, 255, 0.06)",
-                          mixBlendMode: "lighten",
-                        }}
-                      >
+                      <div className="flex items-center px-4 rounded-2xl overflow-hidden">
                         <div className="py-1.5 pr-3">
-                          <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
+                          <div className="w-12 h-12 rounded-full bg-black/5 animate-pulse" />
                         </div>
                         <div className="flex-1 py-2.5 flex flex-col gap-1.5">
-                          <div className="w-16 h-5 bg-white/5 animate-pulse rounded" />
-                          <div className="w-24 h-4 bg-white/5 animate-pulse rounded" />
+                          <div className="w-16 h-5 bg-black/5 animate-pulse rounded" />
+                          <div className="w-24 h-4 bg-black/5 animate-pulse rounded" />
                         </div>
                         <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
-                          <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
-                          <div className="w-14 h-4 bg-white/5 animate-pulse rounded" />
+                          <div className="w-20 h-5 bg-black/5 animate-pulse rounded" />
+                          <div className="w-14 h-4 bg-black/5 animate-pulse rounded" />
                         </div>
                       </div>
                     </div>
@@ -2063,21 +2510,24 @@ export default function Home() {
               return (
                 <div className="flex-1">
                   {/* Activity header */}
-                  <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-                    <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
+                  <div className="px-3 pt-3 pb-2 flex items-center justify-between">
+                    <p className="text-base font-medium text-black leading-5 tracking-[-0.176px]">
                       Activity
                     </p>
                   </div>
                   {/* Empty transactions state */}
-                  <div className="px-4 pb-4">
-                    <div
-                      className="flex items-center justify-center px-8 py-6 rounded-2xl"
-                      style={{
-                        background: "rgba(255, 255, 255, 0.03)",
-                        mixBlendMode: "lighten",
-                      }}
-                    >
-                      <p className="text-base text-white/60 leading-5 text-center">
+                  <div className="px-4 pb-36">
+                    <div className="flex flex-col gap-4 items-center justify-center px-8 py-6 rounded-[20px]">
+                      <Image
+                        src="/dogs/dog-cry.png"
+                        alt=""
+                        width={60}
+                        height={48}
+                      />
+                      <p
+                        className="text-[17px] leading-[22px] text-center"
+                        style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                      >
                         You don&apos;t have any transactions yet
                       </p>
                     </div>
@@ -2089,20 +2539,21 @@ export default function Home() {
             // Normal state with transactions
             return (
               <>
-                <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-                  <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
+                <div className="px-3 pt-3 pb-2 flex items-center justify-between">
+                  <p className="text-base font-medium text-black leading-5 tracking-[-0.176px]">
                     Activity
                   </p>
                   <button
                     onClick={handleOpenActivitySheet}
-                    className="flex items-center gap-0.5 text-[13px] text-white/60 leading-4 active:opacity-70 transition-opacity"
+                    className="flex items-center gap-0.5 text-[13px] leading-4 active:opacity-70 transition-opacity"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
                   >
                     All
                     <ChevronRight size={14} strokeWidth={1.5} />
                   </button>
                 </div>
-                <div className="flex-1 px-4 pb-4">
-                  <div className="flex flex-col gap-2 pb-36">
+                <div className="flex-1 pb-4">
+                  <div className="flex flex-col pb-36">
                     <AnimatePresence initial={false} mode="popLayout">
                       {limitedActivityItems.map((item) => {
                         const isNewTransaction = newTransactionIds.has(
@@ -2134,11 +2585,7 @@ export default function Home() {
                                   ease: [0.34, 1.56, 0.64, 1],
                                 },
                               }}
-                              className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full"
-                              style={{
-                                background: "rgba(255, 255, 255, 0.06)",
-                                mixBlendMode: "lighten",
-                              }}
+                              className="flex items-center px-4 rounded-2xl overflow-hidden w-full"
                             >
                               {/* Left - Icon */}
                               <div className="py-1.5 pr-3">
@@ -2158,20 +2605,28 @@ export default function Home() {
 
                               {/* Middle - Text */}
                               <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                                <p className="text-base text-white leading-5">
+                                <p className="text-base text-black leading-5">
                                   Receiving
                                 </p>
-                                <p className="text-[13px] text-white/60 leading-4">
-                                  {formatTransactionAmount(transaction.amountLamports)} SOL from {formatSenderAddress(transaction.sender)}
+                                <p
+                                  className="text-[13px] leading-4"
+                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                >
+                                  {formatTransactionAmount(
+                                    transaction.amountLamports
+                                  )}{" "}
+                                  SOL from{" "}
+                                  {formatSenderAddress(transaction.sender)}
                                 </p>
                               </div>
 
                               {/* Right - Claiming Badge with pulse animation */}
                               <div className="py-2.5 pl-3">
                                 <motion.div
-                                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-white leading-5"
+                                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm leading-5"
                                   style={{
-                                    background: "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
+                                    background: "rgba(50, 229, 94, 0.15)",
+                                    color: "#32e55e",
                                   }}
                                   animate={{ opacity: [1, 0.4, 1] }}
                                   transition={{
@@ -2191,6 +2646,11 @@ export default function Home() {
                         const transaction = item.transaction;
                         const isIncoming = transaction.type === "incoming";
                         const isPending = transaction.type === "pending";
+                        const mockInfo = USE_MOCK_DATA
+                          ? MOCK_ACTIVITY_INFO[transaction.id]
+                          : undefined;
+                        const isDepositForUsername =
+                          transaction.transferType === "deposit_for_username";
                         const transferTypeLabel =
                           transaction.transferType === "store"
                             ? "Store data"
@@ -2221,7 +2681,7 @@ export default function Home() {
                           ? "#32e55e"
                           : isPending
                           ? "#00b1fb"
-                          : "white";
+                          : "#000";
                         const timestamp = new Date(transaction.timestamp);
 
                         // Compact view for store/verify transactions
@@ -2255,21 +2715,23 @@ export default function Home() {
                                 handleOpenWalletTransactionDetails(transaction)
                               }
                               className="flex items-center py-2 px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                              style={{
-                                background: "rgba(255, 255, 255, 0.06)",
-                                mixBlendMode: "lighten",
-                              }}
                             >
                               {/* Left - Text */}
                               <div className="flex-1 flex items-center">
-                                <p className="text-sm text-white/60 leading-5">
+                                <p
+                                  className="text-sm leading-5"
+                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                >
                                   {transferTypeLabel}
                                 </p>
                               </div>
 
                               {/* Right - Date only */}
                               <div className="pl-3">
-                                <p className="text-[13px] text-white/40 leading-4">
+                                <p
+                                  className="text-[13px] leading-4"
+                                  style={{ color: "rgba(60, 60, 67, 0.4)" }}
+                                >
                                   {timestamp.toLocaleDateString("en-US", {
                                     month: "short",
                                     day: "numeric",
@@ -2311,71 +2773,98 @@ export default function Home() {
                             onClick={() =>
                               handleOpenWalletTransactionDetails(transaction)
                             }
-                            className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                            style={{
-                              background: "rgba(255, 255, 255, 0.06)",
-                              mixBlendMode: "lighten",
-                            }}
+                            className="flex items-center px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
                           >
                             {/* Left - Icon */}
                             <div className="py-1.5 pr-3">
-                              <div
-                                className="w-12 h-12 rounded-full flex items-center justify-center"
-                                style={{
-                                  background: isIncoming
-                                    ? "rgba(50, 229, 94, 0.15)"
-                                    : isPending
-                                    ? "rgba(0, 177, 251, 0.15)"
-                                    : "rgba(255, 255, 255, 0.06)",
-                                  mixBlendMode:
-                                    isIncoming || isPending
-                                      ? "normal"
-                                      : "lighten",
-                                }}
-                              >
-                                {isIncoming ? (
-                                  <ArrowDown
-                                    className="w-7 h-7"
-                                    strokeWidth={1.5}
-                                    style={{ color: "#32e55e" }}
+                              {isDepositForUsername ? (
+                                <div className="w-12 h-12 rounded-full overflow-hidden relative">
+                                  <Image
+                                    src="/loyal-shield.png"
+                                    alt="To be claimed"
+                                    fill
+                                    className="object-cover"
                                   />
-                                ) : isPending ? (
-                                  <Clock
-                                    className="w-7 h-7"
-                                    strokeWidth={1.5}
-                                    style={{ color: "#00b1fb" }}
+                                </div>
+                              ) : mockInfo ? (
+                                <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                                  <Image
+                                    src={mockInfo.tokenIcon}
+                                    alt={mockInfo.tokenSymbol}
+                                    fill
+                                    className="object-cover"
                                   />
-                                ) : (
-                                  <ArrowUp
-                                    className="w-7 h-7 text-white/60"
-                                    strokeWidth={1.5}
-                                  />
-                                )}
-                              </div>
+                                </div>
+                              ) : (
+                                <div
+                                  className="w-12 h-12 rounded-full flex items-center justify-center"
+                                  style={{
+                                    background: isIncoming
+                                      ? "rgba(50, 229, 94, 0.15)"
+                                      : isPending
+                                      ? "rgba(0, 177, 251, 0.15)"
+                                      : "rgba(0, 0, 0, 0.05)",
+                                  }}
+                                >
+                                  {isIncoming ? (
+                                    <ArrowDown
+                                      className="w-7 h-7"
+                                      strokeWidth={1.5}
+                                      style={{ color: "#32e55e" }}
+                                    />
+                                  ) : isPending ? (
+                                    <Clock
+                                      className="w-7 h-7"
+                                      strokeWidth={1.5}
+                                      style={{ color: "#00b1fb" }}
+                                    />
+                                  ) : (
+                                    <ArrowUp
+                                      className="w-7 h-7"
+                                      strokeWidth={1.5}
+                                      style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                    />
+                                  )}
+                                </div>
+                              )}
                             </div>
 
                             {/* Middle - Text */}
                             <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                              <p className="text-base text-white leading-5">
-                                {isIncoming
+                              <p className="text-base text-black leading-5">
+                                {mockInfo
+                                  ? mockInfo.label
+                                  : isIncoming
                                   ? "Received"
                                   : isPending
                                   ? "To be claimed"
                                   : "Sent"}
                               </p>
-                              {!(
-                                isPending === false &&
-                                !isIncoming &&
-                                isUnknownRecipient
-                              ) && (
-                                <p className="text-[13px] text-white/60 leading-4">
-                                  {isIncoming
-                                    ? "from"
-                                    : isPending
-                                    ? "by"
-                                    : "to"}{" "}
-                                  {formattedCounterparty}
+                              {mockInfo ? (
+                                <p
+                                  className="text-[13px] leading-4"
+                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                >
+                                  {mockInfo.subtitle}
                                 </p>
+                              ) : (
+                                !(
+                                  isPending === false &&
+                                  !isIncoming &&
+                                  isUnknownRecipient
+                                ) && (
+                                  <p
+                                    className="text-[13px] leading-4"
+                                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                  >
+                                    {isIncoming
+                                      ? "from"
+                                      : isPending
+                                      ? "by"
+                                      : "to"}{" "}
+                                    {formattedCounterparty}
+                                  </p>
+                                )
                               )}
                             </div>
 
@@ -2385,15 +2874,20 @@ export default function Home() {
                                 className="text-base leading-5"
                                 style={{ color: amountColor }}
                               >
-                                {amountPrefix}
-                                {isEffectivelyZero
-                                  ? "0"
-                                  : formatTransactionAmount(
-                                      transaction.amountLamports
-                                    )}{" "}
-                                SOL
+                                {mockInfo
+                                  ? mockInfo.displayAmount
+                                  : `${amountPrefix}${
+                                      isEffectivelyZero
+                                        ? "0"
+                                        : formatTransactionAmount(
+                                            transaction.amountLamports
+                                          )
+                                    } SOL`}
                               </p>
-                              <p className="text-[13px] text-white/60 leading-4">
+                              <p
+                                className="text-[13px] leading-4"
+                                style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                              >
                                 {timestamp.toLocaleDateString("en-US", {
                                   month: "short",
                                   day: "numeric",
@@ -2420,7 +2914,7 @@ export default function Home() {
         <div
           className="fixed bottom-0 left-0 right-0 h-32 z-40 pointer-events-none"
           style={{
-            background: "linear-gradient(to bottom, transparent, #000)",
+            background: "linear-gradient(to bottom, transparent, #fff)",
           }}
         />
       </main>
@@ -2428,7 +2922,6 @@ export default function Home() {
       <SendSheet
         open={isSendSheetOpen}
         onOpenChange={handleSendSheetChange}
-        trigger={null}
         initialRecipient={selectedRecipient}
         onValidationChange={handleSendValidationChange}
         onFormValuesChange={handleSendFormValuesChange}
@@ -2442,6 +2935,8 @@ export default function Home() {
         isSolPriceLoading={isSolPriceLoading}
         sentAmountSol={sentAmountSol}
         sendError={sendError}
+        isSending={isSendingTransaction}
+        tokenHoldings={tokenHoldings}
       />
       <SwapSheet
         open={isSwapSheetOpen}
@@ -2471,23 +2966,30 @@ export default function Home() {
         swappedFromSymbol={swappedFromSymbol}
         swappedToAmount={swappedToAmount}
         swappedToSymbol={swappedToSymbol}
+        isSwapping={isSwapping}
       />
       <ReceiveSheet
         open={isReceiveSheetOpen}
         onOpenChange={handleReceiveSheetChange}
-        trigger={null}
         walletAddress={walletAddress ?? undefined}
       />
       <TransactionDetailsSheet
         open={isTransactionDetailsSheetOpen}
         onOpenChange={handleTransactionDetailsSheetChange}
-        trigger={null}
         transaction={selectedTransaction}
         showSuccess={showClaimSuccess}
         showError={claimError}
         solPriceUsd={solPriceUsd}
-        onShare={selectedTransaction?.transferType === "deposit_for_username" ? handleShareDepositTransaction : undefined}
+        onShare={
+          selectedTransaction?.transferType === "deposit_for_username"
+            ? handleShareDepositTransaction
+            : undefined
+        }
         onCancelDeposit={handleCancelDeposit}
+        swapFromSymbol={selectedTransaction?.swapFromSymbol}
+        swapToSymbol={selectedTransaction?.swapToSymbol}
+        swapToAmount={selectedTransaction?.swapToAmount}
+        swapToAmountUsd={selectedTransaction?.swapToAmountUsd}
       />
       <ActivitySheet
         open={isActivitySheetOpen}
@@ -2500,6 +3002,11 @@ export default function Home() {
           (isFetchingTransactions && walletTransactions.length === 0) ||
           (isFetchingDeposits && incomingTransactions.length === 0)
         }
+      />
+      <TokensSheet
+        open={isTokensSheetOpen}
+        onOpenChange={setTokensSheetOpen}
+        tokenHoldings={tokenHoldings}
       />
     </>
   );
