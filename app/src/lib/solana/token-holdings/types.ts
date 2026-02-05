@@ -7,6 +7,7 @@ export type TokenHolding = {
   priceUsd: number | null;
   valueUsd: number | null;
   imageUrl: string | null;
+  isSecured?: boolean;
 };
 
 export type HeliusAsset = {

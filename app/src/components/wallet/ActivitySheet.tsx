@@ -430,6 +430,9 @@ export default function ActivitySheet({
                     const transaction = item.transaction;
                     const isIncoming = transaction.type === "incoming";
                     const isPending = transaction.type === "pending";
+                    const isSecureTransaction = transaction.transferType === "secure";
+                    const isUnshieldTransaction = transaction.transferType === "unshield";
+                    const isSecureOrUnshield = isSecureTransaction || isUnshieldTransaction;
                     const transferTypeLabel =
                       transaction.transferType === "store"
                         ? "Store data"
@@ -477,6 +480,74 @@ export default function ActivitySheet({
                                 day: "numeric",
                               })}
                               ,{" "}
+                              {timestamp.toLocaleTimeString([], {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    }
+
+                    // Secure/Unshield transaction view
+                    if (isSecureOrUnshield) {
+                      return (
+                        <button
+                          key={transaction.id}
+                          onClick={() => onTransactionClick(transaction)}
+                          className="flex items-center px-4 w-full text-left active:opacity-70 transition-opacity"
+                        >
+                          {/* Icon */}
+                          <div className="py-1.5 pr-3">
+                            <div className="w-12 h-12 relative">
+                              <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                                <Image
+                                  src={transaction.secureTokenIcon || "/tokens/solana-sol-logo.png"}
+                                  alt={transaction.secureTokenSymbol || "Token"}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              {isSecureTransaction && (
+                                <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
+                                  <Image
+                                    src="/Shield.svg"
+                                    alt="Shield"
+                                    width={20}
+                                    height={20}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Text */}
+                          <div className="flex-1 py-2.5 flex flex-col gap-0.5 min-w-0">
+                            <p className="text-base text-black leading-5">
+                              {isSecureTransaction ? "Secure" : "Unshield"}
+                            </p>
+                            <p
+                              className="text-[13px] leading-4 truncate"
+                              style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                            >
+                              {transaction.secureTokenSymbol || "Token"}
+                            </p>
+                          </div>
+
+                          {/* Amount + Time */}
+                          <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3 shrink-0">
+                            <p
+                              className="text-base leading-5 text-black"
+                            >
+                              {transaction.secureAmount
+                                ? `${transaction.secureAmount.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${transaction.secureTokenSymbol || ""}`
+                                : `${formatTransactionAmount(transaction.amountLamports)} SOL`}
+                            </p>
+                            <p
+                              className="text-[13px] leading-4"
+                              style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                            >
                               {timestamp.toLocaleTimeString([], {
                                 hour: "numeric",
                                 minute: "2-digit",

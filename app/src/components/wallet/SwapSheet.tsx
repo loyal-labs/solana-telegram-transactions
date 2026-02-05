@@ -41,6 +41,7 @@ export type Token = {
   balance: number;
   priceUsd: number;
   mint?: string;
+  isSecured?: boolean;
 };
 
 // Helpers
@@ -112,6 +113,7 @@ function holdingToToken(holding: TokenHolding): Token {
     balance: holding.balance,
     priceUsd: holding.priceUsd ?? 0,
     mint: holding.mint,
+    isSecured: holding.isSecured,
   };
 }
 
@@ -1398,8 +1400,15 @@ export default function SwapSheet({
                   className="w-full flex items-center px-4 active:bg-black/[0.03] transition-colors"
                 >
                   <div className="py-1.5 pr-3">
-                    <div className="w-12 h-12 rounded-full overflow-hidden bg-[#f2f2f7]">
-                      <Image src={token.icon} alt={token.symbol} width={48} height={48} />
+                    <div className="w-12 h-12 relative">
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-[#f2f2f7]">
+                        <Image src={token.icon} alt={token.symbol} width={48} height={48} />
+                      </div>
+                      {token.isSecured && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
+                          <Image src="/Shield.svg" alt="Secured" width={20} height={20} />
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex-1 flex flex-col gap-0.5 py-2.5">
@@ -1472,8 +1481,15 @@ export default function SwapSheet({
                   className="w-full flex items-center px-4 active:bg-black/[0.03] transition-colors"
                 >
                   <div className="py-1.5 pr-3">
-                    <div className="w-12 h-12 rounded-full overflow-hidden bg-[#f2f2f7]">
-                      <Image src={token.icon} alt={token.symbol} width={48} height={48} />
+                    <div className="w-12 h-12 relative">
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-[#f2f2f7]">
+                        <Image src={token.icon} alt={token.symbol} width={48} height={48} />
+                      </div>
+                      {token.isSecured && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
+                          <Image src="/Shield.svg" alt="Secured" width={20} height={20} />
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex-1 flex flex-col gap-0.5 py-2.5">
