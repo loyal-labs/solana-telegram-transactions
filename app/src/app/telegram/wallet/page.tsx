@@ -250,14 +250,18 @@ const MOCK_ACTIVITY_INFO: Record<string, MockActivityInfo> = {
 const MOCK_WALLET_TRANSACTIONS: Transaction[] = [
   {
     id: "mock-1",
-    type: "outgoing",
-    transferType: "transfer",
+    type: "incoming",
+    transferType: "swap",
     amountLamports: 250_000_000,
     sender: undefined,
-    recipient: "UQAt...qZir",
+    recipient: undefined,
     timestamp: Date.now() - 86400000 * 2,
     status: "completed",
     signature: "mock-sig-1",
+    swapFromSymbol: "USDC",
+    swapToSymbol: "SOL",
+    swapToAmount: 0.25,
+    swapToAmountUsd: 25.0,
   },
   {
     id: "mock-2",
@@ -697,6 +701,11 @@ export default function Home() {
         timestamp: transaction.timestamp,
         networkFeeLamports: transaction.networkFeeLamports,
         signature: transaction.signature,
+        // Swap transaction fields
+        swapFromSymbol: transaction.swapFromSymbol,
+        swapToSymbol: transaction.swapToSymbol,
+        swapToAmount: transaction.swapToAmount,
+        swapToAmountUsd: transaction.swapToAmountUsd,
       };
       setSelectedTransaction(detailsData);
       setTransactionDetailsSheetOpen(true);
@@ -2636,6 +2645,8 @@ export default function Home() {
                         const mockInfo = USE_MOCK_DATA
                           ? MOCK_ACTIVITY_INFO[transaction.id]
                           : undefined;
+                        const isDepositForUsername =
+                          transaction.transferType === "deposit_for_username";
                         const transferTypeLabel =
                           transaction.transferType === "store"
                             ? "Store data"
@@ -2762,7 +2773,16 @@ export default function Home() {
                           >
                             {/* Left - Icon */}
                             <div className="py-1.5 pr-3">
-                              {mockInfo ? (
+                              {isDepositForUsername ? (
+                                <div className="w-12 h-12 rounded-full overflow-hidden relative">
+                                  <Image
+                                    src="/loyal-shield.png"
+                                    alt="To be claimed"
+                                    fill
+                                    className="object-cover"
+                                  />
+                                </div>
+                              ) : mockInfo ? (
                                 <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
                                   <Image
                                     src={mockInfo.tokenIcon}
@@ -2962,6 +2982,10 @@ export default function Home() {
             : undefined
         }
         onCancelDeposit={handleCancelDeposit}
+        swapFromSymbol={selectedTransaction?.swapFromSymbol}
+        swapToSymbol={selectedTransaction?.swapToSymbol}
+        swapToAmount={selectedTransaction?.swapToAmount}
+        swapToAmountUsd={selectedTransaction?.swapToAmountUsd}
       />
       <ActivitySheet
         open={isActivitySheetOpen}

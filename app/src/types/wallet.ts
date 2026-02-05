@@ -18,6 +18,11 @@ export type Transaction = {
   // For outgoing transactions
   recipient?: string;
   timestamp: number;
+  // For swap transactions
+  swapFromSymbol?: string;
+  swapToSymbol?: string;
+  swapToAmount?: number;
+  swapToAmountUsd?: number;
 };
 
 // Legacy type for internal use - will be removed
@@ -47,4 +52,9 @@ export type TransactionDetailsData = {
   networkFeeLamports?: number;
   comment?: string;
   signature?: string; // Transaction signature for explorer link
+  // For swap transactions
+  swapFromSymbol?: string;
+  swapToSymbol?: string;
+  swapToAmount?: number;
+  swapToAmountUsd?: number;
 };

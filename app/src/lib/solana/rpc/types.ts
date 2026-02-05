@@ -10,7 +10,8 @@ export type WalletTransfer = {
     | "verify_telegram_init_data"
     | "store"
     | "claim_deposit"
-    | "deposit_for_username";
+    | "deposit_for_username"
+    | "swap";
   amountLamports: number;
   netChangeLamports: number;
   feeLamports: number;
