@@ -184,6 +184,15 @@ html[data-vaul-drawer-wrapper],
   background-color: transparent !important;
 }
 
+/* Hide scrollbar utility */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Caret blink animation for amount input */
 @keyframes blink {
   0%, 100% { opacity: 1; }

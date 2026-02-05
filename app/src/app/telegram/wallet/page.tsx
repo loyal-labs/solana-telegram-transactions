@@ -18,6 +18,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDown,
   ArrowUp,
+  Brush,
   ChevronRight,
   Copy,
   RefreshCcw,
@@ -29,6 +30,7 @@ import Confetti from "react-confetti";
 import { ScanIcon } from "@/components/ui/icons/ScanIcon";
 import { ActionButton } from "@/components/wallet/ActionButton";
 import ActivitySheet from "@/components/wallet/ActivitySheet";
+import BalanceBackgroundPicker from "@/components/wallet/BalanceBackgroundPicker";
 import ReceiveSheet from "@/components/wallet/ReceiveSheet";
 import SendSheet, {
   addRecentRecipient,
@@ -44,6 +46,7 @@ import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet
 import { useSwap } from "@/hooks/useSwap";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
+  BALANCE_BG_KEY,
   DISPLAY_CURRENCY_KEY,
   SOL_PRICE_USD,
   TELEGRAM_BOT_ID,
@@ -439,6 +442,9 @@ let cachedWalletAddress: string | null = null;
 // Display currency preference cache
 let cachedDisplayCurrency: "USD" | "SOL" | null = null;
 
+// Balance background preference cache
+let cachedBalanceBg: string | null | undefined = undefined; // undefined = not loaded yet
+
 // Check if we have enough cached data to skip loading
 const hasCachedWalletData = (): boolean => {
   if (!cachedWalletAddress) return false;
@@ -555,6 +561,11 @@ export default function Home() {
   const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">(
     () => cachedDisplayCurrency ?? "USD"
   );
+  const [balanceBg, setBalanceBg] = useState<string | null>(
+    () => cachedBalanceBg !== undefined ? cachedBalanceBg : null
+  );
+  const [bgLoaded, setBgLoaded] = useState(() => cachedBalanceBg !== undefined);
+  const [isBgPickerOpen, setBgPickerOpen] = useState(false);
   const [addressCopied, setAddressCopied] = useState(false);
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
   const [solPriceUsd, setSolPriceUsd] = useState<number | null>(() =>
@@ -1032,6 +1043,12 @@ export default function Home() {
       hapticFeedback.impactOccurred("light");
     }
     setActivitySheetOpen(open);
+  }, []);
+
+  const handleBgSelect = useCallback((bg: string | null) => {
+    setBalanceBg(bg);
+    cachedBalanceBg = bg;
+    void setCloudValue(BALANCE_BG_KEY, bg ?? "none");
   }, []);
 
   const handleTransactionDetailsSheetChange = useCallback((open: boolean) => {
@@ -1532,6 +1549,31 @@ export default function Home() {
     })();
   }, []);
 
+  // Load balance background preference from cloud storage
+  useEffect(() => {
+    if (cachedBalanceBg !== undefined) return; // Already loaded from cache
+
+    void (async () => {
+      try {
+        const stored = await getCloudValue(BALANCE_BG_KEY);
+        if (typeof stored === "string" && stored.length > 0) {
+          const bg = stored === "none" ? null : stored;
+          cachedBalanceBg = bg;
+          setBalanceBg(bg);
+        } else {
+          cachedBalanceBg = "balance-bg-01";
+          setBalanceBg("balance-bg-01");
+        }
+      } catch (error) {
+        console.error("Failed to load balance background preference", error);
+        cachedBalanceBg = "balance-bg-01";
+        setBalanceBg("balance-bg-01");
+      } finally {
+        setBgLoaded(true);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     if (USE_MOCK_DATA) return;
     if (ensuredWalletRef.current) return;
@@ -1759,6 +1801,14 @@ export default function Home() {
       };
     }
 
+    // Bg picker manages its own main button
+    if (isBgPickerOpen) {
+      return () => {
+        hideMainButton();
+        hideSecondaryButton();
+      };
+    }
+
     if (isTransactionDetailsSheetOpen && selectedTransaction) {
       hideSecondaryButton();
 
@@ -1964,6 +2014,7 @@ export default function Home() {
     isSendSheetOpen,
     isSwapSheetOpen,
     isReceiveSheetOpen,
+    isBgPickerOpen,
     isSendFormValid,
     isSwapFormValid,
     isSendingTransaction,
@@ -2180,13 +2231,21 @@ export default function Home() {
                 className="absolute inset-0 rounded-[26px]"
                 style={{ background: "#f2f2f7" }}
               />
-              <Image
-                src="/bgs/balance-bg-02.png"
-                alt=""
-                fill
-                className="object-cover rounded-[26px]"
-                priority
-              />
+              {!bgLoaded && (
+                <div
+                  className="absolute inset-0 rounded-[26px] animate-pulse"
+                  style={{ background: "rgba(0, 0, 0, 0.04)" }}
+                />
+              )}
+              {balanceBg && (
+                <Image
+                  src={`/bgs/${balanceBg}.png`}
+                  alt=""
+                  fill
+                  className="object-cover rounded-[26px]"
+                  priority
+                />
+              )}
               {/* Inner shadow overlay */}
               <div
                 className="absolute inset-0 rounded-[26px] pointer-events-none"
@@ -2222,8 +2281,15 @@ export default function Home() {
                     }}
                     className="flex items-center gap-1 active:opacity-70 transition-opacity self-start"
                   >
-                    <Copy className="w-5 h-5 text-white" strokeWidth={1.5} />
-                    <span className="text-[17px] text-white leading-[22px]">
+                    <Copy
+                      className="w-5 h-5"
+                      strokeWidth={1.5}
+                      style={{ color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)" }}
+                    />
+                    <span
+                      className="text-[17px] leading-[22px]"
+                      style={{ color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)" }}
+                    >
                       {addressCopied ? "Copied!" : formatAddress(walletAddress)}
                     </span>
                   </button>
@@ -2257,12 +2323,15 @@ export default function Home() {
                       );
                       const prefix = displayCurrency === "USD" ? "$" : "";
                       const suffix = displayCurrency === "SOL" ? " SOL" : "";
+                      const mainColor = balanceBg ? "white" : "#1c1c1e";
+                      const decimalColor = balanceBg ? "white" : "rgba(60, 60, 67, 0.6)";
                       return (
                         <span
-                          className="font-semibold text-white inline-flex items-baseline"
+                          className="font-semibold inline-flex items-baseline"
                           style={{
                             fontVariantNumeric: "tabular-nums",
                             lineHeight: "48px",
+                            color: mainColor,
                           }}
                         >
                           {prefix && (
@@ -2281,7 +2350,7 @@ export default function Home() {
                             value={decimalDigits}
                             prefix="."
                             suffix={suffix}
-                            style={{ fontSize: "28px" }}
+                            style={{ fontSize: "28px", color: decimalColor }}
                             format={{
                               minimumIntegerDigits: decimals,
                               useGrouping: false,
@@ -2295,8 +2364,11 @@ export default function Home() {
 
                   <div className="flex items-center gap-1.5">
                     <span
-                      className="text-[17px] text-white leading-[22px]"
-                      style={{ fontVariantNumeric: "tabular-nums" }}
+                      className="text-[17px] leading-[22px]"
+                      style={{
+                        fontVariantNumeric: "tabular-nums",
+                        color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
+                      }}
                     >
                       {displayCurrency === "USD"
                         ? `${solBalanceNumeric.toLocaleString("en-US", {
@@ -2310,6 +2382,26 @@ export default function Home() {
                     </span>
                   </div>
                 </div>
+
+                {/* Brush icon for background picker */}
+                {bgLoaded && (
+                  <button
+                    onClick={() => {
+                      if (hapticFeedback.impactOccurred.isAvailable()) {
+                        hapticFeedback.impactOccurred("light");
+                      }
+                      setBgPickerOpen(true);
+                    }}
+                    className="absolute bottom-4 right-4 p-2 rounded-full backdrop-blur-[8px] active:opacity-70 transition-opacity"
+                    style={{ background: balanceBg ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.05)" }}
+                  >
+                    <Brush
+                      size={20}
+                      strokeWidth={1.5}
+                      style={{ color: balanceBg ? "rgba(255, 255, 255, 0.6)" : "rgba(60, 60, 67, 0.6)" }}
+                    />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -2985,6 +3077,70 @@ export default function Home() {
         onOpenChange={setTokensSheetOpen}
         tokenHoldings={tokenHoldings}
       />
+      <BalanceBackgroundPicker
+        open={isBgPickerOpen}
+        onOpenChange={setBgPickerOpen}
+        selectedBg={balanceBg}
+        onSelect={handleBgSelect}
+      >
+        {(previewBg) => {
+          const mainColor = previewBg ? "white" : "#1c1c1e";
+          const decimalColor = previewBg ? "white" : "rgba(60, 60, 67, 0.6)";
+          const value =
+            displayCurrency === "USD" ? usdBalanceNumeric : solBalanceNumeric;
+          const decimals = displayCurrency === "USD" ? 2 : 4;
+          const prefix = displayCurrency === "USD" ? "$" : "";
+          const suffix = displayCurrency === "SOL" ? " SOL" : "";
+          const intPart = Math.floor(value);
+          const decimalDigits = Math.round(
+            Math.abs(value - intPart) * Math.pow(10, decimals),
+          );
+          const decimalStr = String(decimalDigits).padStart(decimals, "0");
+          return (
+            <>
+              <div className="flex items-center gap-1">
+                <Copy className="w-5 h-5" strokeWidth={1.5} style={{ color: decimalColor }} />
+                <span className="text-[17px] leading-[22px]" style={{ color: decimalColor }}>
+                  {walletAddress ? formatAddress(walletAddress) : "Loading..."}
+                </span>
+              </div>
+              <div className="flex-1" />
+              <div className="flex flex-col gap-1.5">
+                <span
+                  className="font-semibold inline-flex items-baseline"
+                  style={{
+                    fontVariantNumeric: "tabular-nums",
+                    lineHeight: "48px",
+                    color: mainColor,
+                  }}
+                >
+                  {prefix && <span className="text-[40px]">{prefix}</span>}
+                  <span className="text-[40px]">
+                    {intPart.toLocaleString("en-US")}
+                  </span>
+                  <span className="text-[28px]" style={{ color: decimalColor }}>
+                    .{decimalStr}{suffix}
+                  </span>
+                </span>
+                <span
+                  className="text-[17px] leading-[22px]"
+                  style={{ fontVariantNumeric: "tabular-nums", color: decimalColor }}
+                >
+                  {displayCurrency === "USD"
+                    ? `${solBalanceNumeric.toLocaleString("en-US", {
+                        minimumFractionDigits: 4,
+                        maximumFractionDigits: 4,
+                      })} SOL`
+                    : `$${usdBalanceNumeric.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`}
+                </span>
+              </div>
+            </>
+          );
+        }}
+      </BalanceBackgroundPicker>
     </>
   );
 }
