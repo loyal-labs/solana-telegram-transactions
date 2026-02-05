@@ -37,6 +37,7 @@ import SendSheet, {
   isValidTelegramUsername,
 } from "@/components/wallet/SendSheet";
 import SwapSheet, {
+  type SecureFormValues,
   type SwapFormValues,
   type SwapView,
 } from "@/components/wallet/SwapSheet";
@@ -477,6 +478,11 @@ export default function Home() {
   const [swapFormValues, setSwapFormValues] = useState<SwapFormValues | null>(
     null
   );
+  const [secureFormValues, setSecureFormValues] =
+    useState<SecureFormValues | null>(null);
+  const [secureDirection, setSecureDirection] = useState<"shield" | "unshield">(
+    "shield"
+  );
   const [isSwapping, setIsSwapping] = useState(false);
   const [sendStep, setSendStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [sentAmountSol, setSentAmountSol] = useState<number | undefined>(
@@ -753,6 +759,11 @@ export default function Home() {
     setSwapFormValues(params);
   }, []);
 
+  const handleSecureParamsChange = useCallback((params: SecureFormValues) => {
+    setSecureFormValues(params);
+    setSecureDirection(params.direction);
+  }, []);
+
   const { executeSwap } = useSwap(getWalletKeypair);
 
   const handleSubmitSwap = useCallback(async () => {
@@ -788,6 +799,34 @@ export default function Home() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [swapFormValues, isSwapFormValid, isSwapping, executeSwap]);
+
+  const handleSubmitSecure = useCallback(async () => {
+    if (!secureFormValues || !isSwapFormValid || isSwapping) return;
+
+    setIsSwapping(true);
+    hapticFeedback.impactOccurred("medium");
+
+    try {
+      // TODO: Implement actual secure/unshield transaction
+      // For now, simulate success after a delay
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      setSwappedToAmount(secureFormValues.amount);
+      setSwappedToSymbol(secureFormValues.symbol);
+      setSwapError(null);
+      setSwapView("result");
+      void refreshWalletBalance(true);
+    } catch (error) {
+      console.error("[secure] Error:", error);
+      setSwapError(
+        error instanceof Error ? error.message : "Operation failed"
+      );
+      setSwapView("result");
+    } finally {
+      setIsSwapping(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secureFormValues, isSwapFormValid, isSwapping]);
 
   const refreshWalletBalance = useCallback(
     async (forceRefresh = false) => {
@@ -1976,22 +2015,33 @@ export default function Home() {
           showLoader: false,
         });
       } else if (swapView === "main") {
-        // Main view - show "Review" button based on active tab
-        const buttonText = swapActiveTab === "swap" ? "Review" : "Secure";
-        showMainButton({
-          text: buttonText,
-          onClick: () => {
-            if (swapActiveTab === "swap") {
+        if (swapActiveTab === "swap") {
+          showMainButton({
+            text: "Review",
+            onClick: () => {
               hapticFeedback.impactOccurred("light");
               setSwapView("confirm");
-            } else {
-              // TODO: Implement secure transaction
+            },
+            isEnabled: isSwapFormValid && !isSwapping,
+            showLoader: false,
+          });
+        } else {
+          const btnText =
+            secureDirection === "shield"
+              ? "Confirm and Shield"
+              : "Confirm and Unshield";
+          showMainButton({
+            text: btnText,
+            onClick: () => {
               hapticFeedback.impactOccurred("medium");
-            }
-          },
-          isEnabled: isSwapFormValid && !isSwapping,
-          showLoader: false,
-        });
+              setIsSwapping(true);
+              setSwapView("result");
+              void handleSubmitSecure();
+            },
+            isEnabled: isSwapFormValid && !isSwapping,
+            showLoader: false,
+          });
+        }
       } else {
         // Token selection views - hide main button
         hideMainButton();
@@ -2038,6 +2088,8 @@ export default function Home() {
     swapView,
     swapActiveTab,
     handleSubmitSwap,
+    handleSubmitSecure,
+    secureDirection,
     isSwapping,
   ]);
 
@@ -3025,14 +3077,19 @@ export default function Home() {
             setSwappedFromSymbol(undefined);
             setSwappedToAmount(undefined);
             setSwappedToSymbol(undefined);
+            setSecureDirection("shield");
+            setSecureFormValues(null);
           }
         }}
         tokenHoldings={tokenHoldings}
         solPriceUsd={solPriceUsd}
         onValidationChange={setIsSwapFormValid}
         onSwapParamsChange={handleSwapParamsChange}
+        onSecureParamsChange={handleSecureParamsChange}
         activeTab={swapActiveTab}
         onTabChange={setSwapActiveTab}
+        secureDirection={secureDirection}
+        onSecureDirectionChange={setSecureDirection}
         view={swapView}
         onViewChange={setSwapView}
         swapError={swapError}
