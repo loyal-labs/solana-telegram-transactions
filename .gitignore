@@ -65,6 +65,7 @@ test-ledger
 .yarn
 my-ledger-1/
 test-ledger-magicblock/
+sdk/private-transactions/.cache/devnet-mint.json
 
 /app/testing.ts
 .vercel
