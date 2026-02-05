@@ -19,7 +19,6 @@ import {
   ArrowDown,
   ArrowUp,
   Brush,
-  ChevronRight,
   Copy,
   RefreshCcw,
 } from "lucide-react";
@@ -2630,18 +2629,10 @@ export default function Home() {
             // Normal state with transactions
             return (
               <>
-                <div className="px-3 pt-3 pb-2 flex items-center justify-between">
+                <div className="px-3 pt-3 pb-2">
                   <p className="text-base font-medium text-black leading-5 tracking-[-0.176px]">
                     Activity
                   </p>
-                  <button
-                    onClick={handleOpenActivitySheet}
-                    className="flex items-center gap-0.5 text-[13px] leading-4 active:opacity-70 transition-opacity"
-                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                  >
-                    All
-                    <ChevronRight size={14} strokeWidth={1.5} />
-                  </button>
                 </div>
                 <div className="flex-1 pb-4">
                   <div className="flex flex-col pb-36">
@@ -2972,6 +2963,20 @@ export default function Home() {
                         );
                       })}
                     </AnimatePresence>
+
+                    {/* Show All button */}
+                    {incomingTransactions.length + walletTransactions.length > 10 && (
+                      <button
+                        onClick={handleOpenActivitySheet}
+                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium leading-5"
+                        style={{
+                          background: "rgba(249, 54, 60, 0.14)",
+                          color: "#f9363c",
+                        }}
+                      >
+                        Show All
+                      </button>
+                    )}
                   </div>
                 </div>
               </>
@@ -3063,7 +3068,6 @@ export default function Home() {
       <ActivitySheet
         open={isActivitySheetOpen}
         onOpenChange={handleActivitySheetChange}
-        trigger={null}
         walletTransactions={walletTransactions}
         incomingTransactions={incomingTransactions}
         onTransactionClick={handleOpenWalletTransactionDetails}

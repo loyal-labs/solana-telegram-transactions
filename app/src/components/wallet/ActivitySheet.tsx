@@ -1,22 +1,18 @@
 "use client";
 
 import { hapticFeedback } from "@telegram-apps/sdk-react";
-import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
-import { Drawer } from "@xelene/vaul-with-scroll-fix";
-import { motion } from "framer-motion";
 import { ArrowDown, X } from "lucide-react";
 import Image from "next/image";
 import {
-  type CSSProperties,
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 
-import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
   formatSenderAddress,
   formatTransactionAmount,
@@ -26,7 +22,6 @@ import type { IncomingTransaction, Transaction } from "@/types/wallet";
 const ITEMS_PER_PAGE = 10;
 
 export type ActivitySheetProps = {
-  trigger?: ReactNode | null;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   walletTransactions: Transaction[];
@@ -43,74 +38,37 @@ type GroupedTransactions = {
   >;
 };
 
+const SHEET_TRANSITION = "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)";
+const OVERLAY_TRANSITION = "opacity 0.3s ease";
+
 function getDateLabel(timestamp: number): string {
   const date = new Date(timestamp);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  // Reset time portion for comparison
-  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const yesterdayOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+  const dateOnly = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+  const todayOnly = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  const yesterdayOnly = new Date(
+    yesterday.getFullYear(),
+    yesterday.getMonth(),
+    yesterday.getDate(),
+  );
 
-  if (dateOnly.getTime() === todayOnly.getTime()) {
-    return "Today";
-  }
-  if (dateOnly.getTime() === yesterdayOnly.getTime()) {
-    return "Yesterday";
-  }
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function groupTransactionsByDay(
-  walletTransactions: Transaction[],
-  incomingTransactions: IncomingTransaction[]
-): GroupedTransactions[] {
-  // Combine all transactions with unified structure
-  const allTransactions: Array<{
-    timestamp: number;
-    item:
-      | { type: "wallet"; transaction: Transaction }
-      | { type: "incoming"; transaction: IncomingTransaction };
-  }> = [];
-
-  // Add wallet transactions
-  for (const tx of walletTransactions) {
-    allTransactions.push({
-      timestamp: tx.timestamp,
-      item: { type: "wallet", transaction: tx },
-    });
-  }
-
-  // Add incoming transactions (use current time as they don't have timestamps)
-  for (const tx of incomingTransactions) {
-    allTransactions.push({
-      timestamp: Date.now(), // Incoming claimable transactions are current
-      item: { type: "incoming", transaction: tx },
-    });
-  }
-
-  // Sort by timestamp descending
-  allTransactions.sort((a, b) => b.timestamp - a.timestamp);
-
-  // Group by date label
-  const groups = new Map<string, GroupedTransactions>();
-
-  for (const { timestamp, item } of allTransactions) {
-    const label = getDateLabel(timestamp);
-    if (!groups.has(label)) {
-      groups.set(label, { label, items: [] });
-    }
-    groups.get(label)!.items.push(item);
-  }
-
-  // Convert to array preserving order
-  return Array.from(groups.values());
+  if (dateOnly.getTime() === todayOnly.getTime()) return "Today";
+  if (dateOnly.getTime() === yesterdayOnly.getTime()) return "Yesterday";
+  return date.toLocaleDateString("en-US", { month: "long", day: "numeric" });
 }
 
 export default function ActivitySheet({
-  trigger,
   open,
   onOpenChange,
   walletTransactions,
@@ -118,30 +76,48 @@ export default function ActivitySheet({
   onTransactionClick,
   isLoading = false,
 }: ActivitySheetProps) {
-  const snapPoint = useModalSnapPoint();
   const { bottom: safeBottom } = useTelegramSafeArea();
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [rendered, setRendered] = useState(false);
+  const [show, setShow] = useState(false);
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const dragStartY = useRef(0);
+  const dragDelta = useRef(0);
+  const isDragging = useRef(false);
+  const isClosing = useRef(false);
 
-  // Reset visible count when sheet opens
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (open) {
+      isClosing.current = false;
       setVisibleCount(ITEMS_PER_PAGE);
+      setRendered(true);
     }
   }, [open]);
 
-  const modalStyle = useMemo(
-    () =>
-      ({
-        "--tgui--bg_color": "transparent",
-        "--tgui--divider": "rgba(255, 255, 255, 0.05)",
-      }) as CSSProperties,
-    []
-  );
+  useEffect(() => {
+    if (rendered && open && !show && !isClosing.current) {
+      sheetRef.current?.getBoundingClientRect();
+      setShow(true);
+    }
+  }, [rendered, open, show]);
 
-  const [snapPoints] = useMemo(() => [[snapPoint]], [snapPoint]);
+  useEffect(() => {
+    if (!open) return;
+    const header = document.querySelector("header");
+    if (header) {
+      setHeaderHeight(header.getBoundingClientRect().bottom);
+    }
+  }, [open]);
 
-  // Get all sorted transactions first
+  // All sorted transactions
   const allSortedTransactions = useMemo(() => {
     const all: Array<{
       timestamp: number;
@@ -192,111 +168,207 @@ export default function ActivitySheet({
     if (!container || !hasMore) return;
 
     const { scrollTop, scrollHeight, clientHeight } = container;
-    // Load more when within 100px of bottom
     if (scrollHeight - scrollTop - clientHeight < 100) {
       setVisibleCount((prev) => Math.min(prev + ITEMS_PER_PAGE, totalCount));
     }
   }, [hasMore, totalCount]);
 
-  return (
-    <Modal
-      aria-label="Activity"
-      trigger={trigger || <button style={{ display: "none" }} />}
-      open={open}
-      onOpenChange={onOpenChange}
-      style={modalStyle}
-      snapPoints={snapPoints}
-    >
+  const unmount = useCallback(() => {
+    setRendered(false);
+    setShow(false);
+    onOpenChange?.(false);
+    isClosing.current = false;
+  }, [onOpenChange]);
+
+  const closeSheet = useCallback(() => {
+    if (isClosing.current) return;
+    isClosing.current = true;
+
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+
+    if (sheetRef.current) {
+      sheetRef.current.style.transition = SHEET_TRANSITION;
+      sheetRef.current.style.transform = "translateY(100%)";
+    }
+    if (overlayRef.current) {
+      overlayRef.current.style.transition = OVERLAY_TRANSITION;
+      overlayRef.current.style.opacity = "0";
+    }
+  }, []);
+
+  const handleTransitionEnd = useCallback(
+    (e: React.TransitionEvent) => {
+      if (e.propertyName === "transform" && isClosing.current) {
+        unmount();
+      }
+    },
+    [unmount],
+  );
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    isDragging.current = true;
+    dragStartY.current = e.touches[0].clientY;
+    dragDelta.current = 0;
+    if (sheetRef.current) {
+      sheetRef.current.style.transition = "none";
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging.current) return;
+    const delta = e.touches[0].clientY - dragStartY.current;
+    dragDelta.current = Math.max(0, delta);
+    if (sheetRef.current) {
+      sheetRef.current.style.transform = `translateY(${dragDelta.current}px)`;
+    }
+    if (overlayRef.current) {
+      const opacity = Math.max(0.2, 1 - dragDelta.current / 300);
+      overlayRef.current.style.opacity = String(opacity);
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+
+    if (dragDelta.current > 120) {
+      closeSheet();
+    } else {
+      if (sheetRef.current) {
+        sheetRef.current.style.transition = SHEET_TRANSITION;
+        sheetRef.current.style.transform = "translateY(0px)";
+      }
+      if (overlayRef.current) {
+        overlayRef.current.style.transition = OVERLAY_TRANSITION;
+        overlayRef.current.style.opacity = "1";
+      }
+    }
+    dragDelta.current = 0;
+  }, [closeSheet]);
+
+  // Lock body scroll when rendered
+  useEffect(() => {
+    if (rendered) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
+    }
+  }, [rendered]);
+
+  if (!mounted || !rendered) return null;
+
+  const sheetTopOffset = headerHeight || 56;
+
+  const content = (
+    <>
+      {/* Overlay */}
       <div
+        ref={overlayRef}
+        onClick={closeSheet}
+        className="fixed inset-0 z-[9998]"
         style={{
-          background: "rgba(38, 38, 38, 0.55)",
-          backgroundBlendMode: "luminosity",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
-          paddingBottom: Math.max(safeBottom, 80),
+          background: "rgba(0, 0, 0, 0.3)",
+          opacity: show ? 1 : 0,
+          transition: OVERLAY_TRANSITION,
         }}
-        className="flex flex-col text-white relative overflow-hidden min-h-[500px] rounded-t-3xl"
+      />
+
+      {/* Sheet */}
+      <div
+        ref={sheetRef}
+        onTransitionEnd={handleTransitionEnd}
+        className="fixed left-0 right-0 bottom-0 z-[9999] flex flex-col bg-white rounded-t-[38px] font-sans"
+        style={{
+          top: sheetTopOffset,
+          transform: show ? "translateY(0)" : "translateY(100%)",
+          transition: SHEET_TRANSITION,
+          boxShadow: "0px -4px 40px rgba(0, 0, 0, 0.08)",
+        }}
       >
-        <Drawer.Title asChild>
-          <VisuallyHidden>Activity</VisuallyHidden>
-        </Drawer.Title>
+        {/* Handle bar */}
+        <div
+          className="flex justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div
+            className="w-9 h-1 rounded-full"
+            style={{ background: "rgba(0, 0, 0, 0.15)" }}
+          />
+        </div>
 
         {/* Header */}
-        <div className="relative h-[52px] flex items-center justify-center shrink-0">
-          <span className="text-base font-medium text-white tracking-[-0.176px]">
+        <div
+          className="relative h-[44px] flex items-center justify-center shrink-0 px-4"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <span className="text-[17px] font-semibold text-black leading-[22px]">
             Activity
           </span>
 
-          {/* Close Button */}
-          <Modal.Close>
-            <div
-              onClick={() => {
-                if (hapticFeedback.impactOccurred.isAvailable()) {
-                  hapticFeedback.impactOccurred("light");
-                }
-              }}
-              className="absolute right-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 active:bg-white/10 transition-all duration-150 cursor-pointer"
-              style={{
-                background: "rgba(255, 255, 255, 0.06)",
-              }}
-            >
-              <X size={24} strokeWidth={1.5} className="text-white/60" />
-            </div>
-          </Modal.Close>
+          <button
+            onClick={closeSheet}
+            className="absolute right-3 w-[30px] h-[30px] rounded-full flex items-center justify-center active:scale-95 transition-all duration-150"
+            style={{ background: "rgba(0, 0, 0, 0.06)" }}
+          >
+            <X
+              size={20}
+              strokeWidth={2}
+              style={{ color: "rgba(60, 60, 67, 0.6)" }}
+            />
+          </button>
         </div>
 
         {/* Scrollable Content */}
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto px-4 pb-4"
+          className="flex-1 overflow-y-auto overscroll-contain"
+          style={{ paddingBottom: Math.max(safeBottom, 24) }}
         >
           {isLoading ? (
-            /* Skeleton Loading State */
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col px-4">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div
-                  key={i}
-                  className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.06)",
-                    mixBlendMode: "lighten",
-                  }}
-                >
+                <div key={i} className="flex items-center px-0">
                   <div className="py-1.5 pr-3">
-                    <div className="w-12 h-12 rounded-full bg-white/5 animate-pulse" />
+                    <div className="w-12 h-12 rounded-full bg-black/[0.04] animate-pulse" />
                   </div>
                   <div className="flex-1 py-2.5 flex flex-col gap-1.5">
-                    <div className="w-20 h-5 bg-white/5 animate-pulse rounded" />
-                    <div className="w-28 h-4 bg-white/5 animate-pulse rounded" />
+                    <div className="w-20 h-5 bg-black/[0.04] animate-pulse rounded" />
+                    <div className="w-28 h-4 bg-black/[0.04] animate-pulse rounded" />
                   </div>
                   <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
-                    <div className="w-16 h-5 bg-white/5 animate-pulse rounded" />
-                    <div className="w-12 h-4 bg-white/5 animate-pulse rounded" />
+                    <div className="w-16 h-5 bg-black/[0.04] animate-pulse rounded" />
+                    <div className="w-12 h-4 bg-black/[0.04] animate-pulse rounded" />
                   </div>
                 </div>
               ))}
             </div>
           ) : groupedTransactions.length === 0 ? (
-            <div
-              className="flex items-center justify-center px-8 py-6 rounded-2xl h-[200px]"
-              style={{
-                background: "rgba(255, 255, 255, 0.03)",
-                mixBlendMode: "lighten",
-              }}
-            >
-              <p className="text-base text-white/60 leading-5 text-center">
+            <div className="flex items-center justify-center px-8 py-6 h-[200px]">
+              <p
+                className="text-base leading-5 text-center"
+                style={{ color: "rgba(60, 60, 67, 0.6)" }}
+              >
                 No transactions yet
               </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col">
               {groupedTransactions.map((group) => (
-                <div key={group.label} className="flex flex-col gap-2">
+                <div key={group.label} className="flex flex-col">
                   {/* Date Label */}
-                  <p className="text-[13px] text-white/60 leading-4 px-1">
-                    {group.label}
-                  </p>
+                  <div className="px-3 pt-3 pb-2">
+                    <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px]">
+                      {group.label}
+                    </p>
+                  </div>
 
                   {/* Transactions */}
                   {group.items.map((item) => {
@@ -305,13 +377,9 @@ export default function ActivitySheet({
                       return (
                         <div
                           key={transaction.id}
-                          className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full"
-                          style={{
-                            background: "rgba(255, 255, 255, 0.06)",
-                            mixBlendMode: "lighten",
-                          }}
+                          className="flex items-center px-4"
                         >
-                          {/* Left - Icon */}
+                          {/* Icon */}
                           <div className="py-1.5 pr-3">
                             <div
                               className="w-12 h-12 rounded-full flex items-center justify-center"
@@ -325,32 +393,34 @@ export default function ActivitySheet({
                             </div>
                           </div>
 
-                          {/* Middle - Text */}
-                          <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                            <p className="text-base text-white leading-5">
+                          {/* Text */}
+                          <div className="flex-1 py-2.5 flex flex-col gap-0.5 min-w-0">
+                            <p className="text-base text-black leading-5">
                               Receiving
                             </p>
-                            <p className="text-[13px] text-white/60 leading-4">
-                              {formatTransactionAmount(transaction.amountLamports)} SOL from {formatSenderAddress(transaction.sender)}
+                            <p
+                              className="text-[13px] leading-4 truncate"
+                              style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                            >
+                              {formatTransactionAmount(
+                                transaction.amountLamports,
+                              )}{" "}
+                              SOL from{" "}
+                              {formatSenderAddress(transaction.sender)}
                             </p>
                           </div>
 
-                          {/* Right - Claiming Badge with pulse animation */}
-                          <div className="py-2.5 pl-3">
-                            <motion.div
-                              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-white leading-5"
+                          {/* Claiming badge */}
+                          <div className="py-2.5 pl-3 shrink-0">
+                            <div
+                              className="flex items-center px-3 py-1.5 rounded-full text-[13px] leading-4 animate-pulse"
                               style={{
-                                background: "linear-gradient(90deg, rgba(50, 229, 94, 0.15) 0%, rgba(50, 229, 94, 0.15) 100%), linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.08) 100%)",
-                              }}
-                              animate={{ opacity: [1, 0.4, 1] }}
-                              transition={{
-                                duration: 1.5,
-                                repeat: Infinity,
-                                ease: "easeInOut",
+                                background: "rgba(50, 229, 94, 0.12)",
+                                color: "#32e55e",
                               }}
                             >
                               Claiming...
-                            </motion.div>
+                            </div>
                           </div>
                         </div>
                       );
@@ -363,7 +433,8 @@ export default function ActivitySheet({
                     const transferTypeLabel =
                       transaction.transferType === "store"
                         ? "Store data"
-                        : transaction.transferType === "verify_telegram_init_data"
+                        : transaction.transferType ===
+                            "verify_telegram_init_data"
                           ? "Verify data"
                           : null;
                     const counterparty = isIncoming
@@ -372,38 +443,35 @@ export default function ActivitySheet({
                     const formattedCounterparty = counterparty.startsWith("@")
                       ? counterparty
                       : formatSenderAddress(counterparty);
-                    const amountPrefix = isIncoming ? "+" : "−";
+                    const amountPrefix = isIncoming ? "+" : "\u2212";
                     const amountColor = isIncoming
                       ? "#32e55e"
                       : isPending
-                        ? "#00b1fb"
-                        : "white";
+                        ? "#f9363c"
+                        : "black";
                     const timestamp = new Date(transaction.timestamp);
 
                     // Compact view for store/verify transactions
-                    const isCompactTransaction = transferTypeLabel !== null;
-
-                    if (isCompactTransaction) {
+                    if (transferTypeLabel !== null) {
                       return (
                         <button
                           key={transaction.id}
                           onClick={() => onTransactionClick(transaction)}
-                          className="flex items-center py-2 px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                          style={{
-                            background: "rgba(255, 255, 255, 0.06)",
-                            mixBlendMode: "lighten",
-                          }}
+                          className="flex items-center py-2 px-4 w-full text-left active:opacity-70 transition-opacity"
                         >
-                          {/* Left - Text */}
                           <div className="flex-1 flex items-center">
-                            <p className="text-sm text-white/60 leading-5">
+                            <p
+                              className="text-sm leading-5"
+                              style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                            >
                               {transferTypeLabel}
                             </p>
                           </div>
-
-                          {/* Right - Date only */}
                           <div className="pl-3">
-                            <p className="text-[13px] text-white/40 leading-4">
+                            <p
+                              className="text-[13px] leading-4"
+                              style={{ color: "rgba(60, 60, 67, 0.3)" }}
+                            >
                               {timestamp.toLocaleDateString("en-US", {
                                 month: "short",
                                 day: "numeric",
@@ -423,13 +491,9 @@ export default function ActivitySheet({
                       <button
                         key={transaction.id}
                         onClick={() => onTransactionClick(transaction)}
-                        className="flex items-center py-1 pl-3 pr-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                        style={{
-                          background: "rgba(255, 255, 255, 0.06)",
-                          mixBlendMode: "lighten",
-                        }}
+                        className="flex items-center px-4 w-full text-left active:opacity-70 transition-opacity"
                       >
-                        {/* Left - Icon */}
+                        {/* Icon */}
                         <div className="py-1.5 pr-3">
                           {isPending ? (
                             <div className="w-12 h-12 rounded-full overflow-hidden relative">
@@ -452,37 +516,40 @@ export default function ActivitySheet({
                           )}
                         </div>
 
-                        {/* Middle - Text */}
-                        <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                          <p className="text-base text-white leading-5">
+                        {/* Text */}
+                        <div className="flex-1 py-2.5 flex flex-col gap-0.5 min-w-0">
+                          <p className="text-base text-black leading-5">
                             {isIncoming
                               ? "Received"
                               : isPending
                                 ? "To be claimed"
                                 : "Sent"}
                           </p>
-                          <p className="text-[13px] text-white/60 leading-4">
+                          <p
+                            className="text-[13px] leading-4 truncate"
+                            style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                          >
                             {isIncoming ? "from" : isPending ? "by" : "to"}{" "}
                             {formattedCounterparty}
                           </p>
                         </div>
 
-                        {/* Right - Value */}
-                        <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
+                        {/* Amount + Time */}
+                        <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3 shrink-0">
                           <p
                             className="text-base leading-5"
                             style={{ color: amountColor }}
                           >
                             {amountPrefix}
-                            {formatTransactionAmount(transaction.amountLamports)}{" "}
+                            {formatTransactionAmount(
+                              transaction.amountLamports,
+                            )}{" "}
                             SOL
                           </p>
-                          <p className="text-[13px] text-white/60 leading-4">
-                            {timestamp.toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}
-                            ,{" "}
+                          <p
+                            className="text-[13px] leading-4"
+                            style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                          >
                             {timestamp.toLocaleTimeString([], {
                               hour: "numeric",
                               minute: "2-digit",
@@ -495,16 +562,18 @@ export default function ActivitySheet({
                 </div>
               ))}
 
-              {/* Loading indicator */}
+              {/* Loading indicator for infinite scroll */}
               {hasMore && (
                 <div className="flex justify-center py-4">
-                  <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                  <div className="w-6 h-6 border-2 border-black/10 border-t-black/40 rounded-full animate-spin" />
                 </div>
               )}
             </div>
           )}
         </div>
       </div>
-    </Modal>
+    </>
   );
+
+  return createPortal(content, document.body);
 }
