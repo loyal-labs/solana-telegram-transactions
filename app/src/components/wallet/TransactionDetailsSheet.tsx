@@ -3,6 +3,7 @@
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { hapticFeedback, shareURL } from "@telegram-apps/sdk-react";
 import { Check, ShieldAlert, X } from "lucide-react";
+import Image from "next/image";
 import {
   type ReactNode,
   useCallback,
@@ -46,6 +47,11 @@ export type TransactionDetailsSheetProps = {
   swapToSymbol?: string;
   swapToAmount?: number;
   swapToAmountUsd?: number;
+  // Secure/unshield transaction props
+  secureTokenSymbol?: string;
+  secureTokenIcon?: string;
+  secureAmount?: number;
+  secureAmountUsd?: number;
 };
 
 // Globe icon for "View in explorer" button (light theme)
@@ -79,6 +85,10 @@ export default function TransactionDetailsSheet({
   swapToSymbol,
   swapToAmount,
   swapToAmountUsd,
+  secureTokenSymbol,
+  secureTokenIcon,
+  secureAmount,
+  secureAmountUsd,
 }: TransactionDetailsSheetProps) {
   const { bottom: safeBottom } = useTelegramSafeArea();
   const [mounted, setMounted] = useState(false);
@@ -94,6 +104,9 @@ export default function TransactionDetailsSheet({
 
   const isDepositForUsername = transaction?.transferType === "deposit_for_username";
   const isSwapTransaction = transaction?.transferType === "swap";
+  const isSecureTransaction = transaction?.transferType === "secure";
+  const isUnshieldTransaction = transaction?.transferType === "unshield";
+  const isSecureOrUnshield = isSecureTransaction || isUnshieldTransaction;
 
   // Deposit state for deposit_for_username transactions
   const [depositAmount, setDepositAmount] = useState<number | null>(null);
@@ -425,10 +438,14 @@ export default function TransactionDetailsSheet({
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          {/* Swap Transaction: Title only (no pill) */}
+          {/* Swap / Secure / Unshield Transaction: Title only (no pill) */}
           {isSwapTransaction ? (
             <span className="text-[17px] font-semibold text-black leading-[22px]">
               Swap {swapFromSymbol || "?"} to {swapToSymbol || "?"}
+            </span>
+          ) : isSecureOrUnshield ? (
+            <span className="text-[17px] font-semibold text-black leading-[22px]">
+              {isSecureTransaction ? "Secure" : "Unshield"} {secureTokenSymbol || "?"}
             </span>
           ) : (
             /* Header Pill for non-swap transactions */
@@ -660,6 +677,132 @@ export default function TransactionDetailsSheet({
                   </div>
                   <span
                     className="text-[13px]"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
+                    Share
+                  </span>
+                </button>
+              </div>
+            </>
+          ) : isSecureOrUnshield ? (
+            /* Secure/Unshield Transaction Details View */
+            <>
+              {/* Icon */}
+              <div className="flex flex-col items-center justify-center px-4 pt-8 pb-4">
+                <div className="w-[64px] h-[64px] flex items-center justify-center">
+                  <Image
+                    src={isSecureTransaction ? "/Shield.svg" : "/Unshield.svg"}
+                    alt={isSecureTransaction ? "Secure" : "Unshield"}
+                    width={64}
+                    height={64}
+                  />
+                </div>
+              </div>
+
+              {/* Amount Section */}
+              <div className="flex flex-col items-center justify-center px-4 pb-6">
+                <div className="flex flex-col items-center gap-1">
+                  <div className="flex items-baseline gap-2">
+                    <p
+                      className="text-[40px] font-semibold leading-[48px] text-black"
+                    >
+                      {secureAmount?.toFixed(4).replace(/\.?0+$/, '') || "0"}
+                    </p>
+                    <p
+                      className="text-[28px] font-semibold leading-8 tracking-[0.4px]"
+                      style={{ color: "rgba(60, 60, 67, 0.4)" }}
+                    >
+                      {secureTokenSymbol || "?"}
+                    </p>
+                  </div>
+                  {/* USD Value */}
+                  <p
+                    className="text-[17px] leading-[22px] text-center"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
+                    ≈{secureAmountUsd !== undefined
+                      ? `$${secureAmountUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : "—"}
+                  </p>
+                  {/* Date */}
+                  <p
+                    className="text-[17px] leading-[22px] text-center"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
+                    {formatTransactionDate(transaction.timestamp)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Details Card */}
+              <div className="px-4">
+                <div
+                  className="flex flex-col rounded-[20px] overflow-hidden"
+                  style={{ background: "#f2f2f7" }}
+                >
+                  {/* Status */}
+                  <div className="flex flex-col gap-0.5 px-4 py-2.5">
+                    <p
+                      className="text-[15px] leading-5"
+                      style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                    >
+                      Status
+                    </p>
+                    <p className="text-[17px] leading-[22px] text-black tracking-[-0.187px]">
+                      {getStatusText(transaction.status, false)}
+                    </p>
+                  </div>
+
+                  {/* Network Fee */}
+                  <div className="flex flex-col gap-0.5 px-4 py-2.5">
+                    <p
+                      className="text-[15px] leading-5"
+                      style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                    >
+                      Network Fee
+                    </p>
+                    <p className="text-[17px] leading-[22px] tracking-[-0.187px]">
+                      <span className="text-black">{networkFeeSol} SOL</span>
+                      <span style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                        {" "}≈ {networkFeeUsd !== null ? `$${networkFeeUsd.toFixed(2)}` : "—"}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex w-[256px] mx-auto justify-between px-4 pt-5 pb-4">
+                <button
+                  onClick={handleViewInExplorer}
+                  className="w-[56px] flex flex-col gap-2 items-center overflow-visible whitespace-nowrap active:opacity-70 transition-opacity"
+                >
+                  <div
+                    className="w-[52px] h-[52px] rounded-full flex items-center justify-center"
+                    style={{ background: "rgba(249, 54, 60, 0.14)" }}
+                  >
+                    <ExplorerIcon />
+                  </div>
+                  <span
+                    className="text-[13px] leading-4"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
+                    View in explorer
+                  </span>
+                </button>
+
+                <button
+                  onClick={handleShare}
+                  className="w-[56px] flex flex-col gap-2 items-center overflow-visible whitespace-nowrap active:opacity-70 transition-opacity"
+                >
+                  <div
+                    className="w-[52px] h-[52px] rounded-full flex items-center justify-center"
+                    style={{ background: "rgba(249, 54, 60, 0.14)" }}
+                  >
+                    <ShareIcon />
+                  </div>
+                  <span
+                    className="text-[13px] leading-4"
                     style={{ color: "rgba(60, 60, 67, 0.6)" }}
                   >
                     Share

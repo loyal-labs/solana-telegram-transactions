@@ -277,14 +277,21 @@ export default function TokensSheet({
               className="flex items-center px-4"
             >
               <div className="py-1.5 pr-3">
-                <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
-                  {token.imageUrl && (
-                    <Image
-                      src={token.imageUrl}
-                      alt={token.symbol}
-                      fill
-                      className="object-cover"
-                    />
+                <div className="w-12 h-12 relative">
+                  <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                    {token.imageUrl && (
+                      <Image
+                        src={token.imageUrl}
+                        alt={token.symbol}
+                        fill
+                        className="object-cover"
+                      />
+                    )}
+                  </div>
+                  {token.isSecured && (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
+                      <Image src="/Shield.svg" alt="Secured" width={20} height={20} />
+                    </div>
                   )}
                 </div>
               </div>

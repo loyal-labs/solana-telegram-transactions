@@ -15,13 +15,7 @@ import {
   viewport,
 } from "@telegram-apps/sdk-react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  ArrowDown,
-  ArrowUp,
-  Brush,
-  Copy,
-  RefreshCcw,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, Brush, Copy, RefreshCcw } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Confetti from "react-confetti";
@@ -128,7 +122,7 @@ import type {
 hashes.sha512 = sha512;
 
 // ─── Mock data for development ─────────────────────────────────────────────
-const USE_MOCK_DATA = false;
+const USE_MOCK_DATA = true;
 
 const MOCK_WALLET_ADDRESS = "UQAt7f8Kq9xZ3mNpR2vL5wYcD4bJ6hTgSoAeWnFqZir";
 const MOCK_BALANCE_LAMPORTS = 1_267_476_540_000; // ~1267.47654 SOL
@@ -195,6 +189,17 @@ const MOCK_TOKEN_HOLDINGS: import("@/lib/solana/token-holdings").TokenHolding[] 
       priceUsd: 35.2,
       valueUsd: 17600,
       imageUrl: "/tokens/avalanche-avax-logo.png",
+    },
+    {
+      mint: "usdt-secured",
+      symbol: "USDT",
+      name: "Tether USD",
+      balance: 1267,
+      decimals: 6,
+      priceUsd: 0.99,
+      valueUsd: 2.12,
+      imageUrl: "/tokens/USDT.png",
+      isSecured: true,
     },
   ];
 
@@ -322,6 +327,36 @@ const MOCK_WALLET_TRANSACTIONS: Transaction[] = [
     timestamp: Date.now() - 3600000,
     status: "completed",
     signature: "mock-sig-6",
+  },
+  {
+    id: "mock-7",
+    type: "outgoing",
+    transferType: "secure",
+    amountLamports: 0,
+    sender: undefined,
+    recipient: undefined,
+    timestamp: Date.now() - 7200000,
+    status: "completed",
+    signature: "mock-sig-7",
+    secureTokenSymbol: "USDC",
+    secureTokenIcon: "/tokens/usd-coin-usdc-logo.png",
+    secureAmount: 15.0001,
+    secureAmountUsd: 2869.77,
+  },
+  {
+    id: "mock-8",
+    type: "outgoing",
+    transferType: "unshield",
+    amountLamports: 0,
+    sender: undefined,
+    recipient: undefined,
+    timestamp: Date.now() - 10800000,
+    status: "completed",
+    signature: "mock-sig-8",
+    secureTokenSymbol: "USDT",
+    secureTokenIcon: "/tokens/USDT.png",
+    secureAmount: 15000.01,
+    secureAmountUsd: 15000.01,
   },
 ];
 // ─── End mock data ─────────────────────────────────────────────────────────
@@ -566,8 +601,8 @@ export default function Home() {
   const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">(
     () => cachedDisplayCurrency ?? "USD"
   );
-  const [balanceBg, setBalanceBg] = useState<string | null>(
-    () => cachedBalanceBg !== undefined ? cachedBalanceBg : null
+  const [balanceBg, setBalanceBg] = useState<string | null>(() =>
+    cachedBalanceBg !== undefined ? cachedBalanceBg : null
   );
   const [bgLoaded, setBgLoaded] = useState(() => cachedBalanceBg !== undefined);
   const [isBgPickerOpen, setBgPickerOpen] = useState(false);
@@ -723,6 +758,11 @@ export default function Home() {
         swapToSymbol: transaction.swapToSymbol,
         swapToAmount: transaction.swapToAmount,
         swapToAmountUsd: transaction.swapToAmountUsd,
+        // Secure/unshield transaction fields
+        secureTokenSymbol: transaction.secureTokenSymbol,
+        secureTokenIcon: transaction.secureTokenIcon,
+        secureAmount: transaction.secureAmount,
+        secureAmountUsd: transaction.secureAmountUsd,
       };
       setSelectedTransaction(detailsData);
       setTransactionDetailsSheetOpen(true);
@@ -818,9 +858,7 @@ export default function Home() {
       void refreshWalletBalance(true);
     } catch (error) {
       console.error("[secure] Error:", error);
-      setSwapError(
-        error instanceof Error ? error.message : "Operation failed"
-      );
+      setSwapError(error instanceof Error ? error.message : "Operation failed");
       setSwapView("result");
     } finally {
       setIsSwapping(false);
@@ -2335,11 +2373,15 @@ export default function Home() {
                     <Copy
                       className="w-5 h-5"
                       strokeWidth={1.5}
-                      style={{ color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)" }}
+                      style={{
+                        color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
+                      }}
                     />
                     <span
                       className="text-[17px] leading-[22px]"
-                      style={{ color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)" }}
+                      style={{
+                        color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
+                      }}
                     >
                       {addressCopied ? "Copied!" : formatAddress(walletAddress)}
                     </span>
@@ -2375,7 +2417,9 @@ export default function Home() {
                       const prefix = displayCurrency === "USD" ? "$" : "";
                       const suffix = displayCurrency === "SOL" ? " SOL" : "";
                       const mainColor = balanceBg ? "white" : "#1c1c1e";
-                      const decimalColor = balanceBg ? "white" : "rgba(60, 60, 67, 0.6)";
+                      const decimalColor = balanceBg
+                        ? "white"
+                        : "rgba(60, 60, 67, 0.6)";
                       return (
                         <span
                           className="font-semibold inline-flex items-baseline"
@@ -2444,12 +2488,20 @@ export default function Home() {
                       setBgPickerOpen(true);
                     }}
                     className="absolute bottom-4 right-4 p-2 rounded-full backdrop-blur-[8px] active:opacity-70 transition-opacity"
-                    style={{ background: balanceBg ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.05)" }}
+                    style={{
+                      background: balanceBg
+                        ? "rgba(255, 255, 255, 0.15)"
+                        : "rgba(0, 0, 0, 0.05)",
+                    }}
                   >
                     <Brush
                       size={20}
                       strokeWidth={1.5}
-                      style={{ color: balanceBg ? "rgba(255, 255, 255, 0.6)" : "rgba(60, 60, 67, 0.6)" }}
+                      style={{
+                        color: balanceBg
+                          ? "rgba(255, 255, 255, 0.6)"
+                          : "rgba(60, 60, 67, 0.6)",
+                      }}
                     />
                   </button>
                 )}
@@ -2519,14 +2571,21 @@ export default function Home() {
                     >
                       {/* Token icon */}
                       <div className="py-1.5 pr-3">
-                        <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
-                          {token.imageUrl && (
-                            <Image
-                              src={token.imageUrl}
-                              alt={token.symbol}
-                              fill
-                              className="object-cover"
-                            />
+                        <div className="w-12 h-12 relative">
+                          <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                            {token.imageUrl && (
+                              <Image
+                                src={token.imageUrl}
+                                alt={token.symbol}
+                                fill
+                                className="object-cover"
+                              />
+                            )}
+                          </div>
+                          {token.isSecured && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
+                              <Image src="/Shield.svg" alt="Secured" width={20} height={20} />
+                            </div>
                           )}
                         </div>
                       </div>
@@ -2783,6 +2842,12 @@ export default function Home() {
                         const mockInfo = USE_MOCK_DATA
                           ? MOCK_ACTIVITY_INFO[transaction.id]
                           : undefined;
+                        const isSecureTransaction =
+                          transaction.transferType === "secure";
+                        const isUnshieldTransaction =
+                          transaction.transferType === "unshield";
+                        const isSecureOrUnshield =
+                          isSecureTransaction || isUnshieldTransaction;
                         const isDepositForUsername =
                           transaction.transferType === "deposit_for_username";
                         const transferTypeLabel =
@@ -2865,6 +2930,109 @@ export default function Home() {
                                 <p
                                   className="text-[13px] leading-4"
                                   style={{ color: "rgba(60, 60, 67, 0.4)" }}
+                                >
+                                  {timestamp.toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                  ,{" "}
+                                  {timestamp.toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })}
+                                </p>
+                              </div>
+                            </motion.button>
+                          );
+                        }
+
+                        // Secure/Unshield transaction view
+                        if (isSecureOrUnshield) {
+                          return (
+                            <motion.button
+                              key={transaction.id}
+                              layout
+                              initial={
+                                isNewTransaction
+                                  ? { opacity: 0, scale: 0.85, y: -10 }
+                                  : false
+                              }
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.85 }}
+                              transition={{
+                                layout: {
+                                  type: "spring",
+                                  stiffness: 500,
+                                  damping: 35,
+                                },
+                                opacity: { duration: 0.25 },
+                                scale: {
+                                  duration: 0.3,
+                                  ease: [0.34, 1.56, 0.64, 1],
+                                },
+                              }}
+                              onClick={() =>
+                                handleOpenWalletTransactionDetails(transaction)
+                              }
+                              className="flex items-center px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
+                            >
+                              {/* Left - Icon */}
+                              <div className="py-1.5 pr-3">
+                                <div className="w-12 h-12 relative">
+                                  <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                                    <Image
+                                      src={
+                                        transaction.secureTokenIcon ||
+                                        "/tokens/solana-sol-logo.png"
+                                      }
+                                      alt={
+                                        transaction.secureTokenSymbol || "Token"
+                                      }
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                  {isSecureTransaction && (
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
+                                      <Image
+                                        src="/Shield.svg"
+                                        alt="Shield"
+                                        width={20}
+                                        height={20}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Middle - Text */}
+                              <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                                <p className="text-base text-black leading-5">
+                                  {isSecureTransaction ? "Secure" : "Unshield"}
+                                </p>
+                                <p
+                                  className="text-[13px] leading-4"
+                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                >
+                                  {transaction.secureTokenSymbol || "Token"}
+                                </p>
+                              </div>
+
+                              {/* Right - Value */}
+                              <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
+                                <p className="text-base leading-5 text-black">
+                                  {transaction.secureAmount
+                                    ? `${transaction.secureAmount.toLocaleString(
+                                        "en-US",
+                                        { maximumFractionDigits: 4 }
+                                      )} ${transaction.secureTokenSymbol || ""}`
+                                    : `${formatTransactionAmount(
+                                        transaction.amountLamports
+                                      )} SOL`}
+                                </p>
+                                <p
+                                  className="text-[13px] leading-4"
+                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
                                 >
                                   {timestamp.toLocaleDateString("en-US", {
                                     month: "short",
@@ -3017,7 +3185,8 @@ export default function Home() {
                     </AnimatePresence>
 
                     {/* Show All button */}
-                    {incomingTransactions.length + walletTransactions.length > 10 && (
+                    {incomingTransactions.length + walletTransactions.length >
+                      10 && (
                       <button
                         onClick={handleOpenActivitySheet}
                         className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium leading-5"
@@ -3121,6 +3290,10 @@ export default function Home() {
         swapToSymbol={selectedTransaction?.swapToSymbol}
         swapToAmount={selectedTransaction?.swapToAmount}
         swapToAmountUsd={selectedTransaction?.swapToAmountUsd}
+        secureTokenSymbol={selectedTransaction?.secureTokenSymbol}
+        secureTokenIcon={selectedTransaction?.secureTokenIcon}
+        secureAmount={selectedTransaction?.secureAmount}
+        secureAmountUsd={selectedTransaction?.secureAmountUsd}
       />
       <ActivitySheet
         open={isActivitySheetOpen}
@@ -3154,14 +3327,21 @@ export default function Home() {
           const suffix = displayCurrency === "SOL" ? " SOL" : "";
           const intPart = Math.floor(value);
           const decimalDigits = Math.round(
-            Math.abs(value - intPart) * Math.pow(10, decimals),
+            Math.abs(value - intPart) * Math.pow(10, decimals)
           );
           const decimalStr = String(decimalDigits).padStart(decimals, "0");
           return (
             <>
               <div className="flex items-center gap-1">
-                <Copy className="w-5 h-5" strokeWidth={1.5} style={{ color: decimalColor }} />
-                <span className="text-[17px] leading-[22px]" style={{ color: decimalColor }}>
+                <Copy
+                  className="w-5 h-5"
+                  strokeWidth={1.5}
+                  style={{ color: decimalColor }}
+                />
+                <span
+                  className="text-[17px] leading-[22px]"
+                  style={{ color: decimalColor }}
+                >
                   {walletAddress ? formatAddress(walletAddress) : "Loading..."}
                 </span>
               </div>
@@ -3180,12 +3360,16 @@ export default function Home() {
                     {intPart.toLocaleString("en-US")}
                   </span>
                   <span className="text-[28px]" style={{ color: decimalColor }}>
-                    .{decimalStr}{suffix}
+                    .{decimalStr}
+                    {suffix}
                   </span>
                 </span>
                 <span
                   className="text-[17px] leading-[22px]"
-                  style={{ fontVariantNumeric: "tabular-nums", color: decimalColor }}
+                  style={{
+                    fontVariantNumeric: "tabular-nums",
+                    color: decimalColor,
+                  }}
                 >
                   {displayCurrency === "USD"
                     ? `${solBalanceNumeric.toLocaleString("en-US", {

@@ -11,7 +11,9 @@ export type WalletTransfer = {
     | "store"
     | "claim_deposit"
     | "deposit_for_username"
-    | "swap";
+    | "swap"
+    | "secure"
+    | "unshield";
   amountLamports: number;
   netChangeLamports: number;
   feeLamports: number;

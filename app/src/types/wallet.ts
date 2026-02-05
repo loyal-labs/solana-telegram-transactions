@@ -23,6 +23,11 @@ export type Transaction = {
   swapToSymbol?: string;
   swapToAmount?: number;
   swapToAmountUsd?: number;
+  // For secure/unshield transactions
+  secureTokenSymbol?: string;
+  secureTokenIcon?: string;
+  secureAmount?: number;
+  secureAmountUsd?: number;
 };
 
 // Legacy type for internal use - will be removed
@@ -57,4 +62,9 @@ export type TransactionDetailsData = {
   swapToSymbol?: string;
   swapToAmount?: number;
   swapToAmountUsd?: number;
+  // For secure/unshield transactions
+  secureTokenSymbol?: string;
+  secureTokenIcon?: string;
+  secureAmount?: number;
+  secureAmountUsd?: number;
 };
