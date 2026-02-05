@@ -28,3 +28,10 @@ export function isGroupChat(chatType: string): boolean {
 export function isCommunityChat(chatType: string): boolean {
   return chatType === "group" || chatType === "supergroup" || chatType === "channel";
 }
+
+/**
+ * Checks if a chat type is a private DM.
+ */
+export function isPrivateChat(chatType: string): boolean {
+  return chatType === "private";
+}
