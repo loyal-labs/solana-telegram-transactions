@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1769502523349,
+      "tag": "0000_jazzy_venus",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769657160531,
+      "tag": "0001_curved_johnny_blaze",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769913050781,
+      "tag": "0002_strong_marvel_boy",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770186824696,
+      "tag": "0003_bent_night_nurse",
+      "breakpoints": true
+    }
+  ]
+}

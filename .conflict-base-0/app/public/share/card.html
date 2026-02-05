@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1200, height=630">
+  <title>Transaction Share Card</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .card {
+      width: 1200px;
+      height: 630px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 56px;
+      padding-bottom: 60px;
+      background: white;
+    }
+
+    .background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .you-received {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .icon {
+      width: 72px;
+      height: 72px;
+      background: #FF3347;
+      border-radius: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .icon svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .logo {
+      font-weight: 500;
+      font-size: 57px;
+      line-height: 1;
+      color: black;
+      letter-spacing: -0.57px;
+    }
+
+    .top-text {
+      font-weight: 500;
+      font-size: 47px;
+      line-height: 1;
+      color: black;
+      letter-spacing: -0.47px;
+    }
+
+    .bottom {
+      display: flex;
+      flex-direction: column;
+      gap: 44px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .amount {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .amount-sol {
+      font-weight: 600;
+      font-size: 86px;
+      line-height: 1;
+      color: black;
+      letter-spacing: -0.86px;
+    }
+
+    .amount-usd {
+      font-size: 40px;
+      line-height: 1;
+      color: black;
+      opacity: 0.5;
+    }
+
+    .from-to {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+      max-width: 640px;
+    }
+
+    .from, .to {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .label {
+      font-weight: 500;
+      font-size: 32px;
+      line-height: 1;
+      color: black;
+      opacity: 0.5;
+      letter-spacing: -0.32px;
+    }
+
+    .value {
+      font-size: 44px;
+      line-height: 1;
+      color: black;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img class="background" src="BG.png" alt="">
+
+    <div class="top">
+      <div class="you-received">
+        <div class="icon">
+          <svg viewBox="0 0 47 47" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M23.4424 39.0708L23.4424 7.81372" stroke="white" stroke-width="4.69" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M35.0713 27.4424L23.4427 39.0711L11.814 27.4424" stroke="white" stroke-width="4.69" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="top-text">You received</span>
+      </div>
+      <span class="logo">Loyal</span>
+    </div>
+
+    <div class="bottom">
+      <div class="amount">
+        <div class="amount-sol" id="amount-sol">+15.0988 SOL</div>
+        <div class="amount-usd" id="amount-usd">≈$2,869.77</div>
+      </div>
+
+      <div class="from-to">
+        <div class="from">
+          <div class="label">From</div>
+          <div class="value" id="sender">UQAt…qZir</div>
+        </div>
+        <div class="to">
+          <div class="label">To</div>
+          <div class="value" id="receiver">2fKB…Nhtj</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const sender = params.get('sender');
+      const receiver = params.get('receiver');
+      const usdAmount = params.get('usdAmount');
+      const solAmount = params.get('solAmount');
+
+      const formatUsd = (value) => {
+        const parsed = Number(value);
+        if (Number.isNaN(parsed)) return value ? `≈$${value}` : null;
+        return `≈$${parsed.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`;
+      };
+
+      const formatSol = (value) => {
+        const parsed = Number(value);
+        if (Number.isNaN(parsed)) return value ? `${value} SOL` : null;
+        return `+${parsed.toLocaleString('en-US', {
+          minimumFractionDigits: 4,
+          maximumFractionDigits: 4,
+        })} SOL`;
+      };
+
+      if (sender) document.getElementById('sender').textContent = sender;
+      if (receiver) document.getElementById('receiver').textContent = receiver;
+      const solText = formatSol(solAmount);
+      if (solText) document.getElementById('amount-sol').textContent = solText;
+      const usdText = formatUsd(usdAmount);
+      if (usdText) document.getElementById('amount-usd').textContent = usdText;
+    })();
+  </script>
+</body>
+</html>

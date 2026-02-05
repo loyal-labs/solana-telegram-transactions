@@ -1,0 +1,863 @@
+use anchor_lang::prelude::*;
+use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::token::{Mint, Token, TokenAccount};
+use ephemeral_rollups_sdk::access_control::instructions::CreatePermissionCpiBuilder;
+use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral};
+use ephemeral_rollups_sdk::cpi::DelegateConfig;
+use ephemeral_rollups_sdk::ephem::commit_and_undelegate_accounts;
+use session_keys::{session_auth_or, Session, SessionError, SessionToken};
+use telegram_verification::TelegramSession;
+
+declare_id!("97FzQdWi26mFNR21AbQNg4KqofiCLqQydQfAvRQMcXhV");
+
+// Seed constants
+pub const DEPOSIT_PDA_SEED: &[u8] = b"deposit";
+pub const USERNAME_DEPOSIT_PDA_SEED: &[u8] = b"username_deposit";
+pub const VAULT_PDA_SEED: &[u8] = b"vault";
+
+const MIN_USERNAME_LEN: usize = 5;
+const MAX_USERNAME_LEN: usize = 32;
+
+#[ephemeral]
+#[program]
+pub mod telegram_private_transfer {
+    use anchor_spl::token::{transfer_checked, TransferChecked};
+    use ephemeral_rollups_sdk::access_control::structs::{
+        ACCOUNT_SIGNATURES_FLAG, AUTHORITY_FLAG, Member, MembersArgs, TX_BALANCES_FLAG,
+        TX_LOGS_FLAG, TX_MESSAGE_FLAG,
+    };
+
+    use super::*;
+
+    /// Initializes a deposit account for a user and token mint if it does not exist.
+    ///
+    /// Sets up a new deposit account with zero balance for the user and token mint.
+    /// If the account is already initialized, this instruction is a no-op.
+    pub fn initialize_deposit(ctx: Context<InitializeDeposit>) -> Result<()> {
+        let deposit = &mut ctx.accounts.deposit;
+
+        // Only initialize if account is fresh (uninitialized)
+        if deposit.user == Pubkey::default() {
+            deposit.set_inner(Deposit {
+                user: ctx.accounts.user.key(),
+                token_mint: ctx.accounts.token_mint.key(),
+                amount: 0,
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Modifies the balance of a user's deposit account by transferring tokens in or out.
+    ///
+    /// If `args.increase` is true, tokens are transferred from the user's token account to the deposit account.
+    /// If false, tokens are transferred from the deposit account back to the user's token account.
+    pub fn modify_balance(ctx: Context<ModifyDeposit>, args: ModifyDepositArgs) -> Result<()> {
+        let deposit = &mut ctx.accounts.deposit;
+
+        if args.increase {
+            transfer_checked(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    TransferChecked {
+                        from: ctx.accounts.user_token_account.to_account_info(),
+                        mint: ctx.accounts.token_mint.to_account_info(),
+                        to: ctx.accounts.vault_token_account.to_account_info(),
+                        authority: ctx.accounts.user.to_account_info(),
+                    },
+                ),
+                args.amount,
+                ctx.accounts.token_mint.decimals,
+            )?;
+            deposit.amount = deposit
+                .amount
+                .checked_add(args.amount)
+                .ok_or(ErrorCode::Overflow)?;
+        } else {
+            let seeds = [
+                VAULT_PDA_SEED,
+                &ctx.accounts.token_mint.key().to_bytes(),
+                &[ctx.bumps.vault],
+            ];
+            let signer_seeds = &[&seeds[..]];
+            transfer_checked(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    TransferChecked {
+                        from: ctx.accounts.vault_token_account.to_account_info(),
+                        mint: ctx.accounts.token_mint.to_account_info(),
+                        to: ctx.accounts.user_token_account.to_account_info(),
+                        authority: ctx.accounts.vault.to_account_info(),
+                    },
+                    signer_seeds,
+                ),
+                args.amount,
+                ctx.accounts.token_mint.decimals,
+            )?;
+            deposit.amount = deposit
+                .amount
+                .checked_sub(args.amount)
+                .ok_or(ErrorCode::InsufficientDeposit)?;
+        }
+
+        Ok(())
+    }
+
+    /// Deposits tokens into a username-based deposit.
+    ///
+    /// Anyone can deposit tokens for a Telegram username.
+    pub fn deposit_for_username(
+        ctx: Context<DepositForUsername>,
+        username: String,
+        amount: u64,
+    ) -> Result<()> {
+        validate_username(&username)?;
+
+        let deposit = &mut ctx.accounts.deposit;
+        if deposit.token_mint == Pubkey::default() {
+            deposit.token_mint = ctx.accounts.token_mint.key();
+            deposit.username = username.clone();
+            deposit.amount = 0;
+        } else {
+            require!(deposit.username == username, ErrorCode::InvalidUsername);
+            require_keys_eq!(
+                deposit.token_mint,
+                ctx.accounts.token_mint.key(),
+                ErrorCode::InvalidMint
+            );
+        }
+
+        transfer_checked(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                TransferChecked {
+                    from: ctx.accounts.depositor_token_account.to_account_info(),
+                    mint: ctx.accounts.token_mint.to_account_info(),
+                    to: ctx.accounts.vault_token_account.to_account_info(),
+                    authority: ctx.accounts.depositor.to_account_info(),
+                },
+            ),
+            amount,
+            ctx.accounts.token_mint.decimals,
+        )?;
+
+        deposit.amount = deposit
+            .amount
+            .checked_add(amount)
+            .ok_or(ErrorCode::Overflow)?;
+
+        Ok(())
+    }
+
+    /// Claims tokens from a username-based deposit using a verified Telegram session.
+    pub fn claim_username_deposit(ctx: Context<ClaimUsernameDeposit>, amount: u64) -> Result<()> {
+        let deposit = &mut ctx.accounts.deposit;
+        let session = &ctx.accounts.session;
+
+        require!(session.verified, ErrorCode::NotVerified);
+        require!(
+            session.username == deposit.username,
+            ErrorCode::InvalidUsername
+        );
+        require!(deposit.amount >= amount, ErrorCode::InsufficientDeposit);
+
+        let seeds = [
+            VAULT_PDA_SEED,
+            deposit.token_mint.as_ref(),
+            &[ctx.bumps.vault],
+        ];
+        let signer_seeds = &[&seeds[..]];
+        transfer_checked(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                TransferChecked {
+                    from: ctx.accounts.vault_token_account.to_account_info(),
+                    mint: ctx.accounts.token_mint.to_account_info(),
+                    to: ctx.accounts.recipient_token_account.to_account_info(),
+                    authority: ctx.accounts.vault.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            amount,
+            ctx.accounts.token_mint.decimals,
+        )?;
+
+        deposit.amount = deposit
+            .amount
+            .checked_sub(amount)
+            .ok_or(ErrorCode::InsufficientDeposit)?;
+
+        Ok(())
+    }
+
+    /// Transfers a specified amount from one user's deposit account to another's for the same token mint.
+    ///
+    /// Only updates the internal accounting; does not move actual tokens.
+    #[session_auth_or(
+        ctx.accounts.user.key() == ctx.accounts.source_deposit.user,
+        ErrorCode::Unauthorized
+    )]
+    pub fn transfer_deposit(ctx: Context<TransferDeposit>, amount: u64) -> Result<()> {
+        let source_deposit = &mut ctx.accounts.source_deposit;
+        let destination_deposit = &mut ctx.accounts.destination_deposit;
+
+        source_deposit.amount = source_deposit
+            .amount
+            .checked_sub(amount)
+            .ok_or(ErrorCode::InsufficientDeposit)?;
+        destination_deposit.amount = destination_deposit
+            .amount
+            .checked_add(amount)
+            .ok_or(ErrorCode::Overflow)?;
+
+        Ok(())
+    }
+
+    /// Transfers a specified amount from a user's deposit account to a username-based deposit.
+    ///
+    /// Only updates the internal accounting; does not move actual tokens.
+    #[session_auth_or(
+        ctx.accounts.user.key() == ctx.accounts.source_deposit.user,
+        ErrorCode::Unauthorized
+    )]
+    pub fn transfer_to_username_deposit(
+        ctx: Context<TransferToUsernameDeposit>,
+        amount: u64,
+    ) -> Result<()> {
+        let source_deposit = &mut ctx.accounts.source_deposit;
+        let destination_deposit = &mut ctx.accounts.destination_deposit;
+
+        source_deposit.amount = source_deposit
+            .amount
+            .checked_sub(amount)
+            .ok_or(ErrorCode::InsufficientDeposit)?;
+        destination_deposit.amount = destination_deposit
+            .amount
+            .checked_add(amount)
+            .ok_or(ErrorCode::Overflow)?;
+
+        Ok(())
+    }
+
+    /// Creates a permission for a deposit account using the external permission program.
+    ///
+    /// Calls out to the permission program to create a permission for the deposit account.
+    pub fn create_permission(ctx: Context<CreatePermission>) -> Result<()> {
+        let CreatePermission {
+            payer,
+            permission,
+            permission_program,
+            deposit,
+            user,
+            system_program,
+        } = ctx.accounts;
+
+        // Whitelist programs allowed to use the permission account.
+        // The owner program is added by default to prevent bricking the account.
+        let flags = AUTHORITY_FLAG
+            | TX_LOGS_FLAG
+            | TX_BALANCES_FLAG
+            | TX_MESSAGE_FLAG
+            | ACCOUNT_SIGNATURES_FLAG;
+        let members = vec![Member {
+            pubkey: user.key(),
+            flags,
+        }];
+        CreatePermissionCpiBuilder::new(&permission_program)
+            .permission(&permission)
+            .permissioned_account(&deposit.to_account_info())
+            .payer(&payer)
+            .system_program(system_program)
+            .args(MembersArgs {
+                members: Some(members),
+            })
+            .invoke_signed(&[&[
+                DEPOSIT_PDA_SEED,
+                user.key().as_ref(),
+                deposit.token_mint.as_ref(),
+                &[ctx.bumps.deposit],
+            ]])?;
+
+        Ok(())
+    }
+
+    /// Creates a permission for a username-based deposit account.
+    pub fn create_username_permission(ctx: Context<CreateUsernamePermission>) -> Result<()> {
+        let CreateUsernamePermission {
+            payer,
+            authority,
+            session,
+            permission,
+            permission_program,
+            deposit,
+            system_program,
+        } = ctx.accounts;
+
+        require!(session.verified, ErrorCode::NotVerified);
+        require!(
+            session.username == deposit.username,
+            ErrorCode::InvalidUsername
+        );
+        require_keys_eq!(session.user_wallet, authority.key(), ErrorCode::Unauthorized);
+
+        let flags = AUTHORITY_FLAG
+            | TX_LOGS_FLAG
+            | TX_BALANCES_FLAG
+            | TX_MESSAGE_FLAG
+            | ACCOUNT_SIGNATURES_FLAG;
+        let members = vec![Member {
+            pubkey: authority.key(),
+            flags,
+        }];
+        CreatePermissionCpiBuilder::new(&permission_program)
+            .permission(&permission)
+            .permissioned_account(&deposit.to_account_info())
+            .payer(&payer)
+            .system_program(system_program)
+            .args(MembersArgs {
+                members: Some(members),
+            })
+            .invoke_signed(&[&[
+                USERNAME_DEPOSIT_PDA_SEED,
+                deposit.username.as_bytes(),
+                deposit.token_mint.as_ref(),
+                &[ctx.bumps.deposit],
+            ]])?;
+
+        Ok(())
+    }
+
+    /// Delegates the deposit account to the ephemeral rollups delegate program.
+    ///
+    /// Uses the ephemeral rollups delegate CPI to delegate the deposit account.
+    pub fn delegate(ctx: Context<DelegateDeposit>, user: Pubkey, token_mint: Pubkey) -> Result<()> {
+        let validator = ctx.accounts.validator.as_ref().map(|v| v.key());
+        ctx.accounts.delegate_deposit(
+            &ctx.accounts.payer,
+            &[DEPOSIT_PDA_SEED, user.as_ref(), token_mint.as_ref()],
+            DelegateConfig {
+                validator,
+                commit_frequency_ms: 0,
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Delegates the username-based deposit account to the ephemeral rollups delegate program.
+    pub fn delegate_username_deposit(
+        ctx: Context<DelegateUsernameDeposit>,
+        username: String,
+        token_mint: Pubkey,
+    ) -> Result<()> {
+        validate_username(&username)?;
+        require!(ctx.accounts.session.verified, ErrorCode::NotVerified);
+        require!(
+            ctx.accounts.session.username == username,
+            ErrorCode::InvalidUsername
+        );
+        require_keys_eq!(
+            ctx.accounts.session.user_wallet,
+            ctx.accounts.payer.key(),
+            ErrorCode::Unauthorized
+        );
+        let validator = ctx.accounts.validator.as_ref().map(|v| v.key());
+        ctx.accounts.delegate_deposit(
+            &ctx.accounts.payer,
+            &[
+                USERNAME_DEPOSIT_PDA_SEED,
+                username.as_bytes(),
+                token_mint.as_ref(),
+            ],
+            DelegateConfig {
+                validator,
+                commit_frequency_ms: 0,
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Commits and undelegates the deposit account from the ephemeral rollups program.
+    ///
+    /// Uses the ephemeral rollups SDK to commit and undelegate the deposit account.
+    #[session_auth_or(
+        ctx.accounts.user.key() == ctx.accounts.deposit.user,
+        ErrorCode::Unauthorized
+    )]
+    pub fn undelegate(ctx: Context<UndelegateDeposit>) -> Result<()> {
+        commit_and_undelegate_accounts(
+            &ctx.accounts.payer,
+            vec![&ctx.accounts.deposit.to_account_info()],
+            &ctx.accounts.magic_context,
+            &ctx.accounts.magic_program,
+        )?;
+        Ok(())
+    }
+
+    /// Commits and undelegates the username-based deposit account from the ephemeral rollups program.
+    pub fn undelegate_username_deposit(
+        ctx: Context<UndelegateUsernameDeposit>,
+        username: String,
+        token_mint: Pubkey,
+    ) -> Result<()> {
+        validate_username(&username)?;
+        require!(ctx.accounts.session.verified, ErrorCode::NotVerified);
+        require!(
+            ctx.accounts.session.username == username,
+            ErrorCode::InvalidUsername
+        );
+        require_keys_eq!(
+            ctx.accounts.session.user_wallet,
+            ctx.accounts.payer.key(),
+            ErrorCode::Unauthorized
+        );
+        require_keys_eq!(
+            ctx.accounts.deposit.key(),
+            Pubkey::create_program_address(
+                &[
+                    USERNAME_DEPOSIT_PDA_SEED,
+                    username.as_bytes(),
+                    token_mint.as_ref(),
+                    &[ctx.bumps.deposit]
+                ],
+                ctx.program_id
+            )
+            .map_err(|_| error!(ErrorCode::InvalidUsername))?,
+            ErrorCode::InvalidUsername
+        );
+        commit_and_undelegate_accounts(
+            &ctx.accounts.payer,
+            vec![&ctx.accounts.deposit.to_account_info()],
+            &ctx.accounts.magic_context,
+            &ctx.accounts.magic_program,
+        )?;
+        Ok(())
+    }
+}
+
+// ---------------- Accounts ----------------
+#[derive(Accounts)]
+pub struct InitializeDeposit<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: Anyone can initialize the deposit
+    pub user: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + Deposit::INIT_SPACE,
+        seeds = [DEPOSIT_PDA_SEED, user.key().as_ref(), token_mint.key().as_ref()],
+        bump
+    )]
+    pub deposit: Account<'info, Deposit>,
+    pub token_mint: Account<'info, Mint>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct ModifyDepositArgs {
+    pub amount: u64,
+    pub increase: bool,
+}
+
+#[derive(Accounts)]
+pub struct ModifyDeposit<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub user: Signer<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + Vault::INIT_SPACE,
+        seeds = [VAULT_PDA_SEED, deposit.token_mint.as_ref()],
+        bump,
+    )]
+    pub vault: Account<'info, Vault>,
+    #[account(
+        mut,
+        seeds = [DEPOSIT_PDA_SEED, deposit.user.as_ref(), deposit.token_mint.as_ref()],
+        bump,
+        has_one = user,
+        has_one = token_mint,
+    )]
+    pub deposit: Account<'info, Deposit>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = token_mint,
+        associated_token::authority = user,
+    )]
+    pub user_token_account: Account<'info, TokenAccount>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = token_mint,
+        associated_token::authority = vault,
+    )]
+    pub vault_token_account: Account<'info, TokenAccount>,
+    pub token_mint: Account<'info, Mint>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(username: String)]
+pub struct DepositForUsername<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut)]
+    pub depositor: Signer<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + UsernameDeposit::INIT_SPACE,
+        seeds = [USERNAME_DEPOSIT_PDA_SEED, username.as_bytes(), token_mint.key().as_ref()],
+        bump
+    )]
+    pub deposit: Account<'info, UsernameDeposit>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + Vault::INIT_SPACE,
+        seeds = [VAULT_PDA_SEED, token_mint.key().as_ref()],
+        bump,
+    )]
+    pub vault: Account<'info, Vault>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = token_mint,
+        associated_token::authority = vault,
+    )]
+    pub vault_token_account: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        constraint = depositor_token_account.mint == token_mint.key(),
+        constraint = depositor_token_account.owner == depositor.key(),
+    )]
+    pub depositor_token_account: Account<'info, TokenAccount>,
+    pub token_mint: Account<'info, Mint>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimUsernameDeposit<'info> {
+    #[account(
+        mut,
+        constraint = recipient_token_account.mint == token_mint.key() @ ErrorCode::InvalidMint,
+    )]
+    pub recipient_token_account: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        seeds = [VAULT_PDA_SEED, token_mint.key().as_ref()],
+        bump
+    )]
+    pub vault: Account<'info, Vault>,
+    #[account(
+        mut,
+        associated_token::mint = token_mint,
+        associated_token::authority = vault,
+    )]
+    pub vault_token_account: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        seeds = [USERNAME_DEPOSIT_PDA_SEED, deposit.username.as_bytes(), deposit.token_mint.as_ref()],
+        bump,
+        has_one = token_mint,
+    )]
+    pub deposit: Account<'info, UsernameDeposit>,
+    pub token_mint: Account<'info, Mint>,
+    #[account(
+        constraint = session.user_wallet == recipient_token_account.owner @ ErrorCode::InvalidRecipient,
+        constraint = session.verified @ ErrorCode::NotVerified,
+        constraint = session.username == deposit.username @ ErrorCode::InvalidUsername,
+    )]
+    pub session: Account<'info, TelegramSession>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts, Session)]
+pub struct TransferDeposit<'info> {
+    /// CHECK: Matched against the deposit account
+    pub user: AccountInfo<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[session(
+        signer = payer,
+        authority = user.key()
+    )]
+    pub session_token: Option<Account<'info, SessionToken>>,
+    #[account(
+        mut,
+        seeds = [
+            DEPOSIT_PDA_SEED,
+            source_deposit.user.as_ref(),
+            source_deposit.token_mint.as_ref()
+        ],
+        bump,
+        has_one = user,
+        has_one = token_mint,
+        constraint = source_deposit.user != destination_deposit.user,
+    )]
+    pub source_deposit: Account<'info, Deposit>,
+    #[account(
+        mut,
+        seeds = [
+            DEPOSIT_PDA_SEED,
+            destination_deposit.user.as_ref(),
+            destination_deposit.token_mint.as_ref()
+        ],
+        bump,
+        has_one = token_mint,
+    )]
+    pub destination_deposit: Account<'info, Deposit>,
+    pub token_mint: Account<'info, Mint>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts, Session)]
+pub struct TransferToUsernameDeposit<'info> {
+    /// CHECK: Matched against the deposit account
+    pub user: AccountInfo<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[session(
+        signer = payer,
+        authority = user.key()
+    )]
+    pub session_token: Option<Account<'info, SessionToken>>,
+    #[account(
+        mut,
+        seeds = [
+            DEPOSIT_PDA_SEED,
+            source_deposit.user.as_ref(),
+            source_deposit.token_mint.as_ref()
+        ],
+        bump,
+        has_one = user,
+        has_one = token_mint,
+    )]
+    pub source_deposit: Account<'info, Deposit>,
+    #[account(
+        mut,
+        seeds = [
+            USERNAME_DEPOSIT_PDA_SEED,
+            destination_deposit.username.as_bytes(),
+            destination_deposit.token_mint.as_ref()
+        ],
+        bump,
+        has_one = token_mint,
+    )]
+    pub destination_deposit: Account<'info, UsernameDeposit>,
+    pub token_mint: Account<'info, Mint>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CreatePermission<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub user: Signer<'info>,
+    #[account(
+        seeds = [DEPOSIT_PDA_SEED, user.key().as_ref(), deposit.token_mint.as_ref()],
+        bump
+    )]
+    pub deposit: Account<'info, Deposit>,
+    /// CHECK: Checked by the permission program
+    #[account(mut)]
+    pub permission: UncheckedAccount<'info>,
+    /// CHECK: Checked by the permission program
+    pub permission_program: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CreateUsernamePermission<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub authority: Signer<'info>,
+    #[account(
+        seeds = [
+            USERNAME_DEPOSIT_PDA_SEED,
+            deposit.username.as_bytes(),
+            deposit.token_mint.as_ref()
+        ],
+        bump
+    )]
+    pub deposit: Account<'info, UsernameDeposit>,
+    #[account(
+        constraint = session.user_wallet == authority.key() @ ErrorCode::Unauthorized,
+        constraint = session.verified @ ErrorCode::NotVerified,
+        constraint = session.username == deposit.username @ ErrorCode::InvalidUsername,
+    )]
+    pub session: Account<'info, TelegramSession>,
+    /// CHECK: Checked by the permission program
+    #[account(mut)]
+    pub permission: UncheckedAccount<'info>,
+    /// CHECK: Checked by the permission program
+    pub permission_program: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[delegate]
+#[derive(Accounts)]
+#[instruction(user: Pubkey, token_mint: Pubkey)]
+pub struct DelegateDeposit<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: Checked by the delegate program
+    pub validator: Option<AccountInfo<'info>>,
+    /// CHECK: Checked counter accountby the delegate program
+    #[account(
+        mut,
+        del,
+        seeds = [DEPOSIT_PDA_SEED, user.as_ref(), token_mint.as_ref()],
+        bump,
+    )]
+    pub deposit: AccountInfo<'info>,
+}
+
+#[delegate]
+#[derive(Accounts)]
+#[instruction(username: String, token_mint: Pubkey)]
+pub struct DelegateUsernameDeposit<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: Checked by the delegate program
+    pub validator: Option<AccountInfo<'info>>,
+    #[account(
+        constraint = session.user_wallet == payer.key() @ ErrorCode::Unauthorized,
+        constraint = session.verified @ ErrorCode::NotVerified,
+        constraint = session.username == username @ ErrorCode::InvalidUsername,
+    )]
+    pub session: Account<'info, TelegramSession>,
+    /// CHECK: Checked by the delegate program
+    #[account(
+        mut,
+        del,
+        seeds = [USERNAME_DEPOSIT_PDA_SEED, username.as_bytes(), token_mint.as_ref()],
+        bump,
+    )]
+    pub deposit: AccountInfo<'info>,
+}
+
+#[commit]
+#[derive(Accounts, Session)]
+pub struct UndelegateDeposit<'info> {
+    /// CHECK: Matched against the deposit account
+    pub user: AccountInfo<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[session(
+        signer = payer,
+        authority = user.key()
+    )]
+    pub session_token: Option<Account<'info, SessionToken>>,
+    #[account(
+        mut,
+        seeds = [DEPOSIT_PDA_SEED, user.key().as_ref(), deposit.token_mint.as_ref()],
+        bump
+    )]
+    pub deposit: Account<'info, Deposit>,
+}
+
+#[commit]
+#[derive(Accounts)]
+#[instruction(username: String, token_mint: Pubkey)]
+pub struct UndelegateUsernameDeposit<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        constraint = session.user_wallet == payer.key() @ ErrorCode::Unauthorized,
+        constraint = session.verified @ ErrorCode::NotVerified,
+        constraint = session.username == username @ ErrorCode::InvalidUsername,
+    )]
+    pub session: Account<'info, TelegramSession>,
+    /// CHECK: Delegated account (owned by delegation program)
+    #[account(
+        mut,
+        seeds = [
+            USERNAME_DEPOSIT_PDA_SEED,
+            username.as_bytes(),
+            token_mint.as_ref()
+        ],
+        bump
+    )]
+    pub deposit: AccountInfo<'info>,
+}
+
+// ---------------- State ----------------
+
+/// A deposit account for a user and token mint.
+#[account]
+#[derive(InitSpace)]
+pub struct Deposit {
+    pub user: Pubkey,
+    pub token_mint: Pubkey,
+    pub amount: u64,
+}
+
+/// A deposit account for a telegram username and token mint.
+#[account]
+#[derive(InitSpace)]
+pub struct UsernameDeposit {
+    #[max_len(MAX_USERNAME_LEN)]
+    pub username: String,
+    pub token_mint: Pubkey,
+    pub amount: u64,
+}
+
+/// A vault storing deposited tokens.
+/// Has a dummy field because Anchor requires it.
+#[account]
+#[derive(InitSpace)]
+pub struct Vault {
+    _dummy: u8,
+}
+
+// ---------------- Error Codes ----------------
+#[error_code]
+pub enum ErrorCode {
+    #[msg("Unauthorized")]
+    Unauthorized,
+    #[msg("Overflow")]
+    Overflow,
+    #[msg("Invalid Mint")]
+    InvalidMint,
+    #[msg("Insufficient Vault")]
+    InsufficientVault,
+    #[msg("Insufficient Deposit")]
+    InsufficientDeposit,
+    #[msg("Not Verified")]
+    NotVerified,
+    #[msg("Expired Signature")]
+    ExpiredSignature,
+    #[msg("Replay")]
+    Replay,
+    #[msg("Invalid Ed25519")]
+    InvalidEd25519,
+    #[msg("Invalid Username")]
+    InvalidUsername,
+    #[msg("Invalid Recipient")]
+    InvalidRecipient,
+    #[msg("Invalid Depositor")]
+    InvalidDepositor,
+}
+
+fn validate_username(username: &str) -> Result<()> {
+    require!(
+        (MIN_USERNAME_LEN..=MAX_USERNAME_LEN).contains(&username.len()),
+        ErrorCode::InvalidUsername
+    );
+    require!(
+        username.bytes().all(|b| (b'A'..=b'Z').contains(&b)
+            || (b'a'..=b'z').contains(&b)
+            || (b'0'..=b'9').contains(&b)
+            || b == b'_'),
+        ErrorCode::InvalidUsername
+    );
+    Ok(())
+}

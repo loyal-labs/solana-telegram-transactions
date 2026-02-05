@@ -1,0 +1,6 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="check-circle">
+<circle id="Vector" cx="12" cy="12" r="12" fill="var(--fill-0, #3F89F7)"/>
+<path id="Done" d="M6.5 12.5L10 16L17.5 8.5" stroke="var(--stroke-0, white)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>
