@@ -13,6 +13,12 @@ import type { SolanaEnv } from "./types";
 const DEFAULT_SOLANA_ENV: SolanaEnv = "devnet";
 
 export const getSolanaEnv = (): SolanaEnv => {
+  if (typeof window !== "undefined") {
+    const override = localStorage.getItem("solana-env-override");
+    if (override === "mainnet" || override === "devnet" || override === "localnet") {
+      return override;
+    }
+  }
   const env = process.env.NEXT_PUBLIC_SOLANA_ENV;
   if (env === "mainnet" || env === "devnet" || env === "localnet") {
     return env;

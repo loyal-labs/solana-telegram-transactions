@@ -19,7 +19,6 @@ import {
   ArrowDown,
   ArrowUp,
   ChevronRight,
-  Clock,
   Copy,
   RefreshCcw,
 } from "lucide-react";
@@ -2777,7 +2776,7 @@ export default function Home() {
                           >
                             {/* Left - Icon */}
                             <div className="py-1.5 pr-3">
-                              {isDepositForUsername ? (
+                              {isPending ? (
                                 <div className="w-12 h-12 rounded-full overflow-hidden relative">
                                   <Image
                                     src="/loyal-shield.png"
@@ -2796,35 +2795,13 @@ export default function Home() {
                                   />
                                 </div>
                               ) : (
-                                <div
-                                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                                  style={{
-                                    background: isIncoming
-                                      ? "rgba(50, 229, 94, 0.15)"
-                                      : isPending
-                                      ? "rgba(0, 177, 251, 0.15)"
-                                      : "rgba(0, 0, 0, 0.05)",
-                                  }}
-                                >
-                                  {isIncoming ? (
-                                    <ArrowDown
-                                      className="w-7 h-7"
-                                      strokeWidth={1.5}
-                                      style={{ color: "#32e55e" }}
-                                    />
-                                  ) : isPending ? (
-                                    <Clock
-                                      className="w-7 h-7"
-                                      strokeWidth={1.5}
-                                      style={{ color: "#00b1fb" }}
-                                    />
-                                  ) : (
-                                    <ArrowUp
-                                      className="w-7 h-7"
-                                      strokeWidth={1.5}
-                                      style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                                    />
-                                  )}
+                                <div className="w-12 h-12 rounded-full overflow-hidden relative">
+                                  <Image
+                                    src="/tokens/solana-sol-logo.png"
+                                    alt="SOL"
+                                    fill
+                                    className="object-cover"
+                                  />
                                 </div>
                               )}
                             </div>
