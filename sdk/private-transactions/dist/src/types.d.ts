@@ -1,4 +1,4 @@
-import type { PublicKey, Transaction, VersionedTransaction, Keypair, Commitment } from "@solana/web3.js";
+import type { PublicKey, Transaction, VersionedTransaction, Keypair, Commitment, ConfirmOptions } from "@solana/web3.js";
 import type { AnchorProvider } from "@coral-xyz/anchor";
 /**
  * Minimal wallet interface matching @solana/wallet-adapter-base
@@ -8,6 +8,7 @@ export interface WalletLike {
     publicKey: PublicKey;
     signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T>;
     signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]>;
+    signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
 }
 /**
  * Union type supporting multiple wallet types:
@@ -16,181 +17,229 @@ export interface WalletLike {
  * - AnchorProvider: Existing Anchor projects
  */
 export type WalletSigner = WalletLike | Keypair | AnchorProvider;
-/**
- * RPC options for transactions
- */
-export interface RpcOptions {
-    skipPreflight?: boolean;
-    preflightCommitment?: Commitment;
-    maxRetries?: number;
-}
-/**
- * Configuration for creating an ephemeral client
- */
-export interface EphemeralClientConfig {
+export type Amount = number | bigint;
+export type SignMessage = (message: Uint8Array) => Promise<Uint8Array>;
+export interface EphemeralProviderParams {
     signer: WalletSigner;
-    rpcEndpoint: string;
+    rpcEndpoint?: string;
     wsEndpoint?: string;
     commitment?: Commitment;
+    /** Defaults to auto mode when omitted */
+    useAuth?: boolean;
+    /** Optional pre-fetched auth token */
+    authToken?: string;
+    /** Optional custom signMessage implementation */
+    signMessage?: SignMessage;
+}
+export interface EphemeralProviderResult {
+    provider: AnchorProvider;
+    rpcEndpoint: string;
+    wsEndpoint: string;
+    commitment: Commitment;
+    authToken?: string;
+    authExpiresAt?: number;
+}
+export interface RpcOptions {
+    /** Transaction commitment level (default: 'confirmed') */
+    commitment?: Commitment;
+    /** Full RPC confirm options (overrides commitment when provided) */
+    rpcOptions?: ConfirmOptions;
 }
 /**
- * Data structure for a user deposit account
+ * Deposit account data structure
  */
 export interface DepositData {
+    /** Wallet address of the depositor */
     user: PublicKey;
+    /** Token mint for this deposit */
     tokenMint: PublicKey;
+    /** Total deposited amount (token base units) */
     amount: number;
+    /** PDA address of the deposit account */
     address: PublicKey;
 }
 /**
- * Data structure for a username-based deposit account
+ * Username deposit account data structure
  */
 export interface UsernameDepositData {
+    /** Telegram username */
     username: string;
+    /** Token mint for this deposit */
     tokenMint: PublicKey;
+    /** Total deposited amount (token base units) */
     amount: number;
+    /** PDA address of the username deposit account */
     address: PublicKey;
 }
-/**
- * Parameters for initializing a deposit account
- */
-export interface InitializeDepositParams {
-    user: PublicKey;
+export interface InitializeDepositParams extends RpcOptions {
     tokenMint: PublicKey;
-    payer: PublicKey;
-    rpcOptions?: RpcOptions;
+    /** Defaults to connected wallet */
+    user?: PublicKey;
+    /** Defaults to connected wallet */
+    payer?: PublicKey;
+    tokenProgram?: PublicKey;
 }
-/**
- * Parameters for modifying a deposit balance
- */
-export interface ModifyBalanceParams {
-    user: PublicKey;
+export interface InitializeDepositResult {
+    signature: string;
+    deposit: DepositData;
+}
+export interface ModifyBalanceParams extends RpcOptions {
     tokenMint: PublicKey;
-    amount: number | bigint;
+    amount: Amount;
     increase: boolean;
-    payer: PublicKey;
-    userTokenAccount: PublicKey;
-    rpcOptions?: RpcOptions;
+    /** Defaults to connected wallet */
+    user?: PublicKey;
+    /** Defaults to connected wallet */
+    payer?: PublicKey;
+    userTokenAccount?: PublicKey;
+    vault?: PublicKey;
+    vaultTokenAccount?: PublicKey;
+    tokenProgram?: PublicKey;
+    associatedTokenProgram?: PublicKey;
 }
-/**
- * Result of a balance modification
- */
 export interface ModifyBalanceResult {
     signature: string;
     deposit: DepositData;
 }
-/**
- * Parameters for depositing tokens for a username
- */
-export interface DepositForUsernameParams {
-    username: string;
+export interface TransferDepositParams extends RpcOptions {
     tokenMint: PublicKey;
-    amount: number | bigint;
-    depositor: PublicKey;
-    payer: PublicKey;
-    depositorTokenAccount: PublicKey;
-    rpcOptions?: RpcOptions;
+    amount: Amount;
+    /** Defaults to connected wallet */
+    user?: PublicKey;
+    destinationUser?: PublicKey;
+    sourceDeposit?: PublicKey;
+    destinationDeposit?: PublicKey;
+    /** Optional session token account for session auth */
+    sessionToken?: PublicKey | null;
+    /** Defaults to connected wallet */
+    payer?: PublicKey;
 }
-/**
- * Parameters for claiming tokens from a username deposit
- */
-export interface ClaimUsernameDepositParams {
+export interface TransferDepositResult {
+    signature: string;
+    sourceDeposit: DepositData;
+    destinationDeposit: DepositData;
+}
+export interface TransferToUsernameDepositParams extends RpcOptions {
+    tokenMint: PublicKey;
+    username: string;
+    amount: Amount;
+    /** Defaults to connected wallet */
+    user?: PublicKey;
+    sourceDeposit?: PublicKey;
+    destinationDeposit?: PublicKey;
+    /** Optional session token account for session auth */
+    sessionToken?: PublicKey | null;
+    /** Defaults to connected wallet */
+    payer?: PublicKey;
+}
+export interface TransferToUsernameDepositResult {
+    signature: string;
+    sourceDeposit: DepositData;
+    destinationDeposit: UsernameDepositData;
+}
+export interface DepositForUsernameParams extends RpcOptions {
     username: string;
     tokenMint: PublicKey;
-    amount: number | bigint;
-    recipient: PublicKey;
-    recipientTokenAccount: PublicKey;
+    amount: Amount;
+    /** Defaults to connected wallet */
+    depositor?: PublicKey;
+    /** Defaults to connected wallet */
+    payer?: PublicKey;
+    depositorTokenAccount?: PublicKey;
+    vault?: PublicKey;
+    vaultTokenAccount?: PublicKey;
+    tokenProgram?: PublicKey;
+    associatedTokenProgram?: PublicKey;
+}
+export interface DepositForUsernameResult {
+    signature: string;
+    deposit: UsernameDepositData;
+}
+export interface ClaimUsernameDepositParams extends RpcOptions {
+    username: string;
+    tokenMint: PublicKey;
+    amount: Amount;
+    /** Defaults to connected wallet */
+    recipient?: PublicKey;
+    recipientTokenAccount?: PublicKey;
+    vault?: PublicKey;
+    vaultTokenAccount?: PublicKey;
     session: PublicKey;
-    rpcOptions?: RpcOptions;
+    tokenProgram?: PublicKey;
 }
-/**
- * Parameters for creating a permission for a deposit
- */
-export interface CreatePermissionParams {
-    user: PublicKey;
+export interface ClaimUsernameDepositResult {
+    signature: string;
+    deposit: UsernameDepositData;
+}
+export interface CreatePermissionParams extends RpcOptions {
     tokenMint: PublicKey;
-    payer: PublicKey;
-    rpcOptions?: RpcOptions;
+    /** Defaults to connected wallet */
+    user?: PublicKey;
+    /** Defaults to connected wallet */
+    payer?: PublicKey;
+    deposit?: PublicKey;
+    permission?: PublicKey;
+    permissionProgram?: PublicKey;
 }
-/**
- * Parameters for creating a permission for a username deposit
- */
-export interface CreateUsernamePermissionParams {
+export interface CreatePermissionResult {
+    signature: string;
+    permission: PublicKey;
+}
+export interface CreateUsernamePermissionParams extends RpcOptions {
     username: string;
     tokenMint: PublicKey;
     session: PublicKey;
-    authority: PublicKey;
-    payer: PublicKey;
-    rpcOptions?: RpcOptions;
+    /** Defaults to connected wallet */
+    authority?: PublicKey;
+    /** Defaults to connected wallet */
+    payer?: PublicKey;
+    deposit?: PublicKey;
+    permission?: PublicKey;
+    permissionProgram?: PublicKey;
 }
-/**
- * Parameters for delegating a deposit to an ephemeral rollup
- */
-export interface DelegateDepositParams {
-    user: PublicKey;
+export interface CreateUsernamePermissionResult {
+    signature: string;
+    permission: PublicKey;
+}
+export interface DelegateDepositParams extends RpcOptions {
     tokenMint: PublicKey;
-    payer: PublicKey;
+    /** Defaults to connected wallet */
+    user?: PublicKey;
+    /** Defaults to connected wallet */
+    payer?: PublicKey;
+    deposit?: PublicKey;
     validator?: PublicKey;
-    rpcOptions?: RpcOptions;
 }
-/**
- * Parameters for delegating a username deposit to an ephemeral rollup
- */
-export interface DelegateUsernameDepositParams {
+export interface DelegateUsernameDepositParams extends RpcOptions {
     username: string;
     tokenMint: PublicKey;
     session: PublicKey;
-    payer: PublicKey;
+    /** Defaults to connected wallet */
+    payer?: PublicKey;
+    deposit?: PublicKey;
     validator?: PublicKey;
-    rpcOptions?: RpcOptions;
 }
-/**
- * Parameters for undelegating a deposit from an ephemeral rollup
- */
-export interface UndelegateDepositParams {
-    user: PublicKey;
+export interface UndelegateDepositParams extends RpcOptions {
     tokenMint: PublicKey;
-    payer: PublicKey;
+    /** Defaults to connected wallet */
+    user?: PublicKey;
+    /** Defaults to connected wallet */
+    payer?: PublicKey;
+    deposit?: PublicKey;
+    /** Optional session token account for session auth */
     sessionToken?: PublicKey | null;
-    magicProgram: PublicKey;
-    magicContext: PublicKey;
-    rpcOptions?: RpcOptions;
+    magicProgram?: PublicKey;
+    magicContext?: PublicKey;
 }
-/**
- * Parameters for undelegating a username deposit from an ephemeral rollup
- */
-export interface UndelegateUsernameDepositParams {
+export interface UndelegateUsernameDepositParams extends RpcOptions {
     username: string;
     tokenMint: PublicKey;
     session: PublicKey;
-    payer: PublicKey;
-    magicProgram: PublicKey;
-    magicContext: PublicKey;
-    rpcOptions?: RpcOptions;
-}
-/**
- * Parameters for transferring between user deposits
- */
-export interface TransferDepositParams {
-    user: PublicKey;
-    tokenMint: PublicKey;
-    destinationUser: PublicKey;
-    amount: number | bigint;
-    payer: PublicKey;
-    sessionToken?: PublicKey | null;
-    rpcOptions?: RpcOptions;
-}
-/**
- * Parameters for transferring from a user deposit to a username deposit
- */
-export interface TransferToUsernameDepositParams {
-    username: string;
-    tokenMint: PublicKey;
-    amount: number | bigint;
-    user: PublicKey;
-    payer: PublicKey;
-    sessionToken?: PublicKey | null;
-    rpcOptions?: RpcOptions;
+    /** Defaults to connected wallet */
+    payer?: PublicKey;
+    deposit?: PublicKey;
+    magicProgram?: PublicKey;
+    magicContext?: PublicKey;
 }
 /**
  * Check if signer is a raw Keypair

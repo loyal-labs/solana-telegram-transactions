@@ -3,10 +3,7 @@ import {
   DEPOSIT_SEED_BYTES,
   USERNAME_DEPOSIT_SEED_BYTES,
   VAULT_SEED_BYTES,
-  PERMISSION_SEED_BYTES,
   PROGRAM_ID,
-  PERMISSION_PROGRAM_ID,
-  DELEGATION_PROGRAM_ID,
 } from "./constants";
 
 /**
@@ -61,73 +58,5 @@ export function findVaultPda(
   return PublicKey.findProgramAddressSync(
     [VAULT_SEED_BYTES, tokenMint.toBuffer()],
     programId
-  );
-}
-
-/**
- * Derive the permission PDA for an account
- *
- * @param account - The account to derive permission for
- * @param permissionProgramId - Optional permission program ID (defaults to PERMISSION_PROGRAM_ID)
- * @returns [PDA address, bump seed]
- */
-export function findPermissionPda(
-  account: PublicKey,
-  permissionProgramId: PublicKey = PERMISSION_PROGRAM_ID
-): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [PERMISSION_SEED_BYTES, account.toBuffer()],
-    permissionProgramId
-  );
-}
-
-/**
- * Derive the delegation record PDA for an account
- *
- * @param account - The delegated account
- * @param delegationProgramId - Optional delegation program ID (defaults to DELEGATION_PROGRAM_ID)
- * @returns [PDA address, bump seed]
- */
-export function findDelegationRecordPda(
-  account: PublicKey,
-  delegationProgramId: PublicKey = DELEGATION_PROGRAM_ID
-): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("delegation"), account.toBuffer()],
-    delegationProgramId
-  );
-}
-
-/**
- * Derive the delegation metadata PDA for an account
- *
- * @param account - The delegated account
- * @param delegationProgramId - Optional delegation program ID (defaults to DELEGATION_PROGRAM_ID)
- * @returns [PDA address, bump seed]
- */
-export function findDelegationMetadataPda(
-  account: PublicKey,
-  delegationProgramId: PublicKey = DELEGATION_PROGRAM_ID
-): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("delegation-metadata"), account.toBuffer()],
-    delegationProgramId
-  );
-}
-
-/**
- * Derive the buffer PDA for an account (used in delegation)
- *
- * @param account - The account to derive buffer for
- * @param delegationProgramId - Optional delegation program ID (defaults to DELEGATION_PROGRAM_ID)
- * @returns [PDA address, bump seed]
- */
-export function findBufferPda(
-  account: PublicKey,
-  delegationProgramId: PublicKey = DELEGATION_PROGRAM_ID
-): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("buffer"), account.toBuffer()],
-    delegationProgramId
   );
 }
