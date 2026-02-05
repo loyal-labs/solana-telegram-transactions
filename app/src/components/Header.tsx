@@ -48,16 +48,6 @@ export default function Header() {
           transition: "opacity 0.15s ease-out",
         }}
       />
-      {/* Fade gradient - only visible when scrolled */}
-      <div
-        className="absolute left-0 right-0 pointer-events-none transition-opacity duration-150"
-        style={{
-          bottom: -6,
-          height: 6,
-          background: "linear-gradient(to bottom, #fff, transparent)",
-          opacity: isScrolled ? 1 : 0,
-        }}
-      />
       {/* Bottom border line - only visible when scrolled */}
       <div
         className="absolute left-0 right-0 bottom-0 pointer-events-none transition-opacity duration-150"

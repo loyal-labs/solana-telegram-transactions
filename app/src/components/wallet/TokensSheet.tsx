@@ -198,7 +198,7 @@ export default function TokensSheet({
       <div
         ref={sheetRef}
         onTransitionEnd={handleTransitionEnd}
-        className="fixed left-0 right-0 bottom-0 z-[9999] flex flex-col bg-white rounded-t-[38px]"
+        className="fixed left-0 right-0 bottom-0 z-[9999] flex flex-col bg-white rounded-t-[38px] font-sans"
         style={{
           top: sheetTopOffset,
           transform: show ? "translateY(0)" : "translateY(100%)",

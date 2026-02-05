@@ -2933,7 +2933,6 @@ export default function Home() {
       <TransactionDetailsSheet
         open={isTransactionDetailsSheetOpen}
         onOpenChange={handleTransactionDetailsSheetChange}
-        trigger={null}
         transaction={selectedTransaction}
         showSuccess={showClaimSuccess}
         showError={claimError}
