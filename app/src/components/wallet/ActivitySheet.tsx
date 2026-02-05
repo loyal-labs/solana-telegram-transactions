@@ -4,7 +4,8 @@ import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { Drawer } from "@xelene/vaul-with-scroll-fix";
 import { motion } from "framer-motion";
-import { ArrowDown, ArrowUp, Clock, X } from "lucide-react";
+import { ArrowDown, X } from "lucide-react";
+import Image from "next/image";
 import {
   type CSSProperties,
   type ReactNode,
@@ -430,37 +431,25 @@ export default function ActivitySheet({
                       >
                         {/* Left - Icon */}
                         <div className="py-1.5 pr-3">
-                          <div
-                            className="w-12 h-12 rounded-full flex items-center justify-center"
-                            style={{
-                              background: isIncoming
-                                ? "rgba(50, 229, 94, 0.15)"
-                                : isPending
-                                  ? "rgba(0, 177, 251, 0.15)"
-                                  : "rgba(255, 255, 255, 0.06)",
-                              mixBlendMode:
-                                isIncoming || isPending ? "normal" : "lighten",
-                            }}
-                          >
-                            {isIncoming ? (
-                              <ArrowDown
-                                className="w-7 h-7"
-                                strokeWidth={1.5}
-                                style={{ color: "#32e55e" }}
+                          {isPending ? (
+                            <div className="w-12 h-12 rounded-full overflow-hidden relative">
+                              <Image
+                                src="/loyal-shield.png"
+                                alt="To be claimed"
+                                fill
+                                className="object-cover"
                               />
-                            ) : isPending ? (
-                              <Clock
-                                className="w-7 h-7"
-                                strokeWidth={1.5}
-                                style={{ color: "#00b1fb" }}
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 rounded-full overflow-hidden relative">
+                              <Image
+                                src="/tokens/solana-sol-logo.png"
+                                alt="SOL"
+                                fill
+                                className="object-cover"
                               />
-                            ) : (
-                              <ArrowUp
-                                className="w-7 h-7 text-white/60"
-                                strokeWidth={1.5}
-                              />
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Middle - Text */}

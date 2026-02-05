@@ -6,7 +6,15 @@ import {
   openTelegramLink,
   retrieveLaunchParams,
 } from "@telegram-apps/sdk-react";
-import { ChevronRight, CircleHelp, CirclePlus, Smile } from "lucide-react";
+import {
+  ArrowUpRight,
+  ChevronRight,
+  CircleHelp,
+  CirclePlus,
+  Globe,
+  Network,
+  Smile,
+} from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -19,9 +27,15 @@ type ToggleProps = {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
+  activeColor?: string;
 };
 
-function Toggle({ checked, onChange, disabled = false }: ToggleProps) {
+function Toggle({
+  checked,
+  onChange,
+  disabled = false,
+  activeColor = "#34c759",
+}: ToggleProps) {
   const handleClick = () => {
     if (disabled) return;
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -41,8 +55,9 @@ function Toggle({ checked, onChange, disabled = false }: ToggleProps) {
         disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
       }`}
       style={{
-        backgroundColor: checked ? "#2990ff" : "rgba(255, 255, 255, 0.06)",
-        mixBlendMode: checked ? "normal" : "lighten",
+        backgroundColor: checked
+          ? activeColor
+          : "rgba(120, 120, 128, 0.16)",
       }}
     >
       <div
@@ -61,74 +76,61 @@ type ProfileCellProps = {
   icon: React.ReactNode;
   title: string;
   subtitle?: string;
-  rightContent?: React.ReactNode;
+  rightDetail?: string;
   showChevron?: boolean;
+  showArrow?: boolean;
   toggle?: {
     checked: boolean;
     onChange: (checked: boolean) => void;
+    activeColor?: string;
   };
   onClick?: () => void;
   disabled?: boolean;
-  noBg?: boolean;
 };
 
 function ProfileCell({
   icon,
   title,
   subtitle,
-  rightContent,
+  rightDetail,
   showChevron = false,
+  showArrow = false,
   toggle,
   onClick,
   disabled = false,
-  noBg = false,
 }: ProfileCellProps) {
   const content = (
     <div
-      className={`flex items-center w-full overflow-hidden pl-3 pr-4 py-1 ${
+      className={`flex items-center w-full overflow-hidden px-4 ${
         disabled ? "opacity-50" : ""
-      } ${noBg ? "" : "rounded-2xl"}`}
-      style={
-        noBg
-          ? undefined
-          : {
-              background: "rgba(255, 255, 255, 0.06)",
-              mixBlendMode: "lighten",
-            }
-      }
+      }`}
     >
       {/* Left - Icon */}
       <div className="flex items-center pr-3 py-1.5">
-        <div
-          className="flex items-center justify-center p-2.5 rounded-full"
-          style={{
-            background: "rgba(255, 255, 255, 0.06)",
-            mixBlendMode: "lighten",
-          }}
-        >
-          <div className="opacity-60">{icon}</div>
+        <div className="flex items-center justify-center pr-1 py-2.5">
+          <div className="text-black/60">{icon}</div>
         </div>
       </div>
 
       {/* Middle - Text */}
-      <div className="flex-1 flex flex-col gap-0.5 py-2.5 min-w-0">
-        <p
-          className={`text-base leading-5 ${
-            disabled ? "text-white/60" : "text-white"
-          }`}
-        >
+      <div
+        className={`flex-1 flex flex-col min-w-0 ${subtitle ? "py-[9px]" : "py-[13px]"}`}
+      >
+        <p className="text-[17px] font-medium leading-[22px] tracking-[-0.187px] text-black">
           {title}
         </p>
         {subtitle && (
-          <p className="text-[13px] leading-4 text-white/60">{subtitle}</p>
+          <p className="text-[15px] font-normal leading-5 text-[rgba(60,60,67,0.6)]">
+            {subtitle}
+          </p>
         )}
       </div>
 
-      {/* Right - Value, Toggle, or Chevron */}
-      {rightContent && (
-        <div className="pl-3">
-          <p className="text-base leading-5 text-white/60 text-right">
-            {rightContent}
+      {/* Right - Detail, Toggle, Arrow, or Chevron */}
+      {rightDetail && (
+        <div className="pl-3 flex items-center py-[13px]">
+          <p className="text-[17px] font-normal leading-[22px] text-[rgba(60,60,67,0.6)] text-right">
+            {rightDetail}
           </p>
         </div>
       )}
@@ -138,15 +140,18 @@ function ProfileCell({
             checked={toggle.checked}
             onChange={toggle.onChange}
             disabled={disabled}
+            activeColor={toggle.activeColor}
           />
+        </div>
+      )}
+      {showArrow && (
+        <div className="pl-3 flex items-center justify-center h-10 py-2">
+          <ArrowUpRight size={24} className="text-[rgba(60,60,67,0.3)]" />
         </div>
       )}
       {showChevron && (
         <div className="pl-3 flex items-center justify-center h-10 py-2">
-          <ChevronRight
-            size={16}
-            className={disabled ? "text-white/60" : "text-white"}
-          />
+          <ChevronRight size={16} className="text-[rgba(60,60,67,0.3)]" />
         </div>
       )}
     </div>
@@ -168,15 +173,7 @@ function ProfileCell({
 
 function SettingsSection({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="rounded-2xl py-1"
-      style={{
-        background: "rgba(255, 255, 255, 0.06)",
-        mixBlendMode: "lighten",
-      }}
-    >
-      {children}
-    </div>
+    <div className="bg-[#f2f2f7] rounded-[20px] py-1">{children}</div>
   );
 }
 
@@ -185,6 +182,14 @@ export default function ProfilePage() {
 
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const [isImageError, setIsImageError] = useState(false);
+  const [isMainnet, setIsMainnet] = useState(() => {
+    if (typeof window !== "undefined") {
+      const override = localStorage.getItem("solana-env-override");
+      if (override) return override === "mainnet";
+    }
+    return process.env.NEXT_PUBLIC_SOLANA_ENV === "mainnet";
+  });
 
   // Detect platform on mount
   useEffect(() => {
@@ -193,7 +198,6 @@ export default function ProfilePage() {
       const launchParams = retrieveLaunchParams();
       platform = launchParams.tgWebAppPlatform;
     } catch {
-      // Fallback to hash parsing if SDK fails
       if (typeof window !== "undefined") {
         const hash = window.location.hash.slice(1);
         const params = new URLSearchParams(hash);
@@ -230,11 +234,9 @@ export default function ProfilePage() {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
-    // Try SDK method first, fall back to direct postEvent for Android
     if (addToHomeScreen.isAvailable()) {
       addToHomeScreen();
     } else {
-      // Direct postEvent as fallback
       postEvent("web_app_add_to_home_screen");
     }
   }, []);
@@ -255,16 +257,20 @@ export default function ProfilePage() {
     }
   }, []);
 
+  const handleMainnetToggle = useCallback((checked: boolean) => {
+    setIsMainnet(checked);
+    const newEnv = checked ? "mainnet" : "devnet";
+    localStorage.setItem("solana-env-override", newEnv);
+    setTimeout(() => window.location.reload(), 300);
+  }, []);
+
   return (
-    <main
-      className="min-h-screen text-white font-sans selection:bg-teal-500/30 overflow-hidden relative"
-      style={{ background: "#000" }}
-    >
+    <main className="min-h-screen bg-white font-sans overflow-hidden relative">
       <div className="pb-32 max-w-md mx-auto flex flex-col min-h-screen">
         {/* Avatar and Name Section */}
         <div className="flex flex-col gap-4 items-center justify-center pt-8 pb-6 px-8">
           {/* Avatar */}
-          {userData?.photoUrl ? (
+          {userData?.photoUrl && !isImageError ? (
             <div className="relative w-24 h-24">
               {(!isImageLoaded || isAvatarLoading) && (
                 <Skeleton className="absolute inset-0 w-24 h-24 rounded-full z-10" />
@@ -276,10 +282,13 @@ export default function ProfilePage() {
                 height={96}
                 className={cn(
                   "w-24 h-24 rounded-full object-cover transition-opacity duration-300",
-                  !isImageLoaded || isAvatarLoading ? "opacity-0" : "opacity-100"
+                  !isImageLoaded || isAvatarLoading
+                    ? "opacity-0"
+                    : "opacity-100",
                 )}
                 priority
                 onLoad={() => setIsImageLoaded(true)}
+                onError={() => setIsImageError(true)}
               />
             </div>
           ) : (
@@ -292,11 +301,11 @@ export default function ProfilePage() {
 
           {/* Name and Username */}
           <div className="flex flex-col gap-1 items-center text-center w-full">
-            <p className="text-2xl font-semibold leading-7 text-white">
+            <p className="text-2xl font-semibold leading-7 text-black">
               {fullName}
             </p>
             {displayUsername && (
-              <p className="text-base leading-5 text-white/60">
+              <p className="text-[17px] leading-[22px] text-[rgba(60,60,67,0.6)]">
                 {displayUsername}
               </p>
             )}
@@ -305,58 +314,54 @@ export default function ProfilePage() {
 
         {/* Settings Sections */}
         <div className="flex flex-col gap-4 px-4 pb-4">
-          {/* Section 1: Settings */}
+          {/* Section 1: Language */}
           <SettingsSection>
-            {/* Language */}
             <ProfileCell
-              icon={
-                <Image
-                  src="/globe.svg"
-                  alt="Language"
-                  width={28}
-                  height={28}
-                  className="opacity-60"
-                />
-              }
+              icon={<Globe size={28} strokeWidth={1.5} />}
               title="Language"
-              rightContent="English"
+              rightDetail="English"
               disabled
-              noBg
             />
           </SettingsSection>
 
           {/* Section 2: Actions */}
           <SettingsSection>
-            {/* Add to Home Screen */}
             <ProfileCell
               icon={<CirclePlus size={28} strokeWidth={1.5} />}
               title={addToHomeScreenTitle}
-              showChevron
+              showArrow
               onClick={handleAddToHomeScreen}
               disabled={addToHomeScreenDisabled}
-              noBg
             />
-
-            {/* Set Custom Emoji */}
             <ProfileCell
               icon={<Smile size={28} strokeWidth={1.5} />}
               title="Set Custom Emoji"
-              showChevron
+              showArrow
               onClick={handleSetCustomEmoji}
-              noBg
             />
           </SettingsSection>
 
-          {/* Section 3: Help */}
+          {/* Section 3: Network */}
           <SettingsSection>
-            {/* Support */}
+            <ProfileCell
+              icon={<Network size={28} strokeWidth={1.5} />}
+              title="Mainnet"
+              toggle={{
+                checked: isMainnet,
+                onChange: handleMainnetToggle,
+                activeColor: "#f9363c",
+              }}
+            />
+          </SettingsSection>
+
+          {/* Section 4: Support */}
+          <SettingsSection>
             <ProfileCell
               icon={<CircleHelp size={28} strokeWidth={1.5} />}
               title="Support"
               subtitle="Report a bug or ask any question"
               showChevron
               onClick={handleSupport}
-              noBg
             />
           </SettingsSection>
         </div>
