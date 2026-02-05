@@ -1,21 +1,24 @@
 "use client";
 
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { hapticFeedback, openTelegramLink, retrieveLaunchParams, themeParams } from "@telegram-apps/sdk-react";
-import { Modal, VisuallyHidden } from "@telegram-apps/telegram-ui";
-import { Drawer } from "@xelene/vaul-with-scroll-fix";
+import { hapticFeedback, openTelegramLink, retrieveLaunchParams } from "@telegram-apps/sdk-react";
 import {
   ArrowLeft,
-  Check,
   Search,
-  ShieldAlert,
-  Wallet,
-  X
+  X,
 } from "lucide-react";
 import Image from "next/image";
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 
-import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
   LAST_AMOUNT_KEY,
   MAX_RECENT_RECIPIENTS,
@@ -24,10 +27,15 @@ import {
   SOLANA_FEE_SOL,
 } from "@/lib/constants";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
+import type { TokenHolding } from "@/lib/solana/token-holdings/types";
 import {
   getCloudValue,
   setCloudValue,
 } from "@/lib/telegram/mini-app/cloud-storage";
+
+// iOS-style sheet timing (shared with other sheets)
+const SHEET_TRANSITION = "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)";
+const OVERLAY_TRANSITION = "opacity 0.3s ease";
 
 export type SendSheetProps = {
   trigger?: ReactNode | null;
@@ -36,17 +44,18 @@ export type SendSheetProps = {
   initialRecipient?: string;
   onValidationChange?: (isValid: boolean) => void;
   onFormValuesChange?: (values: { amount: string; recipient: string }) => void;
-  step: 1 | 2 | 3 | 4;
-  onStepChange: (step: 1 | 2 | 3 | 4) => void;
-  balance?: number | null; // Balance in lamports
+  step: 1 | 2 | 3 | 4 | 5;
+  onStepChange: (step: 1 | 2 | 3 | 4 | 5) => void;
+  balance?: number | null;
   walletAddress?: string;
-  starsBalance?: number; // Balance in Stars
-  onTopUpStars?: () => void; // Callback when user wants to top up Stars
+  starsBalance?: number;
+  onTopUpStars?: () => void;
   solPriceUsd?: number | null;
   isSolPriceLoading?: boolean;
-  // Success/Error step props
-  sentAmountSol?: number; // Amount sent in SOL (for success display)
-  sendError?: string | null; // Error message (if present, shows error state instead of success)
+  sentAmountSol?: number;
+  sendError?: string | null;
+  isSending?: boolean;
+  tokenHoldings?: TokenHolding[];
 };
 
 // Basic Solana address validation (base58, 32-44 chars)
@@ -64,7 +73,7 @@ export const isValidTelegramUsername = (username: string): boolean => {
 
 // Recent recipient type
 export type RecentRecipient = {
-  address: string; // wallet address or @username
+  address: string;
   timestamp: number;
 };
 
@@ -87,9 +96,7 @@ export const addRecentRecipient = async (address: string): Promise<void> => {
     if (!trimmed) return;
 
     const existing = await getRecentRecipients();
-    // Remove if already exists (will be added to top)
     const filtered = existing.filter((r) => r.address !== trimmed);
-    // Add to top
     const updated: RecentRecipient[] = [
       { address: trimmed, timestamp: Date.now() },
       ...filtered,
@@ -110,7 +117,6 @@ const truncateDecimals = (num: number, decimals: number): string => {
 const formatForDisplay = (num: number, maxDecimals: number): string => {
   const factor = Math.pow(10, maxDecimals);
   const truncated = Math.floor(num * factor) / factor;
-  // Remove trailing zeros by converting to number and back to string
   return String(Number(truncated.toFixed(maxDecimals)));
 };
 
@@ -140,19 +146,33 @@ const saveLastAmount = async (solAmount: number, solPriceUsd: number | null): Pr
 // Generate a consistent color based on name
 const getAvatarColor = (name: string): string => {
   const colors = [
-    "rgba(99, 102, 241, 0.3)", // indigo
-    "rgba(236, 72, 153, 0.3)", // pink
-    "rgba(34, 197, 94, 0.3)", // green
-    "rgba(249, 115, 22, 0.3)", // orange
-    "rgba(139, 92, 246, 0.3)", // violet
-    "rgba(14, 165, 233, 0.3)", // sky
+    "rgba(99, 102, 241, 0.15)",
+    "rgba(236, 72, 153, 0.15)",
+    "rgba(34, 197, 94, 0.15)",
+    "rgba(249, 115, 22, 0.15)",
+    "rgba(139, 92, 246, 0.15)",
+    "rgba(14, 165, 233, 0.15)",
   ];
   const index = name.charCodeAt(0) % colors.length;
   return colors[index];
 };
 
+// Chevron icon (light theme)
+const ChevronIcon = () => (
+  <svg width="16" height="24" viewBox="0 0 16 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M5.5 6L11 12L5.5 18" stroke="rgba(60,60,67,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Arrow up/down icon for currency switch (light theme)
+const ArrowUpDownIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9.33 5.25V22.75M9.33 22.75L5.25 18.67M9.33 22.75L13.42 18.67" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M18.67 22.75V5.25M18.67 5.25L14.58 9.33M18.67 5.25L22.75 9.33" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 export default function SendSheet({
-  trigger,
   open,
   onOpenChange,
   initialRecipient,
@@ -168,10 +188,20 @@ export default function SendSheet({
   isSolPriceLoading: isSolPriceLoadingProp,
   sentAmountSol,
   sendError,
+  isSending = false,
+  tokenHoldings = [],
 }: SendSheetProps) {
-  // Safe area handling
-  const snapPoint = useModalSnapPoint();
   const { bottom: safeBottom } = useTelegramSafeArea();
+  const [mounted, setMounted] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [rendered, setRendered] = useState(false);
+  const [show, setShow] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const dragStartY = useRef(0);
+  const dragDelta = useRef(0);
+  const isDragging = useRef(false);
+  const isClosing = useRef(false);
 
   // Detect iOS for platform-specific focus handling
   const [isIOS] = useState(() => {
@@ -183,19 +213,26 @@ export default function SendSheet({
     }
   });
 
-  // Get Telegram theme button color
-  const [buttonColor] = useState(() => {
-    try {
-      return themeParams.buttonColor() || "#2990ff";
-    } catch {
-      return "#2990ff";
-    }
-  });
-
   // Abbreviate wallet address for display
   const abbreviatedAddress = walletAddress
     ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
     : '';
+
+  // Token selection state
+  const [tokenSearchQuery, setTokenSearchQuery] = useState("");
+  const [selectedToken, setSelectedToken] = useState<TokenHolding | null>(null);
+
+  const filteredTokens = useMemo(() => {
+    if (!tokenSearchQuery.trim()) return tokenHoldings;
+    const q = tokenSearchQuery.toLowerCase();
+    return tokenHoldings.filter(
+      (t) =>
+        t.symbol.toLowerCase().includes(q) ||
+        t.name.toLowerCase().includes(q),
+    );
+  }, [tokenHoldings, tokenSearchQuery]);
+
+  // Form state
   const [amountStr, setAmountStr] = useState("");
   const [recipient, setRecipient] = useState("");
   const [currency, setCurrency] = useState<'SOL' | 'USD'>('SOL');
@@ -221,10 +258,37 @@ export default function SendSheet({
   const balanceInUsd = solPriceUsd ? balanceInSol * solPriceUsd : null;
   const solanaFeeUsd = solPriceUsd ? SOLANA_FEE_SOL * solPriceUsd : null;
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Open: mount elements, force layout, then trigger CSS transition
+  useEffect(() => {
+    if (open) {
+      isClosing.current = false;
+      setRendered(true);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (rendered && open && !show && !isClosing.current) {
+      sheetRef.current?.getBoundingClientRect();
+      setShow(true);
+    }
+  }, [rendered, open, show]);
+
+  // Measure header
+  useEffect(() => {
+    if (!open) return;
+    const header = document.querySelector("header");
+    if (header) {
+      setHeaderHeight(header.getBoundingClientRect().bottom);
+    }
+  }, [open]);
+
   // Load SOL price for USD conversions when not provided externally
   useEffect(() => {
     if (isUsingExternalPrice) {
-      // If parent handles price, rely on that state
       setIsSolPriceLoadingState(false);
       return;
     }
@@ -260,7 +324,8 @@ export default function SendSheet({
       setAmountStr("");
       setRecipient(initialRecipient || "");
       setCurrency('SOL');
-      // Load from cloud storage asynchronously
+      setTokenSearchQuery("");
+      setSelectedToken(null);
       void getLastAmount().then(setLastAmount);
       void getRecentRecipients().then(setRecentRecipients);
     }
@@ -270,15 +335,14 @@ export default function SendSheet({
   useEffect(() => {
     if (!open) return;
 
-    // iOS handles focus in click handlers, Android uses setTimeout
     if (!isIOS) {
-      if (step === 1) {
+      if (step === 2) {
         const timer = setTimeout(() => {
           inputRef.current?.focus();
         }, 300);
         return () => clearTimeout(timer);
       }
-      if (step === 2) {
+      if (step === 3) {
         const timer = setTimeout(() => {
           amountInputRef.current?.focus({ preventScroll: true });
         }, 300);
@@ -286,8 +350,7 @@ export default function SendSheet({
       }
     }
 
-    if (step === 3 || step === 4) {
-      // Blur inputs to close keyboard (both platforms)
+    if (step === 4 || step === 5) {
       amountInputRef.current?.blur();
       inputRef.current?.blur();
     }
@@ -302,20 +365,17 @@ export default function SendSheet({
     }
   }, [amountStr]);
 
-  // Prevent backspace from navigating when on step 2
-  // We use a ref to track current amountStr to avoid stale closure issues
+  // Prevent backspace from navigating when on step 3
   const amountStrRef = useRef(amountStr);
   useEffect(() => {
     amountStrRef.current = amountStr;
   }, [amountStr]);
 
   useEffect(() => {
-    if (!open || step !== 2) return;
+    if (!open || step !== 3) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Backspace') {
-        // Only prevent if amount is empty (to avoid Telegram navigation)
-        // Let the input handle backspace when there's content
         if (!amountStrRef.current) {
           e.preventDefault();
           e.stopPropagation();
@@ -327,12 +387,11 @@ export default function SendSheet({
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [open, step]);
 
-  // Save last amount when moving to step 3 (confirmation)
+  // Save last amount when moving to step 4 (confirmation)
   useEffect(() => {
-    if (step === 3 && amountStr) {
+    if (step === 4 && amountStr) {
       const amount = parseFloat(amountStr);
       if (!isNaN(amount) && amount > 0) {
-        // Convert to SOL if currently in USD
         const solAmount =
           currency === 'USD'
             ? solPriceUsd
@@ -349,13 +408,12 @@ export default function SendSheet({
   // Handle value reporting to parent
   useEffect(() => {
     if (onFormValuesChange) {
-      // If USD, convert to SOL for the parent form value
       let finalAmount = amountStr;
       if (currency === 'USD' && amountStr) {
         const usdVal = parseFloat(amountStr);
         if (!isNaN(usdVal)) {
           finalAmount = solPriceUsd
-            ? (usdVal / solPriceUsd).toFixed(6) // approx conversion
+            ? (usdVal / solPriceUsd).toFixed(6)
             : "";
         }
       }
@@ -374,15 +432,19 @@ export default function SendSheet({
     const isRecipientValid = isValidSolanaAddress(recipientTrimmed) || isValidTelegramUsername(recipientTrimmed);
 
     if (step === 1) {
+      // Token selection step — always valid (user picks from list)
+      onValidationChange?.(true);
+      return;
+    }
+
+    if (step === 2) {
       onValidationChange?.(isRecipientValid);
       return;
     }
 
-    // For steps 2 and 3, check both amount and recipient
     const amount = parseFloat(amountStr);
     const isAmountValid = !isNaN(amount) && amount > 0 && isFinite(amount);
 
-    // Check if amount exceeds balance
     const amountInSol =
       currency === 'SOL'
         ? amount
@@ -392,8 +454,7 @@ export default function SendSheet({
     const hasEnoughBalance =
       !isNaN(amountInSol) && amountInSol <= balanceInSol;
 
-    // For step 2, don't check fee yet
-    if (step === 2) {
+    if (step === 3) {
       const isValid =
         isAmountValid &&
         isRecipientValid &&
@@ -403,8 +464,7 @@ export default function SendSheet({
       return;
     }
 
-    // For step 3, also check if user has sufficient SOL for fee
-    if (step === 3) {
+    if (step === 4) {
       const hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
 
       const isValid =
@@ -417,7 +477,6 @@ export default function SendSheet({
       return;
     }
 
-    // Default to invalid for any other state
     onValidationChange?.(false);
   }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, solPriceUsd]);
 
@@ -427,9 +486,7 @@ export default function SendSheet({
       hapticFeedback.impactOccurred("light");
     }
     setRecipient(selected);
-    onStepChange(2);
-    // iOS requires focus in direct user interaction context
-    // Use preventScroll to avoid viewport shift while step is animating
+    onStepChange(3);
     if (isIOS) {
       amountInputRef.current?.focus({ preventScroll: true });
     }
@@ -439,238 +496,397 @@ export default function SendSheet({
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
-    // Only focus if not already focused - avoids keyboard open/close causing modal jump
     if (document.activeElement !== amountInputRef.current) {
       amountInputRef.current?.focus({ preventScroll: true });
     }
-    // Ensure we set a clean string value
     const strVal = typeof val === 'string' ? val : val.toString();
     setAmountStr(strVal);
   };
 
-  const modalStyle = useMemo(
-    () =>
-      ({
-        "--tgui--bg_color": "transparent",
-        "--tgui--divider": "rgba(255, 255, 255, 0.05)",
-      }) as CSSProperties,
-    [],
-  );
+  const handleTokenSelect = (token: TokenHolding) => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    setSelectedToken(token);
+    setTokenSearchQuery("");
+    onStepChange(2);
+  };
 
-  // Stable snapPoints array - created once
-  const [snapPoints] = useState(() => [snapPoint]);
+  const tokenSymbol = selectedToken?.symbol || 'SOL';
 
   // Computed display values
   const secondaryDisplay = useMemo(() => {
     const val = parseFloat(amountStr);
-    if (isNaN(val)) return currency === 'SOL' ? '≈ $0.00' : '≈ 0.00 SOL';
+    if (isNaN(val)) return currency === 'SOL' ? '≈ $0.00' : `≈ 0.00 ${tokenSymbol}`;
 
     if (!solPriceUsd) {
-      return currency === 'SOL' ? '≈ $—' : '≈ — SOL';
+      return currency === 'SOL' ? '≈ $—' : `≈ — ${tokenSymbol}`;
     }
 
     if (currency === 'SOL') {
       return `≈ $${(val * solPriceUsd).toFixed(2)}`;
     } else {
-      return `≈ ${(val / solPriceUsd).toFixed(4)} SOL`;
+      return `≈ ${(val / solPriceUsd).toFixed(4)} ${tokenSymbol}`;
     }
-  }, [amountStr, currency, solPriceUsd]);
+  }, [amountStr, currency, solPriceUsd, tokenSymbol]);
 
-  // Chevron icon component
-  const ChevronIcon = () => (
-    <svg width="16" height="24" viewBox="0 0 16 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M5.5 6L11 12L5.5 18" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
+  // Insufficient balance check
+  const insufficientBalance = useMemo(() => {
+    const val = parseFloat(amountStr);
+    if (isNaN(val) || val <= 0) return false;
+    const amountInSol =
+      currency === 'SOL'
+        ? val
+        : solPriceUsd
+          ? val / solPriceUsd
+          : NaN;
+    return amountInSol > balanceInSol;
+  }, [amountStr, currency, solPriceUsd, balanceInSol]);
+
+  // Sheet animation handlers
+  const unmount = useCallback(() => {
+    setRendered(false);
+    setShow(false);
+    onOpenChange?.(false);
+    isClosing.current = false;
+  }, [onOpenChange]);
+
+  const closeSheet = useCallback(() => {
+    if (isClosing.current) return;
+    isClosing.current = true;
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    if (sheetRef.current) {
+      sheetRef.current.style.transition = SHEET_TRANSITION;
+      sheetRef.current.style.transform = "translateY(100%)";
+    }
+    if (overlayRef.current) {
+      overlayRef.current.style.transition = OVERLAY_TRANSITION;
+      overlayRef.current.style.opacity = "0";
+    }
+  }, []);
+
+  const handleTransitionEnd = useCallback(
+    (e: React.TransitionEvent) => {
+      if (e.propertyName === "transform" && isClosing.current) {
+        unmount();
+      }
+    },
+    [unmount],
   );
 
-  // Arrow up/down icon for currency switch
-  const ArrowUpDownIcon = () => (
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M9.33 5.25V22.75M9.33 22.75L5.25 18.67M9.33 22.75L13.42 18.67" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M18.67 22.75V5.25M18.67 5.25L14.58 9.33M18.67 5.25L22.75 9.33" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
+  // Close when parent sets open=false while sheet is still showing
+  useEffect(() => {
+    if (!open && rendered && show && !isClosing.current) {
+      closeSheet();
+    }
+  }, [open, rendered, show, closeSheet]);
 
-  return (
-  <>
-    <Modal
-      aria-label="Send assets"
-      trigger={trigger || <button style={{ display: 'none' }} />}
-      open={open}
-      onOpenChange={onOpenChange}
-      style={modalStyle}
-      snapPoints={snapPoints}
-    >
+  // Pull-down-to-close
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    isDragging.current = true;
+    dragStartY.current = e.touches[0].clientY;
+    dragDelta.current = 0;
+    if (sheetRef.current) {
+      sheetRef.current.style.transition = "none";
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging.current) return;
+    const delta = e.touches[0].clientY - dragStartY.current;
+    dragDelta.current = Math.max(0, delta);
+    if (sheetRef.current) {
+      sheetRef.current.style.transform = `translateY(${dragDelta.current}px)`;
+    }
+    if (overlayRef.current) {
+      const opacity = Math.max(0.2, 1 - dragDelta.current / 300);
+      overlayRef.current.style.opacity = String(opacity);
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    if (dragDelta.current > 120) {
+      closeSheet();
+    } else {
+      if (sheetRef.current) {
+        sheetRef.current.style.transition = SHEET_TRANSITION;
+        sheetRef.current.style.transform = "translateY(0px)";
+      }
+      if (overlayRef.current) {
+        overlayRef.current.style.transition = OVERLAY_TRANSITION;
+        overlayRef.current.style.opacity = "1";
+      }
+    }
+    dragDelta.current = 0;
+  }, [closeSheet]);
+
+  // Lock body scroll
+  useEffect(() => {
+    if (rendered) {
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = ""; };
+    }
+  }, [rendered]);
+
+  if (!mounted || !rendered) return null;
+
+  const sheetTopOffset = headerHeight || 56;
+
+  // Pill display for steps 3-5
+  const pillAddress = recipient.startsWith('@')
+    ? recipient
+    : recipient
+      ? `${recipient.slice(0, 4)}…${recipient.slice(-4)}`
+      : '';
+
+  const content = (
+    <>
+      {/* Overlay */}
       <div
+        ref={overlayRef}
+        onClick={closeSheet}
+        className="fixed inset-0 z-[9998]"
         style={{
-          background: "rgba(38, 38, 38, 0.55)",
-          backgroundBlendMode: "luminosity",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
-          paddingBottom: Math.max(safeBottom, 80),
+          background: "rgba(0, 0, 0, 0.3)",
+          opacity: show ? 1 : 0,
+          transition: OVERLAY_TRANSITION,
         }}
-        className="flex flex-col text-white relative overflow-hidden min-h-[500px] rounded-t-3xl"
-      >
-        <Drawer.Title asChild>
-          <VisuallyHidden>Send assets</VisuallyHidden>
-        </Drawer.Title>
+      />
 
-        {/* Custom Header */}
-        <div className="relative h-[52px] flex items-center justify-center shrink-0">
-          {/* Back Button - only for steps 2 and 3 */}
-          {(step === 2 || step === 3) && (
+      {/* Sheet */}
+      <div
+        ref={sheetRef}
+        onTransitionEnd={handleTransitionEnd}
+        className="fixed left-0 right-0 bottom-0 z-[9999] flex flex-col bg-white rounded-t-[38px] font-sans"
+        style={{
+          top: sheetTopOffset,
+          transform: show ? "translateY(0)" : "translateY(100%)",
+          transition: SHEET_TRANSITION,
+          boxShadow: "0px -4px 40px rgba(0, 0, 0, 0.08)",
+        }}
+      >
+        {/* Handle bar */}
+        <div
+          className="flex justify-center pt-2 pb-1 shrink-0 cursor-grab active:cursor-grabbing"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div
+            className="w-9 h-1 rounded-full"
+            style={{ background: "rgba(0, 0, 0, 0.15)" }}
+          />
+        </div>
+
+        {/* Header */}
+        <div
+          className="relative h-[44px] flex items-center justify-center shrink-0 px-4"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Back Button — steps 2, 3, 4 */}
+          {(step === 2 || step === 3 || step === 4) && (
             <button
-              onMouseDown={(e) => e.preventDefault()} // Prevent blur to keep keyboard open
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 if (hapticFeedback.impactOccurred.isAvailable()) {
                   hapticFeedback.impactOccurred("light");
                 }
-                onStepChange((step - 1) as 1 | 2);
+                onStepChange((step - 1) as 1 | 2 | 3 | 4);
               }}
-              className="absolute left-2 p-1.5 text-white/60 hover:text-white rounded-full bg-white/5 active:scale-95 active:bg-white/10 transition-all duration-150"
+              className="absolute left-3 p-1.5 rounded-full flex items-center justify-center active:scale-95 transition-all duration-150"
             >
-              <ArrowLeft size={22} strokeWidth={1.5} />
+              <ArrowLeft
+                size={22}
+                strokeWidth={1.5}
+                style={{ color: "rgba(60, 60, 67, 0.6)" }}
+              />
             </button>
           )}
 
-          {/* Title - changes based on step */}
+          {/* Step 1: Title */}
           {step === 1 && (
-            <span className="text-base font-medium text-white tracking-[-0.176px]">
-              Send to
+            <span className="text-[17px] font-semibold text-black leading-[22px]">
+              Send
             </span>
           )}
 
-          {/* Recipient Pill for Step 2 */}
+          {/* Step 2: Title with token name */}
           {step === 2 && (
-            <div
-              className={`flex items-center pl-1 pr-3 py-1 rounded-[54px] ${recipient.startsWith('@') ? 'cursor-pointer active:scale-95 active:opacity-80 transition-all duration-150' : ''}`}
-              style={{
-                background: "rgba(255, 255, 255, 0.06)",
-                mixBlendMode: "lighten",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
-              }}
-              onClick={() => {
-                if (recipient.startsWith('@') && openTelegramLink.isAvailable()) {
-                  if (hapticFeedback.impactOccurred.isAvailable()) {
-                    hapticFeedback.impactOccurred("light");
-                  }
-                  const username = recipient.slice(1); // Remove @ prefix
-                  openTelegramLink(`https://t.me/${username}`);
-                }
-              }}
-            >
-              <div className="pr-1.5">
-                {recipient.startsWith('@') ? (
-                  /* Letter avatar for username */
-                  <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium uppercase"
-                    style={{ background: "rgba(255, 255, 255, 0.15)" }}
-                  >
-                    {recipient.charAt(1)}
-                  </div>
-                ) : (
-                  /* Wallet icon for address */
-                  <div className="w-7 h-7 rounded-[16.8px] flex items-center justify-center text-white">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-60">
-                      <path d="M15.8333 5.83333V3.33333C15.8333 3.11232 15.7455 2.90036 15.5893 2.74408C15.433 2.5878 15.221 2.5 15 2.5H4.16667C3.72464 2.5 3.30072 2.67559 2.98816 2.98816C2.67559 3.30072 2.5 3.72464 2.5 4.16667C2.5 4.60869 2.67559 5.03262 2.98816 5.34518C3.30072 5.65774 3.72464 5.83333 4.16667 5.83333H16.6667C16.8877 5.83333 17.0996 5.92113 17.2559 6.07741C17.4122 6.23369 17.5 6.44565 17.5 6.66667V10M17.5 10H15C14.558 10 14.1341 10.1756 13.8215 10.4882C13.5089 10.8007 13.3333 11.2246 13.3333 11.6667C13.3333 12.1087 13.5089 12.5326 13.8215 12.8452C14.1341 13.1577 14.558 13.3333 15 13.3333H17.5C17.721 13.3333 17.933 13.2455 18.0893 13.0893C18.2455 12.933 18.3333 12.721 18.3333 12.5V10.8333C18.3333 10.6123 18.2455 10.4004 18.0893 10.2441C17.933 10.0878 17.721 10 17.5 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M2.5 4.16656V15.8332C2.5 16.2753 2.67559 16.6992 2.98816 17.0117C3.30072 17.3243 3.72464 17.4999 4.16667 17.4999H16.6667C16.8877 17.4999 17.0996 17.4121 17.2559 17.2558C17.4122 17.0995 17.5 16.8876 17.5 16.6666V13.3332" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                )}
-              </div>
-              <span className="text-sm leading-5">
-                <span className="text-white/60">Send to </span>
-                <span className="text-white">{recipient.startsWith('@') ? recipient : `${recipient.slice(0, 4)}…${recipient.slice(-4)}`}</span>
-              </span>
-            </div>
+            <span className="text-[17px] font-semibold text-black leading-[22px]">
+              Send {tokenSymbol} to
+            </span>
           )}
 
-          {/* Recipient Pill for Step 3 and 4 */}
-          {(step === 3 || step === 4) && (
+          {/* Steps 3-5: Recipient Pill */}
+          {step >= 3 && (
             <div
-              className={`flex items-center pl-1 pr-3 py-1 rounded-[54px] ${recipient.startsWith('@') ? 'cursor-pointer active:scale-95 active:opacity-80 transition-all duration-150' : ''}`}
-              style={{
-                background: "rgba(255, 255, 255, 0.06)",
-                mixBlendMode: "lighten",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
-              }}
+              className={`flex items-center px-3 py-1.5 rounded-[54px] ${recipient.startsWith('@') ? 'cursor-pointer active:scale-95 active:opacity-80 transition-all duration-150' : ''}`}
+              style={{ background: "#f2f2f7" }}
               onClick={() => {
                 if (recipient.startsWith('@') && openTelegramLink.isAvailable()) {
                   if (hapticFeedback.impactOccurred.isAvailable()) {
                     hapticFeedback.impactOccurred("light");
                   }
-                  const username = recipient.slice(1); // Remove @ prefix
+                  const username = recipient.slice(1);
                   openTelegramLink(`https://t.me/${username}`);
                 }
               }}
             >
-              <div className="pr-1.5">
-                {recipient.startsWith('@') ? (
-                  /* Letter avatar for username */
-                  <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium uppercase"
-                    style={{ background: "rgba(255, 255, 255, 0.15)" }}
-                  >
-                    {recipient.charAt(1)}
-                  </div>
-                ) : (
-                  /* Wallet icon for address */
-                  <div className="w-7 h-7 rounded-[16.8px] flex items-center justify-center text-white">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-60">
-                      <path d="M15.8333 5.83333V3.33333C15.8333 3.11232 15.7455 2.90036 15.5893 2.74408C15.433 2.5878 15.221 2.5 15 2.5H4.16667C3.72464 2.5 3.30072 2.67559 2.98816 2.98816C2.67559 3.30072 2.5 3.72464 2.5 4.16667C2.5 4.60869 2.67559 5.03262 2.98816 5.34518C3.30072 5.65774 3.72464 5.83333 4.16667 5.83333H16.6667C16.8877 5.83333 17.0996 5.92113 17.2559 6.07741C17.4122 6.23369 17.5 6.44565 17.5 6.66667V10M17.5 10H15C14.558 10 14.1341 10.1756 13.8215 10.4882C13.5089 10.8007 13.3333 11.2246 13.3333 11.6667C13.3333 12.1087 13.5089 12.5326 13.8215 12.8452C14.1341 13.1577 14.558 13.3333 15 13.3333H17.5C17.721 13.3333 17.933 13.2455 18.0893 13.0893C18.2455 12.933 18.3333 12.721 18.3333 12.5V10.8333C18.3333 10.6123 18.2455 10.4004 18.0893 10.2441C17.933 10.0878 17.721 10 17.5 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M2.5 4.16656V15.8332C2.5 16.2753 2.67559 16.6992 2.98816 17.0117C3.30072 17.3243 3.72464 17.4999 4.16667 17.4999H16.6667C16.8877 17.4999 17.0996 17.4121 17.2559 17.2558C17.4122 17.0995 17.5 16.8876 17.5 16.6666V13.3332" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                )}
-              </div>
-              <span className="text-sm leading-5">
-                <span className="text-white/60">{step === 4 ? "Sent to " : "Send to "}</span>
-                <span className="text-white">{recipient.startsWith('@') ? recipient : `${recipient.slice(0, 4)}…${recipient.slice(-4)}`}</span>
+              <span className="text-[14px] leading-5">
+                <span style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                  {step === 5 ? "Sent to " : "Send to "}
+                </span>
+                <span className="text-black">{pillAddress}</span>
               </span>
             </div>
           )}
 
           {/* Close Button */}
-          <Modal.Close>
-            <div
-              onClick={() => {
-                if (hapticFeedback.impactOccurred.isAvailable()) {
-                  hapticFeedback.impactOccurred("light");
-                }
-              }}
-              className="absolute right-2 p-1.5 rounded-full flex items-center justify-center active:scale-95 active:bg-white/10 transition-all duration-150 cursor-pointer"
-              style={{
-                background: "rgba(255, 255, 255, 0.06)",
-              }}
-            >
-              <X size={24} strokeWidth={1.5} className="text-white/60" />
-            </div>
-          </Modal.Close>
+          <button
+            onClick={closeSheet}
+            className="absolute right-3 w-[30px] h-[30px] rounded-full flex items-center justify-center active:scale-95 transition-all duration-150"
+            style={{ background: "rgba(0, 0, 0, 0.06)" }}
+          >
+            <X
+              size={20}
+              strokeWidth={2}
+              style={{ color: "rgba(60, 60, 67, 0.6)" }}
+            />
+          </button>
         </div>
 
         {/* Steps Container with Slide Animation */}
-        <div className="relative flex-1 overflow-hidden">
-          {/* STEP 1: RECIPIENT */}
+        <div
+          className="relative flex-1 overflow-hidden"
+          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+        >
+          {/* STEP 1: TOKEN SELECTION */}
           <div
             className="absolute inset-0 flex flex-col overflow-y-auto transition-all duration-300 ease-out"
             style={{
               transform: `translateX(${(1 - step) * 100}%)`,
               opacity: step === 1 ? 1 : 0,
-              pointerEvents: step === 1 ? 'auto' : 'none'
+              pointerEvents: step === 1 ? 'auto' : 'none',
+            }}
+          >
+            {/* Search Input */}
+            <div className="px-4 pt-2 pb-3 shrink-0">
+              <div
+                className="flex items-center rounded-[47px] px-4"
+                style={{ background: "#f2f2f7" }}
+              >
+                <Search
+                  size={20}
+                  strokeWidth={1.5}
+                  className="shrink-0 mr-2"
+                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                />
+                <input
+                  type="text"
+                  placeholder="Search"
+                  value={tokenSearchQuery}
+                  onChange={(e) => setTokenSearchQuery(e.target.value)}
+                  className="flex-1 bg-transparent py-3 text-[17px] leading-[22px] text-black placeholder:text-[rgba(60,60,67,0.6)] outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Token List */}
+            {filteredTokens.map((token) => (
+              <button
+                key={token.mint}
+                onClick={() => handleTokenSelect(token)}
+                className="flex items-center px-4 active:bg-black/[0.03] transition-colors"
+              >
+                <div className="py-1.5 pr-3">
+                  <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                    {token.imageUrl && (
+                      <Image
+                        src={token.imageUrl}
+                        alt={token.symbol}
+                        fill
+                        className="object-cover"
+                      />
+                    )}
+                  </div>
+                </div>
+                <div className="flex-1 flex flex-col py-2.5 min-w-0">
+                  <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px] text-left">
+                    {token.symbol}
+                  </p>
+                  <p
+                    className="text-[15px] leading-5 text-left"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
+                    {token.priceUsd !== null
+                      ? `$${token.priceUsd.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
+                      : "—"}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end py-2.5 pl-3">
+                  <p className="text-[17px] text-black leading-[22px] text-right">
+                    {token.balance.toLocaleString("en-US", {
+                      maximumFractionDigits: 4,
+                    })}
+                  </p>
+                  <p
+                    className="text-[15px] leading-5 text-right"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
+                    {token.valueUsd !== null
+                      ? `$${token.valueUsd.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
+                      : "—"}
+                  </p>
+                </div>
+              </button>
+            ))}
+
+            {filteredTokens.length === 0 && tokenSearchQuery.trim() && (
+              <div className="flex items-center justify-center py-12">
+                <p
+                  className="text-[17px] leading-[22px]"
+                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                >
+                  No tokens found
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* STEP 2: RECIPIENT */}
+          <div
+            className="absolute inset-0 flex flex-col overflow-y-auto transition-all duration-300 ease-out"
+            style={{
+              transform: `translateX(${(2 - step) * 100}%)`,
+              opacity: step === 2 ? 1 : 0,
+              pointerEvents: step === 2 ? 'auto' : 'none',
             }}
           >
             {/* Search Input */}
             <div className="px-4 pt-2 pb-2">
               <div className="flex flex-col gap-2">
                 <div
-                  className="flex items-center rounded-xl overflow-hidden"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.06)",
-                  }}
+                  className="flex items-center rounded-[47px] overflow-hidden px-4"
+                  style={{ background: "#f2f2f7" }}
                 >
-                  <div className="pl-3 pr-3 py-3 flex items-center justify-center">
-                    <Search size={24} strokeWidth={1.5} className="text-white/40" />
-                  </div>
+                  <Search
+                    size={20}
+                    strokeWidth={1.5}
+                    className="shrink-0 mr-2"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  />
                   <input
                     ref={inputRef}
                     type="text"
@@ -682,26 +898,25 @@ export default function SendSheet({
                         setRecipient(val);
                       }
                     }}
-                    className="flex-1 py-3.5 pr-3 bg-transparent text-base text-white placeholder:text-white/40 focus:outline-none"
+                    className="flex-1 py-3 bg-transparent text-[17px] leading-[22px] text-black placeholder:text-[rgba(60,60,67,0.6)] outline-none"
                   />
                 </div>
                 {/* Validation Error */}
                 {recipient.trim().length > 0 && !isValidSolanaAddress(recipient) && !isValidTelegramUsername(recipient) && (
-                  <p className="text-[13px] text-red-400 leading-4 px-1">Invalid address</p>
+                  <p className="text-[13px] leading-4 px-1" style={{ color: "#f9363c" }}>Invalid address</p>
                 )}
               </div>
             </div>
 
-            {/* Recent Section Header - only show if there are recent recipients */}
+            {/* Recent Section Header */}
             {recentRecipients.length > 0 && (
               <div className="px-4 pt-3 pb-2">
-                <p className="text-base font-medium text-white tracking-[-0.176px]">Recent</p>
+                <p className="text-base font-medium text-black tracking-[-0.176px]">Recent</p>
               </div>
             )}
 
             {/* Recent Recipients List */}
             <div className="pb-4">
-              {/* Recent Recipient Items */}
               {recentRecipients.map((recentItem) => {
                 const isUsername = recentItem.address.startsWith("@");
                 const displayName = isUsername
@@ -715,19 +930,25 @@ export default function SendSheet({
                   <button
                     key={recentItem.address}
                     onClick={() => handleRecipientSelect(recentItem.address)}
-                    className="w-full flex items-center px-3 py-1 rounded-2xl active:bg-white/[0.03] transition-colors"
+                    className="w-full flex items-center px-3 py-1 rounded-2xl active:bg-black/[0.03] transition-colors"
                   >
                     <div className="py-1.5 pr-3">
                       <div
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-white font-medium text-lg"
-                        style={{ background: getAvatarColor(recentItem.address) }}
+                        className="w-12 h-12 rounded-full flex items-center justify-center font-medium text-lg"
+                        style={{
+                          background: getAvatarColor(recentItem.address),
+                          color: "rgba(60, 60, 67, 0.8)",
+                        }}
                       >
                         {avatarChar}
                       </div>
                     </div>
                     <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                      <p className="text-base text-white text-left leading-5">{displayName}</p>
-                      <p className="text-[13px] text-white/60 text-left leading-4">
+                      <p className="text-base text-black text-left leading-5">{displayName}</p>
+                      <p
+                        className="text-[13px] text-left leading-4"
+                        style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                      >
                         {isUsername ? "Telegram" : "Wallet address"}
                       </p>
                     </div>
@@ -738,25 +959,31 @@ export default function SendSheet({
                 );
               })}
 
-              {/* Manual Entry - Show when typing a valid address/username */}
+              {/* Manual Entry */}
               {recipient.trim().length > 0 && (isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient)) && (
                 <button
                   onClick={() => handleRecipientSelect(recipient)}
-                  className="w-full flex items-center px-3 py-1 rounded-2xl active:bg-white/[0.03] transition-colors"
+                  className="w-full flex items-center px-3 py-1 rounded-2xl active:bg-black/[0.03] transition-colors"
                 >
                   <div className="py-1.5 pr-3">
                     <div
                       className="w-12 h-12 rounded-full flex items-center justify-center"
-                      style={{
-                        background: "rgba(99, 102, 241, 0.2)",
-                      }}
+                      style={{ background: "rgba(99, 102, 241, 0.1)" }}
                     >
-                      <Wallet size={24} strokeWidth={1.5} className="text-indigo-400" />
+                      <svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M15.8333 5.83333V3.33333C15.8333 3.11232 15.7455 2.90036 15.5893 2.74408C15.433 2.5878 15.221 2.5 15 2.5H4.16667C3.72464 2.5 3.30072 2.67559 2.98816 2.98816C2.67559 3.30072 2.5 3.72464 2.5 4.16667C2.5 4.60869 2.67559 5.03262 2.98816 5.34518C3.30072 5.65774 3.72464 5.83333 4.16667 5.83333H16.6667C16.8877 5.83333 17.0996 5.92113 17.2559 6.07741C17.4122 6.23369 17.5 6.44565 17.5 6.66667V10M17.5 10H15C14.558 10 14.1341 10.1756 13.8215 10.4882C13.5089 10.8007 13.3333 11.2246 13.3333 11.6667C13.3333 12.1087 13.5089 12.5326 13.8215 12.8452C14.1341 13.1577 14.558 13.3333 15 13.3333H17.5C17.721 13.3333 17.933 13.2455 18.0893 13.0893C18.2455 12.933 18.3333 12.721 18.3333 12.5V10.8333C18.3333 10.6123 18.2455 10.4004 18.0893 10.2441C17.933 10.0878 17.721 10 17.5 10Z" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2.5 4.16656V15.8332C2.5 16.2753 2.67559 16.6992 2.98816 17.0117C3.30072 17.3243 3.72464 17.4999 4.16667 17.4999H16.6667C16.8877 17.4999 17.0996 17.4121 17.2559 17.2558C17.4122 17.0995 17.5 16.8876 17.5 16.6666V13.3332" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                     </div>
                   </div>
                   <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                    <p className="text-base text-white text-left leading-5">Send to address</p>
-                    <p className="text-[13px] text-white/60 text-left leading-4 truncate max-w-[200px]">{recipient}</p>
+                    <p className="text-base text-black text-left leading-5">Send to address</p>
+                    <p
+                      className="text-[13px] text-left leading-4 truncate max-w-[200px]"
+                      style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                    >
+                      {recipient}
+                    </p>
                   </div>
                   <div className="pl-3 py-2 flex items-center justify-center h-10">
                     <ChevronIcon />
@@ -766,16 +993,15 @@ export default function SendSheet({
             </div>
           </div>
 
-          {/* STEP 2: AMOUNT */}
+          {/* STEP 3: AMOUNT */}
           <div
             className="absolute inset-0 flex flex-col transition-all duration-300 ease-out"
             style={{
-              transform: `translateX(${(2 - step) * 100}%)`,
-              opacity: step === 2 ? 1 : 0,
-              pointerEvents: step === 2 ? 'auto' : 'none'
+              transform: `translateX(${(3 - step) * 100}%)`,
+              opacity: step === 3 ? 1 : 0,
+              pointerEvents: step === 3 ? 'auto' : 'none',
             }}
             onKeyDownCapture={(e) => {
-              // Capture backspace at container level to prevent Telegram navigation
               if (e.key === 'Backspace') {
                 e.stopPropagation();
                 if (!amountStr) {
@@ -784,29 +1010,25 @@ export default function SendSheet({
               }
             }}
           >
-            {/* Content Area */}
             <div className="flex-1 flex flex-col px-4 pt-2 pb-4 gap-2.5 overflow-hidden">
               {/* Amount Input Section */}
               <div className="px-2 flex flex-col gap-1 relative">
-                {/* Hidden input for keyboard - positioned to cover the area */}
+                {/* Hidden input for keyboard */}
                 <input
                   ref={amountInputRef}
                   type="text"
                   inputMode="decimal"
                   value={amountStr}
                   onFocus={(e) => {
-                    // iOS: ensure cursor is always at the end when keyboard reopens
                     const input = e.target;
                     const moveCursorToEnd = () => {
                       const len = input.value.length;
                       input.setSelectionRange(len, len);
                     };
-                    // Multiple attempts - iOS cursor positioning timing is unpredictable
                     setTimeout(moveCursorToEnd, 0);
                     setTimeout(moveCursorToEnd, 50);
                   }}
                   onClick={(e) => {
-                    // Also handle click for iOS keyboard reopen
                     const input = e.target as HTMLInputElement;
                     setTimeout(() => {
                       const len = input.value.length;
@@ -814,7 +1036,6 @@ export default function SendSheet({
                     }, 50);
                   }}
                   onChange={(e) => {
-                    // Convert comma to dot for locales that use comma as decimal separator
                     const val = e.target.value.replace(',', '.');
                     if (/^[0-9]*\.?[0-9]*$/.test(val)) {
                       if (val.includes('.')) {
@@ -827,11 +1048,9 @@ export default function SendSheet({
                     }
                   }}
                   onKeyDown={(e) => {
-                    // Prevent backspace from triggering navigation
                     if (e.key === 'Backspace') {
                       e.stopPropagation();
                       e.nativeEvent.stopImmediatePropagation();
-                      // Only prevent default if input is empty to avoid going back
                       if (!amountStr) {
                         e.preventDefault();
                       }
@@ -842,23 +1061,27 @@ export default function SendSheet({
                 />
                 {/* Amount Input Row with Switch Button */}
                 <div className="flex gap-1 items-end h-[48px]">
-                  {/* Amount Input with Currency */}
                   <div className="flex-1 flex gap-2 items-baseline relative">
                     <p
                       ref={amountTextRef}
-                      className="text-[40px] font-semibold leading-[48px] text-white"
+                      className="text-[40px] font-semibold leading-[48px]"
+                      style={{ color: insufficientBalance ? "#f9363c" : "#000" }}
                     >
                       {amountStr || '\u200B'}
                     </p>
-                    <p className="text-[28px] font-semibold leading-8 text-white/40 tracking-[0.4px]">
-                      {currency}
+                    <p
+                      className="text-[28px] font-semibold leading-8 tracking-[0.4px]"
+                      style={{ color: insufficientBalance ? "#f9363c" : "rgba(60, 60, 67, 0.6)" }}
+                    >
+                      {currency === 'SOL' ? tokenSymbol : currency}
                     </p>
-                    {/* Caret - positioned after the number, vertically centered */}
+                    {/* Caret */}
                     <div
-                      className="absolute w-[1.5px] h-[44px] bg-white top-1/2 -translate-y-1/2"
+                      className="absolute w-[1.5px] h-[44px] top-1/2 -translate-y-1/2"
                       style={{
                         left: `${caretLeft}px`,
-                        animation: 'blink 1s step-end infinite'
+                        background: "#f9363c",
+                        animation: 'blink 1s step-end infinite',
                       }}
                     />
                   </div>
@@ -872,7 +1095,6 @@ export default function SendSheet({
                       if (hapticFeedback.selectionChanged.isAvailable()) {
                         hapticFeedback.selectionChanged();
                       }
-                      // Convert the amount when switching
                       if (amountStr) {
                         const val = parseFloat(amountStr);
                         if (!isNaN(val)) {
@@ -886,65 +1108,32 @@ export default function SendSheet({
                       setCurrency(currency === 'SOL' ? 'USD' : 'SOL');
                     }}
                     disabled={isSolPriceLoading || !solPriceUsd}
-                    className="z-20 opacity-40 hover:opacity-60 transition-opacity text-white shrink-0 mb-1 disabled:opacity-20 disabled:pointer-events-none"
+                    className="z-20 shrink-0 mb-1 disabled:opacity-20 disabled:pointer-events-none"
+                    style={{ color: "rgba(60, 60, 67, 0.4)" }}
                   >
                     <ArrowUpDownIcon />
                   </button>
                 </div>
-                {/* USD Conversion */}
-                <p className="text-base leading-5 text-white/40 h-[22px]">
-                  {secondaryDisplay.replace('≈ ', '~')}
+                {/* Secondary display */}
+                <p
+                  className="text-base leading-5 h-[22px]"
+                  style={{ color: insufficientBalance ? "#f9363c" : "rgba(60, 60, 67, 0.6)" }}
+                >
+                  {insufficientBalance
+                    ? "Not enough coins"
+                    : `1 ${currency === 'SOL' ? tokenSymbol : currency} ≈ ${currency === 'SOL' ? (solPriceUsd ? `$${solPriceUsd.toFixed(2)}` : '$—') : (solPriceUsd ? `${(1 / solPriceUsd).toFixed(6)} ${tokenSymbol}` : `— ${tokenSymbol}`)}`}
                 </p>
-                {/* Insufficient balance error */}
-                {(() => {
-                  const val = parseFloat(amountStr);
-                  if (isNaN(val) || val <= 0) return null;
-                  const amountInSol =
-                    currency === 'SOL'
-                      ? val
-                      : solPriceUsd
-                        ? val / solPriceUsd
-                        : NaN;
-                  if (amountInSol > balanceInSol) {
-                    return <p className="text-[13px] text-red-400 leading-4 px-1">Insufficient balance</p>;
-                  }
-                  return null;
-                })()}
-                {/* Blink animation style */}
-                <style jsx>{`
-                  @keyframes blink {
-                    0%, 100% { opacity: 1; }
-                    50% { opacity: 0; }
-                  }
-                `}</style>
               </div>
 
               {/* Quick Amount Presets */}
               <div className="flex gap-2 w-full">
-                {/* Last used amount (first position) */}
-                {lastAmount && (
-                  <button
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handlePresetAmount(lastAmount.sol)}
-                    className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm font-normal leading-5 text-white text-center transition-all active:opacity-70"
-                    style={{
-                      background: "rgba(255, 255, 255, 0.06)",
-                      mixBlendMode: "lighten",
-                    }}
-                  >
-                    {formatForDisplay(lastAmount.sol, 4)}
-                  </button>
-                )}
-                {[0.1, 1].map(val => (
+                {[0.1, 0.2, 0.5, 1].map(val => (
                   <button
                     key={val}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handlePresetAmount(val)}
-                    className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm font-normal leading-5 text-white text-center transition-all active:opacity-70"
-                    style={{
-                      background: "rgba(255, 255, 255, 0.06)",
-                      mixBlendMode: "lighten",
-                    }}
+                    className="flex-1 min-w-[48px] px-3 py-2 rounded-[40px] text-sm font-normal leading-5 text-center transition-all active:opacity-70"
+                    style={{ background: "rgba(249, 54, 60, 0.14)", color: "#f9363c" }}
                   >
                     {val}
                   </button>
@@ -952,7 +1141,6 @@ export default function SendSheet({
                 <button
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
-                    // Format based on current currency - use truncate to never show more than available
                     if (currency === 'SOL') {
                       const maxVal = truncateDecimals(balanceInSol, 4).replace(/\.?0+$/, '');
                       handlePresetAmount(maxVal || '0');
@@ -963,11 +1151,8 @@ export default function SendSheet({
                       handlePresetAmount(maxVal || '0');
                     }
                   }}
-                  className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm font-normal leading-5 text-white text-center transition-all active:opacity-70"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.06)",
-                    mixBlendMode: "lighten",
-                  }}
+                  className="flex-1 min-w-[48px] px-3 py-2 rounded-[40px] text-sm font-normal leading-5 text-center transition-all active:opacity-70"
+                  style={{ background: "rgba(249, 54, 60, 0.14)", color: "#f9363c" }}
                 >
                   Max
                 </button>
@@ -975,57 +1160,57 @@ export default function SendSheet({
 
               {/* Balance Card */}
               <div
-                className="flex items-center pl-3 pr-4 py-1 rounded-2xl overflow-hidden"
-                style={{
-                  background: "rgba(255, 255, 255, 0.06)",
-                  mixBlendMode: "lighten",
-                }}
+                className="flex items-center pl-3 pr-4 py-1 overflow-hidden"
               >
-                {/* Left: Solana Icon */}
                 <div className="py-1.5 pr-3">
                   <div className="w-12 h-12 overflow-hidden flex items-center justify-center">
                     <Image
-                      src="/icons/solana.svg"
+                      src="/tokens/solana-sol-logo.png"
                       alt="Solana"
                       width={48}
                       height={48}
                     />
                   </div>
                 </div>
-                {/* Middle: Balance label + wallet address */}
                 <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                  <p className="text-base leading-5 text-white">Balance</p>
-                  <p className="text-[13px] leading-4 text-white/60">{abbreviatedAddress}</p>
+                  <p className="text-base leading-5 text-black">Balance</p>
+                  <p
+                    className="text-[13px] leading-4"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
+                    {abbreviatedAddress}
+                  </p>
                 </div>
-                {/* Right: Balance amount + USD */}
                 <div className="flex flex-col gap-0.5 items-end py-2.5 pl-3">
-                  <p className="text-base leading-5 text-white text-right">{truncateDecimals(balanceInSol, 4)} SOL</p>
-                  <p className="text-[13px] leading-4 text-white/60 text-right">
+                  <p className="text-base leading-5 text-black text-right">
+                    {truncateDecimals(balanceInSol, 4)} {tokenSymbol}
+                  </p>
+                  <p
+                    className="text-[13px] leading-4 text-right"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
                     ~{balanceInUsd !== null ? `$${truncateDecimals(balanceInUsd, 2)}` : "—"}
                   </p>
                 </div>
               </div>
             </div>
-
           </div>
 
-          {/* STEP 3: CONFIRMATION */}
+          {/* STEP 4: CONFIRMATION */}
           <div
             className="absolute inset-0 flex flex-col overflow-y-auto transition-all duration-300 ease-out"
             style={{
-              transform: `translateX(${(3 - step) * 100}%)`,
-              opacity: step === 3 ? 1 : 0,
-              pointerEvents: step === 3 ? 'auto' : 'none'
+              transform: `translateX(${(4 - step) * 100}%)`,
+              opacity: step === 4 ? 1 : 0,
+              pointerEvents: step === 4 ? 'auto' : 'none',
             }}
           >
-            {/* Amount Display Section (same layout as Step 2, but read-only) */}
+            {/* Amount Display */}
             <div className="px-4 pt-2 pb-4">
               <div className="px-2 flex flex-col gap-1">
-                {/* Amount Display */}
                 <div className="flex gap-2 items-baseline h-[48px]">
-                  <p className="text-[40px] font-semibold leading-[48px] text-white">
+                  <p className="text-[40px] font-semibold leading-[48px] text-black">
                     {(() => {
-                      // Convert to SOL for display if needed
                       const val = parseFloat(amountStr);
                       if (isNaN(val)) return '0';
                       if (currency === 'USD') {
@@ -1035,12 +1220,17 @@ export default function SendSheet({
                       return amountStr || '0';
                     })()}
                   </p>
-                  <p className="text-[28px] font-semibold leading-8 text-white/40 tracking-[0.4px]">
-                    SOL
+                  <p
+                    className="text-[28px] font-semibold leading-8 tracking-[0.4px]"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
+                    {tokenSymbol}
                   </p>
                 </div>
-                {/* USD Conversion */}
-                <p className="text-base leading-[22px] text-white/40">
+                <p
+                  className="text-base leading-[22px]"
+                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                >
                   {(() => {
                     const val = parseFloat(amountStr);
                     if (isNaN(val)) return '≈$0.00';
@@ -1054,7 +1244,6 @@ export default function SendSheet({
                     return `≈$${usdVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                   })()}
                 </p>
-                {/* Username case sensitivity warning */}
                 {recipient.startsWith('@') && (
                   <p className="text-[11px] leading-[14px] mt-1" style={{ color: "#eab308" }}>
                     ⚠️ Usernames are case-sensitive. Double-check spelling.
@@ -1063,197 +1252,173 @@ export default function SendSheet({
               </div>
             </div>
 
-            {/* Payment Details Section */}
-            <div className="flex flex-col w-full">
-              {/* Cards */}
-              <div className="px-4 pt-3 flex flex-col gap-2">
-                {/* Transfer Fee Card */}
-                <div
-                  className="flex items-center pl-3 pr-4 py-1 rounded-2xl"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.06)",
-                    mixBlendMode: "lighten",
-                  }}
-                >
-                  <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                    <p className="text-[13px] leading-4 text-white/60">Transfer fee</p>
-                    <div className="flex items-baseline text-base leading-5">
-                      <span className="text-white">{SOLANA_FEE_SOL} SOL</span>
-                      <span className="text-white/60">
-                        {solanaFeeUsd !== null ? ` ≈ $${solanaFeeUsd.toFixed(2)}` : " ≈ $—"}
-                      </span>
-                    </div>
+            {/* Payment Details */}
+            <div className="px-4 pt-3 flex flex-col gap-2">
+              {/* Transfer Fee */}
+              <div
+                className="flex items-center pl-3 pr-4 py-1 rounded-[20px]"
+                style={{ background: "#f2f2f7" }}
+              >
+                <div className="flex-1 flex flex-col gap-0.5 py-2.5">
+                  <p
+                    className="text-[13px] leading-4"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
+                    Transfer fee
+                  </p>
+                  <div className="flex items-baseline text-base leading-5">
+                    <span className="text-black">{SOLANA_FEE_SOL} {tokenSymbol}</span>
+                    <span style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                      {solanaFeeUsd !== null ? ` ≈ $${solanaFeeUsd.toFixed(2)}` : " ≈ $—"}
+                    </span>
                   </div>
                 </div>
+              </div>
 
-                {/* Total Amount Card */}
-                <div
-                  className="flex items-center pl-3 pr-4 py-1 rounded-2xl"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.06)",
-                    mixBlendMode: "lighten",
-                  }}
-                >
-                  <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                    <p className="text-[13px] leading-4 text-white/60">Total amount</p>
-                    <div className="flex items-baseline text-base leading-5">
-                      <span className="text-white">
-                        {(() => {
-                          const val = parseFloat(amountStr);
-                          if (isNaN(val)) {
-                            return `${SOLANA_FEE_SOL} SOL`;
-                          }
-                          const solVal =
-                            currency === 'SOL'
-                              ? val
-                              : solPriceUsd
-                                ? val / solPriceUsd
-                                : NaN;
-                          const total = solVal + SOLANA_FEE_SOL;
-                          if (isNaN(total)) return `${SOLANA_FEE_SOL} SOL`;
-                          return `${total.toFixed(6).replace(/\.?0+$/, '')} SOL`;
-                        })()}
-                      </span>
-                      <span className="text-white/60">
-                        {(() => {
-                          const val = parseFloat(amountStr);
-                          if (isNaN(val)) {
-                            return solanaFeeUsd !== null ? ` ≈ $${solanaFeeUsd.toFixed(2)}` : " ≈ $—";
-                          }
-                          const usdVal =
-                            currency === 'SOL'
-                              ? solPriceUsd
-                                ? val * solPriceUsd
-                                : null
-                              : val;
-                          if (usdVal === null) {
-                            return ' ≈ $—';
-                          }
-                          const totalUsd = solanaFeeUsd !== null ? usdVal + solanaFeeUsd : usdVal;
-                          return ` ≈ $${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                        })()}
-                      </span>
-                    </div>
+              {/* Total Amount */}
+              <div
+                className="flex items-center pl-3 pr-4 py-1 rounded-[20px]"
+                style={{ background: "#f2f2f7" }}
+              >
+                <div className="flex-1 flex flex-col gap-0.5 py-2.5">
+                  <p
+                    className="text-[13px] leading-4"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
+                    Total amount
+                  </p>
+                  <div className="flex items-baseline text-base leading-5">
+                    <span className="text-black">
+                      {(() => {
+                        const val = parseFloat(amountStr);
+                        if (isNaN(val)) {
+                          return `${SOLANA_FEE_SOL} ${tokenSymbol}`;
+                        }
+                        const solVal =
+                          currency === 'SOL'
+                            ? val
+                            : solPriceUsd
+                              ? val / solPriceUsd
+                              : NaN;
+                        const total = solVal + SOLANA_FEE_SOL;
+                        if (isNaN(total)) return `${SOLANA_FEE_SOL} ${tokenSymbol}`;
+                        return `${total.toFixed(6).replace(/\.?0+$/, '')} ${tokenSymbol}`;
+                      })()}
+                    </span>
+                    <span style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                      {(() => {
+                        const val = parseFloat(amountStr);
+                        if (isNaN(val)) {
+                          return solanaFeeUsd !== null ? ` ≈ $${solanaFeeUsd.toFixed(2)}` : " ≈ $—";
+                        }
+                        const usdVal =
+                          currency === 'SOL'
+                            ? solPriceUsd
+                              ? val * solPriceUsd
+                              : null
+                            : val;
+                        if (usdVal === null) {
+                          return ' ≈ $—';
+                        }
+                        const totalUsd = solanaFeeUsd !== null ? usdVal + solanaFeeUsd : usdVal;
+                        return ` ≈ $${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                      })()}
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* STEP 4: SUCCESS or ERROR */}
+          {/* STEP 5: RESULT (in-progress / success / error) */}
           <div
             className="absolute inset-0 flex flex-col transition-all duration-300 ease-out"
             style={{
-              transform: `translateX(${(4 - step) * 100}%)`,
-              opacity: step === 4 ? 1 : 0,
-              pointerEvents: step === 4 ? 'auto' : 'none'
+              transform: `translateX(${(5 - step) * 100}%)`,
+              opacity: step === 5 ? 1 : 0,
+              pointerEvents: step === 5 ? 'auto' : 'none',
             }}
           >
-            {sendError ? (
-              /* Error Content */
+            {isSending ? (
+              /* In Progress */
               <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
-                {/* Animated Error Icon */}
-                <div className="relative mb-5">
-                  <div
-                    className="w-[72px] h-[72px] rounded-full flex items-center justify-center"
-                    style={{
-                      background: "#FF4D4D",
-                      animation: step === 4 ? "result-pulse 0.6s ease-out" : "none"
-                    }}
-                  >
-                    <ShieldAlert
-                      className="text-white"
-                      size={40}
-                      strokeWidth={2}
-                      style={{
-                        animation: step === 4 ? "result-icon 0.4s ease-out 0.2s both" : "none"
-                      }}
-                    />
-                  </div>
+                <div className="relative w-[72px] h-[72px] mb-5">
+                  <Image
+                    src="/icons/Loader.png"
+                    alt="Loading"
+                    width={72}
+                    height={72}
+                    className="animate-spin"
+                  />
                 </div>
-
-                {/* Error Text */}
-                <div className="flex flex-col gap-3 items-center text-center max-w-[280px]">
-                  <h2 className="text-2xl font-semibold text-white leading-7">
+                <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
+                  <h2 className="text-xl font-semibold text-black leading-6">
+                    {tokenSymbol} is on its way
+                  </h2>
+                  <p
+                    className="text-base leading-5"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
+                    Your transaction is being processed and will be completed shortly
+                  </p>
+                </div>
+              </div>
+            ) : sendError ? (
+              /* Error */
+              <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+                <div className="relative mb-5">
+                  <Image
+                    src="/dogs/dog-cry.png"
+                    alt="Error"
+                    width={96}
+                    height={96}
+                  />
+                </div>
+                <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
+                  <h2 className="text-xl font-semibold text-black leading-6">
                     Transaction failed
                   </h2>
-                  <p className="text-base leading-5 text-white/60">
+                  <p
+                    className="text-base leading-5"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
                     {sendError}
                   </p>
                 </div>
               </div>
             ) : (
-              /* Success Content */
+              /* Success */
               <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
-                {/* Animated Success Icon */}
                 <div className="relative mb-5">
-                  <div
-                    className="w-[72px] h-[72px] rounded-full flex items-center justify-center"
-                    style={{
-                      background: buttonColor,
-                      animation: step === 4 ? "result-pulse 0.6s ease-out" : "none"
-                    }}
-                  >
-                    <Check
-                      className="text-white"
-                      size={40}
-                      strokeWidth={2.5}
-                      style={{
-                        animation: step === 4 ? "result-icon 0.4s ease-out 0.2s both" : "none"
-                      }}
-                    />
-                  </div>
+                  <Image
+                    src="/dogs/dog-green.png"
+                    alt="Success"
+                    width={96}
+                    height={96}
+                  />
                 </div>
-
-                {/* Success Text */}
-                <div className="flex flex-col gap-3 items-center text-center max-w-[280px]">
-                  <h2 className="text-2xl font-semibold text-white leading-7">
-                    SOL sent
+                <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
+                  <h2 className="text-xl font-semibold text-black leading-6">
+                    {tokenSymbol} sent
                   </h2>
-                  <p className="text-base leading-5 text-white/60">
-                    <span className="text-white">
-                      {sentAmountSol?.toFixed(4).replace(/\.?0+$/, '') || '0'} SOL
+                  <p
+                    className="text-base leading-5"
+                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  >
+                    <span className="text-black">
+                      {sentAmountSol?.toFixed(4).replace(/\.?0+$/, '') || '0'} {tokenSymbol}
                     </span>
                     {" "}successfully sent to{" "}
-                    <span className="text-white">
-                      {recipient.startsWith('@') ? recipient : `${recipient.slice(0, 4)}…${recipient.slice(-4)}`}
-                    </span>
+                    <span className="text-black">{pillAddress}</span>
                   </p>
                 </div>
               </div>
             )}
-
-            {/* Animation keyframes */}
-            <style jsx>{`
-              @keyframes result-pulse {
-                0% {
-                  transform: scale(0);
-                  opacity: 0;
-                }
-                50% {
-                  transform: scale(1.1);
-                }
-                100% {
-                  transform: scale(1);
-                  opacity: 1;
-                }
-              }
-              @keyframes result-icon {
-                0% {
-                  transform: scale(0) rotate(-45deg);
-                  opacity: 0;
-                }
-                100% {
-                  transform: scale(1) rotate(0deg);
-                  opacity: 1;
-                }
-              }
-            `}</style>
           </div>
         </div>
       </div>
-    </Modal>
-
-  </>
+    </>
   );
+
+  return createPortal(content, document.body);
 }

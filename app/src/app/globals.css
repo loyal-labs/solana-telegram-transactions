@@ -183,3 +183,9 @@ html[data-vaul-drawer-wrapper],
   background: transparent !important;
   background-color: transparent !important;
 }
+
+/* Caret blink animation for amount input */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
