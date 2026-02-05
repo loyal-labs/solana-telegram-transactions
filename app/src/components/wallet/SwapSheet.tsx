@@ -73,6 +73,14 @@ export type SwapFormValues = {
   toSymbol: string;
 };
 
+export type SecureFormValues = {
+  mint: string;
+  amount: number;
+  decimals: number;
+  symbol: string;
+  direction: "shield" | "unshield";
+};
+
 // Fallback tokens when user has insufficient holdings
 const FALLBACK_TOKENS: Token[] = [
   {
@@ -116,9 +124,13 @@ export type SwapSheetProps = {
   solPriceUsd?: number | null;
   onValidationChange?: (isValid: boolean) => void;
   onSwapParamsChange?: (params: SwapFormValues) => void;
+  onSecureParamsChange?: (params: SecureFormValues) => void;
   // Tab control
   activeTab?: "swap" | "secure";
   onTabChange?: (tab: "swap" | "secure") => void;
+  // Secure direction control
+  secureDirection?: "shield" | "unshield";
+  onSecureDirectionChange?: (dir: "shield" | "unshield") => void;
   // Result state props
   view?: SwapView;
   onViewChange?: (view: SwapView) => void;
@@ -137,8 +149,11 @@ export default function SwapSheet({
   solPriceUsd: solPriceUsdProp,
   onValidationChange,
   onSwapParamsChange,
+  onSecureParamsChange,
   activeTab: activeTabProp,
   onTabChange,
+  secureDirection: secureDirectionProp,
+  onSecureDirectionChange,
   view: viewProp,
   onViewChange,
   swapError,
@@ -198,6 +213,25 @@ export default function SwapSheet({
     },
     [onViewChange]
   );
+
+  // Secure direction: shield or unshield
+  const [internalSecureDirection, setInternalSecureDirection] = useState<"shield" | "unshield">("shield");
+  const secureDirection = secureDirectionProp ?? internalSecureDirection;
+  const setSecureDirection = useCallback(
+    (dir: "shield" | "unshield") => {
+      if (onSecureDirectionChange) {
+        onSecureDirectionChange(dir);
+      } else {
+        setInternalSecureDirection(dir);
+      }
+    },
+    [onSecureDirectionChange]
+  );
+
+  const handleToggleSecureDirection = useCallback(() => {
+    hapticFeedback.impactOccurred("light");
+    setSecureDirection(secureDirection === "shield" ? "unshield" : "shield");
+  }, [secureDirection, setSecureDirection]);
 
   // Compute available tokens from holdings or use fallback
   const availableTokens = useMemo(() => {
@@ -311,6 +345,7 @@ export default function SwapSheet({
       setSearchQuery("");
       setInternalView("main");
       setInternalActiveTab("swap");
+      setInternalSecureDirection("shield");
 
       const firstToken = availableTokens[0] ?? FALLBACK_TOKENS[0];
       const secondToken =
@@ -447,6 +482,20 @@ export default function SwapSheet({
       });
     }
   }, [open, activeTab, fromToken, toToken, amountStr, onSwapParamsChange]);
+
+  // Report secure params to parent
+  useEffect(() => {
+    if (open && activeTab === "secure" && secureToken.mint) {
+      const amount = parseFloat(secureAmountStr);
+      onSecureParamsChange?.({
+        mint: secureToken.mint,
+        amount: isNaN(amount) ? 0 : amount,
+        decimals: secureToken.decimals,
+        symbol: secureToken.symbol,
+        direction: secureDirection,
+      });
+    }
+  }, [open, activeTab, secureToken, secureAmountStr, secureDirection, onSecureParamsChange]);
 
   // Insufficient balance check
   const insufficientBalance = useMemo(() => {
@@ -789,22 +838,30 @@ export default function SwapSheet({
             </div>
           )}
 
-          {/* Token selection: Title */}
-          {view === "selectFrom" && (
-            <span className="text-[17px] font-semibold text-black leading-[22px]">
-              You swap
-            </span>
-          )}
-          {view === "selectTo" && (
-            <span className="text-[17px] font-semibold text-black leading-[22px]">
-              You receive
-            </span>
+          {/* Token selection: Back button + title */}
+          {(view === "selectFrom" || view === "selectTo") && (
+            <>
+              <button
+                onClick={() => {
+                  hapticFeedback.impactOccurred("light");
+                  setView("main");
+                }}
+                className="absolute left-3 w-[30px] h-[30px] flex items-center justify-center active:scale-95 transition-all duration-150"
+              >
+                <Image src="/icons/arrow-left.svg" alt="Back" width={30} height={30} />
+              </button>
+              <span className="text-[17px] font-semibold text-black leading-[22px]">
+                Select asset
+              </span>
+            </>
           )}
 
           {/* Confirm / Result: Title */}
           {(view === "confirm" || view === "result") && (
             <span className="text-[17px] font-semibold text-black leading-[22px]">
-              Swap {fromToken.symbol} to {toToken.symbol}
+              {activeTab === "secure"
+                ? `${secureDirection === "shield" ? "Secure" : "Unshield"} ${secureToken.symbol}`
+                : `Swap ${fromToken.symbol} to ${toToken.symbol}`}
             </span>
           )}
 
@@ -1061,7 +1118,7 @@ export default function SwapSheet({
             {/* SECURE TAB CONTENT */}
             {activeTab === "secure" && (
               <div className="flex flex-col px-4 pt-2 pb-4 gap-2">
-                {/* You Secure Card */}
+                {/* First Card: "You secure" (shield) or "You unshield" (unshield) */}
                 <div
                   className="flex flex-col px-4 py-3 rounded-[20px] relative"
                   style={{ background: "#f2f2f7" }}
@@ -1070,7 +1127,7 @@ export default function SwapSheet({
                     className="text-base leading-5"
                     style={{ color: "rgba(60, 60, 67, 0.6)" }}
                   >
-                    You secure
+                    {secureDirection === "shield" ? "You secure" : "You unshield"}
                   </p>
 
                   <div className="flex gap-1 items-center h-12">
@@ -1114,19 +1171,33 @@ export default function SwapSheet({
                       />
                     </div>
 
+                    {/* Token selector (always selectable) */}
                     <button
                       onClick={handleOpenSecureTokenSelect}
                       className="flex items-center px-1 rounded-[54px] active:scale-95 transition-transform"
                       style={{ background: "rgba(0, 0, 0, 0.06)" }}
                     >
                       <div className="pr-1.5">
-                        <div className="w-7 h-7 rounded-full overflow-hidden">
-                          <Image
-                            src={secureToken.icon}
-                            alt={secureToken.symbol}
-                            width={28}
-                            height={28}
-                          />
+                        <div className="relative">
+                          <div className="w-7 h-7 rounded-full overflow-hidden">
+                            <Image
+                              src={secureToken.icon}
+                              alt={secureToken.symbol}
+                              width={28}
+                              height={28}
+                            />
+                          </div>
+                          {/* Shield badge for unshield mode */}
+                          {secureDirection === "unshield" && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4">
+                              <Image
+                                src="/Shield.svg"
+                                alt="Secured"
+                                width={16}
+                                height={16}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                       <span className="text-base leading-5 text-black py-2.5 pr-1">
@@ -1153,7 +1224,7 @@ export default function SwapSheet({
                         className="text-[13px] leading-4"
                         style={{ color: "rgba(60, 60, 67, 0.6)" }}
                       >
-                        ${secureUsdValue.toFixed(2)}
+                        1 {secureToken.symbol} ≈ ${secureToken.priceUsd.toFixed(4)}
                       </p>
                     </div>
                     <p
@@ -1166,18 +1237,20 @@ export default function SwapSheet({
                     </p>
                   </div>
 
-                  <div
-                    className="absolute -bottom-[18px] left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-white flex items-center justify-center z-10 shadow-sm"
+                  {/* Swap Direction Button */}
+                  <button
+                    onClick={handleToggleSecureDirection}
+                    className="absolute -bottom-[18px] left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-white flex items-center justify-center active:scale-95 transition-transform z-10 shadow-sm"
                     style={{ border: "1px solid rgba(0, 0, 0, 0.06)" }}
                   >
                     <ArrowDownUp size={16} strokeWidth={2} className="text-black" />
-                  </div>
+                  </button>
                 </div>
 
-                {/* You Receive Card (Secured Token) */}
+                {/* Second Card: "You receive" — border only, no fill */}
                 <div
                   className="flex flex-col px-4 py-3 rounded-[20px]"
-                  style={{ background: "#f2f2f7" }}
+                  style={{ border: "1px solid rgba(0, 0, 0, 0.08)" }}
                 >
                   <p
                     className="text-base leading-5"
@@ -1188,29 +1261,34 @@ export default function SwapSheet({
 
                   <div className="flex gap-1 items-center h-12">
                     <div className="flex-1 flex items-baseline">
-                      <p className="text-[28px] font-semibold leading-8 text-black">
+                      <p className={`text-[28px] font-semibold leading-8 ${secureAmountStr ? "text-black" : "text-black/30"}`}>
                         {secureAmountStr || "0"}
                       </p>
                     </div>
 
+                    {/* Token display (NOT selectable) */}
                     <div className="flex items-center px-1 pr-3.5">
                       <div className="flex items-center pr-1.5">
-                        <div className="w-7 h-7 rounded-full overflow-hidden">
-                          <Image
-                            src={secureToken.icon}
-                            alt={secureToken.symbol}
-                            width={28}
-                            height={28}
-                          />
-                        </div>
-                        <div className="w-7 h-7 rounded-full overflow-hidden -ml-2 bg-[#f9363c] flex items-center justify-center">
-                          <Image
-                            src="/loyal-shield.png"
-                            alt="Secured"
-                            width={20}
-                            height={20}
-                            className="object-contain"
-                          />
+                        <div className="relative">
+                          <div className="w-7 h-7 rounded-full overflow-hidden">
+                            <Image
+                              src={secureToken.icon}
+                              alt={secureToken.symbol}
+                              width={28}
+                              height={28}
+                            />
+                          </div>
+                          {/* Shield badge for shield mode (receive side is secured) */}
+                          {secureDirection === "shield" && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4">
+                              <Image
+                                src="/Shield.svg"
+                                alt="Secured"
+                                width={16}
+                                height={16}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                       <span className="text-base leading-5 text-black py-2.5">
@@ -1231,7 +1309,7 @@ export default function SwapSheet({
                       className="text-[13px] leading-4"
                       style={{ color: "rgba(60, 60, 67, 0.6)" }}
                     >
-                      0 {secureToken.symbol}
+                      0
                     </p>
                   </div>
                 </div>
@@ -1527,95 +1605,130 @@ export default function SwapSheet({
               pointerEvents: view === "result" ? "auto" : "none",
             }}
           >
-            {isSwapping ? (
-              /* Swapping in progress */
-              <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
-                {/* Token icons side by side */}
-                <div className="flex items-center gap-2 mb-5">
-                  <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
-                    <Image
-                      src={fromToken.icon}
-                      alt={fromToken.symbol}
-                      width={56}
-                      height={56}
-                    />
+            {activeTab === "swap" ? (
+              /* SWAP RESULT */
+              <>
+                {isSwapping ? (
+                  <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+                    <div className="flex items-center gap-2 mb-5">
+                      <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
+                        <Image src={fromToken.icon} alt={fromToken.symbol} width={56} height={56} />
+                      </div>
+                      <ChevronRight size={20} strokeWidth={2} style={{ color: "rgba(60, 60, 67, 0.3)" }} />
+                      <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
+                        <Image src={toToken.icon} alt={toToken.symbol} width={56} height={56} />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
+                      <h2 className="text-xl font-semibold text-black leading-6">Swapping...</h2>
+                      <p className="text-base leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                        You can close this screen and continue using the app
+                      </p>
+                    </div>
                   </div>
-                  <ChevronRight
-                    size={20}
-                    strokeWidth={2}
-                    style={{ color: "rgba(60, 60, 67, 0.3)" }}
-                  />
-                  <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
-                    <Image
-                      src={toToken.icon}
-                      alt={toToken.symbol}
-                      width={56}
-                      height={56}
-                    />
+                ) : swapError ? (
+                  <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+                    <div className="relative mb-5">
+                      <Image src="/dogs/dog-cry.png" alt="Error" width={96} height={96} />
+                    </div>
+                    <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
+                      <h2 className="text-xl font-semibold text-black leading-6">Swap failed</h2>
+                      <p className="text-base leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                        {swapError}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
-                  <h2 className="text-xl font-semibold text-black leading-6">
-                    Swapping...
-                  </h2>
-                  <p
-                    className="text-base leading-5"
-                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                  >
-                    You can close this screen and continue using the app
-                  </p>
-                </div>
-              </div>
-            ) : swapError ? (
-              /* Error */
-              <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
-                <div className="relative mb-5">
-                  <Image
-                    src="/dogs/dog-cry.png"
-                    alt="Error"
-                    width={96}
-                    height={96}
-                  />
-                </div>
-                <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
-                  <h2 className="text-xl font-semibold text-black leading-6">
-                    Swap failed
-                  </h2>
-                  <p
-                    className="text-base leading-5"
-                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                  >
-                    {swapError}
-                  </p>
-                </div>
-              </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+                    <div className="relative mb-5">
+                      <Image src="/dogs/dog-green.png" alt="Success" width={96} height={96} />
+                    </div>
+                    <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
+                      <h2 className="text-xl font-semibold text-black leading-6">Swap Completed</h2>
+                      <p className="text-base leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                        <span className="text-black">
+                          {swappedToAmount?.toFixed(4).replace(/\.?0+$/, "") || "0"}{" "}
+                          {swappedToSymbol || ""}
+                        </span>
+                        {" "}has been deposited to your wallet
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
-              /* Success */
-              <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
-                <div className="relative mb-5">
-                  <Image
-                    src="/dogs/dog-green.png"
-                    alt="Success"
-                    width={96}
-                    height={96}
-                  />
-                </div>
-                <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
-                  <h2 className="text-xl font-semibold text-black leading-6">
-                    Swap Completed
-                  </h2>
-                  <p
-                    className="text-base leading-5"
-                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                  >
-                    <span className="text-black">
-                      {swappedToAmount?.toFixed(4).replace(/\.?0+$/, "") || "0"}{" "}
-                      {swappedToSymbol || ""}
-                    </span>
-                    {" "}has been deposited to your wallet
-                  </p>
-                </div>
-              </div>
+              /* SECURE RESULT */
+              <>
+                {isSwapping ? (
+                  <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+                    {/* Shield: token icon → Shield.svg | Unshield: Shield.svg → token icon */}
+                    <div className="flex items-center gap-2 mb-5">
+                      {secureDirection === "shield" ? (
+                        <>
+                          <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
+                            <Image src={secureToken.icon} alt={secureToken.symbol} width={56} height={56} />
+                          </div>
+                          <ChevronRight size={20} strokeWidth={2} style={{ color: "rgba(60, 60, 67, 0.3)" }} />
+                          <div className="w-[56px] h-[56px] flex items-center justify-center">
+                            <Image src="/Shield.svg" alt="Shield" width={56} height={56} />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-[56px] h-[56px] flex items-center justify-center">
+                            <Image src="/Shield.svg" alt="Shield" width={56} height={56} />
+                          </div>
+                          <ChevronRight size={20} strokeWidth={2} style={{ color: "rgba(60, 60, 67, 0.3)" }} />
+                          <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
+                            <Image src={secureToken.icon} alt={secureToken.symbol} width={56} height={56} />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
+                      <h2 className="text-xl font-semibold text-black leading-6">
+                        {secureDirection === "shield" ? "Securing..." : "Unshielding..."}
+                      </h2>
+                      <p className="text-base leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                        You can close this screen and continue using the app
+                      </p>
+                    </div>
+                  </div>
+                ) : swapError ? (
+                  <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+                    <div className="relative mb-5">
+                      <Image src="/dogs/dog-cry.png" alt="Error" width={96} height={96} />
+                    </div>
+                    <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
+                      <h2 className="text-xl font-semibold text-black leading-6">
+                        {secureDirection === "shield" ? "Securing failed" : "Unshielding failed"}
+                      </h2>
+                      <p className="text-base leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                        {swapError}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+                    <div className="relative mb-5">
+                      <Image src="/dogs/dog-green.png" alt="Success" width={96} height={96} />
+                    </div>
+                    <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
+                      <h2 className="text-xl font-semibold text-black leading-6">
+                        {swappedToSymbol || secureToken.symbol}{" "}
+                        {secureDirection === "shield" ? "Secured" : "Unshielded"}
+                      </h2>
+                      <p className="text-base leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                        <span className="text-black">
+                          {swappedToAmount?.toFixed(4).replace(/\.?0+$/, "") || "0"}{" "}
+                          {swappedToSymbol || secureToken.symbol}
+                        </span>
+                        {" "}moved to your {secureDirection === "shield" ? "secure balance" : "main balance"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
