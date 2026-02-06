@@ -2565,7 +2565,7 @@ export default function Home() {
                 <div className="flex flex-col gap-2 items-center px-4 pb-4">
                   {displayTokens.slice(0, 5).map((token) => (
                     <div
-                      key={token.mint}
+                      key={`${token.mint} (${token.name})`}
                       className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
                       style={{ border: "2px solid #f2f2f7" }}
                     >
