@@ -65,8 +65,6 @@ import {
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
 import {
-  prepareStoreInitDataTxn,
-  sendStoreInitDataTxn,
   verifyAndClaimDeposit,
 } from "@/lib/solana/verify-and-claim-deposit";
 import {
@@ -77,7 +75,6 @@ import {
   formatUsdValue,
 } from "@/lib/solana/wallet/formatters";
 import {
-  getGaslessPublicKey,
   getWalletBalance,
   getWalletKeypair,
   getWalletProvider,
@@ -458,15 +455,15 @@ const setCachedIncomingTransactions = (
 const mapDepositToIncomingTransaction = (
   deposit: TelegramDeposit
 ): IncomingTransaction => {
-  const senderBase58 =
-    typeof (deposit.user as { toBase58?: () => string }).toBase58 === "function"
-      ? deposit.user.toBase58()
-      : String(deposit.user);
+  const depositId =
+    typeof deposit.address?.toBase58 === "function"
+      ? deposit.address.toBase58()
+      : `${deposit.username}-native`;
 
   return {
-    id: `${senderBase58}-${deposit.lastNonce}`,
+    id: depositId,
     amountLamports: deposit.amount,
-    sender: senderBase58,
+    sender: "Unknown sender",
     username: deposit.username,
   };
 };
@@ -995,22 +992,8 @@ export default function Home() {
         if (username) {
           const provider = await getWalletProvider();
           const deposits = await fetchDeposits(provider, username);
-
           const mappedTransactions: IncomingTransaction[] = deposits.map(
-            (deposit) => {
-              const senderBase58 =
-                typeof (deposit.user as { toBase58?: () => string })
-                  .toBase58 === "function"
-                  ? deposit.user.toBase58()
-                  : String(deposit.user);
-
-              return {
-                id: `${senderBase58}-${deposit.lastNonce}`,
-                amountLamports: deposit.amount,
-                sender: senderBase58,
-                username: username,
-              };
-            }
+            mapDepositToIncomingTransaction
           );
 
           setIncomingTransactions(mappedTransactions);
@@ -1031,6 +1014,7 @@ export default function Home() {
   }, [isRefreshing, loadWalletTransactions, rawInitData, refreshWalletBalance]);
 
   const handleSubmitSend = useCallback(async () => {
+    console.log("handleSubmitSend");
     if (!isSendFormValid || isSendingTransaction) {
       return;
     }
@@ -1053,12 +1037,13 @@ export default function Home() {
       let signature: string | null = null;
 
       if (isValidSolanaAddress(trimmedRecipient)) {
+        console.log("isValidSolanaAddress");
         signature = await sendSolTransaction(trimmedRecipient, lamports);
       } else if (isValidTelegramUsername(trimmedRecipient)) {
+        console.log("isValidTelegramUsername");
         const username = trimmedRecipient.replace(/^@/, "");
         const provider = await getWalletProvider();
-        const transferProgram = getTelegramTransferProgram(provider);
-        await topUpDeposit(provider, transferProgram, username, lamports);
+        await topUpDeposit(provider, username, lamports);
       } else {
         throw new Error("Invalid recipient");
       }
@@ -1295,23 +1280,12 @@ export default function Home() {
 
         const { validationBytes, signatureBytes } =
           createValidationBytesFromRawInitData(rawInitData);
-        const senderPublicKey = new PublicKey(transaction.sender);
-
         const username = transaction.username;
         const amountLamports = transaction.amountLamports;
-        const payerPublicKey = await getGaslessPublicKey();
-        console.log("payerPublicKey", payerPublicKey);
 
-        const preparedStoreInitDataTxn = await prepareStoreInitDataTxn(
+        const claimed = await verifyAndClaimDeposit(
           provider,
-          payerPublicKey,
-          validationBytes,
-          wallet
-        );
-
-        await sendStoreInitDataTxn(
-          preparedStoreInitDataTxn,
-          senderPublicKey,
+          wallet,
           recipientPublicKey,
           username,
           amountLamports,
@@ -1319,6 +1293,9 @@ export default function Home() {
           signatureBytes,
           TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
         );
+        if (!claimed) {
+          throw new Error("Failed to claim deposit");
+        }
 
         setIncomingTransactions((prev) =>
           prev.filter((tx) => tx.id !== transactionId)
@@ -1471,7 +1448,6 @@ export default function Home() {
         }
 
         const provider = await getWalletProvider();
-        const transferProgram = getTelegramTransferProgram(provider);
         console.log("Fetching deposits for username:", username);
         const deposits = await fetchDeposits(provider, username);
         console.log("Deposits fetched:", deposits.length, deposits);
@@ -1487,7 +1463,7 @@ export default function Home() {
         setIncomingTransactions(mappedTransactions);
 
         unsubscribe = await subscribeToDepositsWithUsername(
-          transferProgram,
+          provider,
           username,
           (deposit) => {
             if (isCancelled) {
@@ -1495,6 +1471,12 @@ export default function Home() {
             }
             const mapped = mapDepositToIncomingTransaction(deposit);
             setIncomingTransactions((prev) => {
+              if (deposit.amount <= 0) {
+                const next = prev.filter((tx) => tx.id !== mapped.id);
+                setCachedIncomingTransactions(username, next);
+                return next;
+              }
+
               const existingIndex = prev.findIndex((tx) => tx.id === mapped.id);
               let next: IncomingTransaction[];
               if (existingIndex >= 0) {
@@ -1587,24 +1569,24 @@ export default function Home() {
       }
     }
 
-    // Suppress Telegram SDK viewport errors in non-TMA environment
-    const originalError = console.error;
-    console.error = (...args) => {
-      const message = args[0]?.toString() || "";
-      // Suppress viewport_changed and other bridge validation errors
-      if (
-        message.includes("viewport_changed") ||
-        message.includes(
-          "ValiError: Invalid type: Expected Object but received null"
-        )
-      ) {
-        return; // Silently ignore these errors
-      }
-      originalError.apply(console, args);
-    };
+    // // Suppress Telegram SDK viewport errors in non-TMA environment
+    // const originalError = console.error;
+    // console.error = (...args) => {
+    //   const message = args[0]?.toString() || "";
+    //   // Suppress viewport_changed and other bridge validation errors
+    //   if (
+    //     message.includes("viewport_changed") ||
+    //     message.includes(
+    //       "ValiError: Invalid type: Expected Object but received null"
+    //     )
+    //   ) {
+    //     return; // Silently ignore these errors
+    //   }
+    //   originalError.apply(console, args);
+    // };
 
     return () => {
-      console.error = originalError;
+      // console.error = originalError;
     };
   }, []);
 
@@ -1782,6 +1764,7 @@ export default function Home() {
     const loadHoldings = async () => {
       try {
         const holdings = await fetchTokenHoldings(walletAddress);
+        console.log("holdings", holdings);
         if (isMounted) {
           setTokenHoldings(holdings);
         }
@@ -2359,6 +2342,7 @@ export default function Home() {
                       }
                       if (walletAddress) {
                         if (navigator?.clipboard?.writeText) {
+                          console.log("walletAddress", walletAddress);
                           navigator.clipboard.writeText(walletAddress);
                           setAddressCopied(true);
                           setTimeout(() => setAddressCopied(false), 2000);

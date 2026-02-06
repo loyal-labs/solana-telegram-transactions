@@ -1,20 +1,15 @@
-import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
 
-import { TelegramVerification } from "../../../../target/types/telegram_verification";
 import { resolveEndpoint } from "../core/api";
 import { claimDeposit } from "./deposits/claim-deposit";
-import {
-  getTelegramTransferProgram,
-  getTelegramVerificationProgram,
-} from "./solana-helpers";
+import { getTelegramVerificationProgram } from "./solana-helpers";
 import { storeInitData, verifyInitData } from "./verification";
 import { storeInitDataGasless } from "./verification/store-init-data";
 
 export const verifyAndClaimDeposit = async (
   provider: AnchorProvider,
   wallet: Wallet,
-  user: PublicKey,
   recipient: PublicKey,
   username: string,
   amount: number,
@@ -25,17 +20,16 @@ export const verifyAndClaimDeposit = async (
   if (amount <= 0) {
     throw new Error("Amount must be greater than 0");
   }
-  const transferProgram = getTelegramTransferProgram(provider);
   const verificationProgram = getTelegramVerificationProgram(provider);
 
-  const sessionData = await storeInitData(
+  await storeInitData(
     provider,
     verificationProgram,
     recipient,
     processedInitDataBytes
   );
 
-  const verified = await verifyInitData(
+  await verifyInitData(
     provider,
     wallet,
     recipient,
@@ -46,9 +40,8 @@ export const verifyAndClaimDeposit = async (
   );
 
   const claimed = await claimDeposit(
-    transferProgram,
+    provider,
     verificationProgram,
-    user,
     recipient,
     amount,
     username

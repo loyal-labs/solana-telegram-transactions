@@ -1,24 +1,14 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
 
-import { getTelegramTransferProgram, numberToBN } from "./solana-helpers";
+import { topUpDeposit as topUpPrivateDeposit } from "./deposits/top-up-deposit";
 
 export const topUpDeposit = async (
   provider: AnchorProvider,
   username: string,
   amount: number
 ) => {
-  const transferProgram = getTelegramTransferProgram(provider);
-  const userPublicKey = provider.wallet.publicKey;
-  const amountBN = numberToBN(amount);
-
   try {
-    await transferProgram.methods
-      .depositForUsername(username, amountBN)
-      .accounts({
-        payer: userPublicKey,
-        depositor: userPublicKey,
-      })
-      .rpc({ commitment: "confirmed" });
+    await topUpPrivateDeposit(provider, username, amount);
     return true;
   } catch (error) {
     console.error("Failed to top up deposit", error);
