@@ -14,14 +14,14 @@ import { getSessionPda } from "../solana-helpers";
 const ensureRecipientTokenAccount = async (
   provider: AnchorProvider,
   recipient: PublicKey
-): Promise<PublicKey> => {
+): Promise<{ recipientTokenAccount: PublicKey; createdAta: boolean }> => {
   const recipientTokenAccount = await getAssociatedTokenAddress(
     NATIVE_MINT,
     recipient
   );
   const ataInfo = await provider.connection.getAccountInfo(recipientTokenAccount);
   if (ataInfo) {
-    return recipientTokenAccount;
+    return { recipientTokenAccount, createdAta: false };
   }
 
   const transaction = new Transaction().add(
@@ -33,7 +33,7 @@ const ensureRecipientTokenAccount = async (
     )
   );
   await provider.sendAndConfirm(transaction);
-  return recipientTokenAccount;
+  return { recipientTokenAccount, createdAta: true };
 };
 
 export const claimDeposit = async (
@@ -49,7 +49,7 @@ export const claimDeposit = async (
 
   const privateClient = LoyalPrivateTransactionsClient.fromProvider(provider);
   const sessionPda = getSessionPda(recipient, verificationProgram);
-  const recipientTokenAccount = await ensureRecipientTokenAccount(
+  const { recipientTokenAccount, createdAta } = await ensureRecipientTokenAccount(
     provider,
     recipient
   );
@@ -63,14 +63,16 @@ export const claimDeposit = async (
     session: sessionPda,
   });
 
-  const unwrapTransaction = new Transaction().add(
-    createCloseAccountInstruction(
-      recipientTokenAccount,
-      recipient,
-      recipient
-    )
-  );
-  await provider.sendAndConfirm(unwrapTransaction);
+  if (createdAta) {
+    const unwrapTransaction = new Transaction().add(
+      createCloseAccountInstruction(
+        recipientTokenAccount,
+        recipient,
+        recipient
+      )
+    );
+    await provider.sendAndConfirm(unwrapTransaction);
+  }
 
   return true;
 };

@@ -1,6 +1,7 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
 import {
   createAssociatedTokenAccountInstruction,
+  createCloseAccountInstruction,
   createSyncNativeInstruction,
   getAssociatedTokenAddress,
   NATIVE_MINT,
@@ -17,11 +18,16 @@ import { LoyalPrivateTransactionsClient } from "@vladarbatov/private-transaction
 import type { TelegramDeposit } from "../../../types/deposits";
 import { getDeposit } from "./get-deposit";
 
+export type TopUpDepositResult = {
+  deposit: TelegramDeposit;
+  signature: string;
+};
+
 export async function wrapSolToWSol(opts: {
   connection: Connection;
   provider: AnchorProvider;
   lamports: number;
-}): Promise<PublicKey> {
+}): Promise<{ wsolAta: PublicKey; createdAta: boolean }> {
   const { connection, provider, lamports } = opts;
 
   const wsolAta = await getAssociatedTokenAddress(
@@ -30,9 +36,11 @@ export async function wrapSolToWSol(opts: {
   );
 
   const instructions: TransactionInstruction[] = [];
+  let createdAta = false;
 
   const ataInfo = await connection.getAccountInfo(wsolAta);
   if (!ataInfo) {
+    createdAta = true;
     instructions.push(
       createAssociatedTokenAccountInstruction(
         provider.publicKey,
@@ -56,41 +64,66 @@ export async function wrapSolToWSol(opts: {
   const tx = new Transaction().add(...instructions);
   await provider.sendAndConfirm(tx);
 
-  return wsolAta;
+  return { wsolAta, createdAta };
+}
+
+async function closeTemporaryWsolAta(
+  provider: AnchorProvider,
+  wsolAta: PublicKey,
+  createdAta: boolean
+): Promise<void> {
+  if (!createdAta) return;
+
+  try {
+    const closeTx = new Transaction().add(
+      createCloseAccountInstruction(
+        wsolAta,
+        provider.publicKey,
+        provider.publicKey
+      )
+    );
+    await provider.sendAndConfirm(closeTx);
+  } catch (error) {
+    console.error("Failed to close temporary wSOL ATA after top up", error);
+  }
 }
 
 export const topUpDeposit = async (
   provider: AnchorProvider,
   username: string,
   amount: number
-): Promise<TelegramDeposit> => {
+): Promise<TopUpDepositResult> => {
   if (amount <= 0) {
     throw new Error("Amount must be greater than 0");
   }
 
   const privateClient = LoyalPrivateTransactionsClient.fromProvider(provider);
 
-  const wsolAta = await wrapSolToWSol({
+  const { wsolAta, createdAta } = await wrapSolToWSol({
     connection: provider.connection,
     provider,
     lamports: amount,
   });
 
-  await privateClient.initializeDeposit({
-    tokenMint: NATIVE_MINT,
-    user: provider.publicKey,
-    payer: provider.publicKey,
-  });
+  try {
+    await privateClient.initializeDeposit({
+      tokenMint: NATIVE_MINT,
+      user: provider.publicKey,
+      payer: provider.publicKey,
+    });
 
-  await privateClient.depositForUsername({
-    username,
-    tokenMint: NATIVE_MINT,
-    amount,
-    depositor: provider.publicKey,
-    payer: provider.publicKey,
-    depositorTokenAccount: wsolAta,
-  });
+    const signature = await privateClient.depositForUsername({
+      username,
+      tokenMint: NATIVE_MINT,
+      amount,
+      depositor: provider.publicKey,
+      payer: provider.publicKey,
+      depositorTokenAccount: wsolAta,
+    });
 
-  const deposit = await getDeposit(provider, username);
-  return deposit;
+    const deposit = await getDeposit(provider, username);
+    return { deposit, signature };
+  } finally {
+    await closeTemporaryWsolAta(provider, wsolAta, createdAta);
+  }
 };

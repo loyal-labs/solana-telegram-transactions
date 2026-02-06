@@ -25,6 +25,16 @@ export type TokensSheetProps = {
 const SHEET_TRANSITION = "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)";
 const OVERLAY_TRANSITION = "opacity 0.3s ease";
 
+function getDisplaySymbol(token: TokenHolding): string {
+  if (
+    token.symbol === "SOL" &&
+    token.name.toLowerCase().includes("wrapped")
+  ) {
+    return "wSOL";
+  }
+  return token.symbol;
+}
+
 export default function TokensSheet({
   open,
   onOpenChange,
@@ -273,7 +283,7 @@ export default function TokensSheet({
         >
           {filteredTokens.map((token) => (
             <div
-              key={token.mint}
+              key={`${token.mint}-${token.name}-${token.isSecured ? "secured" : "standard"}`}
               className="flex items-center px-4"
             >
               <div className="py-1.5 pr-3">
@@ -282,7 +292,7 @@ export default function TokensSheet({
                     {token.imageUrl && (
                       <Image
                         src={token.imageUrl}
-                        alt={token.symbol}
+                        alt={getDisplaySymbol(token)}
                         fill
                         className="object-cover"
                       />
@@ -297,7 +307,7 @@ export default function TokensSheet({
               </div>
               <div className="flex-1 flex flex-col py-2.5 min-w-0">
                 <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px]">
-                  {token.symbol}
+                  {getDisplaySymbol(token)}
                 </p>
                 <p
                   className="text-[15px] leading-5"

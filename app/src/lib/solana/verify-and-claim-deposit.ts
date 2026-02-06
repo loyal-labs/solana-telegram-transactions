@@ -1,4 +1,9 @@
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
+import {
+  createCloseAccountInstruction,
+  getAssociatedTokenAddress,
+  NATIVE_MINT,
+} from "@solana/spl-token";
 import { PublicKey, Transaction } from "@solana/web3.js";
 
 import { resolveEndpoint } from "../core/api";
@@ -67,19 +72,56 @@ export const prepareStoreInitDataTxn = async (
   return storeTx;
 };
 
+export const prepareCloseWsolTxn = async (
+  provider: AnchorProvider,
+  payer: PublicKey,
+  userWallet: Wallet
+): Promise<Transaction | null> => {
+  const userPublicKey = userWallet.publicKey;
+  const recipientTokenAccount = await getAssociatedTokenAddress(
+    NATIVE_MINT,
+    userPublicKey
+  );
+  const existingAta = await provider.connection.getAccountInfo(recipientTokenAccount);
+  if (existingAta) {
+    return null;
+  }
+
+  const closeTx = new Transaction().add(
+    createCloseAccountInstruction(
+      recipientTokenAccount,
+      userPublicKey,
+      userPublicKey
+    )
+  );
+
+  const { blockhash, lastValidBlockHeight } =
+    await provider.connection.getLatestBlockhash();
+  closeTx.feePayer = payer;
+  closeTx.recentBlockhash = blockhash;
+  closeTx.lastValidBlockHeight = lastValidBlockHeight;
+
+  await userWallet.signTransaction(closeTx);
+
+  return closeTx;
+};
+
 export const sendStoreInitDataTxn = async (
   storeTx: Transaction,
-  userPubKey: PublicKey,
   recipientPubKey: PublicKey,
   username: string,
   amount: number,
   processedInitDataBytes: Uint8Array,
   telegramSignatureBytes: Uint8Array,
-  telegramPublicKeyBytes: Uint8Array
+  telegramPublicKeyBytes: Uint8Array,
+  closeTx?: Transaction
 ) => {
   const serializedStoreTx = storeTx
     .serialize({ requireAllSignatures: false })
     .toString("base64");
+  const serializedCloseTx = closeTx
+    ? closeTx.serialize({ requireAllSignatures: false }).toString("base64")
+    : null;
   const encodeBytes = (bytes: Uint8Array) =>
     Buffer.from(bytes).toString("base64");
 
@@ -88,18 +130,44 @@ export const sendStoreInitDataTxn = async (
     method: "POST",
     body: JSON.stringify({
       storeTx: serializedStoreTx,
-      userPubKey,
       recipientPubKey,
       username,
       amount,
       processedInitDataBytes: encodeBytes(processedInitDataBytes),
       telegramSignatureBytes: encodeBytes(telegramSignatureBytes),
       telegramPublicKeyBytes: encodeBytes(telegramPublicKeyBytes),
+      closeTx: serializedCloseTx,
     }),
   });
   if (!response.ok) {
+    const rawResponseBody = await response.text();
+    let errorDetails = `${response.status} ${response.statusText}`;
+
+    if (rawResponseBody) {
+      try {
+        const parsedBody = JSON.parse(rawResponseBody) as {
+          error?: unknown;
+          details?: unknown;
+        };
+        const errorMessage =
+          typeof parsedBody.error === "string" ? parsedBody.error : null;
+        const detailMessage =
+          typeof parsedBody.details === "string" ? parsedBody.details : null;
+
+        if (errorMessage && detailMessage) {
+          errorDetails = `${errorMessage}: ${detailMessage}`;
+        } else if (errorMessage) {
+          errorDetails = errorMessage;
+        } else {
+          errorDetails = rawResponseBody;
+        }
+      } catch {
+        errorDetails = rawResponseBody;
+      }
+    }
+
     throw new Error(
-      `Failed to send store init data transaction: ${response.status} ${response.statusText}`
+      `Failed to send store init data transaction: ${errorDetails}`
     );
   }
   return response.json();
