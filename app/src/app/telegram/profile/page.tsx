@@ -8,6 +8,8 @@ import {
 } from "@telegram-apps/sdk-react";
 import {
   ArrowUpRight,
+  Check,
+  ChevronDown,
   ChevronRight,
   CircleHelp,
   CirclePlus,
@@ -16,10 +18,12 @@ import {
   Smile,
 } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTelegramUser } from "@/components/telegram/TelegramProvider";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getSolanaEnv } from "@/lib/solana/rpc/connection";
+import type { SolanaEnv } from "@/lib/solana/rpc/types";
 import { setLoyalEmojiStatus } from "@/lib/telegram/mini-app/emoji-status";
 import { cn } from "@/lib/utils";
 
@@ -183,13 +187,9 @@ export default function ProfilePage() {
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [isImageError, setIsImageError] = useState(false);
-  const [isMainnet, setIsMainnet] = useState(() => {
-    if (typeof window !== "undefined") {
-      const override = localStorage.getItem("solana-env-override");
-      if (override) return override === "mainnet";
-    }
-    return process.env.NEXT_PUBLIC_SOLANA_ENV === "mainnet";
-  });
+  const [networkEnv, setNetworkEnv] = useState<SolanaEnv>(getSolanaEnv);
+  const [isNetworkDropdownOpen, setIsNetworkDropdownOpen] = useState(false);
+  const networkDropdownRef = useRef<HTMLDivElement>(null);
 
   // Detect platform on mount
   useEffect(() => {
@@ -257,12 +257,37 @@ export default function ProfilePage() {
     }
   }, []);
 
-  const handleMainnetToggle = useCallback((checked: boolean) => {
-    setIsMainnet(checked);
-    const newEnv = checked ? "mainnet" : "devnet";
-    localStorage.setItem("solana-env-override", newEnv);
+  const networkOptions: { value: SolanaEnv; label: string }[] = [
+    { value: "mainnet", label: "Mainnet" },
+    { value: "testnet", label: "Testnet" },
+    { value: "devnet", label: "Devnet" },
+  ];
+
+  const handleNetworkSelect = useCallback((env: SolanaEnv) => {
+    if (env === networkEnv) {
+      setIsNetworkDropdownOpen(false);
+      return;
+    }
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    setNetworkEnv(env);
+    setIsNetworkDropdownOpen(false);
+    localStorage.setItem("solana-env-override", env);
     setTimeout(() => window.location.reload(), 300);
-  }, []);
+  }, [networkEnv]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (networkDropdownRef.current && !networkDropdownRef.current.contains(e.target as Node)) {
+        setIsNetworkDropdownOpen(false);
+      }
+    };
+    if (isNetworkDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isNetworkDropdownOpen]);
 
   return (
     <main className="min-h-screen bg-white font-sans overflow-hidden relative">
@@ -343,15 +368,63 @@ export default function ProfilePage() {
 
           {/* Section 3: Network */}
           <SettingsSection>
-            <ProfileCell
-              icon={<Network size={28} strokeWidth={1.5} />}
-              title="Mainnet"
-              toggle={{
-                checked: isMainnet,
-                onChange: handleMainnetToggle,
-                activeColor: "#f9363c",
-              }}
-            />
+            <div ref={networkDropdownRef} className="relative">
+              <button
+                onClick={() => {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
+                  setIsNetworkDropdownOpen((prev) => !prev);
+                }}
+                className="w-full text-left active:opacity-80 transition-opacity"
+              >
+                <div className="flex items-center w-full overflow-hidden px-4">
+                  <div className="flex items-center pr-3 py-1.5">
+                    <div className="flex items-center justify-center pr-1 py-2.5">
+                      <div className="text-black/60">
+                        <Network size={28} strokeWidth={1.5} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 flex flex-col min-w-0 py-[13px]">
+                    <p className="text-[17px] font-medium leading-[22px] tracking-[-0.187px] text-black">
+                      Network
+                    </p>
+                  </div>
+                  <div className="pl-3 flex items-center gap-1 py-[13px]">
+                    <p className="text-[17px] font-normal leading-[22px] text-[rgba(60,60,67,0.6)]">
+                      {networkOptions.find((o) => o.value === networkEnv)?.label}
+                    </p>
+                    <ChevronDown
+                      size={16}
+                      className={cn(
+                        "text-[rgba(60,60,67,0.3)] transition-transform duration-200",
+                        isNetworkDropdownOpen && "rotate-180",
+                      )}
+                    />
+                  </div>
+                </div>
+              </button>
+
+              {isNetworkDropdownOpen && (
+                <div className="absolute right-4 top-full -mt-1 z-50 min-w-[160px] bg-white rounded-xl shadow-[0px_4px_24px_rgba(0,0,0,0.12)] py-1 overflow-hidden">
+                  {networkOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleNetworkSelect(option.value)}
+                      className="w-full flex items-center justify-between px-4 py-2.5 active:bg-black/5 transition-colors"
+                    >
+                      <span className="text-[17px] font-normal leading-[22px] text-black">
+                        {option.label}
+                      </span>
+                      {option.value === networkEnv && (
+                        <Check size={18} className="text-[#f9363c]" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </SettingsSection>
 
           {/* Section 4: Support */}
