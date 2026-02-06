@@ -10,19 +10,29 @@ export type DatePickerProps = {
   selectedDate: string;
   /** Callback when date is selected */
   onDateSelect: (date: string) => void;
-  /** Whether the picker is collapsed (only shows date header) */
-  collapsed?: boolean;
 };
 
-// Format date for display (e.g., "January 27")
-function formatDateHeader(dateStr: string): string {
+// Get 3-letter uppercase month abbreviation from date string
+function getMonthAbbr(dateStr: string): string {
   const date = new Date(dateStr + "T12:00:00");
-  return date.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  return date.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+}
+
+// Get month index (YYYY-MM) from date string
+function getMonthKey(dateStr: string): string {
+  return dateStr.substring(0, 7);
 }
 
 // Get day number from date string
 function getDayNumber(dateStr: string): number {
   return new Date(dateStr + "T12:00:00").getDate();
+}
+
+// Get today's date key
+function getTodayKey(): string {
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  return today.toISOString().split("T")[0];
 }
 
 // Generate array of dates: past N days + future M days
@@ -31,14 +41,12 @@ function generateDateRange(pastDays: number, futureDays: number = 7): string[] {
   const today = new Date();
   today.setHours(12, 0, 0, 0);
 
-  // Past dates (from oldest to today)
   for (let i = pastDays - 1; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     dates.push(date.toISOString().split("T")[0]);
   }
 
-  // Future dates (from tomorrow onwards)
   for (let i = 1; i <= futureDays; i++) {
     const date = new Date(today);
     date.setDate(date.getDate() + i);
@@ -48,7 +56,7 @@ function generateDateRange(pastDays: number, futureDays: number = 7): string[] {
   return dates;
 }
 
-// Check if a date is in the future
+// Check if a date is in the future (strictly after today)
 function isFutureDate(dateStr: string): boolean {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -60,25 +68,57 @@ export default function DatePicker({
   availableDates,
   selectedDate,
   onDateSelect,
-  collapsed = false,
 }: DatePickerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const availableDateSet = new Set(availableDates);
+  const todayKey = getTodayKey();
 
-  // Find the latest date with data (not in future) - this is our scroll boundary
   const latestDateWithData = useMemo(() => {
     const validDates = availableDates.filter(d => !isFutureDate(d));
     if (validDates.length === 0) return new Date().toISOString().split("T")[0];
     return validDates.sort().pop()!;
   }, [availableDates]);
 
-  // Generate all dates including future placeholders
   const dates = useMemo(() => generateDateRange(30, 7), []);
-  const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const isScrollingRef = useRef(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastScrollLeftRef = useRef(0); // Track scroll direction
-  const lastCenteredDateRef = useRef<string | null>(null); // Track centered date for haptics
+  const lastScrollLeftRef = useRef(0);
+  const lastCenteredDateRef = useRef<string | null>(null);
+
+  const selectedMonthKey = getMonthKey(selectedDate);
+
+  // Determine which dates should show month labels
+  // Selected month label travels with the selected date
+  // Earlier months show label on their LAST date (near boundary)
+  // Later months show label on their FIRST date (near boundary)
+  const monthLabelDates = useMemo(() => {
+    const labels = new Map<string, string>(); // date -> month abbreviation
+    const monthGroups = new Map<string, string[]>(); // monthKey -> dates[]
+
+    for (const date of dates) {
+      const monthKey = getMonthKey(date);
+      if (!monthGroups.has(monthKey)) {
+        monthGroups.set(monthKey, []);
+      }
+      monthGroups.get(monthKey)!.push(date);
+    }
+
+    for (const [monthKey, monthDates] of monthGroups) {
+      if (monthKey === selectedMonthKey) {
+        labels.set(selectedDate, getMonthAbbr(selectedDate));
+      } else if (monthKey < selectedMonthKey) {
+        // Months before: label on last date (nearest to boundary)
+        const lastDate = monthDates[monthDates.length - 1];
+        labels.set(lastDate, getMonthAbbr(lastDate));
+      } else {
+        // Months after: label on first date (nearest to boundary)
+        labels.set(monthDates[0], getMonthAbbr(monthDates[0]));
+      }
+    }
+
+    return labels;
+  }, [dates, selectedDate, selectedMonthKey]);
 
   // Scroll to selected date on mount and when selection changes
   useEffect(() => {
@@ -98,21 +138,20 @@ export default function DatePicker({
     }
   }, [selectedDate]);
 
-  // Handle date click - only allow dates with data, not future
   const handleDateClick = useCallback(
     (date: string) => {
       const hasData = availableDateSet.has(date);
       const isFuture = isFutureDate(date);
+      const isToday = date === todayKey;
 
-      // Don't allow selecting dates without data or future dates
-      if (!hasData || isFuture) {
+      // Allow today even without data; block future dates and past dates without data
+      if (isFuture || (!hasData && !isToday)) {
         if (hapticFeedback.notificationOccurred.isAvailable()) {
           hapticFeedback.notificationOccurred("error");
         }
         return;
       }
 
-      // Already selected
       if (date === selectedDate) {
         return;
       }
@@ -122,10 +161,9 @@ export default function DatePicker({
       }
       onDateSelect(date);
     },
-    [availableDateSet, selectedDate, onDateSelect]
+    [availableDateSet, selectedDate, onDateSelect, todayKey]
   );
 
-  // Handle scroll end - snap to nearest date WITH DATA in scroll direction
   const handleScroll = useCallback(() => {
     if (scrollTimeoutRef.current) {
       clearTimeout(scrollTimeoutRef.current);
@@ -134,12 +172,10 @@ export default function DatePicker({
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    // Detect scroll direction
     const currentScrollLeft = container.scrollLeft;
-    const scrollDirection = currentScrollLeft > lastScrollLeftRef.current ? 1 : -1; // 1 = right (newer), -1 = left (older)
+    const scrollDirection = currentScrollLeft > lastScrollLeftRef.current ? 1 : -1;
     lastScrollLeftRef.current = currentScrollLeft;
 
-    // Find currently centered date for haptic feedback
     const containerCenter = currentScrollLeft + container.offsetWidth / 2;
     let closestDate: string | null = null;
     let closestDistance = Infinity;
@@ -153,7 +189,6 @@ export default function DatePicker({
       }
     });
 
-    // Trigger haptic when crossing to a new date
     if (closestDate && closestDate !== lastCenteredDateRef.current && closestDistance < 28) {
       lastCenteredDateRef.current = closestDate;
       if (hapticFeedback.selectionChanged.isAvailable()) {
@@ -169,12 +204,12 @@ export default function DatePicker({
 
       const containerCenter = container.scrollLeft + container.offsetWidth / 2;
 
-      // Get all dates with their positions, sorted by position
       const datesWithPositions: Array<{
         date: string;
         center: number;
         hasData: boolean;
         isFuture: boolean;
+        isToday: boolean;
       }> = [];
 
       itemRefs.current.forEach((element, date) => {
@@ -184,47 +219,42 @@ export default function DatePicker({
           center: elementCenter,
           hasData: availableDateSet.has(date),
           isFuture: isFutureDate(date),
+          isToday: date === todayKey,
         });
       });
 
-      // Sort by position (left to right)
       datesWithPositions.sort((a, b) => a.center - b.center);
 
-      // Find the closest date WITH DATA in the scroll direction
       let targetDate: string | null = null;
+      const isSelectable = (item: typeof datesWithPositions[0]) =>
+        !item.isFuture && (item.hasData || item.isToday);
 
       if (scrollDirection >= 0) {
-        // Scrolling right (towards newer dates) - find closest available date at or after center
-        // But not future dates
         for (const item of datesWithPositions) {
-          if (item.hasData && !item.isFuture && item.center >= containerCenter - 28) {
+          if (isSelectable(item) && item.center >= containerCenter - 28) {
             targetDate = item.date;
             break;
           }
         }
-        // If no date found ahead, find closest behind
         if (!targetDate) {
           for (let i = datesWithPositions.length - 1; i >= 0; i--) {
-            const item = datesWithPositions[i];
-            if (item.hasData && !item.isFuture) {
-              targetDate = item.date;
+            if (isSelectable(datesWithPositions[i])) {
+              targetDate = datesWithPositions[i].date;
               break;
             }
           }
         }
       } else {
-        // Scrolling left (towards older dates) - find closest available date at or before center
         for (let i = datesWithPositions.length - 1; i >= 0; i--) {
           const item = datesWithPositions[i];
-          if (item.hasData && !item.isFuture && item.center <= containerCenter + 28) {
+          if (isSelectable(item) && item.center <= containerCenter + 28) {
             targetDate = item.date;
             break;
           }
         }
-        // If no date found behind, find closest ahead (but not future)
         if (!targetDate) {
           for (const item of datesWithPositions) {
-            if (item.hasData && !item.isFuture) {
+            if (isSelectable(item)) {
               targetDate = item.date;
               break;
             }
@@ -232,14 +262,12 @@ export default function DatePicker({
         }
       }
 
-      // Snap to the target date
       if (targetDate && targetDate !== selectedDate) {
         if (hapticFeedback.selectionChanged.isAvailable()) {
           hapticFeedback.selectionChanged();
         }
         onDateSelect(targetDate);
       } else if (targetDate) {
-        // Same date but might need to re-center
         const element = itemRefs.current.get(targetDate);
         if (element) {
           const elementCenter = element.offsetLeft + element.offsetWidth / 2;
@@ -248,11 +276,10 @@ export default function DatePicker({
         }
       }
     }, 80);
-  }, [availableDateSet, selectedDate, onDateSelect]);
+  }, [availableDateSet, selectedDate, onDateSelect, todayKey]);
 
-  // Set ref for each date element
   const setItemRef = useCallback(
-    (date: string) => (el: HTMLButtonElement | null) => {
+    (date: string) => (el: HTMLDivElement | null) => {
       if (el) {
         itemRefs.current.set(date, el);
       } else {
@@ -264,52 +291,20 @@ export default function DatePicker({
 
   return (
     <div className="flex flex-col items-center w-full overflow-hidden">
-      {/* Selected date header */}
-      <div className="flex flex-col items-center py-0.5">
-        <p className="text-base font-medium text-white leading-5 tracking-[-0.176px]">
-          {formatDateHeader(selectedDate)}
-        </p>
-      </div>
-
-      {/* Collapsible section */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateRows: collapsed ? "0fr" : "1fr",
-          transition: "grid-template-rows 200ms ease-out",
-        }}
-      >
-        <div className="overflow-hidden">
-          {/* Triangle pointer */}
-          <div className="flex items-center justify-center pt-1 pb-1.5">
-            <svg
-              width="8"
-              height="6"
-              viewBox="0 0 8 6"
-              fill="none"
-              className="text-white/60"
-            >
-              <path d="M4 6L0 0H8L4 6Z" fill="currentColor" />
-            </svg>
-          </div>
-
-          {/* Scrollable date strip */}
-          <div className="relative w-full">
+      <div className="relative w-full">
         {/* Left fade gradient */}
         <div
-          className="absolute left-0 top-0 h-10 w-9 z-10 pointer-events-none"
+          className="absolute left-0 top-0 bottom-0 w-9 z-10 pointer-events-none"
           style={{
-            background:
-              "linear-gradient(to right, #000, rgba(0, 0, 0, 0))",
+            background: "linear-gradient(to right, #fff, rgba(255, 255, 255, 0))",
           }}
         />
 
         {/* Right fade gradient */}
         <div
-          className="absolute right-0 top-0 h-10 w-9 z-10 pointer-events-none"
+          className="absolute right-0 top-0 bottom-0 w-9 z-10 pointer-events-none"
           style={{
-            background:
-              "linear-gradient(to left, #000, rgba(0, 0, 0, 0))",
+            background: "linear-gradient(to left, #fff, rgba(255, 255, 255, 0))",
           }}
         />
 
@@ -317,14 +312,13 @@ export default function DatePicker({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex items-center overflow-x-auto scrollbar-none h-10"
+          className="flex items-end overflow-x-auto scrollbar-none pt-5"
           style={{
             scrollSnapType: "x mandatory",
             scrollBehavior: "smooth",
             WebkitOverflowScrolling: "touch",
             scrollbarWidth: "none",
             msOverflowStyle: "none",
-            // Deceleration rate for iOS
             // @ts-expect-error - WebKit specific property
             WebkitScrollDecelerationRate: "fast",
           }}
@@ -336,78 +330,111 @@ export default function DatePicker({
             const isSelected = date === selectedDate;
             const hasData = availableDateSet.has(date);
             const isFuture = isFutureDate(date);
-            const isDisabled = !hasData || isFuture;
-            const isPastLatestWithData = date > latestDateWithData;
+            const isToday = date === todayKey;
+            const isSelectable = !isFuture && (hasData || isToday);
+            const isPastLatestWithData = date > latestDateWithData && !isToday;
+            const monthLabel = monthLabelDates.get(date);
+            const showMonthLabel = !!monthLabel;
+            const dateMonthKey = getMonthKey(date);
+            const isActiveMonth = dateMonthKey === selectedMonthKey;
 
-            // Future placeholder - inactive circle with day number, no snap point
-            if (isPastLatestWithData) {
+            // Future placeholder dates (past latest with data, not today)
+            if (isPastLatestWithData && !isToday) {
               return (
                 <div
                   key={date}
-                  className="shrink-0 flex items-center justify-center w-14 h-10"
+                  className="shrink-0 flex flex-col items-center relative"
+                  style={{ width: 56 }}
                 >
-                  <div
-                    className="flex items-center justify-center rounded-full size-9"
-                    style={{ backgroundColor: "rgba(255, 255, 255, 0.03)" }}
-                  >
-                    <span className="text-sm leading-5 font-normal text-white/20">
-                      {getDayNumber(date)}
+                  {/* Month label */}
+                  {showMonthLabel && (
+                    <span
+                      className="absolute font-medium leading-4 text-[13px]"
+                      style={{
+                        top: -20,
+                        color: isActiveMonth ? "#000" : "rgba(60,60,67,0.6)",
+                      }}
+                    >
+                      {monthLabel}
                     </span>
+                  )}
+                  <div className="flex items-center justify-center" style={{ height: 40, padding: 9 }}>
+                    <div className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40 }}>
+                      <span
+                        className="font-medium leading-[22px] text-[17px] text-center"
+                        style={{ color: "rgba(60,60,67,0.3)" }}
+                      >
+                        {getDayNumber(date)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
             }
 
             return (
-              <button
+              <div
                 key={date}
                 ref={setItemRef(date)}
-                onClick={() => handleDateClick(date)}
-                disabled={isDisabled}
-                className="shrink-0 flex items-center justify-center w-14 h-10 relative"
-                style={{
-                  scrollSnapAlign: "center",
-                  scrollSnapStop: "always",
-                }}
+                className="shrink-0 flex flex-col items-center relative"
+                style={{ width: 56, scrollSnapAlign: "center", scrollSnapStop: "always" }}
               >
-                {/* Date circle */}
-                <div
-                  className="flex items-center justify-center rounded-full size-9 relative"
-                  style={{
-                    backgroundColor: isSelected
-                      ? "rgba(255, 255, 255, 0.14)"
-                      : hasData && !isFuture
-                        ? "rgba(255, 255, 255, 0.06)"
-                        : "rgba(255, 255, 255, 0.03)",
-                  }}
-                >
+                {/* Month label */}
+                {showMonthLabel && (
                   <span
-                    className={`text-sm leading-5 ${
-                      isSelected
-                        ? "font-medium text-white"
-                        : hasData && !isFuture
-                          ? "font-normal text-white/60"
-                          : "font-normal text-white/20"
-                    }`}
+                    className="absolute font-medium leading-4 text-[13px]"
+                    style={{
+                      top: -20,
+                      color: isActiveMonth ? "#000" : "rgba(60,60,67,0.6)",
+                    }}
                   >
-                    {getDayNumber(date)}
+                    {monthLabel}
                   </span>
-                </div>
-
-                {/* Red dot badge for dates with data (except selected) */}
-                {hasData && !isFuture && !isSelected && (
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 size-4 flex items-center justify-center">
-                    <div className="size-1.5 rounded-full bg-[#f9363c]" />
-                  </div>
                 )}
-              </button>
+                {/* Date button */}
+                <button
+                  onClick={() => handleDateClick(date)}
+                  disabled={!isSelectable}
+                  className="flex items-center justify-center"
+                  style={{ width: 56, height: 40 }}
+                >
+                  <div
+                    className="flex items-center justify-center rounded-full"
+                    style={{
+                      width: 40,
+                      height: 40,
+                      backgroundColor: isSelected
+                        ? "rgba(249,54,60,0.14)"
+                        : "transparent",
+                    }}
+                  >
+                    <span
+                      className="font-medium leading-[22px] text-[17px] text-center"
+                      style={{
+                        color: isSelected
+                          ? "#000"
+                          : isSelectable
+                            ? "rgba(60,60,67,0.6)"
+                            : "rgba(60,60,67,0.3)",
+                      }}
+                    >
+                      {getDayNumber(date)}
+                    </span>
+                  </div>
+
+                  {/* Red dot badge for dates with data (including selected) */}
+                  {hasData && !isFuture && (
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 flex items-center justify-center" style={{ width: 16, height: 16 }}>
+                      <div className="rounded-full bg-[#f9363c]" style={{ width: 4, height: 4 }} />
+                    </div>
+                  )}
+                </button>
+              </div>
             );
           })}
 
           {/* Right padding for centering last item */}
           <div className="shrink-0 w-[calc(50%-28px)]" />
-        </div>
-      </div>
         </div>
       </div>
     </div>

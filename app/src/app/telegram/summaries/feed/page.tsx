@@ -40,9 +40,9 @@ export default function SummaryFeedPage() {
       fallback={
         <div
           className="fixed inset-0 flex items-center justify-center"
-          style={{ background: "#000" }}
+          style={{ background: "#fff" }}
         >
-          <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-black/10 border-t-black/40 rounded-full animate-spin" />
         </div>
       }
     >
