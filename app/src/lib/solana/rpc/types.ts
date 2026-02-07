@@ -1,4 +1,4 @@
-export type SolanaEnv = "mainnet" | "devnet" | "localnet";
+export type SolanaEnv = "mainnet" | "testnet" | "devnet" | "localnet";
 
 export type WalletTransfer = {
   signature: string;

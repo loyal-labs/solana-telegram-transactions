@@ -13,6 +13,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+import { getSolscanAccountUrl } from "@/lib/solana/rpc/explorer";
 import { getWalletPublicKey } from "@/lib/solana/wallet/wallet-details";
 
 // iOS-style sheet timing (shared with TokensSheet)
@@ -357,8 +358,7 @@ export default function ReceiveSheet({
       hapticFeedback.impactOccurred("light");
     }
     if (shareURL.isAvailable()) {
-      const solscanUrl = `https://solscan.io/account/${address}`;
-      shareURL(solscanUrl, `My Solana wallet address:\n${address}`);
+      shareURL(getSolscanAccountUrl(address), `My Solana wallet address:\n${address}`);
     } else {
       void copyAddress();
     }

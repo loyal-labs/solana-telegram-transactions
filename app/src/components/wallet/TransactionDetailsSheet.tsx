@@ -16,6 +16,7 @@ import { createPortal } from "react-dom";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import { SOLANA_FEE_SOL } from "@/lib/constants";
 import { getDeposit } from "@/lib/solana/deposits/get-deposit";
+import { getExplorerTxUrl, getSolscanAccountUrl } from "@/lib/solana/rpc/explorer";
 import { formatTransactionDate, getStatusText } from "@/lib/solana/wallet/formatters";
 import { getWalletProvider } from "@/lib/solana/wallet/wallet-details";
 import {
@@ -347,8 +348,7 @@ export default function TransactionDetailsSheet({
       hapticFeedback.impactOccurred("light");
     }
     if (transaction.signature) {
-      const explorerUrl = `https://explorer.solana.com/tx/${transaction.signature}`;
-      window.open(explorerUrl, "_blank");
+      window.open(getExplorerTxUrl(transaction.signature), "_blank");
     }
   };
 
@@ -366,8 +366,8 @@ export default function TransactionDetailsSheet({
 
     if (shareURL.isAvailable()) {
       const explorerUrl = transaction.signature
-        ? `https://explorer.solana.com/tx/${transaction.signature}`
-        : `https://solscan.io/account/${fullAddress}`;
+        ? getExplorerTxUrl(transaction.signature)
+        : getSolscanAccountUrl(fullAddress);
       shareURL(explorerUrl, shareText);
     } else if (navigator?.clipboard?.writeText) {
       void navigator.clipboard.writeText(shareText);
