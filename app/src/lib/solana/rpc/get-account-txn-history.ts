@@ -8,6 +8,7 @@ import {
 } from "@solana/web3.js";
 
 import {
+  decodeTelegramPrivateTransferInstruction,
   decodeTelegramTransferInstruction,
   decodeTelegramVerificationInstruction,
 } from "../solana-helpers";
@@ -133,11 +134,13 @@ const mapTransactionToTransfer = (
     "verify_telegram_init_data",
     "store",
     "claim_deposit",
+    "claim_username_deposit",
     "deposit_for_username",
   ];
 
   const decodeInstructionData = (data: string) => {
     const decoders = [
+      decodeTelegramPrivateTransferInstruction,
       decodeTelegramTransferInstruction,
       decodeTelegramVerificationInstruction,
     ];

@@ -5,4 +5,6 @@ export type TelegramDeposit = {
   username: string;
   amount: number;
   lastNonce: number;
+  tokenMint?: PublicKey;
+  address?: PublicKey;
 };

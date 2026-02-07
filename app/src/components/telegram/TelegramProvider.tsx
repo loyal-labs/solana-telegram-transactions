@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { init, postEvent } from '@telegram-apps/sdk';
-import { useRawInitData } from '@telegram-apps/sdk-react';
-import { usePathname } from 'next/navigation';
+import { init, postEvent } from "@telegram-apps/sdk";
+import { useRawInitData } from "@telegram-apps/sdk-react";
+import { usePathname } from "next/navigation";
 import {
   createContext,
   type PropsWithChildren,
@@ -10,45 +10,45 @@ import {
   useEffect,
   useMemo,
   useState,
-} from 'react';
+} from "react";
 
-import { useDidMount } from '@/hooks/useDidMount';
+import { useDidMount } from "@/hooks/useDidMount";
 import {
   getCloudValue,
   setCloudValue,
-} from '@/lib/telegram/mini-app/cloud-storage';
+} from "@/lib/telegram/mini-app/cloud-storage";
 import {
   parseUserFromInitData,
   type UserData,
-} from '@/lib/telegram/mini-app/init-data-transform';
+} from "@/lib/telegram/mini-app/init-data-transform";
 
-// Patch console.error to suppress specific Telegram SDK errors
-if (typeof window !== 'undefined') {
-  const originalError = console.error;
-  console.error = (...args) => {
-    if (
-      args.some(
-        (arg) =>
-          typeof arg === 'string' &&
-          (arg.includes(
-            'An error occurred processing the "viewport_changed" event'
-          ) ||
-            arg.includes(
-              'An error occurred processing the "theme_changed" event'
-            ) ||
-            arg.includes(
-              'An error occurred processing the "popup_closed" event'
-            ))
-      )
-    ) {
-      return;
-    }
-    originalError.apply(console, args);
-  };
-}
+// // Patch console.error to suppress specific Telegram SDK errors
+// if (typeof window !== 'undefined') {
+//   const originalError = console.error;
+//   console.error = (...args) => {
+//     if (
+//       args.some(
+//         (arg) =>
+//           typeof arg === 'string' &&
+//           (arg.includes(
+//             'An error occurred processing the "viewport_changed" event'
+//           ) ||
+//             arg.includes(
+//               'An error occurred processing the "theme_changed" event'
+//             ) ||
+//             arg.includes(
+//               'An error occurred processing the "popup_closed" event'
+//             ))
+//       )
+//     ) {
+//       return;
+//     }
+//     originalError.apply(console, args);
+//   };
+// }
 
-const USER_AVATAR_CACHE_KEY = 'user_avatar_cache';
-const LAST_PAGE_CACHE_KEY = 'last_visited_page';
+const USER_AVATAR_CACHE_KEY = "user_avatar_cache";
+const LAST_PAGE_CACHE_KEY = "last_visited_page";
 
 interface TelegramUserContextType {
   userData: UserData | null;
@@ -78,14 +78,16 @@ function TelegramProviderInner({ children }: PropsWithChildren) {
     try {
       init();
     } catch (error) {
-      console.error('Failed to initialize Telegram SDK:', error);
+      console.error("Failed to initialize Telegram SDK:", error);
     }
 
     // Disable vertical swipes to prevent conflict with app's swipe gestures (Bot API 7.7+)
     try {
-      postEvent('web_app_setup_swipe_behavior', { allow_vertical_swipe: false });
+      postEvent("web_app_setup_swipe_behavior", {
+        allow_vertical_swipe: false,
+      });
     } catch (error) {
-      console.error('Failed to disable vertical swipes:', error);
+      console.error("Failed to disable vertical swipes:", error);
     }
   }, []);
 
@@ -97,9 +99,9 @@ function TelegramProviderInner({ children }: PropsWithChildren) {
   // Save page
   useEffect(() => {
     if (!isRestored || !pathname) return;
-    if (pathname.startsWith('/telegram')) {
+    if (pathname.startsWith("/telegram")) {
       setCloudValue(LAST_PAGE_CACHE_KEY, pathname).catch((e) =>
-        console.error('Failed to save page', e)
+        console.error("Failed to save page", e)
       );
     }
   }, [pathname, isRestored]);
@@ -114,7 +116,7 @@ function TelegramProviderInner({ children }: PropsWithChildren) {
     async function initCache() {
       try {
         const stored = await getCloudValue(USER_AVATAR_CACHE_KEY);
-        if (stored && typeof stored === 'string') {
+        if (stored && typeof stored === "string") {
           setCachedAvatar(stored);
         }
       } finally {
@@ -135,7 +137,7 @@ function TelegramProviderInner({ children }: PropsWithChildren) {
         const response = await fetch(
           `/api/telegram/proxy-image?url=${encodeURIComponent(url)}`
         );
-        if (!response.ok) throw new Error('Fetch failed');
+        if (!response.ok) throw new Error("Fetch failed");
         const blob = await response.blob();
 
         const base64 = await new Promise<string>((resolve, reject) => {
@@ -151,7 +153,7 @@ function TelegramProviderInner({ children }: PropsWithChildren) {
           setCachedAvatar(base64);
         }
       } catch (e) {
-        console.error('Avatar sync failed', e);
+        console.error("Avatar sync failed", e);
       }
     }
 

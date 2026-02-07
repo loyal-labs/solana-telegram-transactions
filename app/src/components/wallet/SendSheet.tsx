@@ -798,60 +798,67 @@ export default function SendSheet({
             </div>
 
             {/* Token List */}
-            {filteredTokens.map((token) => (
-              <button
-                key={token.mint}
-                onClick={() => handleTokenSelect(token)}
-                className="flex items-center px-4 active:bg-black/[0.03] transition-colors"
-              >
-                <div className="py-1.5 pr-3">
-                  <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
-                    {token.imageUrl && (
-                      <Image
-                        src={token.imageUrl}
-                        alt={token.symbol}
-                        fill
-                        className="object-cover"
-                      />
-                    )}
+            {filteredTokens.map((token) => {
+              const displaySymbol =
+                token.symbol === "SOL" &&
+                token.name.toLowerCase().includes("wrapped")
+                  ? "wSOL"
+                  : token.symbol;
+              return (
+                <button
+                  key={`${token.mint}-${token.name}-${token.isSecured ? "secured" : "standard"}`}
+                  onClick={() => handleTokenSelect(token)}
+                  className="flex items-center px-4 active:bg-black/[0.03] transition-colors"
+                >
+                  <div className="py-1.5 pr-3">
+                    <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                      {token.imageUrl && (
+                        <Image
+                          src={token.imageUrl}
+                          alt={displaySymbol}
+                          fill
+                          className="object-cover"
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex-1 flex flex-col py-2.5 min-w-0">
-                  <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px] text-left">
-                    {token.symbol}
-                  </p>
-                  <p
-                    className="text-[15px] leading-5 text-left"
-                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                  >
-                    {token.priceUsd !== null
-                      ? `$${token.priceUsd.toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}`
-                      : "—"}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end py-2.5 pl-3">
-                  <p className="text-[17px] text-black leading-[22px] text-right">
-                    {token.balance.toLocaleString("en-US", {
-                      maximumFractionDigits: 4,
-                    })}
-                  </p>
-                  <p
-                    className="text-[15px] leading-5 text-right"
-                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                  >
-                    {token.valueUsd !== null
-                      ? `$${token.valueUsd.toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}`
-                      : "—"}
-                  </p>
-                </div>
-              </button>
-            ))}
+                  <div className="flex-1 flex flex-col py-2.5 min-w-0">
+                    <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px] text-left">
+                      {displaySymbol}
+                    </p>
+                    <p
+                      className="text-[15px] leading-5 text-left"
+                      style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                    >
+                      {token.priceUsd !== null
+                        ? `$${token.priceUsd.toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}`
+                        : "—"}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end py-2.5 pl-3">
+                    <p className="text-[17px] text-black leading-[22px] text-right">
+                      {token.balance.toLocaleString("en-US", {
+                        maximumFractionDigits: 4,
+                      })}
+                    </p>
+                    <p
+                      className="text-[15px] leading-5 text-right"
+                      style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                    >
+                      {token.valueUsd !== null
+                        ? `$${token.valueUsd.toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}`
+                        : "—"}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
 
             {filteredTokens.length === 0 && tokenSearchQuery.trim() && (
               <div className="flex items-center justify-center py-12">

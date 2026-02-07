@@ -8,6 +8,7 @@ import {
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import { PublicKey } from "@solana/web3.js";
 
+import telegramPrivateTransferIdl from "../../../../target/idl/telegram_private_transfer.json";
 import telegramTransferIdl from "../../../../target/idl/telegram_transfer.json";
 import telegramVerificationIdl from "../../../../target/idl/telegram_verification.json";
 import type { TelegramTransfer } from "../../../../target/types/telegram_transfer";
@@ -85,6 +86,12 @@ export function decodeTelegramTransferInstruction(data: string) {
   return decoded;
 }
 
+export function decodeTelegramPrivateTransferInstruction(data: string) {
+  const coder = new BorshInstructionCoder(telegramPrivateTransferIdl as Idl);
+  const decoded = coder.decode(data, "base58");
+  return decoded;
+}
+
 export function decodeTelegramVerificationInstruction(data: string) {
   const coder = new BorshInstructionCoder(telegramVerificationIdl as Idl);
   const decoded = coder.decode(data, "base58");
@@ -94,4 +101,5 @@ export function decodeTelegramVerificationInstruction(data: string) {
 //verify_telegram_init_data
 //store
 //claim_deposit
+//claim_username_deposit
 //deposit_for_username

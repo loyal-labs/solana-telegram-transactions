@@ -2,7 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 
 import { fetchJson } from "../../core/http";
 import { getSolanaEnv } from "../rpc/connection";
-import { SECURE_DEVNET_RPC_URL, SECURE_MAINNET_RPC_URL } from "../rpc/constants";
+import { SECURE_DEVNET_RPC_URL, SECURE_MAINNET_RPC_URL, TESTNET_RPC_URL } from "../rpc/constants";
 import { CACHE_TTL_MS, NATIVE_SOL_DECIMALS, NATIVE_SOL_MINT } from "./constants";
 import type {
   CachedHoldings,
@@ -23,6 +23,7 @@ function isCacheValid(cached: CachedHoldings | undefined): boolean {
 function getRpcUrl(): string | null {
   const env = getSolanaEnv();
   if (env === "mainnet") return SECURE_MAINNET_RPC_URL;
+  if (env === "testnet") return TESTNET_RPC_URL;
   if (env === "devnet") return SECURE_DEVNET_RPC_URL;
   return null;
 }

@@ -7,6 +7,8 @@ import {
   SECURE_DEVNET_RPC_WS,
   SECURE_MAINNET_RPC_URL,
   SECURE_MAINNET_RPC_WS,
+  TESTNET_RPC_URL,
+  TESTNET_RPC_WS,
 } from "./constants";
 import type { SolanaEnv } from "./types";
 
@@ -15,12 +17,12 @@ const DEFAULT_SOLANA_ENV: SolanaEnv = "devnet";
 export const getSolanaEnv = (): SolanaEnv => {
   if (typeof window !== "undefined") {
     const override = localStorage.getItem("solana-env-override");
-    if (override === "mainnet" || override === "devnet" || override === "localnet") {
+    if (override === "mainnet" || override === "testnet" || override === "devnet" || override === "localnet") {
       return override;
     }
   }
   const env = process.env.NEXT_PUBLIC_SOLANA_ENV;
-  if (env === "mainnet" || env === "devnet" || env === "localnet") {
+  if (env === "mainnet" || env === "testnet" || env === "devnet" || env === "localnet") {
     return env;
   }
   return DEFAULT_SOLANA_ENV;
@@ -34,6 +36,11 @@ const getEndpoints = (
       return {
         rpcEndpoint: SECURE_MAINNET_RPC_URL,
         websocketEndpoint: SECURE_MAINNET_RPC_WS,
+      };
+    case "testnet":
+      return {
+        rpcEndpoint: TESTNET_RPC_URL,
+        websocketEndpoint: TESTNET_RPC_WS,
       };
     case "localnet":
       return {
