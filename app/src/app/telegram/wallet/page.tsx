@@ -2400,7 +2400,14 @@ export default function Home() {
                       }
                       if (walletAddress) {
                         if (navigator?.clipboard?.writeText) {
-                          navigator.clipboard.writeText(walletAddress);
+                          navigator.clipboard
+                            .writeText(walletAddress)
+                            .catch((err) => {
+                              console.warn(
+                                "Failed to copy address",
+                                walletAddress
+                              );
+                            });
                           setAddressCopied(true);
                           setTimeout(() => setAddressCopied(false), 2000);
                         }
