@@ -22,6 +22,7 @@ type GroupChat = {
   subtitle: string;
   photoBase64?: string;
   photoMimeType?: string;
+  photoUrl?: string;
 };
 
 interface ChatItemSkeletonProps {
@@ -75,13 +76,19 @@ function ChatListSkeleton({ count = 5 }: { count?: number }) {
 }
 
 interface ChatItemProps {
-  chat: { id: string; title: string; subtitle?: string; photoBase64?: string; photoMimeType?: string };
+  chat: { id: string; title: string; subtitle?: string; photoBase64?: string; photoMimeType?: string; photoUrl?: string };
   onClick: () => void;
 }
 
 function ChatItem({ chat, onClick }: ChatItemProps) {
   const avatarColor = getAvatarColor(chat.title);
   const firstLetter = getFirstLetter(chat.title);
+
+  const photoSrc = chat.photoUrl
+    ? chat.photoUrl
+    : chat.photoBase64
+      ? `data:${chat.photoMimeType || "image/jpeg"};base64,${chat.photoBase64}`
+      : null;
 
   return (
     <div className="relative px-4">
@@ -91,9 +98,9 @@ function ChatItem({ chat, onClick }: ChatItemProps) {
       >
         {/* Avatar */}
         <div className="pr-3 py-1.5">
-          {chat.photoBase64 ? (
+          {photoSrc ? (
             <img
-              src={`data:${chat.photoMimeType || "image/jpeg"};base64,${chat.photoBase64}`}
+              src={photoSrc}
               alt={chat.title}
               className="w-12 h-12 rounded-full object-cover"
             />
@@ -136,9 +143,9 @@ interface Tab {
 }
 
 // Tab data will be computed dynamically
-const getTabsData = (groupCount: number): Tab[] => [
+const getTabsData = (groupCount: number, directCount: number): Tab[] => [
   { id: "groups", label: "Groups", count: groupCount, hasDividerAfter: true },
-  { id: "direct", label: "Direct", count: 0 },
+  { id: "direct", label: "Direct", count: directCount },
   { id: "personal", label: "Personal", count: 0 },
   { id: "work", label: "Work", count: 0 },
 ];
@@ -188,6 +195,21 @@ function EmptyStateBanner({ onClose, onConnectChats }: EmptyStateBannerProps) {
     </div>
   );
 }
+
+const MOCK_DIRECT_CHATS: GroupChat[] = [
+  {
+    id: "dm-1",
+    title: "Alice Morgan",
+    subtitle: "Discussed the token migration timeline",
+    photoUrl: "/uifaces-popular-avatar.jpg",
+  },
+  {
+    id: "dm-2",
+    title: "Jake Wilson",
+    subtitle: "Shared the updated deployment config",
+    photoUrl: "/uifaces-popular-avatar-1.jpg",
+  },
+];
 
 const ACTIVE_TAB_STORAGE_KEY = "summaries_active_tab";
 
@@ -280,9 +302,16 @@ export default function SummariesPage() {
     fetchGroupChats();
   }, [setSummaries, hasCachedData]);
 
+  // Mock DM data (dev only, controlled by NEXT_PUBLIC_USE_MOCK_SUMMARIES)
+  const useMockDMs = process.env.NEXT_PUBLIC_USE_MOCK_SUMMARIES === "true";
+  const directChats = useMockDMs ? MOCK_DIRECT_CHATS : [];
+
   // Get tabs data and current chat list based on active tab
-  const tabs = getTabsData(groupChats.length);
-  const currentChatList = activeTab === "groups" ? groupChats : [];
+  const tabs = getTabsData(groupChats.length, directChats.length);
+  const currentChatList =
+    activeTab === "groups" ? groupChats :
+    activeTab === "direct" ? directChats :
+    [];
 
   // Save active tab to localStorage when it changes
   useEffect(() => {

@@ -5,12 +5,11 @@ import {
   hapticFeedback,
   openTelegramLink,
   swipeBehavior,
-  themeParams,
   useSignal,
   viewport,
 } from "@telegram-apps/sdk-react";
 import type { Signal } from "@telegram-apps/signals";
-import { CheckCheck, MessageCircleWarning, Undo2 } from "lucide-react";
+import { CheckCheck, MessageCircleWarning } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Suspense,
@@ -38,6 +37,7 @@ type DirectChat = {
   id: string;
   title: string;
   username: string;
+  avatarUrl?: string;
   messages: Message[];
 };
 
@@ -47,26 +47,45 @@ const MOCK_DIRECT_SUMMARIES: DirectChat[] = [
     id: "d1",
     title: "Alice Johnson",
     username: "candyflipline",
+    avatarUrl: "/uifaces-popular-avatar.jpg",
     messages: [
       { text: "I'll paste some text below — analyze it and suggest how to improve it for the reader", date: "December 10", time: "18:20" },
       { text: "Once your selection is received, we will send you the Renewal Lease Document to be signed by all Parties.", date: "December 10", time: "18:20" },
       { text: "Your current lease is coming to an end, and I just sent you a renewal offer. Please check the Resident Portal for the notice and select the desired term.", date: "December 10", time: "18:20" },
       { text: "The project timeline has been updated. Can you review the new milestones?", date: "December 11", time: "09:15" },
       { text: "Once your selection is received, we will send you the Renewal Lease Document to be signed by all Parties.", date: "December 11", time: "09:30" },
+      { text: "We should discuss the upcoming sprint planning. I have some concerns about the scope.", date: "December 11", time: "10:45" },
+      { text: "Also, the design team wants to review the new components before implementation.", date: "December 11", time: "10:47" },
+      { text: "Let me know when you're available for a quick sync.", date: "December 11", time: "10:48" },
+      { text: "I've reviewed the PR and left some comments. Overall looks good, just a few minor changes needed.", date: "December 12", time: "14:20" },
+      { text: "The client is happy with the progress. They want to schedule a demo for next week.", date: "December 12", time: "14:22" },
+      { text: "Can you prepare the staging environment for the demo?", date: "December 12", time: "14:23" },
+      { text: "Also, we need to update the documentation before the release.", date: "December 12", time: "14:25" },
+      { text: "I've shared the updated requirements in the project channel.", date: "December 12", time: "15:30" },
+      { text: "The performance improvements are impressive! Page load time is down by 40%.", date: "December 12", time: "16:45" },
+      { text: "Great work on the optimization. The users will definitely notice the difference.", date: "December 12", time: "16:46" },
     ],
   },
   {
     id: "d2",
     title: "Bob Smith",
     username: "vlad_arbatov",
+    avatarUrl: "/uifaces-popular-avatar-1.jpg",
     messages: [
       { text: "Thanks for helping with that bug yesterday! The fix is working perfectly in production now.", date: "December 9", time: "14:45" },
+      { text: "The deployment went smoothly. All systems are green.", date: "December 9", time: "15:30" },
+      { text: "I've updated the monitoring dashboards. You should have access now.", date: "December 9", time: "15:32" },
+      { text: "Let's schedule a retrospective for this sprint.", date: "December 10", time: "10:00" },
+      { text: "The new feature is getting positive feedback from beta users.", date: "December 10", time: "11:15" },
+      { text: "We should consider rolling it out to more users next week.", date: "December 10", time: "11:16" },
+      { text: "I've created a rollout plan. Check it when you have time.", date: "December 10", time: "11:20" },
     ],
   },
   {
     id: "d3",
     title: "Charlie Davis",
     username: "candyflipline",
+    avatarUrl: "/uifaces-popular-avatar.jpg",
     messages: [
       { text: "Can we schedule a call for tomorrow?", date: "December 8", time: "10:00" },
       { text: "I need to discuss the upcoming release timeline with you.", date: "December 8", time: "10:02" },
@@ -77,6 +96,7 @@ const MOCK_DIRECT_SUMMARIES: DirectChat[] = [
     id: "d4",
     title: "Diana Wilson",
     username: "vlad_arbatov",
+    avatarUrl: "/uifaces-popular-avatar-1.jpg",
     messages: [
       { text: "The design looks great! Just a few small tweaks needed for mobile.", date: "December 7", time: "11:20" },
       { text: "I've added the new components to the shared design system.", date: "December 7", time: "11:25" },
@@ -182,12 +202,24 @@ function groupMessagesByDate(messages: Message[]): { date: string; messages: Mes
 // Date separator component
 function DateSeparator({ date }: { date: string }) {
   return (
-    <div className="flex items-center justify-center py-3 w-full">
+    <div className="flex items-center justify-center py-3 w-full sticky top-0" style={{ zIndex: 1 }}>
       <div
-        className="px-2 py-0.5 rounded-full"
-        style={{ background: "rgba(255, 255, 255, 0.06)" }}
+        className="px-2 py-0.5"
+        style={{
+          borderRadius: "32px",
+          backgroundColor: "rgba(174, 174, 178, 0.85)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          isolation: "isolate",
+        }}
       >
-        <p className="text-sm text-white leading-5 text-center">{date}</p>
+        <p style={{
+          fontSize: "15px",
+          color: "#FFFFFF",
+          lineHeight: "20px",
+          textAlign: "center",
+          fontWeight: 500
+        }}>{date}</p>
       </div>
     </div>
   );
@@ -197,23 +229,23 @@ function DateSeparator({ date }: { date: string }) {
 function MessageBubble({ message, time, isLast }: { message: string; time: string; isLast: boolean }) {
   return (
     <div
-      className="w-full relative"
+      className="w-full relative flex flex-col"
       style={{
-        background: "rgba(255, 255, 255, 0.12)",
-        borderRadius: isLast ? "16px 16px 16px 4px" : "16px",
+        background: "rgba(255, 182, 193, 0.25)",
+        borderRadius: isLast ? "16px 16px 16px 8px" : "8px 16px 16px 16px",
       }}
     >
-      <div className="px-3 py-1.5">
-        <p className="text-base text-white leading-6">
+      <div className="px-3 pt-1.5">
+        <p className="text-[15px] text-black leading-5">
           {message}
-          {/* Invisible spacer to reserve space for timestamp at end of text */}
-          <span className="inline-block w-[50px] h-[1px] align-bottom" />
         </p>
       </div>
-      {/* Timestamp absolutely positioned at bottom-right, close to edge */}
-      <span className="absolute bottom-0.5 right-3 text-xs text-white/40 leading-5">
-        {time}
-      </span>
+      {/* Timestamp at bottom right */}
+      <div className="flex justify-end pl-2 pr-3 pb-0">
+        <span className="text-xs text-[rgba(249,54,60,0.4)] leading-5">
+          {time}
+        </span>
+      </div>
     </div>
   );
 }
@@ -272,15 +304,6 @@ function DirectFeedContent() {
 
   // Page entrance animation
   const [isPageMounted, setIsPageMounted] = useState(false);
-
-  // Get button color from Telegram theme
-  const [buttonColor] = useState(() => {
-    try {
-      return themeParams.buttonColor() || "#2990ff";
-    } catch {
-      return "#2990ff";
-    }
-  });
 
   const currentChat = summaries[currentIndex];
   const nextChat = summaries[currentIndex + 1];
@@ -366,13 +389,13 @@ function DirectFeedContent() {
     showMainButton({
       text: "Reply",
       onClick: handleOpenTelegram,
-      backgroundColor: buttonColor,
+      backgroundColor: "#000000",
     });
 
     return () => {
       hideMainButton();
     };
-  }, [currentChat, handleOpenTelegram, buttonColor]);
+  }, [currentChat, handleOpenTelegram]);
 
   // Calculate rotation based on swipe distance
   const rotation = useMemo(() => {
@@ -454,28 +477,31 @@ function DirectFeedContent() {
       const targetX = direction === "right" ? 500 : -500;
       setSwipeX(targetX);
 
-      // After front card flies off, start back card transition
+      // Check if this is the last chat BEFORE animating
+      const isLastChat = currentIndex >= summaries.length - 1;
+
+      // After front card flies off
       setTimeout(() => {
+        if (isLastChat) {
+          // Navigate immediately without showing ghost dialog
+          router.push("/telegram/summaries");
+          return;
+        }
+
         setIsBackCardTransitioning(true);
 
         setTimeout(() => {
           setIsResetting(true);
 
           requestAnimationFrame(() => {
+            // Update all states together to prevent flicker
+            setCurrentIndex((prev) => prev + 1);
             setCardKey((k) => k + 1);
             setSwipeX(0);
             setIsAnimatingOut(false);
             setIsBackCardTransitioning(false);
             setIsDragging(false);
             setActiveSwipeDirection(null);
-
-            // Move to next chat or navigate back if done
-            const isLastChat = currentIndex >= summaries.length - 1;
-            if (isLastChat) {
-              router.push("/telegram/summaries");
-            } else {
-              setCurrentIndex((prev) => prev + 1);
-            }
 
             requestAnimationFrame(() => {
               setIsResetting(false);
@@ -509,9 +535,9 @@ function DirectFeedContent() {
     return (
       <div
         className="fixed inset-0 flex items-center justify-center"
-        style={{ background: "#000" }}
+        style={{ background: "#ffffff" }}
       >
-        <p className="text-white/60">No chats available</p>
+        <p className="text-black/60">No chats available</p>
       </div>
     );
   }
@@ -521,35 +547,49 @@ function DirectFeedContent() {
 
   return (
     <main
-      className="text-white font-sans overflow-hidden relative flex flex-col"
-      style={{ background: "#000", height: `calc(100vh - ${headerHeight}px)` }}
+      className="font-sans overflow-hidden relative flex flex-col"
+      style={{ background: "#ffffff", height: `calc(100vh - ${headerHeight}px)` }}
     >
       {/* Header */}
       <div
-        className="relative flex items-center justify-center shrink-0 z-20 py-3"
+        className="relative flex items-center justify-between shrink-0 z-20 pb-3 px-4"
         style={{
           opacity: isPageMounted ? 1 : 0,
           transform: isPageMounted ? "translateY(0)" : "translateY(-10px)",
           transition: isPageMounted ? `all 400ms ${EASE_OUT}` : "none",
         }}
       >
-        {/* Center - Remaining count */}
+        {/* Left - Remaining count */}
         <div className="flex items-center gap-1.5">
           <div
             className="h-6 min-w-6 px-1.5 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: buttonColor }}
+            style={{ backgroundColor: "#F9363C" }}
           >
             <span className="text-sm font-medium text-white">
               {remainingCount}
             </span>
           </div>
-          <span className="text-base text-white">Left</span>
+          <span className="text-base font-medium text-black">left</span>
         </div>
+
+        {/* Right - Undo button */}
+        <button
+          onClick={handleUndo}
+          disabled={currentIndex === 0}
+          className="flex h-11 px-4 justify-center items-center rounded-full active:scale-95 transition-transform disabled:opacity-30"
+          style={{
+            background: "rgba(249, 54, 60, 0.14)",
+          }}
+        >
+          <span style={{ color: "#000000", fontSize: "17px", fontWeight: 500, lineHeight: "22px" }}>
+            Undo
+          </span>
+        </button>
       </div>
 
       {/* Card Container */}
       <div
-        className="flex-1 flex flex-col mx-4 my-4 min-h-0 overflow-visible relative"
+        className="flex-1 flex flex-col mx-4 min-h-0 overflow-visible relative z-10"
         style={{
           opacity: isPageMounted ? 1 : 0,
           transform: isPageMounted ? "translateY(0)" : "translateY(30px)",
@@ -559,9 +599,9 @@ function DirectFeedContent() {
         {/* Back Card */}
         {nextChat && (
           <div
-            className="absolute inset-0 flex flex-col rounded-[24px] overflow-hidden pointer-events-none"
+            className="absolute inset-0 flex flex-col rounded-[26px] overflow-hidden pointer-events-none"
             style={{
-              background: "#28282c",
+              background: "#f2f2f7",
               transform: isBackCardTransitioning
                 ? "rotate(0deg) translateX(0px)"
                 : (() => {
@@ -596,22 +636,58 @@ function DirectFeedContent() {
             >
               {/* Avatar */}
               <div className="pr-3 py-1.5">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-base font-medium text-white"
-                  style={{ backgroundColor: getAvatarColor(nextChat.title) }}
-                >
-                  {getFirstLetter(nextChat.title)}
-                </div>
+                {nextChat.avatarUrl ? (
+                  <img
+                    src={nextChat.avatarUrl}
+                    alt={nextChat.title}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-base font-medium text-white"
+                    style={{ backgroundColor: getAvatarColor(nextChat.title) }}
+                  >
+                    {getFirstLetter(nextChat.title)}
+                  </div>
+                )}
               </div>
               {/* Name and Username */}
-              <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                <p className="text-base text-white leading-5">
+              <div className="flex-1 flex flex-col py-2.5">
+                <p className="text-[17px] font-medium text-black leading-[22px]">
                   {nextChat.title}
                 </p>
-                <p className="text-[13px] text-white/60 leading-4">
+                <p className="text-[15px] text-[rgba(60,60,67,0.6)] leading-5">
                   @{nextChat.username}
                 </p>
               </div>
+            </div>
+            {/* Back card messages preview */}
+            <div className="flex-1 overflow-hidden relative">
+              <div className="flex flex-col pl-3 pr-6 pb-6">
+                {groupMessagesByDate(nextChat.messages.slice(0, 5)).map((group, groupIndex) => (
+                  <div key={groupIndex} className="flex flex-col">
+                    <DateSeparator date={group.date} />
+                    <div className="flex flex-col gap-2">
+                      {group.messages.map((message, msgIndex) => (
+                        <MessageBubble
+                          key={msgIndex}
+                          message={message.text}
+                          time={message.time}
+                          isLast={msgIndex === group.messages.length - 1}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Fade gradient at bottom */}
+              <div
+                className="absolute bottom-0 left-0 right-0 h-[76px] pointer-events-none"
+                style={{
+                  background:
+                    "linear-gradient(to bottom, rgba(242, 242, 247, 0), #f2f2f7)",
+                }}
+              />
             </div>
           </div>
         )}
@@ -623,9 +699,9 @@ function DirectFeedContent() {
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          className="flex-1 flex flex-col rounded-[24px] overflow-hidden min-h-0 relative"
+          className="flex-1 flex flex-col rounded-[26px] overflow-hidden min-h-0 relative z-20"
           style={{
-            background: "#28282c",
+            background: "#f2f2f7",
             transform: `translateX(${swipeX}px) rotate(${rotation}deg)`,
             transition: isDragging ? "none" : "transform 0.3s ease-out",
             transformOrigin: "center bottom",
@@ -640,22 +716,30 @@ function DirectFeedContent() {
           >
             {/* Avatar */}
             <div className="pr-3 py-1.5">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-base font-medium text-white"
-                style={{ backgroundColor: chatAvatarColor }}
-              >
-                {chatFirstLetter}
-              </div>
+              {currentChat.avatarUrl ? (
+                <img
+                  src={currentChat.avatarUrl}
+                  alt={currentChat.title}
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+              ) : (
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-base font-medium text-white"
+                  style={{ backgroundColor: chatAvatarColor }}
+                >
+                  {chatFirstLetter}
+                </div>
+              )}
             </div>
             {/* Name and Username - clickable to open Telegram */}
             <button
               onClick={handleOpenTelegram}
-              className="flex-1 flex flex-col gap-0.5 py-2.5 text-left active:opacity-70 transition-opacity"
+              className="flex-1 flex flex-col py-2.5 text-left active:opacity-70 transition-opacity"
             >
-              <p className="text-base text-white leading-5">
+              <p className="text-[17px] font-medium text-black leading-[22px]">
                 {currentChat.title}
               </p>
-              <p className="text-[13px] text-white/60 leading-4">
+              <p className="text-[15px] text-[rgba(60,60,67,0.6)] leading-5">
                 @{currentChat.username}
               </p>
             </button>
@@ -669,24 +753,16 @@ function DirectFeedContent() {
                   // TODO: Implement not spam action
                   completeSwipe("right");
                 }}
-                className="bg-white/[0.06] rounded-full px-3 py-1.5 active:opacity-80 transition-opacity mr-2"
+                className="rounded-full px-3 py-1.5 active:opacity-80 transition-opacity mr-2"
+                style={{
+                  background: "rgba(249, 54, 60, 0.12)",
+                }}
               >
-                <span className="text-sm font-medium text-white leading-5 whitespace-nowrap">
+                <span className="text-sm font-medium leading-5 whitespace-nowrap" style={{ color: "#F9363C" }}>
                   Not spam
                 </span>
               </button>
             )}
-            {/* Undo button */}
-            <button
-              onClick={handleUndo}
-              disabled={currentIndex === 0}
-              className="p-1.5 rounded-full active:scale-95 transition-transform disabled:opacity-30"
-              style={{
-                background: "rgba(255, 255, 255, 0.06)",
-              }}
-            >
-              <Undo2 size={24} strokeWidth={1.5} className="text-white" />
-            </button>
           </div>
 
           {/* Messages Content - Scrollable with fixed fade gradient */}
@@ -694,7 +770,11 @@ function DirectFeedContent() {
             <div
               ref={scrollContainerRef}
               className="absolute inset-0 overflow-y-auto overscroll-contain"
-              style={{ touchAction: "pan-y" }}
+              style={{
+                touchAction: "pan-y",
+                transformStyle: "preserve-3d",
+                perspective: "1000px"
+              }}
             >
               <div className="flex flex-col pl-3 pr-6 pb-6">
                 {groupMessagesByDate(currentChat.messages).map((group, groupIndex) => (
@@ -712,6 +792,8 @@ function DirectFeedContent() {
                     </div>
                   </div>
                 ))}
+                {/* Safe zone after last message */}
+                <div style={{ height: "70px" }} />
               </div>
             </div>
             {/* Fade gradient at bottom - fixed position relative to container */}
@@ -719,7 +801,7 @@ function DirectFeedContent() {
               className="absolute bottom-0 left-0 right-0 h-[76px] pointer-events-none"
               style={{
                 background:
-                  "linear-gradient(to bottom, rgba(40, 40, 44, 0), #28282c)",
+                  "linear-gradient(to bottom, rgba(242, 242, 247, 0), #f2f2f7)",
               }}
             />
           </div>
@@ -727,21 +809,18 @@ function DirectFeedContent() {
           {/* Swipe Overlay */}
           {swipeDirection && (
             <div
-              className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-[24px]"
+              className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none rounded-[26px]"
               style={{
                 background:
                   swipeDirection === "right"
-                    ? `linear-gradient(to bottom, rgba(41, 144, 255, ${
-                        overlayOpacity * 0.2
-                      }), rgba(41, 144, 255, ${overlayOpacity}))`
-                    : `linear-gradient(to bottom, rgba(40, 40, 44, ${
-                        overlayOpacity * 0.2
-                      }), rgba(40, 40, 44, ${overlayOpacity}))`,
+                    ? `linear-gradient(180deg, rgba(52, 199, 89, 0.20) 0%, #34C759 100%), rgba(247, 247, 250, 0.60)`
+                    : `linear-gradient(180deg, rgba(209, 209, 214, 0.20) 0%, #D1D1D6 100%), rgba(247, 247, 250, 0.60)`,
                 opacity: overlayOpacity,
                 transition: isDragging ? "none" : "opacity 0.3s ease-out",
               }}
             >
               <div
+                className="flex flex-col items-center gap-2"
                 style={{
                   opacity: overlayOpacity,
                   transform: `scale(${0.5 + overlayOpacity * 0.5})`,
@@ -749,17 +828,31 @@ function DirectFeedContent() {
                 }}
               >
                 {swipeDirection === "right" ? (
-                  <CheckCheck
-                    size={96}
-                    strokeWidth={1.5}
-                    className="text-white"
-                  />
+                  <>
+                    <div className="w-24 h-24 rounded-full flex items-center justify-center bg-white">
+                      <CheckCheck
+                        size={48}
+                        strokeWidth={2}
+                        className="text-green-500"
+                      />
+                    </div>
+                    <div className="px-4 py-2 rounded-full backdrop-blur-[24px] bg-[rgba(60,60,67,0.14)]">
+                      <p className="text-[15px] font-medium text-white">Mark as Read</p>
+                    </div>
+                  </>
                 ) : (
-                  <MessageCircleWarning
-                    size={96}
-                    strokeWidth={1.5}
-                    className="text-white"
-                  />
+                  <>
+                    <div className="w-24 h-24 rounded-full flex items-center justify-center bg-[rgba(60,60,67,0.14)]">
+                      <MessageCircleWarning
+                        size={48}
+                        strokeWidth={1.5}
+                        className="text-white"
+                      />
+                    </div>
+                    <div className="px-4 py-2 rounded-full backdrop-blur-[24px] bg-[rgba(60,60,67,0.14)]">
+                      <p className="text-[15px] font-medium text-white">Keep Unread</p>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -776,9 +869,9 @@ export default function DirectFeedPage() {
       fallback={
         <div
           className="h-full flex items-center justify-center"
-          style={{ background: "#000" }}
+          style={{ background: "#ffffff" }}
         >
-          <p className="text-white/60">Loading...</p>
+          <p className="text-black/60">Loading...</p>
         </div>
       }
     >
