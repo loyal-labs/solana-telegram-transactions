@@ -536,12 +536,13 @@ export default function Home() {
   const [walletAddress, setWalletAddress] = useState<string | null>(() =>
     USE_MOCK_DATA ? MOCK_WALLET_ADDRESS : cachedWalletAddress
   );
-  const [solBalanceLamports, setSolBalanceLamports] = useState<number | null>(() =>
-    USE_MOCK_DATA
-      ? MOCK_BALANCE_LAMPORTS
-      : cachedWalletAddress
-      ? getCachedWalletBalance(cachedWalletAddress)
-      : null
+  const [solBalanceLamports, setSolBalanceLamports] = useState<number | null>(
+    () =>
+      USE_MOCK_DATA
+        ? MOCK_BALANCE_LAMPORTS
+        : cachedWalletAddress
+        ? getCachedWalletBalance(cachedWalletAddress)
+        : null
   );
   const [tokenHoldings, setTokenHoldings] = useState<TokenHolding[]>(() =>
     USE_MOCK_DATA ? MOCK_TOKEN_HOLDINGS : []
@@ -898,38 +899,35 @@ export default function Home() {
     walletAddressRef.current = walletAddress;
   }, [walletAddress]);
 
-  const refreshTokenHoldings = useCallback(
-    async (forceRefresh = false) => {
-      const addr = walletAddressRef.current;
-      if (!addr) return;
+  const refreshTokenHoldings = useCallback(async (forceRefresh = false) => {
+    const addr = walletAddressRef.current;
+    if (!addr) return;
 
-      const fetchId = ++holdingsFetchIdRef.current;
+    const fetchId = ++holdingsFetchIdRef.current;
 
+    if (!hasLoadedHoldingsRef.current) {
+      setIsHoldingsLoading(true);
+    }
+
+    try {
+      const holdings = await fetchTokenHoldings(addr, forceRefresh);
+      if (walletAddressRef.current !== addr) return;
+      if (holdingsFetchIdRef.current !== fetchId) return;
+      setTokenHoldings(holdings);
+      hasLoadedHoldingsRef.current = true;
+    } catch (error) {
+      console.error("Failed to fetch token holdings:", error);
+    } finally {
+      if (walletAddressRef.current !== addr) return;
+      if (holdingsFetchIdRef.current !== fetchId) return;
       if (!hasLoadedHoldingsRef.current) {
+        // If we never loaded successfully, keep showing skeleton.
         setIsHoldingsLoading(true);
+      } else {
+        setIsHoldingsLoading(false);
       }
-
-      try {
-        const holdings = await fetchTokenHoldings(addr, forceRefresh);
-        if (walletAddressRef.current !== addr) return;
-        if (holdingsFetchIdRef.current !== fetchId) return;
-        setTokenHoldings(holdings);
-        hasLoadedHoldingsRef.current = true;
-      } catch (error) {
-        console.error("Failed to fetch token holdings:", error);
-      } finally {
-        if (walletAddressRef.current !== addr) return;
-        if (holdingsFetchIdRef.current !== fetchId) return;
-        if (!hasLoadedHoldingsRef.current) {
-          // If we never loaded successfully, keep showing skeleton.
-          setIsHoldingsLoading(true);
-        } else {
-          setIsHoldingsLoading(false);
-        }
-      }
-    },
-    []
-  );
+    }
+  }, []);
 
   const scheduleTokenHoldingsRefresh = useCallback(() => {
     if (!walletAddressRef.current) return;

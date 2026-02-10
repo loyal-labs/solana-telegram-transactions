@@ -379,7 +379,7 @@ export default function BalanceBackgroundPicker({
         {/* Content */}
         <div
           className="flex-1 flex flex-col overflow-hidden"
-          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+          style={{ paddingBottom: Math.max(safeBottom, 24) + 80 }}
         >
           {/* Preview Card */}
           <div className="px-4 pt-2 pb-6">

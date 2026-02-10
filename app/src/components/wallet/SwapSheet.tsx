@@ -27,6 +27,7 @@ import {
   NATIVE_SOL_MINT,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 
 // iOS-style sheet timing (shared with other sheets)
 const SHEET_TRANSITION = "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)";
@@ -660,6 +661,7 @@ export default function SwapSheet({
   const closeSheet = useCallback(() => {
     if (isClosing.current) return;
     isClosing.current = true;
+    hideAllButtons();
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
@@ -884,7 +886,7 @@ export default function SwapSheet({
         {/* Content Container */}
         <div
           className="relative flex-1 overflow-hidden"
-          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+          style={{ paddingBottom: Math.max(safeBottom, 24) + 80 }}
         >
           {/* MAIN VIEW */}
           <div

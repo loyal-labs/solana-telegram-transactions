@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import type { TokenHolding } from "@/lib/solana/token-holdings/types";
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 
 export type TokensSheetProps = {
   open?: boolean;
@@ -95,6 +96,7 @@ export default function TokensSheet({
   const closeSheet = useCallback(() => {
     if (isClosing.current) return;
     isClosing.current = true;
+    hideAllButtons();
 
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
@@ -269,7 +271,7 @@ export default function TokensSheet({
         {/* Token List - scrollable */}
         <div
           className="flex-1 overflow-y-auto overscroll-contain"
-          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+          style={{ paddingBottom: Math.max(safeBottom, 24) + 80 }}
         >
           {filteredTokens.map((token) => (
             <div
