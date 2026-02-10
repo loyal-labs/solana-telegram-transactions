@@ -1200,7 +1200,7 @@ export default function Home() {
           await navigator.clipboard.writeText(address);
           return;
         } catch (copyError) {
-          console.warn("Clipboard copy failed", copyError);
+          console.warn("Clipboard copy failed", copyError, address);
         }
       }
 
@@ -1376,6 +1376,7 @@ export default function Home() {
           setTimeout(() => hapticFeedback.impactOccurred("heavy"), 1060);
         }
       } catch (error) {
+        console.error("Failed to claim transaction", error);
         if (hapticFeedback.notificationOccurred.isAvailable()) {
           hapticFeedback.notificationOccurred("error");
         }
@@ -1410,8 +1411,10 @@ export default function Home() {
         TELEGRAM_BOT_ID,
         cleanInitDataResult
       );
+      console.log("validationString:", validationString);
       const signature = cleanInitDataResult.signature as string;
       const isValid = validateInitData(validationString, signature);
+      console.log("Signature is valid: ", isValid);
       if (!isValid) {
         console.warn("Telegram init data signature validation failed");
       }
@@ -2402,9 +2405,10 @@ export default function Home() {
                         if (navigator?.clipboard?.writeText) {
                           navigator.clipboard
                             .writeText(walletAddress)
-                            .catch((err) => {
+                            .catch((copyError) => {
                               console.warn(
-                                "Failed to copy address",
+                                "Clipboard copy failed",
+                                copyError,
                                 walletAddress
                               );
                             });
