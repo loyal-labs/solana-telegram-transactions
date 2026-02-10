@@ -8,7 +8,6 @@ export const getDeposit = async (
   provider: AnchorProvider,
   username: string
 ): Promise<TelegramDeposit> => {
-
   const privateClient = LoyalPrivateTransactionsClient.fromProvider(provider);
   const deposit = await privateClient.getUsernameDeposit(username, NATIVE_MINT);
   if (!deposit) {
@@ -18,7 +17,7 @@ export const getDeposit = async (
   return {
     user: provider.publicKey,
     username: deposit.username,
-    amount: deposit.amount,
+    amount: Number(deposit.amount),
     lastNonce: 0,
     tokenMint: deposit.tokenMint,
     address: deposit.address,

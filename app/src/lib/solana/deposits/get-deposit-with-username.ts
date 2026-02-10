@@ -14,7 +14,7 @@ const mapUsernameDepositToTelegramDeposit = (
 ): TelegramDeposit => ({
   user: provider.publicKey,
   username: deposit.username,
-  amount: deposit.amount,
+  amount: Number(deposit.amount),
   lastNonce: 0,
   tokenMint: deposit.tokenMint,
   address: deposit.address,

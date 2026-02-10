@@ -234,7 +234,12 @@ export class LoyalPrivateTransactionsClient {
   static async fromEphemeral(
     config: EphemeralClientConfig
   ): Promise<LoyalPrivateTransactionsClient> {
-    const { signer, rpcEndpoint, wsEndpoint, commitment = "confirmed" } = config;
+    const {
+      signer,
+      rpcEndpoint,
+      wsEndpoint,
+      commitment = "confirmed",
+    } = config;
 
     const connection = new Connection(rpcEndpoint, {
       wsEndpoint,
@@ -271,7 +276,9 @@ export class LoyalPrivateTransactionsClient {
   /**
    * Modify the balance of a user's deposit account
    */
-  async modifyBalance(params: ModifyBalanceParams): Promise<ModifyBalanceResult> {
+  async modifyBalance(
+    params: ModifyBalanceParams
+  ): Promise<ModifyBalanceResult> {
     const {
       user,
       tokenMint,
@@ -721,7 +728,7 @@ export class LoyalPrivateTransactionsClient {
       return {
         user: account.user,
         tokenMint: account.tokenMint,
-        amount: account.amount.toNumber(),
+        amount: BigInt(account.amount.toString()),
         address: depositPda,
       };
     } catch {
@@ -739,12 +746,13 @@ export class LoyalPrivateTransactionsClient {
     const [depositPda] = findUsernameDepositPda(username, tokenMint);
 
     try {
-      const account =
-        await this.program.account.usernameDeposit.fetch(depositPda);
+      const account = await this.program.account.usernameDeposit.fetch(
+        depositPda
+      );
       return {
         username: account.username,
         tokenMint: account.tokenMint,
-        amount: account.amount.toNumber(),
+        amount: BigInt(account.amount.toString()),
         address: depositPda,
       };
     } catch {
@@ -759,10 +767,7 @@ export class LoyalPrivateTransactionsClient {
   /**
    * Find the deposit PDA for a user and token mint
    */
-  findDepositPda(
-    user: PublicKey,
-    tokenMint: PublicKey
-  ): [PublicKey, number] {
+  findDepositPda(user: PublicKey, tokenMint: PublicKey): [PublicKey, number] {
     return findDepositPda(user, tokenMint, PROGRAM_ID);
   }
 
@@ -835,7 +840,9 @@ export class LoyalPrivateTransactionsClient {
     };
   }
 
-  private async permissionAccountExists(permission: PublicKey): Promise<boolean> {
+  private async permissionAccountExists(
+    permission: PublicKey
+  ): Promise<boolean> {
     const info = await this.program.provider.connection.getAccountInfo(
       permission
     );
@@ -847,8 +854,8 @@ export class LoyalPrivateTransactionsClient {
     if (message.includes("already in use")) {
       return true;
     }
-    const logs = (error as { logs?: string[]; transactionLogs?: string[] })
-      ?.logs ??
+    const logs =
+      (error as { logs?: string[]; transactionLogs?: string[] })?.logs ??
       (error as { logs?: string[]; transactionLogs?: string[] })
         ?.transactionLogs;
     if (Array.isArray(logs)) {

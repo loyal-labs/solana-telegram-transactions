@@ -39,7 +39,7 @@ export interface EphemeralClientConfig {
 export interface DepositData {
     user: PublicKey;
     tokenMint: PublicKey;
-    amount: number;
+    amount: bigint;
     address: PublicKey;
 }
 /**
@@ -48,7 +48,7 @@ export interface DepositData {
 export interface UsernameDepositData {
     username: string;
     tokenMint: PublicKey;
-    amount: number;
+    amount: bigint;
     address: PublicKey;
 }
 /**
