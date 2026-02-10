@@ -59,7 +59,6 @@ import {
   listenForAccountTransactions,
 } from "@/lib/solana/rpc/get-account-txn-history";
 import type { WalletTransfer } from "@/lib/solana/rpc/types";
-import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import {
   fetchTokenHoldings,
   type TokenHolding,
@@ -1135,8 +1134,7 @@ export default function Home() {
     async (username: string, amount: number) => {
       try {
         const provider = await getWalletProvider();
-        const transferProgram = getTelegramTransferProgram(provider);
-        await refundDeposit(provider, transferProgram, username, amount);
+        await refundDeposit(provider, username, amount);
 
         if (hapticFeedback.notificationOccurred.isAvailable()) {
           hapticFeedback.notificationOccurred("success");
@@ -1264,7 +1262,9 @@ export default function Home() {
       }
 
       if (!rawInitData) {
-        setClaimError("Cannot verify init data: missing Telegram session data.");
+        setClaimError(
+          "Cannot verify init data: missing Telegram session data."
+        );
         return;
       }
 
