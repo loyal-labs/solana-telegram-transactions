@@ -12,31 +12,31 @@ const THEME_CONFIG: Record<
   {
     bg: string;
     dogPrefix: string;
-    logo: string;
     textColor: string;
     dateOpacity: number;
+    brandKey: "brandDark" | "brandRed" | "brandWhite";
   }
 > = {
   black: {
     bg: "bg_black.png",
     dogPrefix: "Dark",
-    logo: "Darklogo.png",
     textColor: "#FFFFFF",
     dateOpacity: 0.6,
+    brandKey: "brandDark",
   },
   white: {
     bg: "bg_white.png",
     dogPrefix: "Red",
-    logo: "Lightlogo.png",
     textColor: "#000000",
     dateOpacity: 0.6,
+    brandKey: "brandWhite",
   },
   red: {
     bg: "bg_red.png",
     dogPrefix: "Red",
-    logo: "Redlogo.png",
     textColor: "#FFFFFF",
     dateOpacity: 0.8,
+    brandKey: "brandRed",
   },
 };
 
@@ -72,8 +72,21 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const text = searchParams.get("text") || "";
     const date = searchParams.get("date") || "";
+    const imagesParam = searchParams.get("images") || "";
+    const brandUrls = {
+      brandDark: searchParams.get("brandDark") || "",
+      brandRed: searchParams.get("brandRed") || "",
+      brandWhite: searchParams.get("brandWhite") || "",
+    };
 
-    const truncatedText = truncateText(text, 110);
+    const imageUrls = imagesParam
+      ? imagesParam
+          .split(",")
+          .map((u) => u.trim())
+          .filter(Boolean)
+      : [];
+
+    const truncatedText = truncateText(text, 200);
 
     // Randomize theme and dog variant
     const theme = THEMES[Math.floor(Math.random() * THEMES.length)];
@@ -81,10 +94,16 @@ export async function GET(request: Request) {
       DOG_VARIANTS[Math.floor(Math.random() * DOG_VARIANTS.length)];
     const config = THEME_CONFIG[theme];
 
-    const allText = `Summary for ${date}${truncatedText}loyal`;
+    // Strip {img} markers for font loading
+    const plainText = truncatedText.replace(/\{img\}/g, " ");
+    const allText = `${date}Summary${plainText}`;
 
-    const [fontMedium, backgroundData, dogData, logoData] = await Promise.all([
+    // Select brand URL based on theme
+    const brandUrl = brandUrls[config.brandKey];
+
+    const [fontMedium, fontRegular, backgroundData, dogData] = await Promise.all([
       loadGoogleFont("Geist", 500, allText),
+      loadGoogleFont("Geist", 400, "Summary"),
       readFile(join(process.cwd(), `public/share_summary/bgs/${config.bg}`)),
       readFile(
         join(
@@ -92,12 +111,27 @@ export async function GET(request: Request) {
           `public/share_summary/dogs/${config.dogPrefix}${dogVariant}.png`
         )
       ),
-      readFile(join(process.cwd(), `public/share_summary/logos/${config.logo}`)),
     ]);
 
     const backgroundBase64 = `data:image/png;base64,${backgroundData.toString("base64")}`;
     const dogBase64 = `data:image/png;base64,${dogData.toString("base64")}`;
-    const logoBase64 = `data:image/png;base64,${logoData.toString("base64")}`;
+
+    // Parse text with {img} placeholders into interleaved words and images
+    const textSegments = truncatedText.split("{img}");
+    const IMG_SIZE = 52;
+
+    const inlineElements: { type: "word" | "image"; value: string }[] = [];
+    let imgIdx = 0;
+    for (let i = 0; i < textSegments.length; i++) {
+      const words = textSegments[i].split(/\s+/).filter(Boolean);
+      for (const word of words) {
+        inlineElements.push({ type: "word", value: word });
+      }
+      if (i < textSegments.length - 1 && imgIdx < imageUrls.length) {
+        inlineElements.push({ type: "image", value: imageUrls[imgIdx] });
+        imgIdx++;
+      }
+    }
 
     return new ImageResponse(
       (
@@ -110,7 +144,7 @@ export async function GET(request: Request) {
             fontFamily: "Geist",
           }}
         >
-          {/* Background image */}
+          {/* Background */}
           <img
             src={backgroundBase64}
             alt=""
@@ -123,41 +157,80 @@ export async function GET(request: Request) {
             }}
           />
 
-          {/* Date header */}
+          {/* Date - top right */}
+          <div
+            style={{
+              position: "absolute",
+              top: 56,
+              right: 56,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              color: config.textColor,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 56,
+                fontWeight: 500,
+                lineHeight: 1.2,
+                letterSpacing: "-1.12px",
+              }}
+            >
+              {date}
+            </div>
+            <div
+              style={{
+                fontSize: 30,
+                fontWeight: 400,
+                lineHeight: 1,
+                opacity: config.dateOpacity,
+                marginTop: 2,
+              }}
+            >
+              Summary
+            </div>
+          </div>
+
+          {/* Main text with inline images */}
           <div
             style={{
               position: "absolute",
               top: 56,
               left: 56,
+              width: 750,
               display: "flex",
-              color: config.textColor,
-              opacity: config.dateOpacity,
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 0,
               fontWeight: 500,
-              fontSize: 48,
-              lineHeight: 1,
-              letterSpacing: "-0.96px",
+              fontSize: 56,
+              lineHeight: 1.2,
+              letterSpacing: "-1.12px",
+              color: config.textColor,
             }}
           >
-            Summary for {date}
-          </div>
-
-          {/* Main text */}
-          <div
-            style={{
-              position: "absolute",
-              top: 128,
-              left: 56,
-              display: "flex",
-              width: 600,
-              color: config.textColor,
-              fontWeight: 500,
-              fontSize: 48,
-              lineHeight: 1.1,
-              letterSpacing: "-0.96px",
-              wordBreak: "break-word",
-            }}
-          >
-            {truncatedText}
+            {inlineElements.map((el, idx) =>
+              el.type === "word" ? (
+                <span key={idx} style={{ marginRight: 16 }}>
+                  {el.value}
+                </span>
+              ) : (
+                <img
+                  key={idx}
+                  src={el.value}
+                  alt=""
+                  style={{
+                    width: IMG_SIZE,
+                    height: IMG_SIZE,
+                    borderRadius: IMG_SIZE / 2,
+                    objectFit: "cover",
+                    marginLeft: 4,
+                    marginRight: 16,
+                  }}
+                />
+              )
+            )}
           </div>
 
           {/* Dog mascot */}
@@ -168,24 +241,26 @@ export async function GET(request: Request) {
               position: "absolute",
               bottom: 0,
               right: 0,
-              width: 500,
-              height: 500,
+              width: 450,
+              height: 450,
               objectFit: "contain",
               objectPosition: "bottom right",
             }}
           />
 
-          {/* Logo */}
-          <img
-            src={logoBase64}
-            alt=""
-            style={{
-              position: "absolute",
-              bottom: 47,
-              left: 56,
-              height: 56,
-            }}
-          />
+          {/* Brand - bottom left (only if provided) */}
+          {brandUrl && (
+            <img
+              src={brandUrl}
+              alt=""
+              style={{
+                position: "absolute",
+                bottom: 47,
+                left: 56,
+                height: 56,
+              }}
+            />
+          )}
         </div>
       ),
       {
@@ -197,6 +272,12 @@ export async function GET(request: Request) {
             data: fontMedium,
             style: "normal",
             weight: 500,
+          },
+          {
+            name: "Geist",
+            data: fontRegular,
+            style: "normal",
+            weight: 400,
           },
         ],
       }
