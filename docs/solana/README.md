@@ -1,6 +1,6 @@
-# Solana Smart Contract Documentation
+# Solana Documentation
 
-Documentation for the Anchor programs in this project.
+Solana-related documentation for this project (Anchor programs + app/RPC integration).
 
 ## Programs
 
@@ -12,3 +12,4 @@ Documentation for the Anchor programs in this project.
 ## Quick Links
 
 - [Localnet Testing](./localnet-testing.md) - Step-by-step local development setup
+- [Wallet Activity + RPC Parsing](./wallet-activity.md) - How we derive SOL/SPL token activity from RPC transactions

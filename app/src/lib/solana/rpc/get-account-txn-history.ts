@@ -18,6 +18,25 @@ type ListenForAccountTransactionsOptions = {
   onlySystemTransfers?: boolean;
 };
 
+type TokenBalanceEntry = {
+  accountIndex: number;
+  mint: string;
+  owner?: string;
+  programId?: string;
+  uiTokenAmount?: {
+    amount: string; // raw integer, as base-10 string
+    decimals: number;
+  };
+};
+
+type TokenChange = {
+  mint: string;
+  decimals: number;
+  rawDelta: bigint; // post - pre, in base units
+  direction: "in" | "out";
+  absRaw: bigint;
+};
+
 const accountKeyToString = (
   key: ParsedMessage["accountKeys"][number] | PublicKey | string
 ): string => {
@@ -28,6 +47,282 @@ const accountKeyToString = (
   }
   const maybePubkey = key as PublicKey;
   return maybePubkey?.toString ? maybePubkey.toString() : String(key);
+};
+
+const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+);
+const TOKEN_PROGRAM_ID = new PublicKey(
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+);
+const TOKEN_2022_PROGRAM_ID = new PublicKey(
+  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+);
+
+const absBigInt = (n: bigint): bigint =>
+  n < BigInt(0) ? BigInt(0) - n : n;
+
+const getAtaAddress = (args: {
+  walletAddress: string;
+  mint: string;
+  tokenProgramId: PublicKey;
+}): string => {
+  const wallet = new PublicKey(args.walletAddress);
+  const mint = new PublicKey(args.mint);
+  const [ata] = PublicKey.findProgramAddressSync(
+    [wallet.toBuffer(), args.tokenProgramId.toBuffer(), mint.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+  return ata.toBase58();
+};
+
+const isWalletTokenAccount = (args: {
+  tokenAccount: string;
+  owner: string | undefined;
+  walletAddress: string;
+  mint: string;
+  programId: string | undefined;
+}): boolean => {
+  if (args.owner === args.walletAddress) return true;
+  if (typeof args.owner === "string" && args.owner !== args.walletAddress) {
+    return false;
+  }
+
+  // Fallback when owner is missing: treat the associated token account (ATA) as wallet-owned.
+  // This covers the common case without extra RPC calls.
+  const tokenProgramId =
+    args.programId === TOKEN_2022_PROGRAM_ID.toBase58()
+      ? TOKEN_2022_PROGRAM_ID
+      : TOKEN_PROGRAM_ID;
+  try {
+    const ata = getAtaAddress({
+      walletAddress: args.walletAddress,
+      mint: args.mint,
+      tokenProgramId,
+    });
+    return ata === args.tokenAccount;
+  } catch {
+    return false;
+  }
+};
+
+const addToMintSum = (
+  map: Map<string, { raw: bigint; decimals: number }>,
+  mint: string,
+  raw: bigint,
+  decimals: number
+) => {
+  const existing = map.get(mint);
+  if (!existing) {
+    map.set(mint, { raw, decimals });
+    return;
+  }
+  map.set(mint, { raw: existing.raw + raw, decimals: existing.decimals });
+};
+
+const pow10BigInt = (exp: number): bigint => {
+  let result = BigInt(1);
+  for (let i = 0; i < exp; i++) {
+    result *= BigInt(10);
+  }
+  return result;
+};
+
+const formatTokenAmountFromRaw = (args: {
+  absRaw: bigint;
+  decimals: number;
+  maxFractionDigits: number;
+}): string => {
+  const { absRaw, decimals } = args;
+  if (decimals <= 0) return absRaw.toString();
+
+  const fracDigits = Math.min(decimals, args.maxFractionDigits);
+  const base = pow10BigInt(decimals);
+  const integer = absRaw / base;
+  const remainder = absRaw % base;
+
+  if (fracDigits === 0) return integer.toString();
+
+  // Truncate the fractional remainder to the desired precision.
+  const drop =
+    decimals > fracDigits ? pow10BigInt(decimals - fracDigits) : BigInt(1);
+  const fracTruncated = remainder / drop;
+  const fracStr = fracTruncated
+    .toString()
+    .padStart(fracDigits, "0")
+    .replace(/0+$/, "");
+
+  return fracStr.length ? `${integer.toString()}.${fracStr}` : integer.toString();
+};
+
+const findTokenBalanceChange = (
+  message: ParsedMessage,
+  meta: NonNullable<ParsedTransactionWithMeta["meta"]>,
+  walletAddress: string
+): TokenChange | null => {
+  const preList = (meta.preTokenBalances ?? []) as TokenBalanceEntry[];
+  const postList = (meta.postTokenBalances ?? []) as TokenBalanceEntry[];
+
+  const preByMint = new Map<string, { raw: bigint; decimals: number }>();
+  const postByMint = new Map<string, { raw: bigint; decimals: number }>();
+
+  for (const b of preList) {
+    if (!b) continue;
+    const key = message.accountKeys?.[b.accountIndex];
+    const tokenAccount = key ? accountKeyToString(key) : null;
+    if (
+      !tokenAccount ||
+      !isWalletTokenAccount({
+        tokenAccount,
+        owner: b.owner,
+        walletAddress,
+        mint: b.mint,
+        programId: b.programId,
+      })
+    ) {
+      continue;
+    }
+    const ui = b.uiTokenAmount;
+    if (!ui || typeof ui.amount !== "string") continue;
+    addToMintSum(preByMint, b.mint, BigInt(ui.amount), ui.decimals);
+  }
+
+  for (const b of postList) {
+    if (!b) continue;
+    const key = message.accountKeys?.[b.accountIndex];
+    const tokenAccount = key ? accountKeyToString(key) : null;
+    if (
+      !tokenAccount ||
+      !isWalletTokenAccount({
+        tokenAccount,
+        owner: b.owner,
+        walletAddress,
+        mint: b.mint,
+        programId: b.programId,
+      })
+    ) {
+      continue;
+    }
+    const ui = b.uiTokenAmount;
+    if (!ui || typeof ui.amount !== "string") continue;
+    addToMintSum(postByMint, b.mint, BigInt(ui.amount), ui.decimals);
+  }
+
+  const allMints = new Set<string>([
+    ...Array.from(preByMint.keys()),
+    ...Array.from(postByMint.keys()),
+  ]);
+
+  let best: TokenChange | null = null;
+  let bestAbs = BigInt(0);
+
+  for (const mint of allMints) {
+    const pre = preByMint.get(mint);
+    const post = postByMint.get(mint);
+    const preRaw = pre?.raw ?? BigInt(0);
+    const postRaw = post?.raw ?? BigInt(0);
+    const decimals = post?.decimals ?? pre?.decimals ?? 0;
+    const delta = postRaw - preRaw;
+    if (delta === BigInt(0)) continue;
+
+    const abs = absBigInt(delta);
+    if (abs <= bestAbs) continue;
+
+    bestAbs = abs;
+    best = {
+      mint,
+      decimals,
+      rawDelta: delta,
+      direction: delta > BigInt(0) ? "in" : "out",
+      absRaw: abs,
+    };
+  }
+
+  return best;
+};
+
+const findSplTokenTransferCounterparty = (args: {
+  message: ParsedMessage;
+  innerInstructions: ParsedInnerInstruction[] | null | undefined;
+  meta: NonNullable<ParsedTransactionWithMeta["meta"]>;
+  walletAddress: string;
+  mint: string;
+  direction: "in" | "out";
+}): string | undefined => {
+  const { message, innerInstructions, meta, walletAddress, mint, direction } =
+    args;
+
+  const preList = (meta.preTokenBalances ?? []) as TokenBalanceEntry[];
+  const postList = (meta.postTokenBalances ?? []) as TokenBalanceEntry[];
+  const allBalances = [...preList, ...postList].filter((b) => b?.mint === mint);
+
+  const tokenAccountToOwner = new Map<string, string>();
+  const walletTokenAccounts = new Set<string>();
+
+  for (const b of allBalances) {
+    const key = message.accountKeys?.[b.accountIndex];
+    if (!key) continue;
+    const tokenAccount = accountKeyToString(key);
+    if (b.owner) {
+      tokenAccountToOwner.set(tokenAccount, b.owner);
+    }
+    if (
+      isWalletTokenAccount({
+        tokenAccount,
+        owner: b.owner,
+        walletAddress,
+        mint: b.mint,
+        programId: b.programId,
+      })
+    ) {
+      walletTokenAccounts.add(tokenAccount);
+    }
+  }
+
+  const topLevel = (message.instructions ?? []) as ParsedInstruction[];
+  const innerList: ParsedInnerInstruction[] = innerInstructions ?? [];
+  const inner = innerList.flatMap((ix: ParsedInnerInstruction) => {
+    const instructions = ix.instructions ?? [];
+    return instructions as ParsedInstruction[];
+  });
+
+  const allInstructions = [...topLevel, ...inner];
+
+  for (const ix of allInstructions) {
+    if (
+      ix.program !== "spl-token" &&
+      ix.program !== "spl-token-2022"
+    ) {
+      continue;
+    }
+    const parsed = (
+      ix as ParsedInstruction & {
+        parsed?: {
+          type?: string;
+          info?: { source?: string; destination?: string };
+        };
+      }
+    ).parsed;
+    const parsedType = parsed?.type;
+    if (parsedType !== "transfer" && parsedType !== "transferChecked") {
+      continue;
+    }
+    const info = parsed?.info as
+      | { source?: string; destination?: string }
+      | undefined;
+    const source = info?.source;
+    const destination = info?.destination;
+    if (!source || !destination) continue;
+
+    if (direction === "out" && walletTokenAccounts.has(source)) {
+      return tokenAccountToOwner.get(destination) ?? destination;
+    }
+    if (direction === "in" && walletTokenAccounts.has(destination)) {
+      return tokenAccountToOwner.get(source) ?? source;
+    }
+  }
+
+  return undefined;
 };
 
 const findSystemTransfer = (
@@ -79,15 +374,6 @@ const mapTransactionToTransfer = (
   const accountIndex = message.accountKeys.findIndex(
     (key) => accountKeyToString(key) === walletAddress
   );
-  if (accountIndex === -1) return null;
-
-  const preLamports = safeMeta.preBalances?.[accountIndex] ?? 0;
-  const postLamports = safeMeta.postBalances?.[accountIndex] ?? 0;
-  const netChangeLamports = postLamports - preLamports;
-  if (netChangeLamports === 0) return null;
-
-  const direction: "in" | "out" = netChangeLamports > 0 ? "in" : "out";
-  const amountLamports = Math.abs(netChangeLamports);
 
   const systemTransfer = findSystemTransfer(
     message,
@@ -95,6 +381,23 @@ const mapTransactionToTransfer = (
     walletAddress
   );
   if (onlySystemTransfers && !systemTransfer) return null;
+
+  const tokenChange = onlySystemTransfers
+    ? null
+    : findTokenBalanceChange(message, safeMeta, walletAddress);
+
+  if (accountIndex === -1 && !tokenChange) return null;
+
+  const preLamports =
+    accountIndex === -1 ? 0 : safeMeta.preBalances?.[accountIndex] ?? 0;
+  const postLamports =
+    accountIndex === -1 ? 0 : safeMeta.postBalances?.[accountIndex] ?? 0;
+  const netChangeLamports = postLamports - preLamports;
+
+  if (netChangeLamports === 0 && !tokenChange) return null;
+
+  const solDirection: "in" | "out" = netChangeLamports > 0 ? "in" : "out";
+  const solAmountLamports = Math.abs(netChangeLamports);
 
   let counterparty: string | undefined;
   if (systemTransfer && "parsed" in systemTransfer) {
@@ -105,7 +408,7 @@ const mapTransactionToTransfer = (
     ).parsed?.info;
     if (info) {
       counterparty =
-        direction === "in"
+        solDirection === "in"
           ? info.source ?? undefined
           : info.destination ?? undefined;
     }
@@ -166,12 +469,32 @@ const mapTransactionToTransfer = (
       ? (decodedType as WalletTransfer["type"])
       : "transfer";
 
+  const isTokenTransfer = type === "transfer" && tokenChange !== null;
+  const direction: "in" | "out" = isTokenTransfer
+    ? tokenChange!.direction
+    : solDirection;
+  const amountLamports = isTokenTransfer ? 0 : solAmountLamports;
+
   if (type === "deposit_for_username") {
     const usernameFromInstruction = (
       decodedInstruction?.data as { username?: string }
     )?.username;
     if (usernameFromInstruction) {
       counterparty = usernameFromInstruction;
+    }
+  }
+
+  if (isTokenTransfer) {
+    const tokenCounterparty = findSplTokenTransferCounterparty({
+      message,
+      innerInstructions,
+      meta: safeMeta,
+      walletAddress,
+      mint: tokenChange!.mint,
+      direction: tokenChange!.direction,
+    });
+    if (tokenCounterparty) {
+      counterparty = tokenCounterparty;
     }
   }
 
@@ -186,6 +509,17 @@ const mapTransactionToTransfer = (
     feeLamports: safeMeta.fee ?? 0,
     status: safeMeta.err ? "failed" : "success",
     counterparty,
+    ...(isTokenTransfer
+      ? {
+          tokenMint: tokenChange!.mint,
+          tokenAmount: formatTokenAmountFromRaw({
+            absRaw: tokenChange!.absRaw,
+            decimals: tokenChange!.decimals,
+            maxFractionDigits: 4,
+          }),
+          tokenDecimals: tokenChange!.decimals,
+        }
+      : {}),
   };
 
   return returnObject as WalletTransfer;
@@ -213,7 +547,6 @@ export const getAccountTransactionHistory = async (
       maxSupportedTransactionVersion: 0,
     }
   );
-  console.log("parsedTransactions", parsedTransactions);
 
   const transfers: WalletTransfer[] = [];
 

@@ -746,6 +746,9 @@ export default function Home() {
         type: transaction.type === "incoming" ? "incoming" : "outgoing",
         amountLamports: transaction.amountLamports,
         transferType: transaction.transferType,
+        tokenMint: transaction.tokenMint,
+        tokenAmount: transaction.tokenAmount,
+        tokenDecimals: transaction.tokenDecimals,
         recipient: transaction.recipient,
         recipientUsername,
         sender: transaction.sender,
@@ -952,6 +955,9 @@ export default function Home() {
         type: isIncoming ? "incoming" : "outgoing",
         transferType: transfer.type,
         amountLamports: transfer.amountLamports,
+        tokenMint: transfer.tokenMint,
+        tokenAmount: transfer.tokenAmount,
+        tokenDecimals: transfer.tokenDecimals,
         sender: isIncoming ? counterparty : undefined,
         recipient: !isIncoming ? counterparty : undefined,
         timestamp: transfer.timestamp ?? Date.now(),
@@ -3379,6 +3385,7 @@ export default function Home() {
         showSuccess={showClaimSuccess}
         showError={claimError}
         solPriceUsd={solPriceUsd}
+        tokenHoldings={tokenHoldings}
         onShare={
           selectedTransaction?.transferType === "deposit_for_username"
             ? handleShareDepositTransaction
@@ -3400,6 +3407,7 @@ export default function Home() {
         walletTransactions={walletTransactions}
         incomingTransactions={incomingTransactions}
         onTransactionClick={handleOpenWalletTransactionDetails}
+        tokenHoldings={tokenHoldings}
         isLoading={
           (isFetchingTransactions && walletTransactions.length === 0) ||
           (isFetchingDeposits && incomingTransactions.length === 0)
