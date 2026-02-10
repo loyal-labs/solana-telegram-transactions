@@ -1929,7 +1929,12 @@ class LoyalPrivateTransactionsClient {
     return LoyalPrivateTransactionsClient.from(connection, keypair);
   }
   static async fromEphemeral(config) {
-    const { signer, rpcEndpoint, wsEndpoint, commitment = "confirmed" } = config;
+    const {
+      signer,
+      rpcEndpoint,
+      wsEndpoint,
+      commitment = "confirmed"
+    } = config;
     const connection = new Connection(rpcEndpoint, {
       wsEndpoint,
       commitment
@@ -2221,7 +2226,7 @@ class LoyalPrivateTransactionsClient {
       return {
         user: account.user,
         tokenMint: account.tokenMint,
-        amount: account.amount.toNumber(),
+        amount: BigInt(account.amount.toString()),
         address: depositPda
       };
     } catch {
@@ -2235,7 +2240,7 @@ class LoyalPrivateTransactionsClient {
       return {
         username: account.username,
         tokenMint: account.tokenMint,
-        amount: account.amount.toNumber(),
+        amount: BigInt(account.amount.toString()),
         address: depositPda
       };
     } catch {

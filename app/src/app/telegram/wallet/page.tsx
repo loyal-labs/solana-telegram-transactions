@@ -59,15 +59,14 @@ import {
   listenForAccountTransactions,
 } from "@/lib/solana/rpc/get-account-txn-history";
 import type { WalletTransfer } from "@/lib/solana/rpc/types";
-import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import {
   fetchTokenHoldings,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
 import {
+  prepareCloseWsolTxn,
   prepareStoreInitDataTxn,
   sendStoreInitDataTxn,
-  verifyAndClaimDeposit,
 } from "@/lib/solana/verify-and-claim-deposit";
 import {
   formatAddress,
@@ -123,6 +122,7 @@ hashes.sha512 = sha512;
 
 // ─── Mock data for development ─────────────────────────────────────────────
 const USE_MOCK_DATA = false;
+const TELEGRAM_USERNAME_PATTERN = /^[A-Za-z0-9_]{5,32}$/;
 
 const MOCK_WALLET_ADDRESS = "UQAt7f8Kq9xZ3mNpR2vL5wYcD4bJ6hTgSoAeWnFqZir";
 const MOCK_BALANCE_LAMPORTS = 1_267_476_540_000; // ~1267.47654 SOL
@@ -458,15 +458,15 @@ const setCachedIncomingTransactions = (
 const mapDepositToIncomingTransaction = (
   deposit: TelegramDeposit
 ): IncomingTransaction => {
-  const senderBase58 =
-    typeof (deposit.user as { toBase58?: () => string }).toBase58 === "function"
-      ? deposit.user.toBase58()
-      : String(deposit.user);
+  const depositId =
+    typeof deposit.address?.toBase58 === "function"
+      ? deposit.address.toBase58()
+      : `${deposit.username}-native`;
 
   return {
-    id: `${senderBase58}-${deposit.lastNonce}`,
+    id: depositId,
     amountLamports: deposit.amount,
-    sender: senderBase58,
+    sender: "Unknown sender",
     username: deposit.username,
   };
 };
@@ -622,6 +622,8 @@ export default function Home() {
     secondaryButton.setParams.isAvailable
   );
   const ensuredWalletRef = useRef(false);
+  const claimInFlightRef = useRef(false);
+  const attemptedAutoClaimIdsRef = useRef<Set<string>>(new Set());
 
   // Track seen transaction IDs to detect new ones for animation
   const seenTransactionIdsRef = useRef<Set<string>>(new Set());
@@ -995,22 +997,8 @@ export default function Home() {
         if (username) {
           const provider = await getWalletProvider();
           const deposits = await fetchDeposits(provider, username);
-
           const mappedTransactions: IncomingTransaction[] = deposits.map(
-            (deposit) => {
-              const senderBase58 =
-                typeof (deposit.user as { toBase58?: () => string })
-                  .toBase58 === "function"
-                  ? deposit.user.toBase58()
-                  : String(deposit.user);
-
-              return {
-                id: `${senderBase58}-${deposit.lastNonce}`,
-                amountLamports: deposit.amount,
-                sender: senderBase58,
-                username: username,
-              };
-            }
+            mapDepositToIncomingTransaction
           );
 
           setIncomingTransactions(mappedTransactions);
@@ -1057,8 +1045,8 @@ export default function Home() {
       } else if (isValidTelegramUsername(trimmedRecipient)) {
         const username = trimmedRecipient.replace(/^@/, "");
         const provider = await getWalletProvider();
-        const transferProgram = getTelegramTransferProgram(provider);
-        await topUpDeposit(provider, transferProgram, username, lamports);
+        const topUpResult = await topUpDeposit(provider, username, lamports);
+        signature = topUpResult.signature;
       } else {
         throw new Error("Invalid recipient");
       }
@@ -1146,8 +1134,7 @@ export default function Home() {
     async (username: string, amount: number) => {
       try {
         const provider = await getWalletProvider();
-        const transferProgram = getTelegramTransferProgram(provider);
-        await refundDeposit(provider, transferProgram, username, amount);
+        await refundDeposit(provider, username, amount);
 
         if (hapticFeedback.notificationOccurred.isAvailable()) {
           hapticFeedback.notificationOccurred("success");
@@ -1213,7 +1200,7 @@ export default function Home() {
           await navigator.clipboard.writeText(address);
           return;
         } catch (copyError) {
-          console.warn("Clipboard copy failed", copyError);
+          console.warn("Clipboard copy failed", copyError, address);
         }
       }
 
@@ -1270,8 +1257,14 @@ export default function Home() {
 
   const handleApproveTransaction = useCallback(
     async (transactionId: string) => {
+      if (claimInFlightRef.current) {
+        return;
+      }
+
       if (!rawInitData) {
-        console.error("Cannot verify init data: raw init data missing");
+        setClaimError(
+          "Cannot verify init data: missing Telegram session data."
+        );
         return;
       }
 
@@ -1283,6 +1276,9 @@ export default function Home() {
         return;
       }
 
+      claimInFlightRef.current = true;
+      setClaimError(null);
+
       if (hapticFeedback.impactOccurred.isAvailable()) {
         hapticFeedback.impactOccurred("medium");
       }
@@ -1292,33 +1288,63 @@ export default function Home() {
         const keypair = await getWalletKeypair();
         const wallet = new SimpleWallet(keypair);
         const recipientPublicKey = provider.publicKey;
+        const gaslessPublicKey = await getGaslessPublicKey();
 
         const { validationBytes, signatureBytes } =
           createValidationBytesFromRawInitData(rawInitData);
-        const senderPublicKey = new PublicKey(transaction.sender);
+        const parsedInitData = cleanInitData(rawInitData);
+        const initDataUsername = parseUsernameFromInitData(parsedInitData);
+
+        if (
+          !initDataUsername ||
+          !TELEGRAM_USERNAME_PATTERN.test(initDataUsername)
+        ) {
+          throw new Error("Invalid Telegram username in init data.");
+        }
 
         const username = transaction.username;
+        if (!TELEGRAM_USERNAME_PATTERN.test(username)) {
+          throw new Error("Invalid username on deposit.");
+        }
+        if (initDataUsername !== username) {
+          throw new Error(
+            "Telegram account username does not match the deposit username."
+          );
+        }
         const amountLamports = transaction.amountLamports;
-        const payerPublicKey = await getGaslessPublicKey();
-        console.log("payerPublicKey", payerPublicKey);
 
-        const preparedStoreInitDataTxn = await prepareStoreInitDataTxn(
+        const storeTx = await prepareStoreInitDataTxn(
           provider,
-          payerPublicKey,
+          gaslessPublicKey,
           validationBytes,
           wallet
         );
 
-        await sendStoreInitDataTxn(
-          preparedStoreInitDataTxn,
-          senderPublicKey,
+        const closeTx = await prepareCloseWsolTxn(
+          provider,
+          gaslessPublicKey,
+          wallet
+        );
+
+        const claimResponse = await sendStoreInitDataTxn(
+          storeTx,
           recipientPublicKey,
           username,
           amountLamports,
           validationBytes,
           signatureBytes,
-          TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
+          TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
+          closeTx ?? undefined
         );
+
+        const claimed = Boolean(
+          typeof claimResponse === "object" && claimResponse !== null
+            ? (claimResponse as { success?: boolean }).success
+            : claimResponse
+        );
+        if (!claimed) {
+          throw new Error("Failed to claim deposit");
+        }
 
         setIncomingTransactions((prev) =>
           prev.filter((tx) => tx.id !== transactionId)
@@ -1362,6 +1388,7 @@ export default function Home() {
             : "Something went wrong. Please try again.";
         setClaimError(errorMessage);
       } finally {
+        claimInFlightRef.current = false;
         setIsClaimingTransaction(false);
       }
     },
@@ -1388,6 +1415,9 @@ export default function Home() {
       const signature = cleanInitDataResult.signature as string;
       const isValid = validateInitData(validationString, signature);
       console.log("Signature is valid: ", isValid);
+      if (!isValid) {
+        console.warn("Telegram init data signature validation failed");
+      }
     }
   }, [rawInitData]);
 
@@ -1471,10 +1501,7 @@ export default function Home() {
         }
 
         const provider = await getWalletProvider();
-        const transferProgram = getTelegramTransferProgram(provider);
-        console.log("Fetching deposits for username:", username);
         const deposits = await fetchDeposits(provider, username);
-        console.log("Deposits fetched:", deposits.length, deposits);
         if (isCancelled) {
           return;
         }
@@ -1487,7 +1514,7 @@ export default function Home() {
         setIncomingTransactions(mappedTransactions);
 
         unsubscribe = await subscribeToDepositsWithUsername(
-          transferProgram,
+          provider,
           username,
           (deposit) => {
             if (isCancelled) {
@@ -1495,6 +1522,12 @@ export default function Home() {
             }
             const mapped = mapDepositToIncomingTransaction(deposit);
             setIncomingTransactions((prev) => {
+              if (deposit.amount <= 0) {
+                const next = prev.filter((tx) => tx.id !== mapped.id);
+                setCachedIncomingTransactions(username, next);
+                return next;
+              }
+
               const existingIndex = prev.findIndex((tx) => tx.id === mapped.id);
               let next: IncomingTransaction[];
               if (existingIndex >= 0) {
@@ -1536,10 +1569,21 @@ export default function Home() {
       return;
     }
 
-    // Auto-claim the first available transaction
-    const firstTransaction = incomingTransactions[0];
-    if (firstTransaction) {
-      void handleApproveTransaction(firstTransaction.id);
+    // Keep only tx ids that still exist to avoid unbounded growth.
+    const currentIds = new Set(incomingTransactions.map((tx) => tx.id));
+    attemptedAutoClaimIdsRef.current.forEach((attemptedId) => {
+      if (!currentIds.has(attemptedId)) {
+        attemptedAutoClaimIdsRef.current.delete(attemptedId);
+      }
+    });
+
+    // Auto-claim each transaction id at most once to prevent retry loops.
+    const nextAutoClaim = incomingTransactions.find(
+      (tx) => !attemptedAutoClaimIdsRef.current.has(tx.id)
+    );
+    if (nextAutoClaim) {
+      attemptedAutoClaimIdsRef.current.add(nextAutoClaim.id);
+      void handleApproveTransaction(nextAutoClaim.id);
     }
   }, [incomingTransactions, isClaimingTransaction, handleApproveTransaction]);
 
@@ -2359,7 +2403,15 @@ export default function Home() {
                       }
                       if (walletAddress) {
                         if (navigator?.clipboard?.writeText) {
-                          navigator.clipboard.writeText(walletAddress);
+                          navigator.clipboard
+                            .writeText(walletAddress)
+                            .catch((copyError) => {
+                              console.warn(
+                                "Clipboard copy failed",
+                                copyError,
+                                walletAddress
+                              );
+                            });
                           setAddressCopied(true);
                           setTimeout(() => setAddressCopied(false), 2000);
                         }
@@ -2563,75 +2615,82 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 items-center px-4 pb-4">
-                  {displayTokens.slice(0, 5).map((token) => (
-                    <div
-                      key={`${token.mint} (${token.name})`}
-                      className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
-                      style={{ border: "2px solid #f2f2f7" }}
-                    >
-                      {/* Token icon */}
-                      <div className="py-1.5 pr-3">
-                        <div className="w-12 h-12 relative">
-                          <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
-                            {token.imageUrl && (
-                              <Image
-                                src={token.imageUrl}
-                                alt={token.symbol}
-                                fill
-                                className="object-cover"
-                              />
+                  {displayTokens.slice(0, 5).map((token) => {
+                    const displaySymbol =
+                      token.symbol === "SOL" &&
+                      token.name.toLowerCase().includes("wrapped")
+                        ? "wSOL"
+                        : token.symbol;
+                    return (
+                      <div
+                        key={`${token.mint} (${token.name})`}
+                        className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
+                        style={{ border: "2px solid #f2f2f7" }}
+                      >
+                        {/* Token icon */}
+                        <div className="py-1.5 pr-3">
+                          <div className="w-12 h-12 relative">
+                            <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                              {token.imageUrl && (
+                                <Image
+                                  src={token.imageUrl}
+                                  alt={displaySymbol}
+                                  fill
+                                  className="object-cover"
+                                />
+                              )}
+                            </div>
+                            {token.isSecured && (
+                              <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
+                                <Image
+                                  src="/Shield.svg"
+                                  alt="Secured"
+                                  width={20}
+                                  height={20}
+                                />
+                              </div>
                             )}
                           </div>
-                          {token.isSecured && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
-                              <Image
-                                src="/Shield.svg"
-                                alt="Secured"
-                                width={20}
-                                height={20}
-                              />
-                            </div>
-                          )}
+                        </div>
+                        {/* Token info */}
+                        <div className="flex-1 flex flex-col py-2.5 min-w-0">
+                          <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px]">
+                            {displaySymbol}
+                          </p>
+                          <p
+                            className="text-[15px] leading-5"
+                            style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                          >
+                            {token.priceUsd !== null
+                              ? `$${token.priceUsd.toLocaleString("en-US", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}`
+                              : "—"}
+                          </p>
+                        </div>
+                        {/* Token amount */}
+                        <div className="flex flex-col items-end py-2.5 pl-3">
+                          <p className="text-[17px] text-black leading-[22px] text-right">
+                            {token.balance.toLocaleString("en-US", {
+                              maximumFractionDigits: 4,
+                            })}
+                          </p>
+                          <p
+                            className="text-[15px] leading-5 text-right"
+                            style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                          >
+                            {token.valueUsd !== null
+                              ? `$${token.valueUsd.toLocaleString("en-US", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}`
+                              : "—"}
+                          </p>
                         </div>
                       </div>
-                      {/* Token info */}
-                      <div className="flex-1 flex flex-col py-2.5 min-w-0">
-                        <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px]">
-                          {token.symbol}
-                        </p>
-                        <p
-                          className="text-[15px] leading-5"
-                          style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                        >
-                          {token.priceUsd !== null
-                            ? `$${token.priceUsd.toLocaleString("en-US", {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`
-                            : "—"}
-                        </p>
-                      </div>
-                      {/* Token amount */}
-                      <div className="flex flex-col items-end py-2.5 pl-3">
-                        <p className="text-[17px] text-black leading-[22px] text-right">
-                          {token.balance.toLocaleString("en-US", {
-                            maximumFractionDigits: 4,
-                          })}
-                        </p>
-                        <p
-                          className="text-[15px] leading-5 text-right"
-                          style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                        >
-                          {token.valueUsd !== null
-                            ? `$${token.valueUsd.toLocaleString("en-US", {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`
-                            : "—"}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {/* Show All button */}
                   {tokenHoldings.length > 5 && (

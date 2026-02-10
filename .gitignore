@@ -56,7 +56,7 @@ next-env.d.ts
 
 .anchor
 DS_Store
-target
+target/*
 !target/idl/
 !target/types/
 **/*.rs.bk

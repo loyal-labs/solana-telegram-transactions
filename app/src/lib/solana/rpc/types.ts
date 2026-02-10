@@ -1,4 +1,4 @@
-export type SolanaEnv = "mainnet" | "devnet" | "localnet";
+export type SolanaEnv = "mainnet" | "testnet" | "devnet" | "localnet";
 
 export type WalletTransfer = {
   signature: string;
@@ -10,6 +10,7 @@ export type WalletTransfer = {
     | "verify_telegram_init_data"
     | "store"
     | "claim_deposit"
+    | "claim_username_deposit"
     | "deposit_for_username"
     | "swap"
     | "secure"
