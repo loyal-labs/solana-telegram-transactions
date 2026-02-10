@@ -2,6 +2,8 @@
 
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { Search, X } from "lucide-react";
+
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 import Image from "next/image";
 import {
   useCallback,
@@ -95,6 +97,7 @@ export default function TokensSheet({
   const closeSheet = useCallback(() => {
     if (isClosing.current) return;
     isClosing.current = true;
+    hideAllButtons();
 
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
@@ -269,7 +272,7 @@ export default function TokensSheet({
         {/* Token List - scrollable */}
         <div
           className="flex-1 overflow-y-auto overscroll-contain"
-          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+          style={{ paddingBottom: Math.max(safeBottom, 24) + 80 }}
         >
           {filteredTokens.map((token) => (
             <div

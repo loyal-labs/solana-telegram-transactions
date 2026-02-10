@@ -2,6 +2,8 @@
 
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { ArrowDown, X } from "lucide-react";
+
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 import Image from "next/image";
 import {
   useCallback,
@@ -187,6 +189,7 @@ export default function ActivitySheet({
   const closeSheet = useCallback(() => {
     if (isClosing.current) return;
     isClosing.current = true;
+    hideAllButtons();
 
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
@@ -334,7 +337,7 @@ export default function ActivitySheet({
           ref={scrollContainerRef}
           onScroll={handleScroll}
           className="flex-1 overflow-y-auto overscroll-contain"
-          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+          style={{ paddingBottom: Math.max(safeBottom, 24) + 80 }}
         >
           {isLoading ? (
             <div className="flex flex-col px-4">

@@ -1,6 +1,8 @@
 "use client";
 
 import { hapticFeedback, retrieveLaunchParams } from "@telegram-apps/sdk-react";
+
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 import {
   ArrowDownUp,
   ArrowLeft,
@@ -660,6 +662,7 @@ export default function SwapSheet({
   const closeSheet = useCallback(() => {
     if (isClosing.current) return;
     isClosing.current = true;
+    hideAllButtons();
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
@@ -884,7 +887,7 @@ export default function SwapSheet({
         {/* Content Container */}
         <div
           className="relative flex-1 overflow-hidden"
-          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+          style={{ paddingBottom: Math.max(safeBottom, 24) + 80 }}
         >
           {/* MAIN VIEW */}
           <div

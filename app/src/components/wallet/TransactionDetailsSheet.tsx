@@ -25,6 +25,7 @@ import {
 } from "@/lib/solana/wallet/formatters";
 import { getWalletProvider } from "@/lib/solana/wallet/wallet-details";
 import {
+  hideAllButtons,
   hideMainButton,
   hideSecondaryButton,
   showMainButton,
@@ -248,6 +249,7 @@ export default function TransactionDetailsSheet({
   const closeSheet = useCallback(() => {
     if (isClosing.current) return;
     isClosing.current = true;
+    hideAllButtons();
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
@@ -518,7 +520,7 @@ export default function TransactionDetailsSheet({
         {/* Content — scrollable */}
         <div
           className="flex-1 overflow-y-auto overscroll-contain"
-          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+          style={{ paddingBottom: Math.max(safeBottom, 24) + 80 }}
         >
           {showError ? (
             /* Error View */

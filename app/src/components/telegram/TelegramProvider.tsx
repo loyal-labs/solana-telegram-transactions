@@ -22,6 +22,8 @@ import {
   type UserData,
 } from '@/lib/telegram/mini-app/init-data-transform';
 
+import { BottomButtonBar } from './BottomButtonBar';
+
 // Patch console.error to suppress specific Telegram SDK errors
 if (typeof window !== 'undefined') {
   const originalError = console.error;
@@ -163,6 +165,7 @@ function TelegramProviderInner({ children }: PropsWithChildren) {
       value={{ userData, cachedAvatar, setCachedAvatar, isAvatarLoading }}
     >
       {children}
+      <BottomButtonBar />
     </TelegramUserContext.Provider>
   );
 }

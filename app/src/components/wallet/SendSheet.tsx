@@ -2,6 +2,8 @@
 
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { hapticFeedback, openTelegramLink, retrieveLaunchParams } from "@telegram-apps/sdk-react";
+
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 import {
   ArrowLeft,
   Search,
@@ -554,6 +556,7 @@ export default function SendSheet({
   const closeSheet = useCallback(() => {
     if (isClosing.current) return;
     isClosing.current = true;
+    hideAllButtons();
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
@@ -764,7 +767,7 @@ export default function SendSheet({
         {/* Steps Container with Slide Animation */}
         <div
           className="relative flex-1 overflow-hidden"
-          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+          style={{ paddingBottom: Math.max(safeBottom, 24) + 80 }}
         >
           {/* STEP 1: TOKEN SELECTION */}
           <div
