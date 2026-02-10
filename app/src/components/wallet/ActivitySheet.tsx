@@ -13,6 +13,8 @@ import {
 import { createPortal } from "react-dom";
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+import type { TokenHolding } from "@/lib/solana/token-holdings";
+import { resolveTokenInfo } from "@/lib/solana/token-holdings/resolve-token-info";
 import {
   formatSenderAddress,
   formatTransactionAmount,
@@ -28,6 +30,7 @@ export type ActivitySheetProps = {
   incomingTransactions: IncomingTransaction[];
   onTransactionClick: (transaction: Transaction) => void;
   isLoading?: boolean;
+  tokenHoldings?: TokenHolding[];
 };
 
 type GroupedTransactions = {
@@ -75,6 +78,7 @@ export default function ActivitySheet({
   incomingTransactions,
   onTransactionClick,
   isLoading = false,
+  tokenHoldings = [],
 }: ActivitySheetProps) {
   const { bottom: safeBottom } = useTelegramSafeArea();
   const [mounted, setMounted] = useState(false);
@@ -453,6 +457,14 @@ export default function ActivitySheet({
                         ? "#f9363c"
                         : "black";
                     const timestamp = new Date(transaction.timestamp);
+                    const isTokenTransfer =
+                      !!transaction.tokenMint &&
+                      typeof transaction.tokenAmount === "string";
+                    const tokenInfo = isTokenTransfer
+                      ? resolveTokenInfo(transaction.tokenMint!, tokenHoldings)
+                      : null;
+                    const tokenAmountText =
+                      isTokenTransfer ? transaction.tokenAmount : null;
 
                     // Compact view for store/verify transactions
                     if (transferTypeLabel !== null) {
@@ -578,8 +590,8 @@ export default function ActivitySheet({
                           ) : (
                             <div className="w-12 h-12 rounded-full overflow-hidden relative">
                               <Image
-                                src="/tokens/solana-sol-logo.png"
-                                alt="SOL"
+                                src={tokenInfo?.icon || "/tokens/solana-sol-logo.png"}
+                                alt={tokenInfo?.symbol || "SOL"}
                                 fill
                                 className="object-cover"
                               />
@@ -612,10 +624,9 @@ export default function ActivitySheet({
                             style={{ color: amountColor }}
                           >
                             {amountPrefix}
-                            {formatTransactionAmount(
-                              transaction.amountLamports,
-                            )}{" "}
-                            SOL
+                            {isTokenTransfer
+                              ? `${tokenAmountText ?? "0"} ${tokenInfo?.symbol ?? ""}`.trim()
+                              : `${formatTransactionAmount(transaction.amountLamports)} SOL`}
                           </p>
                           <p
                             className="text-[13px] leading-4"
