@@ -61,6 +61,7 @@ import {
 import type { WalletTransfer } from "@/lib/solana/rpc/types";
 import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import {
+  computePortfolioTotals,
   fetchTokenHoldings,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
@@ -71,11 +72,10 @@ import {
 } from "@/lib/solana/verify-and-claim-deposit";
 import {
   formatAddress,
-  formatBalance,
   formatSenderAddress,
   formatTransactionAmount,
-  formatUsdValue,
 } from "@/lib/solana/wallet/formatters";
+import { subscribeToWalletAssetChanges } from "@/lib/solana/wallet/subscribe-wallet-asset-changes";
 import {
   getGaslessPublicKey,
   getWalletBalance,
@@ -367,6 +367,8 @@ const walletBalanceListeners = new Set<(lamports: number) => void>();
 let walletBalanceSubscriptionPromise: Promise<() => Promise<void>> | null =
   null;
 
+const HOLDINGS_REFRESH_DEBOUNCE_MS = 750;
+
 const getCachedWalletBalance = (
   walletAddress: string | null
 ): number | null => {
@@ -534,7 +536,7 @@ export default function Home() {
   const [walletAddress, setWalletAddress] = useState<string | null>(() =>
     USE_MOCK_DATA ? MOCK_WALLET_ADDRESS : cachedWalletAddress
   );
-  const [balance, setBalance] = useState<number | null>(() =>
+  const [solBalanceLamports, setSolBalanceLamports] = useState<number | null>(() =>
     USE_MOCK_DATA
       ? MOCK_BALANCE_LAMPORTS
       : cachedWalletAddress
@@ -543,6 +545,9 @@ export default function Home() {
   );
   const [tokenHoldings, setTokenHoldings] = useState<TokenHolding[]>(() =>
     USE_MOCK_DATA ? MOCK_TOKEN_HOLDINGS : []
+  );
+  const [isHoldingsLoading, setIsHoldingsLoading] = useState(() =>
+    USE_MOCK_DATA ? false : true
   );
   const [starsBalance, setStarsBalance] = useState<number>(() =>
     cachedWalletAddress ? getCachedStarsBalance(cachedWalletAddress) ?? 0 : 0
@@ -871,13 +876,69 @@ export default function Home() {
       try {
         const balanceLamports = await getWalletBalance(forceRefresh);
         setCachedWalletBalance(walletAddress, balanceLamports);
-        setBalance(balanceLamports);
+        setSolBalanceLamports(balanceLamports);
       } catch (error) {
         console.error("Failed to refresh wallet balance", error);
       }
     },
     [walletAddress]
   );
+
+  const hasLoadedHoldingsRef = useRef(USE_MOCK_DATA);
+  const walletAddressRef = useRef<string | null>(walletAddress);
+  const holdingsFetchIdRef = useRef(0);
+  const holdingsRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  useEffect(() => {
+    walletAddressRef.current = walletAddress;
+  }, [walletAddress]);
+
+  const refreshTokenHoldings = useCallback(
+    async (forceRefresh = false) => {
+      const addr = walletAddressRef.current;
+      if (!addr) return;
+
+      const fetchId = ++holdingsFetchIdRef.current;
+
+      if (!hasLoadedHoldingsRef.current) {
+        setIsHoldingsLoading(true);
+      }
+
+      try {
+        const holdings = await fetchTokenHoldings(addr, forceRefresh);
+        if (walletAddressRef.current !== addr) return;
+        if (holdingsFetchIdRef.current !== fetchId) return;
+        setTokenHoldings(holdings);
+        hasLoadedHoldingsRef.current = true;
+      } catch (error) {
+        console.error("Failed to fetch token holdings:", error);
+      } finally {
+        if (walletAddressRef.current !== addr) return;
+        if (holdingsFetchIdRef.current !== fetchId) return;
+        if (!hasLoadedHoldingsRef.current) {
+          // If we never loaded successfully, keep showing skeleton.
+          setIsHoldingsLoading(true);
+        } else {
+          setIsHoldingsLoading(false);
+        }
+      }
+    },
+    []
+  );
+
+  const scheduleTokenHoldingsRefresh = useCallback(() => {
+    if (!walletAddressRef.current) return;
+
+    if (holdingsRefreshTimerRef.current) {
+      clearTimeout(holdingsRefreshTimerRef.current);
+    }
+
+    holdingsRefreshTimerRef.current = setTimeout(() => {
+      void refreshTokenHoldings(true);
+    }, HOLDINGS_REFRESH_DEBOUNCE_MS);
+  }, [refreshTokenHoldings]);
 
   const mapTransferToTransaction = useCallback(
     (transfer: WalletTransfer): Transaction => {
@@ -973,6 +1034,7 @@ export default function Home() {
     try {
       // Refresh wallet balance
       await refreshWalletBalance(true);
+      await refreshTokenHoldings(true);
 
       try {
         const latestPrice = await fetchSolUsdPrice();
@@ -1028,7 +1090,13 @@ export default function Home() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [isRefreshing, loadWalletTransactions, rawInitData, refreshWalletBalance]);
+  }, [
+    isRefreshing,
+    loadWalletTransactions,
+    rawInitData,
+    refreshTokenHoldings,
+    refreshWalletBalance,
+  ]);
 
   const handleSubmitSend = useCallback(async () => {
     if (!isSendFormValid || isSendingTransaction) {
@@ -1158,7 +1226,7 @@ export default function Home() {
         setSelectedTransaction(null);
 
         // Refresh balance and transactions
-        void getWalletBalance(true).then(setBalance);
+        void getWalletBalance(true).then(setSolBalanceLamports);
       } catch (error) {
         console.error("Failed to refund deposit:", error);
         if (hapticFeedback.notificationOccurred.isAvailable()) {
@@ -1673,13 +1741,13 @@ export default function Home() {
           setIsLoading(false);
           void getWalletBalance().then((freshBalance) => {
             setCachedWalletBalance(publicKeyBase58, freshBalance);
-            setBalance(freshBalance);
+            setSolBalanceLamports(freshBalance);
           });
         } else {
           // First load - need to fetch balance
           const balanceLamports = await getWalletBalance();
           setCachedWalletBalance(publicKeyBase58, balanceLamports);
-          setBalance(balanceLamports);
+          setSolBalanceLamports(balanceLamports);
           setIsLoading(false);
         }
       } catch (error) {
@@ -1752,12 +1820,15 @@ export default function Home() {
 
     const handleBalanceUpdate = (lamports: number) => {
       if (isCancelled) return;
-      setBalance((prev) => (prev === lamports ? prev : lamports));
+      setSolBalanceLamports((prev) => (prev === lamports ? prev : lamports));
+      scheduleTokenHoldingsRefresh();
     };
 
     const cachedBalance = getCachedWalletBalance(walletAddress);
     if (cachedBalance !== null) {
-      setBalance((prev) => (prev === cachedBalance ? prev : cachedBalance));
+      setSolBalanceLamports((prev) =>
+        prev === cachedBalance ? prev : cachedBalance
+      );
     }
 
     walletBalanceListeners.add(handleBalanceUpdate);
@@ -1770,47 +1841,58 @@ export default function Home() {
       isCancelled = true;
       walletBalanceListeners.delete(handleBalanceUpdate);
     };
-  }, [walletAddress]);
+  }, [scheduleTokenHoldingsRefresh, walletAddress]);
 
   // Fetch token holdings
   useEffect(() => {
     if (USE_MOCK_DATA) return;
     if (!walletAddress) return;
 
-    let isMounted = true;
+    hasLoadedHoldingsRef.current = false;
+    setIsHoldingsLoading(true);
+    setTokenHoldings([]);
 
-    const loadHoldings = async () => {
-      try {
-        const holdings = await fetchTokenHoldings(walletAddress);
-        if (isMounted) {
-          setTokenHoldings(holdings);
-        }
-      } catch (error) {
-        console.error("Failed to fetch token holdings:", error);
-      }
-    };
-
-    void loadHoldings();
+    void refreshTokenHoldings(false);
 
     return () => {
-      isMounted = false;
+      if (holdingsRefreshTimerRef.current) {
+        clearTimeout(holdingsRefreshTimerRef.current);
+        holdingsRefreshTimerRef.current = null;
+      }
     };
-  }, [walletAddress]);
+  }, [refreshTokenHoldings, walletAddress]);
 
-  // Refresh token holdings when balance changes (transaction completed)
+  // Refresh holdings on any portfolio-relevant SPL token account changes.
   useEffect(() => {
     if (USE_MOCK_DATA) return;
-    if (!walletAddress || balance === null) return;
+    if (!walletAddress) return;
 
-    // Debounce the refresh to avoid rapid refetches
-    const timer = setTimeout(() => {
-      void fetchTokenHoldings(walletAddress, true)
-        .then(setTokenHoldings)
-        .catch(console.error);
-    }, 2000);
+    let unsubscribe: (() => Promise<void>) | null = null;
 
-    return () => clearTimeout(timer);
-  }, [balance, walletAddress]);
+    void (async () => {
+      try {
+        unsubscribe = await subscribeToWalletAssetChanges(
+          walletAddress,
+          () => {
+            scheduleTokenHoldingsRefresh();
+          },
+          {
+            debounceMs: 0,
+            commitment: "confirmed",
+            includeNative: false,
+          }
+        );
+      } catch (error) {
+        console.error("Failed to subscribe to wallet asset changes", error);
+      }
+    })();
+
+    return () => {
+      if (unsubscribe) {
+        void unsubscribe();
+      }
+    };
+  }, [scheduleTokenHoldingsRefresh, walletAddress]);
 
   useEffect(() => {
     if (USE_MOCK_DATA) return;
@@ -2131,29 +2213,24 @@ export default function Home() {
     isSwapping,
   ]);
 
-  const formattedUsdBalance = formatUsdValue(balance, solPriceUsd);
-  const formattedSolBalance = formatBalance(balance);
+  const portfolioTotals = useMemo(
+    () => computePortfolioTotals(tokenHoldings, solPriceUsd),
+    [tokenHoldings, solPriceUsd]
+  );
+
   const showBalanceSkeleton =
-    isLoading || (displayCurrency === "USD" && isSolPriceLoading);
+    isLoading ||
+    isHoldingsLoading ||
+    (displayCurrency === "SOL" && portfolioTotals.totalSol === null);
   const showSecondarySkeleton =
-    isLoading || (displayCurrency === "SOL" && isSolPriceLoading);
+    isLoading ||
+    isHoldingsLoading ||
+    (displayCurrency === "USD" && portfolioTotals.totalSol === null);
   const showStarsSkeleton = isLoading || isStarsLoading;
 
-  // Computed numeric values for NumberFlow animations
-  const solBalanceNumeric = useMemo(() => {
-    if (balance === null) return 0;
-    // Truncate to 4 decimal places (floor, no rounding)
-    const sol = balance / LAMPORTS_PER_SOL;
-    return Math.floor(sol * 10000) / 10000;
-  }, [balance]);
-
-  const usdBalanceNumeric = useMemo(() => {
-    if (balance === null || solPriceUsd === null) return 0;
-    const sol = balance / LAMPORTS_PER_SOL;
-    const usd = sol * solPriceUsd;
-    // Truncate to 2 decimal places (floor, no rounding)
-    return Math.floor(usd * 100) / 100;
-  }, [balance, solPriceUsd]);
+  // Computed numeric values for NumberFlow animations (portfolio totals)
+  const usdBalanceNumeric = portfolioTotals.totalUsd;
+  const solBalanceNumeric = portfolioTotals.totalSol ?? 0;
 
   // Combine and limit transactions for main Activity section (max 10)
   const limitedActivityItems = useMemo(() => {
@@ -2272,7 +2349,7 @@ export default function Home() {
       >
         {/* Sticky Balance Pill — crossfades with logo in header */}
         <AnimatePresence>
-          {showStickyBalance && !isLoading && (
+          {showStickyBalance && !showBalanceSkeleton && (
             <motion.button
               initial={{ opacity: 0, scale: 0.7 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -2405,21 +2482,34 @@ export default function Home() {
                     className="active:scale-[0.98] transition-transform self-start"
                   >
                     {(() => {
-                      const value =
-                        displayCurrency === "USD"
-                          ? usdBalanceNumeric
-                          : solBalanceNumeric;
-                      const decimals = displayCurrency === "USD" ? 2 : 5;
-                      const intPart = Math.trunc(value);
-                      const decimalDigits = Math.round(
-                        Math.abs(value - intPart) * Math.pow(10, decimals)
-                      );
-                      const prefix = displayCurrency === "USD" ? "$" : "";
-                      const suffix = displayCurrency === "SOL" ? " SOL" : "";
                       const mainColor = balanceBg ? "white" : "#1c1c1e";
                       const decimalColor = balanceBg
                         ? "white"
                         : "rgba(60, 60, 67, 0.6)";
+
+                      if (showBalanceSkeleton) {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <div className="w-40 h-10 bg-white/20 animate-pulse rounded" />
+                            <div className="w-16 h-8 bg-white/20 animate-pulse rounded" />
+                          </div>
+                        );
+                      }
+
+                      const value =
+                        displayCurrency === "USD"
+                          ? usdBalanceNumeric
+                          : solBalanceNumeric;
+                      const decimals = displayCurrency === "USD" ? 2 : 4;
+                      const prefix = displayCurrency === "USD" ? "$" : "";
+                      const suffix = displayCurrency === "SOL" ? " SOL" : "";
+
+                      // Convert to a stable fixed string so decimal digits never drift due to float math.
+                      const fixed = value.toFixed(decimals);
+                      const [intStr, decStr = "0"] = fixed.split(".");
+                      const intPart = Number(intStr);
+                      const decimalDigits = Number(decStr);
+
                       return (
                         <span
                           className="font-semibold inline-flex items-baseline"
@@ -2465,15 +2555,19 @@ export default function Home() {
                         color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
                       }}
                     >
-                      {displayCurrency === "USD"
-                        ? `${solBalanceNumeric.toLocaleString("en-US", {
-                            minimumFractionDigits: 4,
-                            maximumFractionDigits: 4,
-                          })} SOL`
-                        : `$${usdBalanceNumeric.toLocaleString("en-US", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}`}
+                      {showSecondarySkeleton ? (
+                        <span className="inline-block w-28 h-5 bg-white/20 animate-pulse rounded" />
+                      ) : displayCurrency === "USD" ? (
+                        `${solBalanceNumeric.toLocaleString("en-US", {
+                          minimumFractionDigits: 4,
+                          maximumFractionDigits: 4,
+                        })} SOL`
+                      ) : (
+                        `$${usdBalanceNumeric.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
+                      )}
                     </span>
                   </div>
                 </div>
@@ -2515,7 +2609,7 @@ export default function Home() {
               icon={<ArrowUp />}
               label="Send"
               onClick={() => handleOpenSendSheet()}
-              disabled={balance === null || balance === 0}
+              disabled={solBalanceLamports === null || solBalanceLamports === 0}
             />
             <ActionButton
               icon={<ArrowDown />}
@@ -3227,7 +3321,7 @@ export default function Home() {
         onFormValuesChange={handleSendFormValuesChange}
         step={sendStep}
         onStepChange={setSendStep}
-        balance={balance}
+        balance={solBalanceLamports}
         walletAddress={walletAddress ?? undefined}
         starsBalance={starsBalance}
         onTopUpStars={handleTopUpStars}

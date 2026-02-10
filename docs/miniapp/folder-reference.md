@@ -115,6 +115,40 @@ Wallet keypair management. Keypairs stored in **Telegram Cloud Storage** (not lo
 
 **Key exports:** `ensureWalletKeypair()`, `getWalletBalance()`, `sendSolTransaction()`
 
+#### `subscribe-wallet-asset-changes.ts`
+
+Subscribes to WebSocket changes that can affect a wallet's portfolio value:
+- Native SOL (system account)
+- SPL Token accounts (Token program)
+- SPL Token-2022 accounts (Token-2022 program)
+
+Emits debounced `onChange()` callbacks to avoid refetch storms when multiple account updates arrive in quick succession.
+
+**Key export:** `subscribeToWalletAssetChanges(walletAddress, onChange, options?)`
+
+**Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `commitment` | `"confirmed"` | Solana commitment level |
+| `debounceMs` | `750` | Debounce interval for change callbacks |
+| `includeNative` | `true` | Subscribe to native SOL changes (disable if already subscribed elsewhere) |
+
+**Usage:**
+
+```typescript
+import { subscribeToWalletAssetChanges } from "@/lib/solana/wallet/subscribe-wallet-asset-changes";
+
+const unsubscribe = await subscribeToWalletAssetChanges(
+  walletAddress,
+  () => { void refreshTokenHoldings(true); },
+  { debounceMs: 750, commitment: "confirmed" }
+);
+
+// Cleanup
+await unsubscribe();
+```
+
 ### `/solana/deposits/`
 
 Deposit/claim logic using Anchor programs and PDAs.
@@ -137,9 +171,9 @@ Fetches all fungible token holdings (SPL tokens + native SOL) with USD prices vi
 | `NATIVE_SOL_MINT` | `So111...112` | Native SOL mint address |
 | `NATIVE_SOL_DECIMALS` | `9` | SOL decimal places |
 
-**Key exports:** `fetchTokenHoldings(publicKey, forceRefresh?)`
+**Key exports:** `fetchTokenHoldings(publicKey, forceRefresh?)`, `computePortfolioTotals(holdings, fallbackSolPriceUsd)`
 
-**Type exports:** `TokenHolding`
+**Type exports:** `TokenHolding`, `PortfolioTotals`
 
 ```typescript
 type TokenHolding = {
@@ -151,21 +185,33 @@ type TokenHolding = {
   priceUsd: number | null;  // Price per token (null if unavailable)
   valueUsd: number | null;  // Total value (null if unavailable)
 };
+
+type PortfolioTotals = {
+  totalUsd: number;                  // Sum of all priced holdings (floor to 2 decimals)
+  totalSol: number | null;           // totalUsd / SOL price (floor to 4 decimals), null if no SOL price
+  pricedCount: number;               // Holdings with a known USD value
+  unpricedCount: number;             // Holdings without price data
+  effectiveSolPriceUsd: number | null; // SOL price used (from holdings → fallback → constant)
+};
 ```
 
 **Usage:**
 
 ```typescript
-import { fetchTokenHoldings } from "@/lib/solana/token-holdings";
+import { fetchTokenHoldings, computePortfolioTotals } from "@/lib/solana/token-holdings";
 
 const holdings = await fetchTokenHoldings("ADDRESS");
-const totalValue = holdings.reduce((sum, h) => sum + (h.valueUsd ?? 0), 0);
+const totals = computePortfolioTotals(holdings, solPriceUsd);
+// totals.totalUsd  — portfolio value in USD
+// totals.totalSol  — portfolio value in SOL
 ```
 
 **Notes:**
 - Returns cached data for 30s (use `forceRefresh: true` to bypass)
+- Concurrent requests are coalesced (even forced refreshes share an in-flight request)
 - Returns empty array on localnet (DAS API unavailable)
 - Price data available for top 10k tokens by volume
+- `computePortfolioTotals` resolves SOL price via a fallback chain: holdings price → passed-in `fallbackSolPriceUsd` → `SOL_PRICE_USD` constant
 
 ### `solana-helpers.ts`
 
