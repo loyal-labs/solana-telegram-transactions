@@ -1628,24 +1628,24 @@ export default function Home() {
       }
     }
 
-    // // Suppress Telegram SDK viewport errors in non-TMA environment
-    // const originalError = console.error;
-    // console.error = (...args) => {
-    //   const message = args[0]?.toString() || "";
-    //   // Suppress viewport_changed and other bridge validation errors
-    //   if (
-    //     message.includes("viewport_changed") ||
-    //     message.includes(
-    //       "ValiError: Invalid type: Expected Object but received null"
-    //     )
-    //   ) {
-    //     return; // Silently ignore these errors
-    //   }
-    //   originalError.apply(console, args);
-    // };
+    // Suppress Telegram SDK viewport errors in non-TMA environment
+    const originalError = console.error;
+    console.error = (...args) => {
+      const message = args[0]?.toString() || "";
+      // Suppress viewport_changed and other bridge validation errors
+      if (
+        message.includes("viewport_changed") ||
+        message.includes(
+          "ValiError: Invalid type: Expected Object but received null"
+        )
+      ) {
+        return; // Silently ignore these errors
+      }
+      originalError.apply(console, args);
+    };
 
     return () => {
-      // console.error = originalError;
+      console.error = originalError;
     };
   }, []);
 

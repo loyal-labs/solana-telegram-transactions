@@ -22,30 +22,30 @@ import {
   type UserData,
 } from "@/lib/telegram/mini-app/init-data-transform";
 
-// // Patch console.error to suppress specific Telegram SDK errors
-// if (typeof window !== 'undefined') {
-//   const originalError = console.error;
-//   console.error = (...args) => {
-//     if (
-//       args.some(
-//         (arg) =>
-//           typeof arg === 'string' &&
-//           (arg.includes(
-//             'An error occurred processing the "viewport_changed" event'
-//           ) ||
-//             arg.includes(
-//               'An error occurred processing the "theme_changed" event'
-//             ) ||
-//             arg.includes(
-//               'An error occurred processing the "popup_closed" event'
-//             ))
-//       )
-//     ) {
-//       return;
-//     }
-//     originalError.apply(console, args);
-//   };
-// }
+// Patch console.error to suppress specific Telegram SDK errors
+if (typeof window !== "undefined") {
+  const originalError = console.error;
+  console.error = (...args) => {
+    if (
+      args.some(
+        (arg) =>
+          typeof arg === "string" &&
+          (arg.includes(
+            'An error occurred processing the "viewport_changed" event'
+          ) ||
+            arg.includes(
+              'An error occurred processing the "theme_changed" event'
+            ) ||
+            arg.includes(
+              'An error occurred processing the "popup_closed" event'
+            ))
+      )
+    ) {
+      return;
+    }
+    originalError.apply(console, args);
+  };
+}
 
 const USER_AVATAR_CACHE_KEY = "user_avatar_cache";
 const LAST_PAGE_CACHE_KEY = "last_visited_page";
