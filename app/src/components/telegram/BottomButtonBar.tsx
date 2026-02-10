@@ -5,8 +5,8 @@ import { createPortal } from "react-dom";
 
 import {
   type ButtonBarState,
-  type SingleButtonState,
   getButtonStateSnapshot,
+  type SingleButtonState,
   subscribeButtonState,
 } from "@/lib/telegram/mini-app/buttons";
 

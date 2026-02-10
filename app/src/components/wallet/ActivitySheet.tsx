@@ -2,8 +2,6 @@
 
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { ArrowDown, X } from "lucide-react";
-
-import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 import Image from "next/image";
 import {
   useCallback,
@@ -21,6 +19,7 @@ import {
   formatSenderAddress,
   formatTransactionAmount,
 } from "@/lib/solana/wallet/formatters";
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 import type { IncomingTransaction, Transaction } from "@/types/wallet";
 
 const ITEMS_PER_PAGE = 10;

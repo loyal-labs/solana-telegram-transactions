@@ -2,8 +2,6 @@
 
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { Search, X } from "lucide-react";
-
-import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 import Image from "next/image";
 import {
   useCallback,
@@ -16,6 +14,7 @@ import { createPortal } from "react-dom";
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import type { TokenHolding } from "@/lib/solana/token-holdings/types";
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 
 export type TokensSheetProps = {
   open?: boolean;

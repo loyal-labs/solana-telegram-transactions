@@ -1,8 +1,6 @@
 "use client";
 
 import { hapticFeedback, retrieveLaunchParams } from "@telegram-apps/sdk-react";
-
-import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 import {
   ArrowDownUp,
   ArrowLeft,
@@ -29,6 +27,7 @@ import {
   NATIVE_SOL_MINT,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 
 // iOS-style sheet timing (shared with other sheets)
 const SHEET_TRANSITION = "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)";

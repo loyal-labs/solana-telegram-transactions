@@ -2,8 +2,6 @@
 
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { hapticFeedback, openTelegramLink, retrieveLaunchParams } from "@telegram-apps/sdk-react";
-
-import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 import {
   ArrowLeft,
   Search,
@@ -30,6 +28,7 @@ import {
 } from "@/lib/constants";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import type { TokenHolding } from "@/lib/solana/token-holdings/types";
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 import {
   getCloudValue,
   setCloudValue,
