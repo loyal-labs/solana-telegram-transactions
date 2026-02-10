@@ -52,6 +52,11 @@ import {
   subscribeToDepositsWithUsername,
   topUpDeposit,
 } from "@/lib/solana/deposits";
+import {
+  fetchLoyalDeposits,
+  shieldTokens,
+  unshieldTokens,
+} from "@/lib/solana/deposits/loyal-deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import {
@@ -849,9 +854,16 @@ export default function Home() {
     hapticFeedback.impactOccurred("medium");
 
     try {
-      // TODO: Implement actual secure/unshield transaction
-      // For now, simulate success after a delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const tokenMint = new PublicKey(secureFormValues.mint);
+      const rawAmount = Math.floor(
+        secureFormValues.amount * Math.pow(10, secureFormValues.decimals)
+      );
+
+      if (secureDirection === "shield") {
+        await shieldTokens({ tokenMint, amount: rawAmount });
+      } else {
+        await unshieldTokens({ tokenMint, amount: rawAmount });
+      }
 
       setSwappedToAmount(secureFormValues.amount);
       setSwappedToSymbol(secureFormValues.symbol);
@@ -866,7 +878,7 @@ export default function Home() {
       setIsSwapping(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secureFormValues, isSwapFormValid, isSwapping]);
+  }, [secureFormValues, secureDirection, isSwapFormValid, isSwapping]);
 
   const refreshWalletBalance = useCallback(
     async (forceRefresh = false) => {
@@ -1826,9 +1838,32 @@ export default function Home() {
     const loadHoldings = async () => {
       try {
         const holdings = await fetchTokenHoldings(walletAddress);
-        if (isMounted) {
-          setTokenHoldings(holdings);
+        if (!isMounted) return;
+
+        // Check Loyal deposits for all tokens
+        const userPubkey = new PublicKey(walletAddress);
+        const mints = holdings.map((h) => h.mint);
+        const loyalDeposits = await fetchLoyalDeposits(userPubkey, mints);
+
+        if (!isMounted) return;
+
+        // Add secured entries for tokens with Loyal deposits
+        const securedHoldings: TokenHolding[] = [];
+        for (const [mint, amount] of loyalDeposits) {
+          const original = holdings.find((h) => h.mint === mint);
+          if (original) {
+            securedHoldings.push({
+              ...original,
+              balance: amount / Math.pow(10, original.decimals),
+              valueUsd: original.priceUsd
+                ? (amount / Math.pow(10, original.decimals)) * original.priceUsd
+                : null,
+              isSecured: true,
+            });
+          }
         }
+
+        setTokenHoldings([...holdings, ...securedHoldings]);
       } catch (error) {
         console.error("Failed to fetch token holdings:", error);
       }
@@ -1849,7 +1884,28 @@ export default function Home() {
     // Debounce the refresh to avoid rapid refetches
     const timer = setTimeout(() => {
       void fetchTokenHoldings(walletAddress, true)
-        .then(setTokenHoldings)
+        .then(async (holdings) => {
+          const userPubkey = new PublicKey(walletAddress);
+          const mints = holdings.map((h) => h.mint);
+          const loyalDeposits = await fetchLoyalDeposits(userPubkey, mints);
+
+          const securedHoldings: TokenHolding[] = [];
+          for (const [mint, amount] of loyalDeposits) {
+            const original = holdings.find((h) => h.mint === mint);
+            if (original) {
+              securedHoldings.push({
+                ...original,
+                balance: Number(amount) / Math.pow(10, original.decimals),
+                valueUsd: original.priceUsd
+                  ? (Number(amount) / Math.pow(10, original.decimals)) * original.priceUsd
+                  : null,
+                isSecured: true,
+              });
+            }
+          }
+
+          setTokenHoldings([...holdings, ...securedHoldings]);
+        })
         .catch(console.error);
     }, 2000);
 
