@@ -82,8 +82,10 @@ export const prepareCloseWsolTxn = async (
     NATIVE_MINT,
     userPublicKey
   );
-  const existingAta = await provider.connection.getAccountInfo(recipientTokenAccount);
-  if (existingAta) {
+  const existingAta = await provider.connection.getAccountInfo(
+    recipientTokenAccount
+  );
+  if (!existingAta) {
     return null;
   }
 
