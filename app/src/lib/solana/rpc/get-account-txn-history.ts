@@ -155,11 +155,11 @@ const formatTokenAmountFromRaw = (args: {
   return fracStr.length ? `${integer.toString()}.${fracStr}` : integer.toString();
 };
 
-const findTokenBalanceChange = (
+const findAllTokenBalanceChanges = (
   message: ParsedMessage,
   meta: NonNullable<ParsedTransactionWithMeta["meta"]>,
   walletAddress: string
-): TokenChange | null => {
+): TokenChange[] => {
   const preList = (meta.preTokenBalances ?? []) as TokenBalanceEntry[];
   const postList = (meta.postTokenBalances ?? []) as TokenBalanceEntry[];
 
@@ -213,8 +213,7 @@ const findTokenBalanceChange = (
     ...Array.from(postByMint.keys()),
   ]);
 
-  let best: TokenChange | null = null;
-  let bestAbs = BigInt(0);
+  const changes: TokenChange[] = [];
 
   for (const mint of allMints) {
     const pre = preByMint.get(mint);
@@ -225,20 +224,16 @@ const findTokenBalanceChange = (
     const delta = postRaw - preRaw;
     if (delta === BigInt(0)) continue;
 
-    const abs = absBigInt(delta);
-    if (abs <= bestAbs) continue;
-
-    bestAbs = abs;
-    best = {
+    changes.push({
       mint,
       decimals,
       rawDelta: delta,
       direction: delta > BigInt(0) ? "in" : "out",
-      absRaw: abs,
-    };
+      absRaw: absBigInt(delta),
+    });
   }
 
-  return best;
+  return changes;
 };
 
 const findSplTokenTransferCounterparty = (args: {
@@ -355,6 +350,9 @@ const findSystemTransfer = (
   });
 };
 
+/** Threshold below which third-party transactions with no token change are treated as dust/noise */
+const DUST_LAMPORTS_THRESHOLD = 10_000;
+
 const mapTransactionToTransfer = (
   tx: ParsedTransactionWithMeta,
   signature: string,
@@ -375,6 +373,11 @@ const mapTransactionToTransfer = (
     (key) => accountKeyToString(key) === walletAddress
   );
 
+  // Check if the wallet is the transaction signer (fee payer / first account key)
+  const isSigner =
+    accountIndex >= 0 &&
+    !!(message.accountKeys[accountIndex] as { signer?: boolean })?.signer;
+
   const systemTransfer = findSystemTransfer(
     message,
     innerInstructions,
@@ -382,9 +385,12 @@ const mapTransactionToTransfer = (
   );
   if (onlySystemTransfers && !systemTransfer) return null;
 
-  const tokenChange = onlySystemTransfers
-    ? null
-    : findTokenBalanceChange(message, safeMeta, walletAddress);
+  const allTokenChanges = onlySystemTransfers
+    ? []
+    : findAllTokenBalanceChanges(message, safeMeta, walletAddress);
+  const tokenChange = allTokenChanges.length > 0
+    ? allTokenChanges.reduce((best, c) => (c.absRaw > best.absRaw ? c : best))
+    : null;
 
   if (accountIndex === -1 && !tokenChange) return null;
 
@@ -393,6 +399,15 @@ const mapTransactionToTransfer = (
   const postLamports =
     accountIndex === -1 ? 0 : safeMeta.postBalances?.[accountIndex] ?? 0;
   const netChangeLamports = postLamports - preLamports;
+
+  // Dust filter: skip third-party transactions with no token change and tiny SOL movement
+  if (
+    !isSigner &&
+    !tokenChange &&
+    Math.abs(netChangeLamports) < DUST_LAMPORTS_THRESHOLD
+  ) {
+    return null;
+  }
 
   if (netChangeLamports === 0 && !tokenChange) return null;
 
@@ -463,17 +478,92 @@ const mapTransactionToTransfer = (
 
   const decodedType = decodedInstruction?.name;
 
-  const type: WalletTransfer["type"] =
+  let type: WalletTransfer["type"] =
     decodedType &&
     knownInstructionTypes.includes(decodedType as WalletTransfer["type"])
       ? (decodedType as WalletTransfer["type"])
       : "transfer";
 
   const isTokenTransfer = type === "transfer" && tokenChange !== null;
-  const direction: "in" | "out" = isTokenTransfer
-    ? tokenChange!.direction
-    : solDirection;
-  const amountLamports = isTokenTransfer ? 0 : solAmountLamports;
+
+  // Swap detection: wallet is signer + opposing SOL/token movements
+  let swapFields: Partial<WalletTransfer> = {};
+  if (isSigner && type === "transfer" && allTokenChanges.length > 0) {
+    const tokenIn = allTokenChanges.find((c) => c.direction === "in");
+    const tokenOut = allTokenChanges.find((c) => c.direction === "out");
+    const solOut = netChangeLamports < -DUST_LAMPORTS_THRESHOLD;
+    const solIn = netChangeLamports > DUST_LAMPORTS_THRESHOLD;
+
+    // Token-to-token swap (e.g. USDT -> BONK)
+    if (tokenIn && tokenOut) {
+      type = "swap";
+      swapFields = {
+        swapFromMint: tokenOut.mint,
+        swapFromAmount: formatTokenAmountFromRaw({
+          absRaw: tokenOut.absRaw,
+          decimals: tokenOut.decimals,
+          maxFractionDigits: 6,
+        }),
+        swapFromDecimals: tokenOut.decimals,
+        swapToMint: tokenIn.mint,
+        swapToAmount: formatTokenAmountFromRaw({
+          absRaw: tokenIn.absRaw,
+          decimals: tokenIn.decimals,
+          maxFractionDigits: 6,
+        }),
+        swapToDecimals: tokenIn.decimals,
+      };
+    }
+    // SOL-to-token swap
+    else if (solOut && tokenIn) {
+      type = "swap";
+      swapFields = {
+        swapFromMint: "So11111111111111111111111111111111111111112",
+        swapFromAmount: formatTokenAmountFromRaw({
+          absRaw: BigInt(Math.abs(netChangeLamports)),
+          decimals: 9,
+          maxFractionDigits: 6,
+        }),
+        swapFromDecimals: 9,
+        swapToMint: tokenIn.mint,
+        swapToAmount: formatTokenAmountFromRaw({
+          absRaw: tokenIn.absRaw,
+          decimals: tokenIn.decimals,
+          maxFractionDigits: 6,
+        }),
+        swapToDecimals: tokenIn.decimals,
+      };
+    }
+    // Token-to-SOL swap
+    else if (tokenOut && solIn) {
+      type = "swap";
+      swapFields = {
+        swapFromMint: tokenOut.mint,
+        swapFromAmount: formatTokenAmountFromRaw({
+          absRaw: tokenOut.absRaw,
+          decimals: tokenOut.decimals,
+          maxFractionDigits: 6,
+        }),
+        swapFromDecimals: tokenOut.decimals,
+        swapToMint: "So11111111111111111111111111111111111111112",
+        swapToAmount: formatTokenAmountFromRaw({
+          absRaw: BigInt(netChangeLamports),
+          decimals: 9,
+          maxFractionDigits: 6,
+        }),
+        swapToDecimals: 9,
+      };
+    }
+  }
+
+  const direction: "in" | "out" =
+    type === "swap"
+      ? "out" // swaps always show as outgoing (SOL/token spent)
+      : isTokenTransfer
+        ? tokenChange!.direction
+        : solDirection;
+  const amountLamports =
+    type === "swap" ? solAmountLamports : isTokenTransfer ? 0 : solAmountLamports;
 
   if (type === "deposit_for_username") {
     const usernameFromInstruction = (
@@ -484,7 +574,7 @@ const mapTransactionToTransfer = (
     }
   }
 
-  if (isTokenTransfer) {
+  if (isTokenTransfer && type !== "swap") {
     const tokenCounterparty = findSplTokenTransferCounterparty({
       message,
       innerInstructions,
@@ -498,7 +588,7 @@ const mapTransactionToTransfer = (
     }
   }
 
-  const returnObject = {
+  const returnObject: WalletTransfer = {
     signature,
     slot: tx.slot,
     timestamp: tx.blockTime ? tx.blockTime * 1000 : null,
@@ -509,7 +599,7 @@ const mapTransactionToTransfer = (
     feeLamports: safeMeta.fee ?? 0,
     status: safeMeta.err ? "failed" : "success",
     counterparty,
-    ...(isTokenTransfer
+    ...(isTokenTransfer && type !== "swap"
       ? {
           tokenMint: tokenChange!.mint,
           tokenAmount: formatTokenAmountFromRaw({
@@ -520,9 +610,10 @@ const mapTransactionToTransfer = (
           tokenDecimals: tokenChange!.decimals,
         }
       : {}),
+    ...swapFields,
   };
 
-  return returnObject as WalletTransfer;
+  return returnObject;
 };
 
 export const getAccountTransactionHistory = async (
