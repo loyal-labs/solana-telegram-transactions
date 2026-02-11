@@ -46,8 +46,6 @@ import {
   TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
 } from "@/lib/constants";
-import { publicEnv } from "@/lib/core/config/public";
-import { fetchInvoiceState } from "@/lib/irys/fetch-invoice-state";
 import {
   refundDeposit,
   subscribeToDepositsWithUsername,
@@ -55,7 +53,6 @@ import {
 } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
-import { getSolanaEnv } from "@/lib/solana/rpc/connection";
 import {
   getAccountTransactionHistory,
   listenForAccountTransactions,
@@ -65,6 +62,7 @@ import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import {
   computePortfolioTotals,
   fetchTokenHoldings,
+  resolveTokenIcon,
   subscribeToTokenHoldings,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
@@ -107,7 +105,6 @@ import {
   validateInitData,
 } from "@/lib/telegram/mini-app/init-data-transform";
 import { parseUsernameFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
-import { openInvoice } from "@/lib/telegram/mini-app/invoice";
 import { openQrScanner } from "@/lib/telegram/mini-app/qr-code";
 import {
   createShareMessage,
@@ -422,23 +419,6 @@ const setCachedSolPrice = (price: number): void => {
   solPriceFetchedAt = Date.now();
 };
 
-// Stars balance cache (keyed by wallet address)
-const starsBalanceCache = new Map<string, number>();
-
-const getCachedStarsBalance = (walletAddress: string | null): number | null => {
-  if (!walletAddress) return null;
-  const cached = starsBalanceCache.get(walletAddress);
-  return typeof cached === "number" ? cached : null;
-};
-
-const setCachedStarsBalance = (
-  walletAddress: string | null,
-  stars: number
-): void => {
-  if (!walletAddress) return;
-  starsBalanceCache.set(walletAddress, stars);
-};
-
 // Incoming transactions cache (keyed by username)
 let cachedUsername: string | null = null;
 const incomingTransactionsCache = new Map<string, IncomingTransaction[]>();
@@ -552,15 +532,6 @@ export default function Home() {
   const [isHoldingsLoading, setIsHoldingsLoading] = useState(() =>
     USE_MOCK_DATA ? false : true
   );
-  const [starsBalance, setStarsBalance] = useState<number>(() =>
-    cachedWalletAddress ? getCachedStarsBalance(cachedWalletAddress) ?? 0 : 0
-  );
-  const [isStarsLoading, setIsStarsLoading] = useState(
-    () =>
-      !cachedWalletAddress ||
-      getCachedStarsBalance(cachedWalletAddress) === null
-  );
-  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   const [isLoading, setIsLoading] = useState(() =>
     USE_MOCK_DATA ? false : !hasCachedWalletData()
   );
@@ -637,9 +608,9 @@ export default function Home() {
     new Set()
   );
 
-  // Sticky balance pill state
+  // Sticky balance pill state (scroll-driven, synced with header logo fade)
   const balanceRef = useRef<HTMLDivElement>(null);
-  const [showStickyBalance, setShowStickyBalance] = useState(false);
+  const [stickyBalanceOpacity, setStickyBalanceOpacity] = useState(0);
 
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -662,71 +633,6 @@ export default function Home() {
     }
     setReceiveSheetOpen(true);
   }, []);
-  const handleTopUpStars = useCallback(async () => {
-    if (isCreatingInvoice) return;
-
-    if (hapticFeedback.impactOccurred.isAvailable()) {
-      hapticFeedback.impactOccurred("light");
-    }
-
-    if (!rawInitData) {
-      console.error("Cannot create invoice: init data is missing");
-      return;
-    }
-
-    setIsCreatingInvoice(true);
-    try {
-      const serverHost = publicEnv.serverHost;
-      const endpoint = (() => {
-        // prefer same-origin to avoid CORS
-        if (typeof window !== "undefined") {
-          if (!serverHost) return "/api/telegram/invoice";
-          try {
-            const configured = new URL(serverHost);
-            const current = new URL(window.location.origin);
-            const hostsMatch =
-              configured.protocol === current.protocol &&
-              configured.host === current.host;
-            return hostsMatch
-              ? new URL("/api/telegram/invoice", configured).toString()
-              : "/api/telegram/invoice";
-          } catch {
-            return "/api/telegram/invoice";
-          }
-        }
-        // fall back to configured host if provided
-        return serverHost
-          ? new URL("/api/telegram/invoice", serverHost).toString()
-          : "/api/telegram/invoice";
-      })();
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        body: new TextEncoder().encode(rawInitData),
-      });
-
-      if (!response.ok) {
-        console.error(
-          "Failed to create invoice",
-          await response.text().catch(() => response.statusText)
-        );
-        return;
-      }
-
-      const data = (await response.json()) as { invoiceLink?: string };
-      if (!data.invoiceLink) {
-        console.error("Invoice link missing from response");
-        return;
-      }
-
-      await openInvoice(data.invoiceLink);
-    } catch (error) {
-      console.error("Failed to open invoice", error);
-    } finally {
-      setIsCreatingInvoice(false);
-    }
-  }, [isCreatingInvoice, rawInitData]);
-
   const handleOpenWalletTransactionDetails = useCallback(
     (transaction: Transaction) => {
       if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -1034,7 +940,10 @@ export default function Home() {
             const existing = existingBySignature.get(tx.signature);
             if (!existing) return tx;
             // Preserve app-injected swap data when on-chain data arrives
-            if (existing.transferType === "swap" && tx.transferType !== "swap") {
+            if (
+              existing.transferType === "swap" &&
+              tx.transferType !== "swap"
+            ) {
               return { ...tx, ...existing };
             }
             return { ...existing, ...tx };
@@ -1795,54 +1704,6 @@ export default function Home() {
     void loadWalletTransactions();
   }, [walletAddress, loadWalletTransactions]);
 
-  useEffect(() => {
-    if (USE_MOCK_DATA) return;
-    if (!walletAddress) return;
-
-    let isCancelled = false;
-
-    // Check if we have cached stars (state may have been initialized from it)
-    const hasCache = getCachedStarsBalance(walletAddress) !== null;
-
-    // Only show loading if we don't have cache
-    if (!hasCache) {
-      setIsStarsLoading(true);
-    } else {
-      // Ensure loading is false if we have cache
-      setIsStarsLoading(false);
-    }
-
-    const loadStarsBalance = async () => {
-      try {
-        const invoice = await fetchInvoiceState(walletAddress);
-        if (isCancelled) return;
-        const remaining = Number.isFinite(invoice.remainingStars)
-          ? Number(invoice.remainingStars)
-          : 0;
-        setCachedStarsBalance(walletAddress, remaining);
-        setStarsBalance(remaining);
-      } catch (error) {
-        if (!isCancelled) {
-          console.error("Failed to fetch Stars balance", error);
-          // Only reset to 0 if we don't have cached data
-          if (!hasCache) {
-            setStarsBalance(0);
-          }
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsStarsLoading(false);
-        }
-      }
-    };
-
-    void loadStarsBalance();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [walletAddress]);
-
   // Subscribe to websocket balance updates so inbound funds appear in real time
   useEffect(() => {
     if (USE_MOCK_DATA) return;
@@ -1911,7 +1772,10 @@ export default function Home() {
             includeNative: true,
             emitInitial: false,
             onError: (error) => {
-              console.error("Failed to refresh token holdings from websocket", error);
+              console.error(
+                "Failed to refresh token holdings from websocket",
+                error
+              );
             },
           }
         );
@@ -1952,7 +1816,10 @@ export default function Home() {
               if (matchIndex >= 0) {
                 const existing = next[matchIndex];
                 // Preserve app-injected swap data when on-chain data arrives
-                if (existing.transferType === "swap" && mapped.transferType !== "swap") {
+                if (
+                  existing.transferType === "swap" &&
+                  mapped.transferType !== "swap"
+                ) {
                   next[matchIndex] = { ...mapped, ...existing };
                 } else {
                   next[matchIndex] = { ...existing, ...mapped };
@@ -2266,8 +2133,6 @@ export default function Home() {
     isLoading ||
     isHoldingsLoading ||
     (displayCurrency === "USD" && portfolioTotals.totalSol === null);
-  const showStarsSkeleton = isLoading || isStarsLoading;
-
   // Computed numeric values for NumberFlow animations (portfolio totals)
   const usdBalanceNumeric = portfolioTotals.totalUsd;
   const solBalanceNumeric = portfolioTotals.totalSol ?? 0;
@@ -2337,26 +2202,38 @@ export default function Home() {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // Track balance visibility for sticky pill
+  // Track balance card position for sticky pill crossfade with header logo.
+  // Crossfade starts as the card bottom approaches the header — i.e. when
+  // the card is almost fully scrolled behind the header, not when its top
+  // edge first touches it.
   useEffect(() => {
-    const balanceElement = balanceRef.current;
-    if (!balanceElement) return;
+    const headerBottom = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
+    const fadeRange = 50; // px over which the crossfade happens
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        // Show sticky pill when balance is not visible
-        setShowStickyBalance(!entry.isIntersecting);
-      },
-      {
-        threshold: 0,
-        rootMargin: `-${
-          Math.max(safeAreaInsetTop || 0, 12) + 15
-        }px 0px 0px 0px`,
-      }
-    );
+    const handleScroll = () => {
+      const el = balanceRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      // Progress 0→1 as the card bottom moves from (headerBottom + fadeRange) to headerBottom
+      const progress =
+        rect.bottom >= headerBottom + fadeRange
+          ? 0
+          : rect.bottom <= headerBottom
+          ? 1
+          : 1 - (rect.bottom - headerBottom) / fadeRange;
+      setStickyBalanceOpacity(progress);
+      document.documentElement.style.setProperty(
+        "--header-logo-opacity",
+        String(1 - progress)
+      );
+    };
 
-    observer.observe(balanceElement);
-    return () => observer.disconnect();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      document.documentElement.style.removeProperty("--header-logo-opacity");
+    };
   }, [safeAreaInsetTop]);
 
   const handleScrollToTop = useCallback(() => {
@@ -2387,38 +2264,35 @@ export default function Home() {
         className="min-h-screen font-sans overflow-hidden relative flex flex-col"
         style={{ background: "#fff" }}
       >
-        {/* Sticky Balance Pill — crossfades with logo in header */}
-        <AnimatePresence>
-          {showStickyBalance && !showBalanceSkeleton && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.7 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.7 }}
-              transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
-              onClick={handleScrollToTop}
-              className="fixed left-1/2 -translate-x-1/2 z-[51] flex items-center px-4 py-1.5 rounded-[54px] active:opacity-80 transition-opacity"
-              style={{
-                top: `${Math.max(safeAreaInsetTop || 0, 12) + 4}px`,
-                background: "#fff",
-              }}
+        {/* Sticky Balance Pill — scroll-driven crossfade with header logo */}
+        {!showBalanceSkeleton && (
+          <button
+            onClick={handleScrollToTop}
+            className="fixed left-1/2 -translate-x-1/2 z-[51] flex items-center px-4 py-1.5 rounded-[54px] active:opacity-80"
+            style={{
+              top: `${Math.max(safeAreaInsetTop || 0, 12) + 4}px`,
+              background: "#fff",
+              opacity: stickyBalanceOpacity,
+              pointerEvents: stickyBalanceOpacity > 0.1 ? "auto" : "none",
+              willChange: "opacity",
+            }}
+          >
+            <span
+              className="text-sm font-medium text-black"
+              style={{ fontVariantNumeric: "tabular-nums" }}
             >
-              <span
-                className="text-sm font-medium text-black"
-                style={{ fontVariantNumeric: "tabular-nums" }}
-              >
-                {displayCurrency === "USD"
-                  ? `$${usdBalanceNumeric.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}`
-                  : `${solBalanceNumeric.toLocaleString("en-US", {
-                      minimumFractionDigits: 4,
-                      maximumFractionDigits: 4,
-                    })} SOL`}
-              </span>
-            </motion.button>
-          )}
-        </AnimatePresence>
+              {displayCurrency === "USD"
+                ? `$${usdBalanceNumeric.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}`
+                : `${solBalanceNumeric.toLocaleString("en-US", {
+                    minimumFractionDigits: 4,
+                    maximumFractionDigits: 4,
+                  })} SOL`}
+            </span>
+          </button>
+        )}
 
         {/* Main Content */}
         <div className="relative flex-1 flex flex-col w-full">
@@ -2663,7 +2537,6 @@ export default function Home() {
                 hapticFeedback.impactOccurred("light");
                 setSwapSheetOpen(true);
               }}
-              disabled={getSolanaEnv() !== "mainnet"}
             />
             <ActionButton
               icon={<ScanIcon />}
@@ -2698,75 +2571,77 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 items-center px-4 pb-4">
-                  {displayTokens.slice(0, 5).map((token) => (
-                    <div
-                      key={token.mint}
-                      className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
-                      style={{ border: "2px solid #f2f2f7" }}
-                    >
-                      {/* Token icon */}
-                      <div className="py-1.5 pr-3">
-                        <div className="w-12 h-12 relative">
-                          <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
-                            {token.imageUrl && (
+                  {displayTokens.slice(0, 5).map((token) => {
+                    const iconSrc = resolveTokenIcon(token);
+
+                    return (
+                      <div
+                        key={token.mint}
+                        className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
+                        style={{ border: "2px solid #f2f2f7" }}
+                      >
+                        {/* Token icon */}
+                        <div className="py-1.5 pr-3">
+                          <div className="w-12 h-12 relative">
+                            <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
                               <Image
-                                src={token.imageUrl}
+                                src={iconSrc}
                                 alt={token.symbol}
                                 fill
                                 className="object-cover"
                               />
+                            </div>
+                            {token.isSecured && (
+                              <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
+                                <Image
+                                  src="/Shield.svg"
+                                  alt="Secured"
+                                  width={20}
+                                  height={20}
+                                />
+                              </div>
                             )}
                           </div>
-                          {token.isSecured && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
-                              <Image
-                                src="/Shield.svg"
-                                alt="Secured"
-                                width={20}
-                                height={20}
-                              />
-                            </div>
-                          )}
+                        </div>
+                        {/* Token info */}
+                        <div className="flex-1 flex flex-col py-2.5 min-w-0">
+                          <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px]">
+                            {token.symbol}
+                          </p>
+                          <p
+                            className="text-[15px] leading-5"
+                            style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                          >
+                            {token.priceUsd !== null
+                              ? `$${token.priceUsd.toLocaleString("en-US", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}`
+                              : "—"}
+                          </p>
+                        </div>
+                        {/* Token amount */}
+                        <div className="flex flex-col items-end py-2.5 pl-3">
+                          <p className="text-[17px] text-black leading-[22px] text-right">
+                            {token.balance.toLocaleString("en-US", {
+                              maximumFractionDigits: 4,
+                            })}
+                          </p>
+                          <p
+                            className="text-[15px] leading-5 text-right"
+                            style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                          >
+                            {token.valueUsd !== null
+                              ? `$${token.valueUsd.toLocaleString("en-US", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}`
+                              : "—"}
+                          </p>
                         </div>
                       </div>
-                      {/* Token info */}
-                      <div className="flex-1 flex flex-col py-2.5 min-w-0">
-                        <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px]">
-                          {token.symbol}
-                        </p>
-                        <p
-                          className="text-[15px] leading-5"
-                          style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                        >
-                          {token.priceUsd !== null
-                            ? `$${token.priceUsd.toLocaleString("en-US", {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`
-                            : "—"}
-                        </p>
-                      </div>
-                      {/* Token amount */}
-                      <div className="flex flex-col items-end py-2.5 pl-3">
-                        <p className="text-[17px] text-black leading-[22px] text-right">
-                          {token.balance.toLocaleString("en-US", {
-                            maximumFractionDigits: 4,
-                          })}
-                        </p>
-                        <p
-                          className="text-[15px] leading-5 text-right"
-                          style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                        >
-                          {token.valueUsd !== null
-                            ? `$${token.valueUsd.toLocaleString("en-US", {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`
-                            : "—"}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {/* Show All button */}
                   {tokenHoldings.length > 5 && (
@@ -3364,8 +3239,6 @@ export default function Home() {
         onStepChange={setSendStep}
         balance={solBalanceLamports}
         walletAddress={walletAddress ?? undefined}
-        starsBalance={starsBalance}
-        onTopUpStars={handleTopUpStars}
         solPriceUsd={solPriceUsd}
         isSolPriceLoading={isSolPriceLoading}
         sentAmountSol={sentAmountSol}

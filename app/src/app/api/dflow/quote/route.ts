@@ -10,7 +10,6 @@ import {
   fetchQuote,
   fetchSwapTransaction,
 } from "@/lib/dflow/server";
-import { getSolanaEnv } from "@/lib/solana/rpc/connection";
 
 type QuoteRequestBody = {
   fromMint: string;
@@ -40,13 +39,6 @@ function isValidDecimals(decimals: unknown): decimals is number {
 }
 
 export async function POST(req: Request) {
-  if (getSolanaEnv() !== "mainnet") {
-    return NextResponse.json(
-      { error: SWAP_ERRORS.SWAP_NOT_AVAILABLE },
-      { status: 400 }
-    );
-  }
-
   try {
     const body = await req.arrayBuffer();
     if (!body || body.byteLength === 0) {

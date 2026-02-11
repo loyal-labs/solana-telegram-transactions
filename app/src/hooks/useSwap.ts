@@ -5,7 +5,6 @@ import { useCallback, useState } from "react";
 
 import { fetchJson } from "@/lib/core/http";
 import { executeSwapTransaction, SWAP_ERRORS, type SwapParams, type SwapResult } from "@/lib/dflow";
-import { getSolanaEnv } from "@/lib/solana/rpc/connection";
 
 type QuoteApiResponse = {
   transaction: string;
@@ -25,12 +24,6 @@ export function useSwap(getKeypair: () => Promise<Keypair>) {
 
   const executeSwap = useCallback(
     async (params: SwapParams): Promise<SwapResult> => {
-      if (getSolanaEnv() !== "mainnet") {
-        const msg = SWAP_ERRORS.SWAP_NOT_AVAILABLE;
-        setError(msg);
-        return { success: false, error: msg };
-      }
-
       setError(null);
       setState("quoting");
 

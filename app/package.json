@@ -15,8 +15,6 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.918.0",
     "@coral-xyz/anchor": "^0.32.1",
-    "@irys/upload": "^0.0.15",
-    "@irys/upload-solana": "^0.1.8",
     "@neondatabase/serverless": "^1.0.2",
     "@noble/ed25519": "^3.0.0",
     "@number-flow/react": "^0.5.10",

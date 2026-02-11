@@ -3,10 +3,17 @@
 import { useSignal, viewport } from "@telegram-apps/sdk-react";
 import type { Signal } from "@telegram-apps/signals";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import Header from "@/components/Header";
 import BottomNav from "@/components/telegram/BottomNav";
+import Onboarding from "@/components/telegram/Onboarding";
+import {
+  getCloudValue,
+  setCloudValue,
+} from "@/lib/telegram/mini-app/cloud-storage";
+
+const ONBOARDING_DONE_KEY = "onboarding_done";
 
 export default function TelegramLayout({
   children
@@ -17,6 +24,20 @@ export default function TelegramLayout({
     viewport.safeAreaInsetTop as Signal<number>
   );
   const pathname = usePathname();
+  // null = loading, true = show, false = don't show
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+
+  // Check cloud storage for onboarding completion
+  useEffect(() => {
+    getCloudValue(ONBOARDING_DONE_KEY).then((value) => {
+      setShowOnboarding(value !== "1");
+    });
+  }, []);
+
+  const handleOnboardingDone = () => {
+    setShowOnboarding(false);
+    void setCloudValue(ONBOARDING_DONE_KEY, "1");
+  };
 
   // Reset scroll position when navigating between pages
   useEffect(() => {
@@ -32,13 +53,22 @@ export default function TelegramLayout({
       style={{ background: "#fff", minHeight: "100vh" }}
     >
       <Header />
-      <div
-        className="flex-1"
-        style={{ paddingTop: headerHeight }}
-      >
-        {children}
-      </div>
-      <BottomNav />
+      {showOnboarding ? (
+        <Onboarding
+          headerHeight={headerHeight}
+          onDone={handleOnboardingDone}
+        />
+      ) : showOnboarding === false ? (
+        <>
+          <div
+            className="flex-1"
+            style={{ paddingTop: headerHeight }}
+          >
+            {children}
+          </div>
+          <BottomNav />
+        </>
+      ) : null}
     </div>
   );
 }

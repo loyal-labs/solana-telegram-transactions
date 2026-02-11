@@ -4,6 +4,7 @@ import { fetchJson } from "../../core/http";
 import { getSolanaEnv } from "../rpc/connection";
 import { SECURE_DEVNET_RPC_URL, SECURE_MAINNET_RPC_URL } from "../rpc/constants";
 import { CACHE_TTL_MS, NATIVE_SOL_DECIMALS, NATIVE_SOL_MINT } from "./constants";
+import { resolveTokenIcon } from "./resolve-token-info";
 import type {
   CachedHoldings,
   HeliusAsset,
@@ -58,7 +59,7 @@ function mapNativeBalance(nativeBalance: HeliusNativeBalance | undefined): Token
     decimals: NATIVE_SOL_DECIMALS,
     priceUsd: price_per_sol ?? null,
     valueUsd: total_price ?? null,
-    imageUrl: null,
+    imageUrl: resolveTokenIcon({ mint: NATIVE_SOL_MINT, imageUrl: null }),
   };
 }
 
