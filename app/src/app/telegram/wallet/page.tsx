@@ -54,6 +54,7 @@ import {
 } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
+import { getSolanaEnv } from "@/lib/solana/rpc/connection";
 import {
   getAccountTransactionHistory,
   listenForAccountTransactions,
@@ -833,6 +834,32 @@ export default function Home() {
         setSwappedToSymbol(result.toSymbol);
         setSwapError(null);
         setSwapView("result");
+
+        // Inject swap transaction immediately for instant feedback
+        if (result.signature && swapFormValues) {
+          const swapTx: Transaction = {
+            id: result.signature,
+            type: "outgoing",
+            transferType: "swap",
+            amountLamports: 0,
+            signature: result.signature,
+            timestamp: Date.now(),
+            status: "completed",
+            swapFromMint: swapFormValues.fromMint,
+            swapToMint: swapFormValues.toMint,
+            swapFromSymbol: result.fromSymbol,
+            swapToSymbol: result.toSymbol,
+            swapToAmount: result.toAmount,
+          };
+          setWalletTransactions((prev) => {
+            const updated = [swapTx, ...prev];
+            if (walletAddress) {
+              walletTransactionsCache.set(walletAddress, updated);
+            }
+            return updated;
+          });
+        }
+
         // Refresh balance after successful swap
         void refreshWalletBalance(true);
       } else {
@@ -933,7 +960,7 @@ export default function Home() {
         transfer.counterparty ||
         (isIncoming ? "Unknown sender" : "Unknown recipient");
 
-      return {
+      const base: Transaction = {
         id: transfer.signature,
         type: isIncoming ? "incoming" : "outgoing",
         transferType: transfer.type,
@@ -948,6 +975,16 @@ export default function Home() {
         signature: transfer.signature,
         status: transfer.status === "failed" ? "error" : "completed",
       };
+
+      if (transfer.type === "swap") {
+        base.swapFromMint = transfer.swapFromMint;
+        base.swapToMint = transfer.swapToMint;
+        if (transfer.swapToAmount) {
+          base.swapToAmount = parseFloat(transfer.swapToAmount);
+        }
+      }
+
+      return base;
     },
     []
   );
@@ -994,7 +1031,12 @@ export default function Home() {
           const merged = mappedTransactions.map((tx) => {
             if (!tx.signature) return tx;
             const existing = existingBySignature.get(tx.signature);
-            return existing ? { ...existing, ...tx } : tx;
+            if (!existing) return tx;
+            // Preserve app-injected swap data when on-chain data arrives
+            if (existing.transferType === "swap" && tx.transferType !== "swap") {
+              return { ...tx, ...existing };
+            }
+            return { ...existing, ...tx };
           });
 
           const combined = [...pending, ...merged].sort(
@@ -1907,7 +1949,13 @@ export default function Home() {
                 : next.findIndex((tx) => tx.id === mapped.id);
 
               if (matchIndex >= 0) {
-                next[matchIndex] = { ...next[matchIndex], ...mapped };
+                const existing = next[matchIndex];
+                // Preserve app-injected swap data when on-chain data arrives
+                if (existing.transferType === "swap" && mapped.transferType !== "swap") {
+                  next[matchIndex] = { ...mapped, ...existing };
+                } else {
+                  next[matchIndex] = { ...existing, ...mapped };
+                }
               } else {
                 next.unshift(mapped);
               }
@@ -2614,6 +2662,7 @@ export default function Home() {
                 hapticFeedback.impactOccurred("light");
                 setSwapSheetOpen(true);
               }}
+              disabled={getSolanaEnv() !== "mainnet"}
             />
             <ActionButton
               icon={<ScanIcon />}
