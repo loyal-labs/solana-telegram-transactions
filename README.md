@@ -1,4 +1,24 @@
 # How-tos
+## Commit Message Style
+We use Conventional Commits for commit messages and pull request titles.
+
+1. Install dependencies:
+```bash
+bun install
+```
+
+2. Enable repo hooks (one-time per clone):
+```bash
+./scripts/setup-git-hooks.sh
+```
+
+3. Optional local check:
+```bash
+echo "feat(scope): short description" | bunx commitlint --verbose
+```
+
+GitHub pull requests also enforce commit messages and PR titles with the same rules.
+
 ## Local Development
 1. Run Solana validator
 ```bash
