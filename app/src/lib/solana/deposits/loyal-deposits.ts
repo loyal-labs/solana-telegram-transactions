@@ -1,4 +1,8 @@
-import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import {
+  getAssociatedTokenAddressSync,
+  NATIVE_MINT,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import {
   LoyalPrivateTransactionsClient,
@@ -8,6 +12,7 @@ import {
 
 import { getConnection } from "../rpc/connection";
 import { getWalletKeypair } from "../wallet/wallet-details";
+import { closeWsolAta, wrapSolToWSol } from "./wsol-utils";
 
 const PER_RPC_ENDPOINT = "https://tee.magicblock.app";
 const PER_WS_ENDPOINT = "wss://tee.magicblock.app";
@@ -33,7 +38,7 @@ export async function fetchLoyalDeposits(
       const mintPubkey = new PublicKey(mint);
       const deposit = await client.getDeposit(userPublicKey, mintPubkey);
       if (deposit && deposit.amount > 0) {
-        deposits.set(mint, deposit.amount);
+        deposits.set(mint, Number(deposit.amount));
       }
     })
   );
@@ -62,21 +67,39 @@ export async function shieldTokens(params: {
   // 1. Initialize deposit if it doesn't exist yet
   const existingDeposit = await client.getDeposit(keypair.publicKey, tokenMint);
   if (!existingDeposit) {
-    await client.initializeDeposit({
+    console.log("initializeDeposit");
+    const initializeDepositSig = await client.initializeDeposit({
       tokenMint,
       user: keypair.publicKey,
       payer: keypair.publicKey,
     });
+    console.log("initializeDepositSig", initializeDepositSig);
   }
 
-  // 2. Move tokens into the deposit vault
+  // 2. Wrap native SOL → wSOL if needed
+  const isNativeSol = tokenMint.equals(NATIVE_MINT);
+  const connection = getConnection();
+  let createdAta = false;
+
+  if (isNativeSol) {
+    const result = await wrapSolToWSol({
+      connection,
+      payer: keypair,
+      lamports: amount,
+    });
+    createdAta = result.createdAta;
+  }
+
   const userTokenAccount = getAssociatedTokenAddressSync(
     tokenMint,
     keypair.publicKey,
     false,
     TOKEN_PROGRAM_ID
   );
+  console.log("userTokenAccount", userTokenAccount.toString());
 
+  // 3. Move tokens into the deposit vault
+  console.log("modifyBalance");
   const { signature } = await client.modifyBalance({
     tokenMint,
     amount,
@@ -85,8 +108,18 @@ export async function shieldTokens(params: {
     payer: keypair.publicKey,
     userTokenAccount,
   });
+  console.log("modifyBalance sig", signature);
 
-  // 3. Create permission (may already exist)
+  // Close temporary wSOL ATA if we created it
+  if (isNativeSol && createdAta) {
+    await closeWsolAta({
+      connection,
+      payer: keypair,
+      wsolAta: userTokenAccount,
+    });
+  }
+
+  // 4. Create permission (may already exist)
   try {
     await client.createPermission({
       tokenMint,
@@ -97,7 +130,7 @@ export async function shieldTokens(params: {
     // Permission may already exist, that's fine
   }
 
-  // 4. Delegate deposit to PER
+  // 5. Delegate deposit to PER
   try {
     await client.delegateDeposit({
       tokenMint,
@@ -139,6 +172,14 @@ export async function unshieldTokens(params: {
 
   // 2. Withdraw tokens back to regular wallet
   const baseClient = await getBaseClient();
+  const connection = getConnection();
+  const isNativeSol = tokenMint.equals(NATIVE_MINT);
+
+  // Ensure wSOL ATA exists for native SOL withdrawals
+  if (isNativeSol) {
+    await wrapSolToWSol({ connection, payer: keypair, lamports: 0 });
+  }
+
   const userTokenAccount = getAssociatedTokenAddressSync(
     tokenMint,
     keypair.publicKey,
@@ -154,6 +195,15 @@ export async function unshieldTokens(params: {
     payer: keypair.publicKey,
     userTokenAccount,
   });
+
+  // 3. Unwrap wSOL back to native SOL
+  if (isNativeSol) {
+    await closeWsolAta({
+      connection,
+      payer: keypair,
+      wsolAta: userTokenAccount,
+    });
+  }
 
   return signature;
 }
