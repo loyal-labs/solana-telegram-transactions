@@ -3,10 +3,11 @@
 import { useSignal, viewport } from "@telegram-apps/sdk-react";
 import type { Signal } from "@telegram-apps/signals";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import Header from "@/components/Header";
 import BottomNav from "@/components/telegram/BottomNav";
+import Onboarding from "@/components/telegram/Onboarding";
 
 export default function TelegramLayout({
   children
@@ -17,6 +18,7 @@ export default function TelegramLayout({
     viewport.safeAreaInsetTop as Signal<number>
   );
   const pathname = usePathname();
+  const [showOnboarding, setShowOnboarding] = useState(true);
 
   // Reset scroll position when navigating between pages
   useEffect(() => {
@@ -32,13 +34,22 @@ export default function TelegramLayout({
       style={{ background: "#fff", minHeight: "100vh" }}
     >
       <Header />
-      <div
-        className="flex-1"
-        style={{ paddingTop: headerHeight }}
-      >
-        {children}
-      </div>
-      <BottomNav />
+      {showOnboarding ? (
+        <Onboarding
+          headerHeight={headerHeight}
+          onDone={() => setShowOnboarding(false)}
+        />
+      ) : (
+        <>
+          <div
+            className="flex-1"
+            style={{ paddingTop: headerHeight }}
+          >
+            {children}
+          </div>
+          <BottomNav />
+        </>
+      )}
     </div>
   );
 }
