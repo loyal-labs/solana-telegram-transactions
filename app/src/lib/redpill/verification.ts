@@ -1,5 +1,6 @@
 import { verifyMessage } from "ethers";
 
+import { serverEnv } from "../core/config/server";
 import { fetchJson } from "../core/http";
 import { REDPILL_BASE_URL } from "./constants";
 import type {
@@ -11,8 +12,7 @@ import type {
 } from "./types";
 
 const getHeaders = () => {
-  const apiKey = process.env.REDPILL_AI_API_KEY;
-  if (!apiKey) throw new Error("REDPILL_AI_API_KEY is not set");
+  const apiKey = serverEnv.redpillApiKey;
   return { Authorization: `Bearer ${apiKey}` };
 };
 

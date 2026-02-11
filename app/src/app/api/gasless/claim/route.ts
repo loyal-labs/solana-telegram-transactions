@@ -18,9 +18,9 @@ import {
   numberToBN,
 } from "@/lib/solana/solana-helpers";
 import { getSessionPda } from "@/lib/solana/solana-helpers";
+import { getGaslessKeypair } from "@/lib/solana/wallet/gasless-keypair.server";
 import {
   getCustomWalletProvider,
-  getGaslessKeypair,
 } from "@/lib/solana/wallet/wallet-details";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
 

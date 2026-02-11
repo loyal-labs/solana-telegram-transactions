@@ -15,6 +15,7 @@ import { getAvatarColor, getFirstLetter } from "@/components/summaries/avatar-ut
 import { MOCK_SUMMARIES } from "@/components/summaries/mock-data";
 import { useSummaries } from "@/components/summaries/SummariesContext";
 import ConnectBotModal from "@/components/telegram/ConnectBotModal";
+import { publicEnv } from "@/lib/core/config/public";
 
 type GroupChat = {
   id: string;
@@ -271,7 +272,7 @@ export default function SummariesPage() {
   useEffect(() => {
     const fetchGroupChats = async () => {
       // Use mock data in development when flag is set
-      if (process.env.NEXT_PUBLIC_USE_MOCK_SUMMARIES === "true") {
+      if (publicEnv.useMockSummaries) {
         setSummaries(MOCK_SUMMARIES);
         setGroupChats(transformToGroupChats(MOCK_SUMMARIES));
         setIsGroupsLoading(false);
@@ -303,7 +304,7 @@ export default function SummariesPage() {
   }, [setSummaries, hasCachedData]);
 
   // Mock DM data (dev only, controlled by NEXT_PUBLIC_USE_MOCK_SUMMARIES)
-  const useMockDMs = process.env.NEXT_PUBLIC_USE_MOCK_SUMMARIES === "true";
+  const useMockDMs = publicEnv.useMockSummaries;
   const directChats = useMockDMs ? MOCK_DIRECT_CHATS : [];
 
   // Get tabs data and current chat list based on active tab

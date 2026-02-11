@@ -38,10 +38,13 @@ HTTP, database, and storage/CDN utilities.
 | File | Exports | Description |
 |------|---------|-------------|
 | `http.ts` | `fetchJson()`, `fetchStream()` | Typed fetch wrappers |
-| `api.ts` | `resolveEndpoint()` | Builds URLs from `NEXT_PUBLIC_SERVER_HOST` |
+| `api.ts` | `resolveEndpoint()` | Builds URLs from `publicEnv.serverHost` (`NEXT_PUBLIC_SERVER_HOST`) |
 | `database.ts` | `getDatabase()` | Neon PostgreSQL connection via Drizzle ORM |
 | `r2-upload.ts` | `createCloudflareR2UploadClient()`, `getCloudflareR2UploadClientFromEnv()` | Server-side Cloudflare R2 image upload client |
 | `cdn-url.ts` | `createCloudflareCdnUrlClient()`, `getCloudflareCdnUrlClientFromEnv()` | Resolves public CDN URLs from object keys |
+| `config/public.ts` | `publicEnv` | Public env access (`NEXT_PUBLIC_*`) |
+| `config/server.ts` | `serverEnv` | Server-only env access (`server-only`) |
+| `config/shared.ts` | parsing helpers | Shared env normalization helpers |
 
 ### `r2-upload.ts` (server-side only)
 
@@ -143,11 +146,13 @@ RPC connection management using Helius endpoints (mainnet/devnet) or local valid
 | Constant | Source | Value |
 |----------|--------|-------|
 | `SECURE_MAINNET_RPC_URL` | Hardcoded | Helius mainnet endpoint |
+| `TESTNET_RPC_URL` | Hardcoded | Solana testnet endpoint |
 | `SECURE_DEVNET_RPC_URL` | Hardcoded | Helius devnet endpoint |
 | `LOCALNET_RPC_URL` | Hardcoded | `http://127.0.0.1:8899` |
 
 Selected by `NEXT_PUBLIC_SOLANA_ENV`:
 - `"mainnet"` - Production (Helius)
+- `"testnet"` - Test network
 - `"devnet"` - Testing (Helius, default)
 - `"localnet"` - Local development (`solana-test-validator`)
 
@@ -288,6 +293,7 @@ For browser/mini app context.
 ### `/telegram/bot-api/` (Server-side)
 
 For API routes. Requires `ASKLOYAL_TGBOT_KEY` env var.
+`/api/telegram/setup-commands` additionally uses `TELEGRAM_SETUP_SECRET` for route auth.
 
 | Constant | Value |
 |----------|-------|

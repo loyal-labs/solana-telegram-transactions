@@ -15,6 +15,7 @@ import {
   handleCommunityMessage,
   handleGLoyalReaction,
 } from "@/lib/telegram/bot-api/message-handlers";
+import { resolveSummaryCommunityPeerId } from "@/lib/telegram/bot-api/summary-chat-id";
 import { handleDirectMessage } from "@/lib/telegram/conversation-service";
 import { isPrivateChat } from "@/lib/telegram/utils";
 
@@ -37,7 +38,13 @@ bot.command("deactivate_community", async (ctx: CommandContext<Context>) => {
 });
 
 bot.command("summary", async (ctx: CommandContext<Context>) => {
-  await handleSummaryCommand(ctx, bot);
+  const summarySourceChatId = ctx.chat
+    ? resolveSummaryCommunityPeerId(BigInt(ctx.chat.id))
+    : undefined;
+
+  await handleSummaryCommand(ctx, bot, {
+    summarySourceChatId,
+  });
 });
 
 bot.on("inline_query", async (ctx) => {

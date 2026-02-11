@@ -9,11 +9,7 @@ import {
   test,
 } from "bun:test";
 
-import type {
-  createCloudflareR2UploadClient as createCloudflareR2UploadClientType,
-  getCloudflareR2UploadClientConfigFromEnv as getCloudflareR2UploadClientConfigFromEnvType,
-  isCloudflareR2UploadConfigured as isCloudflareR2UploadConfiguredType,
-} from "../r2-upload";
+mock.module("server-only", () => ({}));
 
 const R2_ENV_KEYS = [
   "CLOUDFLARE_R2_ACCOUNT_ID",
@@ -25,9 +21,38 @@ const R2_ENV_KEYS = [
 ] as const;
 
 const originalSend = S3Client.prototype.send;
-let createCloudflareR2UploadClient: typeof createCloudflareR2UploadClientType;
-let getCloudflareR2UploadClientConfigFromEnv: typeof getCloudflareR2UploadClientConfigFromEnvType;
-let isCloudflareR2UploadConfigured: typeof isCloudflareR2UploadConfiguredType;
+let createCloudflareR2UploadClient: (
+  config: {
+    accountId: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    bucketName: string;
+    endpoint?: string;
+    uploadPrefix?: string;
+  }
+) => {
+  uploadImage: (input: {
+    key: string;
+    body: NonNullable<PutObjectCommandInput["Body"]>;
+    contentType: string;
+    cacheControl?: string;
+    metadata?: Record<string, string>;
+  }) => Promise<{
+    key: string;
+    bucket: string;
+    etag?: string;
+    versionId?: string;
+  }>;
+};
+let getCloudflareR2UploadClientConfigFromEnv: () => {
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucketName: string;
+  endpoint?: string;
+  uploadPrefix?: string;
+};
+let isCloudflareR2UploadConfigured: () => boolean;
 
 function clearR2Env(): void {
   for (const key of R2_ENV_KEYS) {
@@ -37,7 +62,6 @@ function clearR2Env(): void {
 
 describe("r2-upload", () => {
   beforeAll(async () => {
-    mock.module("server-only", () => ({}));
     const loadedModule = await import("../r2-upload");
     createCloudflareR2UploadClient = loadedModule.createCloudflareR2UploadClient;
     getCloudflareR2UploadClientConfigFromEnv =

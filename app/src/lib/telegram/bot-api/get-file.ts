@@ -1,5 +1,7 @@
 import { File } from "grammy/types";
 
+import { serverEnv } from "@/lib/core/config/server";
+
 import { getBot } from "./bot";
 
 const getFileId = async (fileId: string): Promise<File> => {
@@ -10,5 +12,5 @@ const getFileId = async (fileId: string): Promise<File> => {
 
 export const getFileUrl = async (fileId: string): Promise<string> => {
   const file = await getFileId(fileId);
-  return `https://api.telegram.org/file/bot${process.env.ASKLOYAL_TGBOT_KEY}/${file.file_path}`;
+  return `https://api.telegram.org/file/bot${serverEnv.askLoyalBotToken}/${file.file_path}`;
 };

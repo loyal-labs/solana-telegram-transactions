@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$repo_root"
+
+if [ "${SKIP_VERIFY:-}" = "1" ]; then
+  echo "Skipping pre-push checks because SKIP_VERIFY=1"
+  exit 0
+fi
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "bun is required for pre-push checks." >&2
+  exit 1
+fi
+
+echo "[pre-push] Running app lint..."
+(cd app && bun run lint)

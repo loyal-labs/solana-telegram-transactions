@@ -1,7 +1,9 @@
+import { publicEnv } from "./core/config/public";
+
 export const PUBLIC_KEY_STORAGE_KEY = "solana_public_key";
 export const SECRET_KEY_STORAGE_KEY = "solana_secret_key";
 
-export const TELEGRAM_BOT_ID = process.env.NEXT_PUBLIC_TELEGRAM_BOT_ID || "";
+export const TELEGRAM_BOT_ID = publicEnv.telegramBotId;
 
 export const TELEGRAM_PUBLIC_KEY_PROD =
   "e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d";

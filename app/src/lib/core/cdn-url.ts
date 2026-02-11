@@ -1,3 +1,4 @@
+import { serverEnv } from "./config/server";
 import { encodeObjectPath, joinObjectPaths } from "./object-path";
 
 export type CdnQueryValue = string | number | boolean | null | undefined;
@@ -22,13 +23,6 @@ export type CloudflareCdnUrlClient = {
   resolveUrls: (keys: string[], options?: ResolveCloudflareCdnUrlOptions) => string[];
 };
 
-const CDN_BASE_URL_ENV_KEYS = [
-  "CLOUDFLARE_CDN_BASE_URL",
-  "NEXT_PUBLIC_CLOUDFLARE_CDN_BASE_URL",
-  "CLOUDFLARE_R2_PUBLIC_DEV_URL",
-  "NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_DEV_URL",
-] as const;
-
 let clientFromEnv: CloudflareCdnUrlClient | null = null;
 
 function normalizeBaseUrl(baseUrl: string): URL {
@@ -49,13 +43,7 @@ function appendQuery(
 }
 
 export function getCloudflareCdnBaseUrlFromEnv(): string | null {
-  for (const key of CDN_BASE_URL_ENV_KEYS) {
-    const value = process.env[key];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
-    }
-  }
-  return null;
+  return serverEnv.cloudflareCdnBaseUrl;
 }
 
 export function createCloudflareCdnUrlClient(
@@ -100,7 +88,7 @@ export function getCloudflareCdnUrlClientFromEnv(): CloudflareCdnUrlClient {
 
   clientFromEnv = createCloudflareCdnUrlClient({
     baseUrl,
-    keyPrefix: process.env.CLOUDFLARE_R2_UPLOAD_PREFIX?.trim() || undefined,
+    keyPrefix: serverEnv.cloudflareR2UploadPrefix,
   });
 
   return clientFromEnv;

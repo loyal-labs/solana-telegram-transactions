@@ -1,10 +1,20 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import { encrypt } from "../encrypt";
+mock.module("server-only", () => ({}));
+
+let encrypt: (plaintext: string) => Promise<{
+  ciphertext: string;
+  iv: string;
+} | null>;
 
 const TEST_KEY = "0fegoicH8L0zl6r5Xn7v2y7e8UAhDOyxwWtBTQXWT/A=";
 
 describe("encrypt", () => {
+  beforeAll(async () => {
+    const loadedModule = await import("../encrypt");
+    encrypt = loadedModule.encrypt;
+  });
+
   beforeEach(() => {
     process.env.MESSAGE_ENCRYPTION_KEY = TEST_KEY;
   });

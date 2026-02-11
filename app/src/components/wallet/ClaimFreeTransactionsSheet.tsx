@@ -15,6 +15,7 @@ import {
 } from "react";
 
 import { useModalSnapPoint, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+import { publicEnv } from "@/lib/core/config/public";
 import {
   hideMainButton,
   hideSecondaryButton,
@@ -66,7 +67,7 @@ export default function ClaimFreeTransactionsSheet({
   );
 
   const resolveEndpoint = useCallback((path: string): string => {
-    const serverHost = process.env.NEXT_PUBLIC_SERVER_HOST;
+    const serverHost = publicEnv.serverHost;
 
     if (typeof window !== "undefined") {
       if (!serverHost) return path;

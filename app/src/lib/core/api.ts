@@ -1,5 +1,7 @@
+import { publicEnv } from "./config/public";
+
 export function resolveEndpoint(path: string): string {
-  const serverHost = process.env.NEXT_PUBLIC_SERVER_HOST;
+  const serverHost = publicEnv.serverHost;
   if (!serverHost) return path;
 
   try {
