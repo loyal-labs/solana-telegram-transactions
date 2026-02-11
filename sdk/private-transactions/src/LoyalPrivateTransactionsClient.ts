@@ -17,6 +17,11 @@ import {
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
+import {
+  verifyTeeRpcIntegrity,
+  getAuthToken,
+} from "@magicblock-labs/ephemeral-rollups-sdk";
+import { sign } from "tweetnacl";
 import { IDL, type TelegramPrivateTransfer } from "./idl";
 import {
   PROGRAM_ID,
@@ -35,6 +40,7 @@ import {
   findBufferPda,
 } from "./pda";
 import { InternalWalletAdapter } from "./wallet-adapter";
+import { isKeypair, isAnchorProvider } from "./types";
 import type {
   WalletSigner,
   WalletLike,
@@ -135,6 +141,40 @@ function patchProviderForMagicRouter(
 }
 
 /**
+ * Derive a message signing function from any supported signer type.
+ * Required for PER auth token acquisition.
+ */
+function deriveMessageSigner(
+  signer: WalletSigner
+): (message: Uint8Array) => Promise<Uint8Array> {
+  if (isKeypair(signer)) {
+    return (message: Uint8Array) =>
+      Promise.resolve(sign.detached(message, signer.secretKey));
+  }
+
+  if (isAnchorProvider(signer)) {
+    const wallet = signer.wallet as {
+      signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
+    };
+    if (typeof wallet.signMessage === "function") {
+      return (message: Uint8Array) => wallet.signMessage!(message);
+    }
+    throw new Error(
+      "AnchorProvider wallet does not support signMessage, required for PER auth"
+    );
+  }
+
+  // WalletLike
+  const walletLike = signer as {
+    signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
+  };
+  if (typeof walletLike.signMessage === "function") {
+    return (message: Uint8Array) => walletLike.signMessage!(message);
+  }
+  throw new Error("Wallet does not support signMessage, required for PER auth");
+}
+
+/**
  * LoyalPrivateTransactionsClient - SDK for interacting with the Telegram Private Transfer program
  * with MagicBlock PER (Private Ephemeral Rollups) support
  *
@@ -162,15 +202,21 @@ function patchProviderForMagicRouter(
  * await ephemeralClient.undelegateDeposit({ user, tokenMint, ... });
  */
 export class LoyalPrivateTransactionsClient {
-  private readonly program: Program<TelegramPrivateTransfer>;
-  private readonly wallet: WalletLike;
+  readonly program: Program<TelegramPrivateTransfer>;
+  readonly wallet: WalletLike;
+  readonly authToken?: string;
+  readonly authTokenExpiresAt?: number;
 
   private constructor(
     program: Program<TelegramPrivateTransfer>,
-    wallet: WalletLike
+    wallet: WalletLike,
+    authToken?: string,
+    authTokenExpiresAt?: number
   ) {
     this.program = program;
     this.wallet = wallet;
+    this.authToken = authToken;
+    this.authTokenExpiresAt = authTokenExpiresAt;
   }
 
   // ============================================================
@@ -228,8 +274,8 @@ export class LoyalPrivateTransactionsClient {
   }
 
   /**
-   * Create client connected to an ephemeral rollup endpoint
-   * Use this for executing transactions on the Private Ephemeral Rollup
+   * Create client connected to an ephemeral rollup endpoint with PER auth token.
+   * Verifies TEE RPC integrity and obtains an auth token automatically.
    */
   static async fromEphemeral(
     config: EphemeralClientConfig
@@ -241,12 +287,67 @@ export class LoyalPrivateTransactionsClient {
       commitment = "confirmed",
     } = config;
 
-    const connection = new Connection(rpcEndpoint, {
-      wsEndpoint,
-      commitment,
-    });
+    const adapter = InternalWalletAdapter.from(signer);
 
-    return LoyalPrivateTransactionsClient.from(connection, signer);
+    if (rpcEndpoint.includes("tee")) {
+      const isVerified = await verifyTeeRpcIntegrity(rpcEndpoint);
+      if (!isVerified) {
+        throw new Error("TEE RPC integrity verification failed");
+      }
+
+      const signMessage = deriveMessageSigner(signer);
+
+      console.log("getAuthToken");
+      const { token, expiresAt } = await getAuthToken(
+        rpcEndpoint,
+        adapter.publicKey,
+        signMessage
+      );
+      console.log("getAuthToken token", token);
+      console.log("getAuthToken expiresAt", expiresAt);
+
+      const authedRpcEndpoint = `${rpcEndpoint}?token=${token}`;
+      const authedWsEndpoint = wsEndpoint
+        ? `${wsEndpoint}?token=${token}`
+        : undefined;
+
+      console.log("authedRpcEndpoint", authedRpcEndpoint);
+      console.log("authedWsEndpoint", authedWsEndpoint);
+
+      const connection = new Connection(authedRpcEndpoint, {
+        wsEndpoint: authedWsEndpoint,
+        commitment,
+      });
+
+      const provider = patchProviderForMagicRouter(
+        new AnchorProvider(connection, adapter, { commitment }),
+        adapter
+      );
+      const program = createProgram(provider);
+      return new LoyalPrivateTransactionsClient(
+        program,
+        adapter,
+        token,
+        expiresAt
+      );
+    } else {
+      const connection = new Connection(rpcEndpoint, {
+        wsEndpoint,
+        commitment,
+      });
+
+      const provider = patchProviderForMagicRouter(
+        new AnchorProvider(connection, adapter, { commitment }),
+        adapter
+      );
+      const program = createProgram(provider);
+      return new LoyalPrivateTransactionsClient(
+        program,
+        adapter
+        // token,
+        // expiresAt
+      );
+    }
   }
 
   // ============================================================
@@ -298,6 +399,19 @@ export class LoyalPrivateTransactionsClient {
       TOKEN_PROGRAM_ID,
       ASSOCIATED_TOKEN_PROGRAM_ID
     );
+
+    console.log("modifyBalance", {
+      payer: payer.toString(),
+      user: user.toString(),
+      vault: vaultPda.toString(),
+      deposit: depositPda.toString(),
+      userTokenAccount: userTokenAccount.toString(),
+      vaultTokenAccount: vaultTokenAccount.toString(),
+      tokenMint: tokenMint.toString(),
+      // tokenProgram: TOKEN_PROGRAM_ID,
+      // associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      // systemProgram: SystemProgram.programId,
+    });
 
     const signature = await this.program.methods
       .modifyBalance({ amount: new BN(amount.toString()), increase })
@@ -580,15 +694,47 @@ export class LoyalPrivateTransactionsClient {
     } = params;
 
     const [depositPda] = findDepositPda(user, tokenMint);
+    console.log("undelegateDeposit user", user.toString());
+    console.log("undelegateDeposit tokenMint", tokenMint.toString());
+    console.log("undelegateDeposit depositPda", depositPda.toString());
+    const depositAccountInfo =
+      await this.program.provider.connection.getAccountInfo(depositPda);
+    console.log(
+      "undelegateDeposit depositPda owner",
+      depositAccountInfo?.owner?.toString() ?? "account not found"
+    );
 
+    /*
+      /getDelegationStatus for 9aK4zwcYaJsAQaonegfjCyzNbayMMduAbAom8WwL8tsh
+      {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "isDelegated": true,
+          "fqdn": "https://devnet-as.magicblock.app/",
+          "delegationRecord": {
+            "authority": "MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57",
+            "owner": "97FzQdWi26mFNR21AbQNg4KqofiCLqQydQfAvRQMcXhV",
+            "delegationSlot": 441399826,
+            "lamports": 1447680
+          }
+        }
+      }
+      */
     const accounts: Record<string, PublicKey | null> = {
-      user,
-      payer,
-      deposit: depositPda,
-      magicProgram,
-      magicContext,
+      user, // CcWNCNvWhuvdAaLyFCJknzuaNhEfkyVzoGtXunLMtTuF
+      payer, // CcWNCNvWhuvdAaLyFCJknzuaNhEfkyVzoGtXunLMtTuF
+      deposit: depositPda, // 9aK4zwcYaJsAQaonegfjCyzNbayMMduAbAom8WwL8tsh
+      magicProgram, // Magic11111111111111111111111111111111111111
+      magicContext, // MagicContext1111111111111111111111111111111
     };
     accounts.sessionToken = sessionToken ?? null;
+
+    console.log("undelegateDeposit Accounts:");
+    Object.entries(accounts).forEach(([key, value]) => {
+      console.log(key, value && value.toString());
+    });
+    console.log("-----");
 
     const signature = await this.program.methods
       .undelegate()
