@@ -223,6 +223,11 @@ refactor(ui): extract pill button component
 - Do not end the subject line with a period
 - Validate locally before pushing: `bun run commitlint:head`
 
+## Pull Requests
+
+- PR titles MUST follow the same conventional commit format: `type(scope): description`
+- PR body should be a simple one-two sentence summary of the changes — no templates or checklists
+
 ## Tooling
 
 - **Package Manager**: Bun (preferred)
