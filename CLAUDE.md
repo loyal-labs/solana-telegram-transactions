@@ -244,6 +244,8 @@ refactor(ui): extract pill button component
 
 - PR titles MUST follow the same conventional commit format: `type(scope): description`
 - PR body should be a simple one-two sentence summary of the changes — no templates or checklists
+- Only merge a PR after its Vercel build/check is successful
+- Merge PRs using squash-and-merge
 
 ## Tooling
 
