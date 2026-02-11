@@ -16,6 +16,15 @@ const REQUIRED_R2_ENV_VARS = [
   "CLOUDFLARE_R2_BUCKET_NAME",
 ] as const;
 
+const TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM =
+  "TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM";
+const TELEGRAM_SUMMARY_PEER_OVERRIDE_TO = "TELEGRAM_SUMMARY_PEER_OVERRIDE_TO";
+
+type TelegramSummaryPeerOverride = {
+  fromPeerId: bigint;
+  toPeerId: bigint;
+};
+
 const getCloudflareCdnBaseUrl = (): string | null => {
   for (const key of CLOUDFLARE_CDN_BASE_URL_ENV_KEYS) {
     const value = getOptionalEnv(key);
@@ -25,6 +34,37 @@ const getCloudflareCdnBaseUrl = (): string | null => {
   }
 
   return null;
+};
+
+const parseTelegramPeerId = (value: string, envName: string): bigint => {
+  try {
+    return BigInt(value);
+  } catch {
+    throw new Error(`${envName} must be a valid integer peer ID`);
+  }
+};
+
+const getTelegramSummaryPeerOverride = (): TelegramSummaryPeerOverride | null => {
+  const fromValue = getOptionalEnv(TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM);
+  const toValue = getOptionalEnv(TELEGRAM_SUMMARY_PEER_OVERRIDE_TO);
+
+  if (!fromValue && !toValue) {
+    return null;
+  }
+
+  if (!fromValue || !toValue) {
+    throw new Error(
+      `${TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM} and ${TELEGRAM_SUMMARY_PEER_OVERRIDE_TO} must both be set`
+    );
+  }
+
+  return {
+    fromPeerId: parseTelegramPeerId(
+      fromValue,
+      TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM
+    ),
+    toPeerId: parseTelegramPeerId(toValue, TELEGRAM_SUMMARY_PEER_OVERRIDE_TO),
+  };
 };
 
 export const serverEnv = {
@@ -51,6 +91,9 @@ export const serverEnv = {
   },
   get telegramSetupSecret(): string {
     return getRequiredEnv("TELEGRAM_SETUP_SECRET");
+  },
+  get telegramSummaryPeerOverride(): TelegramSummaryPeerOverride | null {
+    return getTelegramSummaryPeerOverride();
   },
   get cloudflareCdnBaseUrl(): string | null {
     return getCloudflareCdnBaseUrl();

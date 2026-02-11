@@ -11,6 +11,7 @@ import { CA_COMMAND_CHAT_ID, MINI_APP_LINK } from "./constants";
 import { getChat } from "./get-chat";
 import { getFileUrl } from "./get-file";
 import { sendLatestSummary } from "./summaries";
+import type { HandleSummaryCommandOptions } from "./types";
 
 interface CommunityPhoto {
   base64: string;
@@ -265,7 +266,8 @@ export async function handleActivateCommunityCommand(
 
 export async function handleSummaryCommand(
   ctx: CommandContext<Context>,
-  bot: Bot
+  bot: Bot,
+  options?: HandleSummaryCommandOptions
 ): Promise<void> {
   if (!ctx.chat) return;
 
@@ -274,10 +276,14 @@ export async function handleSummaryCommand(
     return;
   }
 
-  const chatId = BigInt(ctx.chat.id);
+  const requestChatId = BigInt(ctx.chat.id);
+  const summarySourceChatId = options?.summarySourceChatId ?? requestChatId;
 
   try {
-    const result = await sendLatestSummary(bot, chatId, ctx.msg?.message_id);
+    const result = await sendLatestSummary(bot, summarySourceChatId, {
+      destinationChatId: requestChatId,
+      replyToMessageId: ctx.msg?.message_id,
+    });
 
     if (!result.sent) {
       if (result.reason === "not_activated") {

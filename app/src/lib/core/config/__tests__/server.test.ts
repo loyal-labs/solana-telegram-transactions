@@ -19,6 +19,8 @@ const SERVER_ENV_KEYS = [
   "DEPLOYMENT_PK",
   "ASKLOYAL_TGBOT_KEY",
   "TELEGRAM_SETUP_SECRET",
+  "TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM",
+  "TELEGRAM_SUMMARY_PEER_OVERRIDE_TO",
   "CLOUDFLARE_CDN_BASE_URL",
   "NEXT_PUBLIC_CLOUDFLARE_CDN_BASE_URL",
   "CLOUDFLARE_R2_PUBLIC_DEV_URL",
@@ -46,6 +48,7 @@ let serverEnv: {
   deploymentPrivateKey: string;
   askLoyalBotToken: string;
   telegramSetupSecret: string;
+  telegramSummaryPeerOverride: { fromPeerId: bigint; toPeerId: bigint } | null;
   cloudflareCdnBaseUrl: string | null;
   cloudflareR2UploadPrefix: string | undefined;
   cloudflareR2S3Endpoint: string | undefined;
@@ -93,6 +96,37 @@ describe("server config", () => {
     expect(serverEnv.messageEncryptionKey).toBe("key");
     expect(serverEnv.cloudflareR2S3Endpoint).toBe("https://r2.example.com");
     expect(serverEnv.cloudflareR2UploadPrefix).toBe("uploads");
+  });
+
+  test("returns null summary override when env vars are not set", () => {
+    expect(serverEnv.telegramSummaryPeerOverride).toBeNull();
+  });
+
+  test("returns summary override when both env vars are set", () => {
+    process.env.TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM = "4864680368";
+    process.env.TELEGRAM_SUMMARY_PEER_OVERRIDE_TO = "-1002981429221";
+
+    expect(serverEnv.telegramSummaryPeerOverride).toEqual({
+      fromPeerId: BigInt("4864680368"),
+      toPeerId: BigInt("-1002981429221"),
+    });
+  });
+
+  test("throws when only one summary override env var is set", () => {
+    process.env.TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM = "4864680368";
+
+    expect(() => serverEnv.telegramSummaryPeerOverride).toThrow(
+      "TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM and TELEGRAM_SUMMARY_PEER_OVERRIDE_TO must both be set"
+    );
+  });
+
+  test("throws when summary override env vars are invalid peer IDs", () => {
+    process.env.TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM = "invalid";
+    process.env.TELEGRAM_SUMMARY_PEER_OVERRIDE_TO = "-1002981429221";
+
+    expect(() => serverEnv.telegramSummaryPeerOverride).toThrow(
+      "TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM must be a valid integer peer ID"
+    );
   });
 
   test("selects CDN base URL in documented priority order", () => {

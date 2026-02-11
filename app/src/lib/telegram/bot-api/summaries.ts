@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gte } from "drizzle-orm";
-import { type Bot,InlineKeyboard } from "grammy";
+import { type Bot, InlineKeyboard } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
 import {
@@ -13,6 +13,7 @@ import { SUMMARY_INTERVAL_MS } from "@/lib/telegram/utils";
 
 import { buildSummaryMessageWithPreview } from "./build-summary-og-url";
 import { MINI_APP_FEED_LINK } from "./constants";
+import type { SendLatestSummaryOptions, SendSummaryResult } from "./types";
 
 export const MIN_MESSAGES_FOR_SUMMARY = 5;
 
@@ -121,19 +122,20 @@ function isValidTopic(topic: unknown): topic is Topic {
   );
 }
 
-export type SendSummaryResult =
-  | { sent: true }
-  | { sent: false; reason: "not_activated" | "no_summaries" };
-
 export async function sendLatestSummary(
   bot: Bot,
-  chatId: bigint,
-  replyToMessageId?: number
+  sourceChatId: bigint,
+  options?: SendLatestSummaryOptions
 ): Promise<SendSummaryResult> {
   const db = getDatabase();
+  const destinationChatId = options?.destinationChatId ?? sourceChatId;
+  const replyToMessageId = options?.replyToMessageId;
 
   const community = await db.query.communities.findFirst({
-    where: and(eq(communities.chatId, chatId), eq(communities.isActive, true)),
+    where: and(
+      eq(communities.chatId, sourceChatId),
+      eq(communities.isActive, true)
+    ),
   });
 
   if (!community) {
@@ -168,7 +170,7 @@ export async function sendLatestSummary(
 
   if (replyToMessageId) {
     try {
-      await bot.api.sendMessage(Number(chatId), messageWithPreview, {
+      await bot.api.sendMessage(Number(destinationChatId), messageWithPreview, {
         ...messageOptions,
         reply_parameters: { message_id: replyToMessageId },
       });
@@ -178,7 +180,11 @@ export async function sendLatestSummary(
     }
   }
 
-  await bot.api.sendMessage(Number(chatId), messageWithPreview, messageOptions);
+  await bot.api.sendMessage(
+    Number(destinationChatId),
+    messageWithPreview,
+    messageOptions
+  );
   return { sent: true };
 }
 
