@@ -504,6 +504,77 @@ export default function ActivitySheet({
                       );
                     }
 
+                    // Swap transaction view
+                    if (transaction.transferType === "swap") {
+                      const toInfo = transaction.swapToMint
+                        ? resolveTokenInfo(transaction.swapToMint, tokenHoldings)
+                        : null;
+                      const fromSymbol =
+                        transaction.swapFromSymbol ||
+                        (transaction.swapFromMint
+                          ? resolveTokenInfo(transaction.swapFromMint, tokenHoldings).symbol
+                          : "?");
+                      const toSymbol =
+                        transaction.swapToSymbol ||
+                        (toInfo ? toInfo.symbol : "?");
+                      const toIcon = toInfo?.icon || "/tokens/solana-sol-logo.png";
+                      const toAmount = transaction.swapToAmount;
+
+                      return (
+                        <button
+                          key={transaction.id}
+                          onClick={() => onTransactionClick(transaction)}
+                          className="flex items-center px-4 w-full text-left active:opacity-70 transition-opacity"
+                        >
+                          {/* Icon */}
+                          <div className="py-1.5 pr-3">
+                            <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                              <Image
+                                src={toIcon}
+                                alt={toSymbol}
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Text */}
+                          <div className="flex-1 py-2.5 flex flex-col gap-0.5 min-w-0">
+                            <p className="text-base text-black leading-5">
+                              Swap
+                            </p>
+                            <p
+                              className="text-[13px] leading-4 truncate"
+                              style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                            >
+                              {fromSymbol} to {toSymbol}
+                            </p>
+                          </div>
+
+                          {/* Amount + Time */}
+                          <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3 shrink-0">
+                            <p
+                              className="text-base leading-5"
+                              style={{ color: "#32e55e" }}
+                            >
+                              {toAmount != null
+                                ? `+${toAmount.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${toSymbol}`
+                                : "Swap"}
+                            </p>
+                            <p
+                              className="text-[13px] leading-4"
+                              style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                            >
+                              {timestamp.toLocaleTimeString([], {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    }
+
                     // Secure/Unshield transaction view
                     if (isSecureOrUnshield) {
                       return (

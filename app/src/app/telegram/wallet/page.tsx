@@ -54,6 +54,7 @@ import {
 } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
+import { getSolanaEnv } from "@/lib/solana/rpc/connection";
 import {
   getAccountTransactionHistory,
   listenForAccountTransactions,
@@ -63,6 +64,7 @@ import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import {
   computePortfolioTotals,
   fetchTokenHoldings,
+  subscribeToTokenHoldings,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
 import {
@@ -75,7 +77,6 @@ import {
   formatSenderAddress,
   formatTransactionAmount,
 } from "@/lib/solana/wallet/formatters";
-import { subscribeToWalletAssetChanges } from "@/lib/solana/wallet/subscribe-wallet-asset-changes";
 import {
   getGaslessPublicKey,
   getWalletBalance,
@@ -833,6 +834,32 @@ export default function Home() {
         setSwappedToSymbol(result.toSymbol);
         setSwapError(null);
         setSwapView("result");
+
+        // Inject swap transaction immediately for instant feedback
+        if (result.signature && swapFormValues) {
+          const swapTx: Transaction = {
+            id: result.signature,
+            type: "outgoing",
+            transferType: "swap",
+            amountLamports: 0,
+            signature: result.signature,
+            timestamp: Date.now(),
+            status: "completed",
+            swapFromMint: swapFormValues.fromMint,
+            swapToMint: swapFormValues.toMint,
+            swapFromSymbol: result.fromSymbol,
+            swapToSymbol: result.toSymbol,
+            swapToAmount: result.toAmount,
+          };
+          setWalletTransactions((prev) => {
+            const updated = [swapTx, ...prev];
+            if (walletAddress) {
+              walletTransactionsCache.set(walletAddress, updated);
+            }
+            return updated;
+          });
+        }
+
         // Refresh balance after successful swap
         void refreshWalletBalance(true);
       } else {
@@ -891,9 +918,6 @@ export default function Home() {
   const hasLoadedHoldingsRef = useRef(USE_MOCK_DATA);
   const walletAddressRef = useRef<string | null>(walletAddress);
   const holdingsFetchIdRef = useRef(0);
-  const holdingsRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
 
   useEffect(() => {
     walletAddressRef.current = walletAddress;
@@ -929,18 +953,6 @@ export default function Home() {
     }
   }, []);
 
-  const scheduleTokenHoldingsRefresh = useCallback(() => {
-    if (!walletAddressRef.current) return;
-
-    if (holdingsRefreshTimerRef.current) {
-      clearTimeout(holdingsRefreshTimerRef.current);
-    }
-
-    holdingsRefreshTimerRef.current = setTimeout(() => {
-      void refreshTokenHoldings(true);
-    }, HOLDINGS_REFRESH_DEBOUNCE_MS);
-  }, [refreshTokenHoldings]);
-
   const mapTransferToTransaction = useCallback(
     (transfer: WalletTransfer): Transaction => {
       const isIncoming = transfer.direction === "in";
@@ -948,7 +960,7 @@ export default function Home() {
         transfer.counterparty ||
         (isIncoming ? "Unknown sender" : "Unknown recipient");
 
-      return {
+      const base: Transaction = {
         id: transfer.signature,
         type: isIncoming ? "incoming" : "outgoing",
         transferType: transfer.type,
@@ -963,6 +975,16 @@ export default function Home() {
         signature: transfer.signature,
         status: transfer.status === "failed" ? "error" : "completed",
       };
+
+      if (transfer.type === "swap") {
+        base.swapFromMint = transfer.swapFromMint;
+        base.swapToMint = transfer.swapToMint;
+        if (transfer.swapToAmount) {
+          base.swapToAmount = parseFloat(transfer.swapToAmount);
+        }
+      }
+
+      return base;
     },
     []
   );
@@ -1009,7 +1031,12 @@ export default function Home() {
           const merged = mappedTransactions.map((tx) => {
             if (!tx.signature) return tx;
             const existing = existingBySignature.get(tx.signature);
-            return existing ? { ...existing, ...tx } : tx;
+            if (!existing) return tx;
+            // Preserve app-injected swap data when on-chain data arrives
+            if (existing.transferType === "swap" && tx.transferType !== "swap") {
+              return { ...tx, ...existing };
+            }
+            return { ...existing, ...tx };
           });
 
           const combined = [...pending, ...merged].sort(
@@ -1825,7 +1852,6 @@ export default function Home() {
     const handleBalanceUpdate = (lamports: number) => {
       if (isCancelled) return;
       setSolBalanceLamports((prev) => (prev === lamports ? prev : lamports));
-      scheduleTokenHoldingsRefresh();
     };
 
     const cachedBalance = getCachedWalletBalance(walletAddress);
@@ -1845,7 +1871,7 @@ export default function Home() {
       isCancelled = true;
       walletBalanceListeners.delete(handleBalanceUpdate);
     };
-  }, [scheduleTokenHoldingsRefresh, walletAddress]);
+  }, [walletAddress]);
 
   // Fetch token holdings
   useEffect(() => {
@@ -1857,46 +1883,49 @@ export default function Home() {
     setTokenHoldings([]);
 
     void refreshTokenHoldings(false);
-
-    return () => {
-      if (holdingsRefreshTimerRef.current) {
-        clearTimeout(holdingsRefreshTimerRef.current);
-        holdingsRefreshTimerRef.current = null;
-      }
-    };
   }, [refreshTokenHoldings, walletAddress]);
 
-  // Refresh holdings on any portfolio-relevant SPL token account changes.
+  // Keep holdings in sync with wallet asset websocket updates.
   useEffect(() => {
     if (USE_MOCK_DATA) return;
     if (!walletAddress) return;
 
+    let isCancelled = false;
     let unsubscribe: (() => Promise<void>) | null = null;
 
     void (async () => {
       try {
-        unsubscribe = await subscribeToWalletAssetChanges(
+        unsubscribe = await subscribeToTokenHoldings(
           walletAddress,
-          () => {
-            scheduleTokenHoldingsRefresh();
+          (holdings) => {
+            if (isCancelled) return;
+            holdingsFetchIdRef.current += 1;
+            setTokenHoldings(holdings);
+            hasLoadedHoldingsRef.current = true;
+            setIsHoldingsLoading(false);
           },
           {
-            debounceMs: 0,
+            debounceMs: HOLDINGS_REFRESH_DEBOUNCE_MS,
             commitment: "confirmed",
-            includeNative: false,
+            includeNative: true,
+            emitInitial: false,
+            onError: (error) => {
+              console.error("Failed to refresh token holdings from websocket", error);
+            },
           }
         );
       } catch (error) {
-        console.error("Failed to subscribe to wallet asset changes", error);
+        console.error("Failed to subscribe to token holdings", error);
       }
     })();
 
     return () => {
+      isCancelled = true;
       if (unsubscribe) {
         void unsubscribe();
       }
     };
-  }, [scheduleTokenHoldingsRefresh, walletAddress]);
+  }, [walletAddress]);
 
   useEffect(() => {
     if (USE_MOCK_DATA) return;
@@ -1920,7 +1949,13 @@ export default function Home() {
                 : next.findIndex((tx) => tx.id === mapped.id);
 
               if (matchIndex >= 0) {
-                next[matchIndex] = { ...next[matchIndex], ...mapped };
+                const existing = next[matchIndex];
+                // Preserve app-injected swap data when on-chain data arrives
+                if (existing.transferType === "swap" && mapped.transferType !== "swap") {
+                  next[matchIndex] = { ...mapped, ...existing };
+                } else {
+                  next[matchIndex] = { ...existing, ...mapped };
+                }
               } else {
                 next.unshift(mapped);
               }
@@ -2627,6 +2662,7 @@ export default function Home() {
                 hapticFeedback.impactOccurred("light");
                 setSwapSheetOpen(true);
               }}
+              disabled={getSolanaEnv() !== "mainnet"}
             />
             <ActionButton
               icon={<ScanIcon />}

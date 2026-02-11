@@ -23,6 +23,8 @@ export type Transaction = {
   recipient?: string;
   timestamp: number;
   // For swap transactions
+  swapFromMint?: string;
+  swapToMint?: string;
   swapFromSymbol?: string;
   swapToSymbol?: string;
   swapToAmount?: number;
@@ -66,6 +68,8 @@ export type TransactionDetailsData = {
   comment?: string;
   signature?: string; // Transaction signature for explorer link
   // For swap transactions
+  swapFromMint?: string;
+  swapToMint?: string;
   swapFromSymbol?: string;
   swapToSymbol?: string;
   swapToAmount?: number;

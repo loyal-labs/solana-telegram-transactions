@@ -23,6 +23,13 @@ export type WalletTransfer = {
   tokenMint?: string;
   tokenAmount?: string; // human-readable (decimal-adjusted, truncated for display)
   tokenDecimals?: number;
+  // Optional swap fields (used when type === "swap")
+  swapFromMint?: string;
+  swapFromAmount?: string; // human-readable
+  swapFromDecimals?: number;
+  swapToMint?: string;
+  swapToAmount?: string; // human-readable
+  swapToDecimals?: number;
 };
 
 export type GetAccountTransactionHistoryOptions = {

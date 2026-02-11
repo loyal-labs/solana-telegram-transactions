@@ -15,6 +15,7 @@ export const SWAP_ERRORS = {
   CONFIRMATION_TIMEOUT: "Transaction confirmation timed out.",
   INVALID_RESPONSE: "Invalid response from swap API.",
   MISSING_API_KEY: "Swap service is not configured.",
+  SWAP_NOT_AVAILABLE: "Swaps are only available on mainnet.",
 } as const;
 
 export const DEFAULT_PRIORITY_FEE_LAMPORTS = 100000;
