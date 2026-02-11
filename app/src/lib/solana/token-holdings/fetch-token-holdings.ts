@@ -118,10 +118,23 @@ export async function fetchTokenHoldings(
   }
 
   const inflight = inflightRequests.get(publicKey);
-  // Coalesce concurrent requests even if a force refresh is requested.
-  // Force refresh still bypasses the TTL check above.
   if (inflight) {
-    return inflight;
+    if (!forceRefresh) {
+      return inflight;
+    }
+
+    // If a force refresh arrives while another request is in flight, wait for
+    // it to settle and then issue a fresh request.
+    try {
+      await inflight;
+    } catch {
+      // Ignore previous request failure; a fresh forced request is next.
+    }
+
+    const nextInflight = inflightRequests.get(publicKey);
+    if (nextInflight) {
+      return nextInflight;
+    }
   }
 
   const rpcUrl = getRpcUrl();

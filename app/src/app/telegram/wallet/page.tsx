@@ -63,6 +63,7 @@ import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import {
   computePortfolioTotals,
   fetchTokenHoldings,
+  subscribeToTokenHoldings,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
 import {
@@ -75,7 +76,6 @@ import {
   formatSenderAddress,
   formatTransactionAmount,
 } from "@/lib/solana/wallet/formatters";
-import { subscribeToWalletAssetChanges } from "@/lib/solana/wallet/subscribe-wallet-asset-changes";
 import {
   getGaslessPublicKey,
   getWalletBalance,
@@ -891,9 +891,6 @@ export default function Home() {
   const hasLoadedHoldingsRef = useRef(USE_MOCK_DATA);
   const walletAddressRef = useRef<string | null>(walletAddress);
   const holdingsFetchIdRef = useRef(0);
-  const holdingsRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
 
   useEffect(() => {
     walletAddressRef.current = walletAddress;
@@ -928,18 +925,6 @@ export default function Home() {
       }
     }
   }, []);
-
-  const scheduleTokenHoldingsRefresh = useCallback(() => {
-    if (!walletAddressRef.current) return;
-
-    if (holdingsRefreshTimerRef.current) {
-      clearTimeout(holdingsRefreshTimerRef.current);
-    }
-
-    holdingsRefreshTimerRef.current = setTimeout(() => {
-      void refreshTokenHoldings(true);
-    }, HOLDINGS_REFRESH_DEBOUNCE_MS);
-  }, [refreshTokenHoldings]);
 
   const mapTransferToTransaction = useCallback(
     (transfer: WalletTransfer): Transaction => {
@@ -1825,7 +1810,6 @@ export default function Home() {
     const handleBalanceUpdate = (lamports: number) => {
       if (isCancelled) return;
       setSolBalanceLamports((prev) => (prev === lamports ? prev : lamports));
-      scheduleTokenHoldingsRefresh();
     };
 
     const cachedBalance = getCachedWalletBalance(walletAddress);
@@ -1845,7 +1829,7 @@ export default function Home() {
       isCancelled = true;
       walletBalanceListeners.delete(handleBalanceUpdate);
     };
-  }, [scheduleTokenHoldingsRefresh, walletAddress]);
+  }, [walletAddress]);
 
   // Fetch token holdings
   useEffect(() => {
@@ -1857,46 +1841,49 @@ export default function Home() {
     setTokenHoldings([]);
 
     void refreshTokenHoldings(false);
-
-    return () => {
-      if (holdingsRefreshTimerRef.current) {
-        clearTimeout(holdingsRefreshTimerRef.current);
-        holdingsRefreshTimerRef.current = null;
-      }
-    };
   }, [refreshTokenHoldings, walletAddress]);
 
-  // Refresh holdings on any portfolio-relevant SPL token account changes.
+  // Keep holdings in sync with wallet asset websocket updates.
   useEffect(() => {
     if (USE_MOCK_DATA) return;
     if (!walletAddress) return;
 
+    let isCancelled = false;
     let unsubscribe: (() => Promise<void>) | null = null;
 
     void (async () => {
       try {
-        unsubscribe = await subscribeToWalletAssetChanges(
+        unsubscribe = await subscribeToTokenHoldings(
           walletAddress,
-          () => {
-            scheduleTokenHoldingsRefresh();
+          (holdings) => {
+            if (isCancelled) return;
+            holdingsFetchIdRef.current += 1;
+            setTokenHoldings(holdings);
+            hasLoadedHoldingsRef.current = true;
+            setIsHoldingsLoading(false);
           },
           {
-            debounceMs: 0,
+            debounceMs: HOLDINGS_REFRESH_DEBOUNCE_MS,
             commitment: "confirmed",
-            includeNative: false,
+            includeNative: true,
+            emitInitial: false,
+            onError: (error) => {
+              console.error("Failed to refresh token holdings from websocket", error);
+            },
           }
         );
       } catch (error) {
-        console.error("Failed to subscribe to wallet asset changes", error);
+        console.error("Failed to subscribe to token holdings", error);
       }
     })();
 
     return () => {
+      isCancelled = true;
       if (unsubscribe) {
         void unsubscribe();
       }
     };
-  }, [scheduleTokenHoldingsRefresh, walletAddress]);
+  }, [walletAddress]);
 
   useEffect(() => {
     if (USE_MOCK_DATA) return;
