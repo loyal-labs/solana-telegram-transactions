@@ -54,7 +54,6 @@ import {
 } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
-import { getSolanaEnv } from "@/lib/solana/rpc/connection";
 import {
   getAccountTransactionHistory,
   listenForAccountTransactions,
@@ -64,6 +63,7 @@ import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import {
   computePortfolioTotals,
   fetchTokenHoldings,
+  resolveTokenIcon,
   subscribeToTokenHoldings,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
@@ -2662,7 +2662,6 @@ export default function Home() {
                 hapticFeedback.impactOccurred("light");
                 setSwapSheetOpen(true);
               }}
-              disabled={getSolanaEnv() !== "mainnet"}
             />
             <ActionButton
               icon={<ScanIcon />}
@@ -2697,75 +2696,77 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 items-center px-4 pb-4">
-                  {displayTokens.slice(0, 5).map((token) => (
-                    <div
-                      key={token.mint}
-                      className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
-                      style={{ border: "2px solid #f2f2f7" }}
-                    >
-                      {/* Token icon */}
-                      <div className="py-1.5 pr-3">
-                        <div className="w-12 h-12 relative">
-                          <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
-                            {token.imageUrl && (
+                  {displayTokens.slice(0, 5).map((token) => {
+                    const iconSrc = resolveTokenIcon(token);
+
+                    return (
+                      <div
+                        key={token.mint}
+                        className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
+                        style={{ border: "2px solid #f2f2f7" }}
+                      >
+                        {/* Token icon */}
+                        <div className="py-1.5 pr-3">
+                          <div className="w-12 h-12 relative">
+                            <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
                               <Image
-                                src={token.imageUrl}
+                                src={iconSrc}
                                 alt={token.symbol}
                                 fill
                                 className="object-cover"
                               />
+                            </div>
+                            {token.isSecured && (
+                              <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
+                                <Image
+                                  src="/Shield.svg"
+                                  alt="Secured"
+                                  width={20}
+                                  height={20}
+                                />
+                              </div>
                             )}
                           </div>
-                          {token.isSecured && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
-                              <Image
-                                src="/Shield.svg"
-                                alt="Secured"
-                                width={20}
-                                height={20}
-                              />
-                            </div>
-                          )}
+                        </div>
+                        {/* Token info */}
+                        <div className="flex-1 flex flex-col py-2.5 min-w-0">
+                          <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px]">
+                            {token.symbol}
+                          </p>
+                          <p
+                            className="text-[15px] leading-5"
+                            style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                          >
+                            {token.priceUsd !== null
+                              ? `$${token.priceUsd.toLocaleString("en-US", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}`
+                              : "—"}
+                          </p>
+                        </div>
+                        {/* Token amount */}
+                        <div className="flex flex-col items-end py-2.5 pl-3">
+                          <p className="text-[17px] text-black leading-[22px] text-right">
+                            {token.balance.toLocaleString("en-US", {
+                              maximumFractionDigits: 4,
+                            })}
+                          </p>
+                          <p
+                            className="text-[15px] leading-5 text-right"
+                            style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                          >
+                            {token.valueUsd !== null
+                              ? `$${token.valueUsd.toLocaleString("en-US", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}`
+                              : "—"}
+                          </p>
                         </div>
                       </div>
-                      {/* Token info */}
-                      <div className="flex-1 flex flex-col py-2.5 min-w-0">
-                        <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px]">
-                          {token.symbol}
-                        </p>
-                        <p
-                          className="text-[15px] leading-5"
-                          style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                        >
-                          {token.priceUsd !== null
-                            ? `$${token.priceUsd.toLocaleString("en-US", {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`
-                            : "—"}
-                        </p>
-                      </div>
-                      {/* Token amount */}
-                      <div className="flex flex-col items-end py-2.5 pl-3">
-                        <p className="text-[17px] text-black leading-[22px] text-right">
-                          {token.balance.toLocaleString("en-US", {
-                            maximumFractionDigits: 4,
-                          })}
-                        </p>
-                        <p
-                          className="text-[15px] leading-5 text-right"
-                          style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                        >
-                          {token.valueUsd !== null
-                            ? `$${token.valueUsd.toLocaleString("en-US", {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}`
-                            : "—"}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {/* Show All button */}
                   {tokenHoldings.length > 5 && (

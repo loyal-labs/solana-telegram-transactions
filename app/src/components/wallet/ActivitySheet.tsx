@@ -533,7 +533,7 @@ export default function ActivitySheet({
                                 src={toIcon}
                                 alt={toSymbol}
                                 fill
-                                className="object-cover"
+                                className="object-contain"
                               />
                             </div>
                           </div>
@@ -591,7 +591,7 @@ export default function ActivitySheet({
                                   src={transaction.secureTokenIcon || "/tokens/solana-sol-logo.png"}
                                   alt={transaction.secureTokenSymbol || "Token"}
                                   fill
-                                  className="object-cover"
+                                  className="object-contain"
                                 />
                               </div>
                               {isSecureTransaction && (
@@ -666,7 +666,7 @@ export default function ActivitySheet({
                                 src={tokenInfo?.icon || "/tokens/solana-sol-logo.png"}
                                 alt={tokenInfo?.symbol || "SOL"}
                                 fill
-                                className="object-cover"
+                                className="object-contain"
                               />
                             </div>
                           )}

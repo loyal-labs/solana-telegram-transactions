@@ -5,6 +5,7 @@ import {
 } from "./constants";
 import { fetchTokenHoldings } from "./fetch-token-holdings";
 import { computePortfolioTotals } from "./portfolio";
+import { resolveTokenIcon } from "./resolve-token-info";
 import {
   subscribeToTokenHoldings,
   type SubscribeToTokenHoldingsOptions,
@@ -17,6 +18,7 @@ export {
   fetchTokenHoldings,
   KNOWN_TOKEN_ICONS,
   NATIVE_SOL_MINT,
+  resolveTokenIcon,
   subscribeToTokenHoldings,
   type SubscribeToTokenHoldingsOptions,
   type TokenHolding,
