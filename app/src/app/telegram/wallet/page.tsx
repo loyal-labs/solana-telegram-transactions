@@ -608,9 +608,9 @@ export default function Home() {
     new Set()
   );
 
-  // Sticky balance pill state
+  // Sticky balance pill state (scroll-driven, synced with header logo fade)
   const balanceRef = useRef<HTMLDivElement>(null);
-  const [showStickyBalance, setShowStickyBalance] = useState(false);
+  const [stickyBalanceOpacity, setStickyBalanceOpacity] = useState(0);
 
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -940,7 +940,10 @@ export default function Home() {
             const existing = existingBySignature.get(tx.signature);
             if (!existing) return tx;
             // Preserve app-injected swap data when on-chain data arrives
-            if (existing.transferType === "swap" && tx.transferType !== "swap") {
+            if (
+              existing.transferType === "swap" &&
+              tx.transferType !== "swap"
+            ) {
               return { ...tx, ...existing };
             }
             return { ...existing, ...tx };
@@ -1769,7 +1772,10 @@ export default function Home() {
             includeNative: true,
             emitInitial: false,
             onError: (error) => {
-              console.error("Failed to refresh token holdings from websocket", error);
+              console.error(
+                "Failed to refresh token holdings from websocket",
+                error
+              );
             },
           }
         );
@@ -1810,7 +1816,10 @@ export default function Home() {
               if (matchIndex >= 0) {
                 const existing = next[matchIndex];
                 // Preserve app-injected swap data when on-chain data arrives
-                if (existing.transferType === "swap" && mapped.transferType !== "swap") {
+                if (
+                  existing.transferType === "swap" &&
+                  mapped.transferType !== "swap"
+                ) {
                   next[matchIndex] = { ...mapped, ...existing };
                 } else {
                   next[matchIndex] = { ...existing, ...mapped };
@@ -2193,26 +2202,38 @@ export default function Home() {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // Track balance visibility for sticky pill
+  // Track balance card position for sticky pill crossfade with header logo.
+  // Crossfade starts as the card bottom approaches the header — i.e. when
+  // the card is almost fully scrolled behind the header, not when its top
+  // edge first touches it.
   useEffect(() => {
-    const balanceElement = balanceRef.current;
-    if (!balanceElement) return;
+    const headerBottom = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
+    const fadeRange = 50; // px over which the crossfade happens
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        // Show sticky pill when balance is not visible
-        setShowStickyBalance(!entry.isIntersecting);
-      },
-      {
-        threshold: 0,
-        rootMargin: `-${
-          Math.max(safeAreaInsetTop || 0, 12) + 15
-        }px 0px 0px 0px`,
-      }
-    );
+    const handleScroll = () => {
+      const el = balanceRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      // Progress 0→1 as the card bottom moves from (headerBottom + fadeRange) to headerBottom
+      const progress =
+        rect.bottom >= headerBottom + fadeRange
+          ? 0
+          : rect.bottom <= headerBottom
+          ? 1
+          : 1 - (rect.bottom - headerBottom) / fadeRange;
+      setStickyBalanceOpacity(progress);
+      document.documentElement.style.setProperty(
+        "--header-logo-opacity",
+        String(1 - progress)
+      );
+    };
 
-    observer.observe(balanceElement);
-    return () => observer.disconnect();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      document.documentElement.style.removeProperty("--header-logo-opacity");
+    };
   }, [safeAreaInsetTop]);
 
   const handleScrollToTop = useCallback(() => {
@@ -2243,38 +2264,35 @@ export default function Home() {
         className="min-h-screen font-sans overflow-hidden relative flex flex-col"
         style={{ background: "#fff" }}
       >
-        {/* Sticky Balance Pill — crossfades with logo in header */}
-        <AnimatePresence>
-          {showStickyBalance && !showBalanceSkeleton && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.7 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.7 }}
-              transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
-              onClick={handleScrollToTop}
-              className="fixed left-1/2 -translate-x-1/2 z-[51] flex items-center px-4 py-1.5 rounded-[54px] active:opacity-80 transition-opacity"
-              style={{
-                top: `${Math.max(safeAreaInsetTop || 0, 12) + 4}px`,
-                background: "#fff",
-              }}
+        {/* Sticky Balance Pill — scroll-driven crossfade with header logo */}
+        {!showBalanceSkeleton && (
+          <button
+            onClick={handleScrollToTop}
+            className="fixed left-1/2 -translate-x-1/2 z-[51] flex items-center px-4 py-1.5 rounded-[54px] active:opacity-80"
+            style={{
+              top: `${Math.max(safeAreaInsetTop || 0, 12) + 4}px`,
+              background: "#fff",
+              opacity: stickyBalanceOpacity,
+              pointerEvents: stickyBalanceOpacity > 0.1 ? "auto" : "none",
+              willChange: "opacity",
+            }}
+          >
+            <span
+              className="text-sm font-medium text-black"
+              style={{ fontVariantNumeric: "tabular-nums" }}
             >
-              <span
-                className="text-sm font-medium text-black"
-                style={{ fontVariantNumeric: "tabular-nums" }}
-              >
-                {displayCurrency === "USD"
-                  ? `$${usdBalanceNumeric.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}`
-                  : `${solBalanceNumeric.toLocaleString("en-US", {
-                      minimumFractionDigits: 4,
-                      maximumFractionDigits: 4,
-                    })} SOL`}
-              </span>
-            </motion.button>
-          )}
-        </AnimatePresence>
+              {displayCurrency === "USD"
+                ? `$${usdBalanceNumeric.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}`
+                : `${solBalanceNumeric.toLocaleString("en-US", {
+                    minimumFractionDigits: 4,
+                    maximumFractionDigits: 4,
+                  })} SOL`}
+            </span>
+          </button>
+        )}
 
         {/* Main Content */}
         <div className="relative flex-1 flex flex-col w-full">

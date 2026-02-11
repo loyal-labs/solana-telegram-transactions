@@ -10,15 +10,10 @@ export default function Header() {
     viewport.safeAreaInsetTop as Signal<number>
   );
   const [isScrolled, setIsScrolled] = useState(false);
-  const [logoOpacity, setLogoOpacity] = useState(1);
 
   useEffect(() => {
     const handleScroll = () => {
-      const y = window.scrollY;
-      setIsScrolled(y > 0);
-      // Fade logo out between 80–160px of scroll (when balance card exits viewport)
-      const opacity = y < 80 ? 1 : y > 160 ? 0 : 1 - (y - 80) / 80;
-      setLogoOpacity(opacity);
+      setIsScrolled(window.scrollY > 0);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
@@ -44,8 +39,8 @@ export default function Header() {
         priority
         style={{
           marginTop: -4,
-          opacity: logoOpacity,
-          transition: "opacity 0.15s ease-out",
+          opacity: "var(--header-logo-opacity, 1)",
+          willChange: "opacity",
         }}
       />
       {/* Bottom border line - only visible when scrolled */}
