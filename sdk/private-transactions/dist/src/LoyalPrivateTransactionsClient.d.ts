@@ -30,8 +30,10 @@ import type { WalletSigner, WalletLike, EphemeralClientConfig, DepositData, User
  * await ephemeralClient.undelegateDeposit({ user, tokenMint, ... });
  */
 export declare class LoyalPrivateTransactionsClient {
-    private readonly program;
-    private readonly wallet;
+    readonly program: Program<TelegramPrivateTransfer>;
+    readonly wallet: WalletLike;
+    readonly authToken?: string;
+    readonly authTokenExpiresAt?: number;
     private constructor();
     /**
      * Create client from an AnchorProvider (for existing Anchor projects)
@@ -50,8 +52,8 @@ export declare class LoyalPrivateTransactionsClient {
      */
     static fromKeypair(connection: Connection, keypair: Keypair): LoyalPrivateTransactionsClient;
     /**
-     * Create client connected to an ephemeral rollup endpoint
-     * Use this for executing transactions on the Private Ephemeral Rollup
+     * Create client connected to an ephemeral rollup endpoint with PER auth token.
+     * Verifies TEE RPC integrity and obtains an auth token automatically.
      */
     static fromEphemeral(config: EphemeralClientConfig): Promise<LoyalPrivateTransactionsClient>;
     /**

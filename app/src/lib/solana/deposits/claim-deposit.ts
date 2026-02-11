@@ -19,7 +19,9 @@ const ensureRecipientTokenAccount = async (
     NATIVE_MINT,
     recipient
   );
-  const ataInfo = await provider.connection.getAccountInfo(recipientTokenAccount);
+  const ataInfo = await provider.connection.getAccountInfo(
+    recipientTokenAccount
+  );
   if (ataInfo) {
     return { recipientTokenAccount, createdAta: false };
   }
@@ -49,10 +51,8 @@ export const claimDeposit = async (
 
   const privateClient = LoyalPrivateTransactionsClient.fromProvider(provider);
   const sessionPda = getSessionPda(recipient, verificationProgram);
-  const { recipientTokenAccount, createdAta } = await ensureRecipientTokenAccount(
-    provider,
-    recipient
-  );
+  const { recipientTokenAccount, createdAta } =
+    await ensureRecipientTokenAccount(provider, recipient);
 
   await privateClient.claimUsernameDeposit({
     username,
@@ -65,11 +65,7 @@ export const claimDeposit = async (
 
   if (createdAta) {
     const unwrapTransaction = new Transaction().add(
-      createCloseAccountInstruction(
-        recipientTokenAccount,
-        recipient,
-        recipient
-      )
+      createCloseAccountInstruction(recipientTokenAccount, recipient, recipient)
     );
     await provider.sendAndConfirm(unwrapTransaction);
   }
