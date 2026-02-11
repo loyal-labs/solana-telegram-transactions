@@ -10,6 +10,16 @@ permissions:
 jobs:
   build-app:
     runs-on: ubuntu-latest
+    env:
+      ASKLOYAL_TGBOT_KEY: "test-bot-token"
+      TELEGRAM_SETUP_SECRET: "test-setup-secret"
+      DATABASE_URL: "postgresql://user:pass@localhost:5432/app"
+      REDPILL_AI_API_KEY: "test-redpill-key"
+      DFLOW_API_KEY: "test-dflow-key"
+      IRYS_SOLANA_KEY: "test-irys-key"
+      DEPLOYMENT_PK: "test-deployment-pk"
+      NEXT_PUBLIC_TELEGRAM_BOT_ID: "123456"
+      NEXT_PUBLIC_SOLANA_ENV: "devnet"
     defaults:
       run:
         working-directory: app
