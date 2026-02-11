@@ -1,0 +1,35 @@
+name: Commit Style
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  check-commit-style:
+    runs-on: ubuntu-latest
+    env:
+      PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.17"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check commit messages in PR
+        run: bunx commitlint --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
+
+      - name: Check pull request title
+        run: echo "$PR_TITLE" | bunx commitlint --verbose
