@@ -128,9 +128,14 @@ const parseTransactionError = async (
       );
     }
 
-    if ((!logs || logs.length === 0) && typeof candidate.getLogs === "function") {
+    if (
+      (!logs || logs.length === 0) &&
+      typeof candidate.getLogs === "function"
+    ) {
       try {
-        const fetchedLogs = await (candidate.getLogs as () => Promise<unknown>)();
+        const fetchedLogs = await (
+          candidate.getLogs as () => Promise<unknown>
+        )();
         if (Array.isArray(fetchedLogs)) {
           logs = fetchedLogs.filter(
             (line): line is string => typeof line === "string"
@@ -208,7 +213,9 @@ const ensureRecipientTokenAccount = async (
     recipientPubKey
   );
 
-  const ataInfo = await provider.connection.getAccountInfo(recipientTokenAccount);
+  const ataInfo = await provider.connection.getAccountInfo(
+    recipientTokenAccount
+  );
   if (ataInfo) {
     return recipientTokenAccount;
   }
@@ -227,7 +234,11 @@ const ensureRecipientTokenAccount = async (
   createAtaTx.recentBlockhash = blockhash;
   createAtaTx.lastValidBlockHeight = lastValidBlockHeight;
 
-  const created = await sendSignedTransaction(provider, createAtaTx, payerWallet);
+  const created = await sendSignedTransaction(
+    provider,
+    createAtaTx,
+    payerWallet
+  );
   if (!created.ok) {
     throw new Error(
       `Failed to create recipient token account: ${created.message}`
@@ -271,7 +282,11 @@ const verifyInitDataGasless = async (
   verifyTx.recentBlockhash = blockhash;
   verifyTx.lastValidBlockHeight = lastValidBlockHeight;
 
-  const verifyResult = await sendSignedTransaction(provider, verifyTx, payerWallet);
+  const verifyResult = await sendSignedTransaction(
+    provider,
+    verifyTx,
+    payerWallet
+  );
   return verifyResult.ok;
 };
 

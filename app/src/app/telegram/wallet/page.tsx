@@ -2679,7 +2679,7 @@ export default function Home() {
                         : token.symbol;
                     return (
                       <div
-                        key={`${token.mint} (${token.name})`}
+                        key={`${token.mint} (${token.name})${token.isSecured ? " secured" : ""}`}
                         className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
                         style={{ border: "2px solid #f2f2f7" }}
                       >
