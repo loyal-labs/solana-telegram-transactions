@@ -50,8 +50,6 @@ export type SendSheetProps = {
   onStepChange: (step: 1 | 2 | 3 | 4 | 5) => void;
   balance?: number | null;
   walletAddress?: string;
-  starsBalance?: number;
-  onTopUpStars?: () => void;
   solPriceUsd?: number | null;
   isSolPriceLoading?: boolean;
   sentAmountSol?: number;
@@ -184,8 +182,6 @@ export default function SendSheet({
   onStepChange,
   balance,
   walletAddress,
-  starsBalance: _starsBalance = 0,
-  onTopUpStars: _onTopUpStars,
   solPriceUsd: solPriceUsdProp,
   isSolPriceLoading: isSolPriceLoadingProp,
   sentAmountSol,

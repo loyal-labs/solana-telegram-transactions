@@ -46,7 +46,6 @@ import {
   TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
 } from "@/lib/constants";
-import { fetchInvoiceState } from "@/lib/irys/fetch-invoice-state";
 import {
   refundDeposit,
   subscribeToDepositsWithUsername,
@@ -106,7 +105,6 @@ import {
   validateInitData,
 } from "@/lib/telegram/mini-app/init-data-transform";
 import { parseUsernameFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
-import { openInvoice } from "@/lib/telegram/mini-app/invoice";
 import { openQrScanner } from "@/lib/telegram/mini-app/qr-code";
 import {
   createShareMessage,
@@ -421,23 +419,6 @@ const setCachedSolPrice = (price: number): void => {
   solPriceFetchedAt = Date.now();
 };
 
-// Stars balance cache (keyed by wallet address)
-const starsBalanceCache = new Map<string, number>();
-
-const getCachedStarsBalance = (walletAddress: string | null): number | null => {
-  if (!walletAddress) return null;
-  const cached = starsBalanceCache.get(walletAddress);
-  return typeof cached === "number" ? cached : null;
-};
-
-const setCachedStarsBalance = (
-  walletAddress: string | null,
-  stars: number
-): void => {
-  if (!walletAddress) return;
-  starsBalanceCache.set(walletAddress, stars);
-};
-
 // Incoming transactions cache (keyed by username)
 let cachedUsername: string | null = null;
 const incomingTransactionsCache = new Map<string, IncomingTransaction[]>();
@@ -551,15 +532,6 @@ export default function Home() {
   const [isHoldingsLoading, setIsHoldingsLoading] = useState(() =>
     USE_MOCK_DATA ? false : true
   );
-  const [starsBalance, setStarsBalance] = useState<number>(() =>
-    cachedWalletAddress ? getCachedStarsBalance(cachedWalletAddress) ?? 0 : 0
-  );
-  const [isStarsLoading, setIsStarsLoading] = useState(
-    () =>
-      !cachedWalletAddress ||
-      getCachedStarsBalance(cachedWalletAddress) === null
-  );
-  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   const [isLoading, setIsLoading] = useState(() =>
     USE_MOCK_DATA ? false : !hasCachedWalletData()
   );
@@ -661,71 +633,6 @@ export default function Home() {
     }
     setReceiveSheetOpen(true);
   }, []);
-  const handleTopUpStars = useCallback(async () => {
-    if (isCreatingInvoice) return;
-
-    if (hapticFeedback.impactOccurred.isAvailable()) {
-      hapticFeedback.impactOccurred("light");
-    }
-
-    if (!rawInitData) {
-      console.error("Cannot create invoice: init data is missing");
-      return;
-    }
-
-    setIsCreatingInvoice(true);
-    try {
-      const serverHost = process.env.NEXT_PUBLIC_SERVER_HOST;
-      const endpoint = (() => {
-        // prefer same-origin to avoid CORS
-        if (typeof window !== "undefined") {
-          if (!serverHost) return "/api/telegram/invoice";
-          try {
-            const configured = new URL(serverHost);
-            const current = new URL(window.location.origin);
-            const hostsMatch =
-              configured.protocol === current.protocol &&
-              configured.host === current.host;
-            return hostsMatch
-              ? new URL("/api/telegram/invoice", configured).toString()
-              : "/api/telegram/invoice";
-          } catch {
-            return "/api/telegram/invoice";
-          }
-        }
-        // fall back to configured host if provided
-        return serverHost
-          ? new URL("/api/telegram/invoice", serverHost).toString()
-          : "/api/telegram/invoice";
-      })();
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        body: new TextEncoder().encode(rawInitData),
-      });
-
-      if (!response.ok) {
-        console.error(
-          "Failed to create invoice",
-          await response.text().catch(() => response.statusText)
-        );
-        return;
-      }
-
-      const data = (await response.json()) as { invoiceLink?: string };
-      if (!data.invoiceLink) {
-        console.error("Invoice link missing from response");
-        return;
-      }
-
-      await openInvoice(data.invoiceLink);
-    } catch (error) {
-      console.error("Failed to open invoice", error);
-    } finally {
-      setIsCreatingInvoice(false);
-    }
-  }, [isCreatingInvoice, rawInitData]);
-
   const handleOpenWalletTransactionDetails = useCallback(
     (transaction: Transaction) => {
       if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -1794,54 +1701,6 @@ export default function Home() {
     void loadWalletTransactions();
   }, [walletAddress, loadWalletTransactions]);
 
-  useEffect(() => {
-    if (USE_MOCK_DATA) return;
-    if (!walletAddress) return;
-
-    let isCancelled = false;
-
-    // Check if we have cached stars (state may have been initialized from it)
-    const hasCache = getCachedStarsBalance(walletAddress) !== null;
-
-    // Only show loading if we don't have cache
-    if (!hasCache) {
-      setIsStarsLoading(true);
-    } else {
-      // Ensure loading is false if we have cache
-      setIsStarsLoading(false);
-    }
-
-    const loadStarsBalance = async () => {
-      try {
-        const invoice = await fetchInvoiceState(walletAddress);
-        if (isCancelled) return;
-        const remaining = Number.isFinite(invoice.remainingStars)
-          ? Number(invoice.remainingStars)
-          : 0;
-        setCachedStarsBalance(walletAddress, remaining);
-        setStarsBalance(remaining);
-      } catch (error) {
-        if (!isCancelled) {
-          console.error("Failed to fetch Stars balance", error);
-          // Only reset to 0 if we don't have cached data
-          if (!hasCache) {
-            setStarsBalance(0);
-          }
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsStarsLoading(false);
-        }
-      }
-    };
-
-    void loadStarsBalance();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [walletAddress]);
-
   // Subscribe to websocket balance updates so inbound funds appear in real time
   useEffect(() => {
     if (USE_MOCK_DATA) return;
@@ -2265,8 +2124,6 @@ export default function Home() {
     isLoading ||
     isHoldingsLoading ||
     (displayCurrency === "USD" && portfolioTotals.totalSol === null);
-  const showStarsSkeleton = isLoading || isStarsLoading;
-
   // Computed numeric values for NumberFlow animations (portfolio totals)
   const usdBalanceNumeric = portfolioTotals.totalUsd;
   const solBalanceNumeric = portfolioTotals.totalSol ?? 0;
@@ -3364,8 +3221,6 @@ export default function Home() {
         onStepChange={setSendStep}
         balance={solBalanceLamports}
         walletAddress={walletAddress ?? undefined}
-        starsBalance={starsBalance}
-        onTopUpStars={handleTopUpStars}
         solPriceUsd={solPriceUsd}
         isSolPriceLoading={isSolPriceLoading}
         sentAmountSol={sentAmountSol}
