@@ -242,7 +242,8 @@ Required for frontend (in `/app/.env.local`):
 ```env
 NEXT_PUBLIC_TELEGRAM_BOT_ID=<bot_id>
 NEXT_PUBLIC_SOLANA_ENV=devnet  # mainnet, devnet, or localnet
-ASKLOYAL_TGBOT_KEY=<bot_token>
+ASKLOYAL_TGBOT_KEY=<bot_token>  # Telegram Bot API token only
+TELEGRAM_SETUP_SECRET=<route_secret>  # Bearer token for /api/telegram/setup-commands
 REDPILL_AI_API_KEY=<api_key>
 DATABASE_URL=postgresql://...
 MESSAGE_ENCRYPTION_KEY=<base64-32-bytes>  # For encrypted bot messages

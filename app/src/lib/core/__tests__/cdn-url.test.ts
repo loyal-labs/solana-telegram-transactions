@@ -1,9 +1,14 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-
 import {
-  createCloudflareCdnUrlClient,
-  getCloudflareCdnBaseUrlFromEnv,
-} from "../cdn-url";
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  mock,
+  test,
+} from "bun:test";
+
+mock.module("server-only", () => ({}));
 
 const CDN_ENV_KEYS = [
   "CLOUDFLARE_CDN_BASE_URL",
@@ -18,7 +23,31 @@ function clearCdnEnv(): void {
   }
 }
 
+let createCloudflareCdnUrlClient: (config: {
+  baseUrl: string;
+  keyPrefix?: string;
+  defaultQuery?: Record<string, string | number | boolean | null | undefined>;
+}) => {
+  resolveUrl: (input: {
+    key: string;
+    query?: Record<string, string | number | boolean | null | undefined>;
+  }) => string;
+  resolveUrls: (
+    keys: string[],
+    options?: {
+      query?: Record<string, string | number | boolean | null | undefined>;
+    }
+  ) => string[];
+};
+let getCloudflareCdnBaseUrlFromEnv: () => string | null;
+
 describe("cdn-url", () => {
+  beforeAll(async () => {
+    const loadedModule = await import("../cdn-url");
+    createCloudflareCdnUrlClient = loadedModule.createCloudflareCdnUrlClient;
+    getCloudflareCdnBaseUrlFromEnv = loadedModule.getCloudflareCdnBaseUrlFromEnv;
+  });
+
   beforeEach(() => {
     clearCdnEnv();
   });

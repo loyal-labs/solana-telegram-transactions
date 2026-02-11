@@ -1,10 +1,10 @@
+import { serverEnv } from "../core/config/server";
 import { fetchJson, fetchStream } from "../core/http";
 import { REDPILL_BASE_URL } from "./constants";
 import type { ChatCompletionRequest, ChatCompletionResponse } from "./types";
 
 const getHeaders = () => {
-  const apiKey = process.env.REDPILL_AI_API_KEY;
-  if (!apiKey) throw new Error("REDPILL_AI_API_KEY is not set");
+  const apiKey = serverEnv.redpillApiKey;
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${apiKey}`,

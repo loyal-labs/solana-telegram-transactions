@@ -1,13 +1,16 @@
 import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 
+import { serverEnv } from "@/lib/core/config/server";
 import { getBot } from "@/lib/telegram/bot-api/bot";
 import { registerBotCommands } from "@/lib/telegram/bot-api/register-commands";
 
 export async function POST(request: Request) {
-  const expectedToken = process.env.ASKLOYAL_TGBOT_KEY;
-  if (!expectedToken) {
-    console.error("ASKLOYAL_TGBOT_KEY environment variable is not set");
+  let expectedToken: string;
+  try {
+    expectedToken = serverEnv.telegramSetupSecret;
+  } catch {
+    console.error("TELEGRAM_SETUP_SECRET environment variable is not set");
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   }
 

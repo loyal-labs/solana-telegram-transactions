@@ -1,3 +1,4 @@
+import { serverEnv } from "../core/config/server";
 import { fetchJson } from "../core/http";
 import { DEFAULT_PRIORITY_FEE_LAMPORTS, DFLOW_API_BASE_URL, SWAP_ERRORS } from "./constants";
 import type {
@@ -8,11 +9,11 @@ import type {
 } from "./types";
 
 function getApiKey(): string {
-  const apiKey = process.env.DFLOW_API_KEY;
-  if (!apiKey) {
+  try {
+    return serverEnv.dflowApiKey;
+  } catch {
     throw new Error(SWAP_ERRORS.MISSING_API_KEY);
   }
-  return apiKey;
 }
 
 function buildHeaders(): HeadersInit {

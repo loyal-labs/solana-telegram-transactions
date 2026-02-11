@@ -46,6 +46,7 @@ import {
   TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
 } from "@/lib/constants";
+import { publicEnv } from "@/lib/core/config/public";
 import { fetchInvoiceState } from "@/lib/irys/fetch-invoice-state";
 import {
   refundDeposit,
@@ -675,7 +676,7 @@ export default function Home() {
 
     setIsCreatingInvoice(true);
     try {
-      const serverHost = process.env.NEXT_PUBLIC_SERVER_HOST;
+      const serverHost = publicEnv.serverHost;
       const endpoint = (() => {
         // prefer same-origin to avoid CORS
         if (typeof window !== "undefined") {

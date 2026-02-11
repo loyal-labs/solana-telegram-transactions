@@ -1,11 +1,12 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
-import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import {
   Keypair,
   PublicKey,
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";
+
+import { publicEnv } from "@/lib/core/config/public";
 
 import { getConnection } from "../rpc/connection";
 import { SimpleWallet } from "./wallet-implementation";
@@ -47,16 +48,8 @@ export const getCustomWalletProvider = async (
   return new AnchorProvider(connection, wallet);
 };
 
-export const getGaslessKeypair = async (): Promise<Keypair> => {
-  const privateKey = process.env.DEPLOYMENT_PK;
-  if (!privateKey) {
-    throw new Error("GASLESS_SOLANA_KEY is not set");
-  }
-  return Keypair.fromSecretKey(bs58.decode(privateKey));
-};
-
 export const getGaslessPublicKey = async (): Promise<PublicKey> => {
-  const publicKey = process.env.NEXT_PUBLIC_GAS_PUBLIC_KEY;
+  const publicKey = publicEnv.gasPublicKey;
   if (!publicKey) {
     throw new Error("NEXT_PUBLIC_GAS_PUBLIC_KEY is not set");
   }

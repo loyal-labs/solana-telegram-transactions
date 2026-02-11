@@ -6,16 +6,8 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 
+import { serverEnv } from "./config/server";
 import { joinObjectPaths } from "./object-path";
-
-const REQUIRED_R2_ENV_VARS = [
-  "CLOUDFLARE_R2_ACCOUNT_ID",
-  "CLOUDFLARE_R2_ACCESS_KEY_ID",
-  "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
-  "CLOUDFLARE_R2_BUCKET_NAME",
-] as const;
-
-type RequiredR2EnvVar = (typeof REQUIRED_R2_ENV_VARS)[number];
 
 export type CloudflareR2UploadClientConfig = {
   accountId: string;
@@ -47,14 +39,6 @@ export type CloudflareR2UploadClient = {
 
 let uploadClientFromEnv: CloudflareR2UploadClient | null = null;
 
-function getRequiredEnv(name: RequiredR2EnvVar): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`${name} is not set`);
-  }
-  return value;
-}
-
 function createS3Client(config: CloudflareR2UploadClientConfig): S3Client {
   return new S3Client({
     region: "auto",
@@ -71,20 +55,17 @@ function createS3Client(config: CloudflareR2UploadClientConfig): S3Client {
 }
 
 export function isCloudflareR2UploadConfigured(): boolean {
-  return REQUIRED_R2_ENV_VARS.every((name) => {
-    const value = process.env[name];
-    return typeof value === "string" && value.trim().length > 0;
-  });
+  return serverEnv.isCloudflareR2UploadConfigured;
 }
 
 export function getCloudflareR2UploadClientConfigFromEnv(): CloudflareR2UploadClientConfig {
   return {
-    accountId: getRequiredEnv("CLOUDFLARE_R2_ACCOUNT_ID"),
-    accessKeyId: getRequiredEnv("CLOUDFLARE_R2_ACCESS_KEY_ID"),
-    secretAccessKey: getRequiredEnv("CLOUDFLARE_R2_SECRET_ACCESS_KEY"),
-    bucketName: getRequiredEnv("CLOUDFLARE_R2_BUCKET_NAME"),
-    endpoint: process.env.CLOUDFLARE_R2_S3_ENDPOINT?.trim() || undefined,
-    uploadPrefix: process.env.CLOUDFLARE_R2_UPLOAD_PREFIX?.trim() || undefined,
+    accountId: serverEnv.cloudflareR2AccountId,
+    accessKeyId: serverEnv.cloudflareR2AccessKeyId,
+    secretAccessKey: serverEnv.cloudflareR2SecretAccessKey,
+    bucketName: serverEnv.cloudflareR2BucketName,
+    endpoint: serverEnv.cloudflareR2S3Endpoint,
+    uploadPrefix: serverEnv.cloudflareR2UploadPrefix,
   };
 }
 

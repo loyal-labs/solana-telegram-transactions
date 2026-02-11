@@ -1,0 +1,79 @@
+import "server-only";
+
+import { getOptionalEnv, getRequiredEnv } from "./shared";
+
+const CLOUDFLARE_CDN_BASE_URL_ENV_KEYS = [
+  "CLOUDFLARE_CDN_BASE_URL",
+  "NEXT_PUBLIC_CLOUDFLARE_CDN_BASE_URL",
+  "CLOUDFLARE_R2_PUBLIC_DEV_URL",
+  "NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_DEV_URL",
+] as const;
+
+const REQUIRED_R2_ENV_VARS = [
+  "CLOUDFLARE_R2_ACCOUNT_ID",
+  "CLOUDFLARE_R2_ACCESS_KEY_ID",
+  "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+  "CLOUDFLARE_R2_BUCKET_NAME",
+] as const;
+
+const getCloudflareCdnBaseUrl = (): string | null => {
+  for (const key of CLOUDFLARE_CDN_BASE_URL_ENV_KEYS) {
+    const value = getOptionalEnv(key);
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+};
+
+export const serverEnv = {
+  get databaseUrl(): string {
+    return getRequiredEnv("DATABASE_URL");
+  },
+  get redpillApiKey(): string {
+    return getRequiredEnv("REDPILL_AI_API_KEY");
+  },
+  get dflowApiKey(): string {
+    return getRequiredEnv("DFLOW_API_KEY");
+  },
+  get irysSolanaKey(): string {
+    return getRequiredEnv("IRYS_SOLANA_KEY");
+  },
+  get messageEncryptionKey(): string | undefined {
+    return getOptionalEnv("MESSAGE_ENCRYPTION_KEY");
+  },
+  get deploymentPrivateKey(): string {
+    return getRequiredEnv("DEPLOYMENT_PK");
+  },
+  get askLoyalBotToken(): string {
+    return getRequiredEnv("ASKLOYAL_TGBOT_KEY");
+  },
+  get telegramSetupSecret(): string {
+    return getRequiredEnv("TELEGRAM_SETUP_SECRET");
+  },
+  get cloudflareCdnBaseUrl(): string | null {
+    return getCloudflareCdnBaseUrl();
+  },
+  get cloudflareR2UploadPrefix(): string | undefined {
+    return getOptionalEnv("CLOUDFLARE_R2_UPLOAD_PREFIX");
+  },
+  get cloudflareR2S3Endpoint(): string | undefined {
+    return getOptionalEnv("CLOUDFLARE_R2_S3_ENDPOINT");
+  },
+  get cloudflareR2AccountId(): string {
+    return getRequiredEnv("CLOUDFLARE_R2_ACCOUNT_ID");
+  },
+  get cloudflareR2AccessKeyId(): string {
+    return getRequiredEnv("CLOUDFLARE_R2_ACCESS_KEY_ID");
+  },
+  get cloudflareR2SecretAccessKey(): string {
+    return getRequiredEnv("CLOUDFLARE_R2_SECRET_ACCESS_KEY");
+  },
+  get cloudflareR2BucketName(): string {
+    return getRequiredEnv("CLOUDFLARE_R2_BUCKET_NAME");
+  },
+  get isCloudflareR2UploadConfigured(): boolean {
+    return REQUIRED_R2_ENV_VARS.every((name) => Boolean(getOptionalEnv(name)));
+  },
+} as const;

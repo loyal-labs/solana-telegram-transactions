@@ -1,12 +1,24 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import { decrypt } from "../decrypt";
-import { encrypt } from "../encrypt";
 import { EncryptedData } from "../types";
+
+mock.module("server-only", () => ({}));
+
+let encrypt: (plaintext: string) => Promise<EncryptedData | null>;
+let decrypt: (encrypted: EncryptedData) => Promise<string | null>;
 
 const TEST_KEY = "0fegoicH8L0zl6r5Xn7v2y7e8UAhDOyxwWtBTQXWT/A=";
 
 describe("decrypt", () => {
+  beforeAll(async () => {
+    const [encryptModule, decryptModule] = await Promise.all([
+      import("../encrypt"),
+      import("../decrypt"),
+    ]);
+    encrypt = encryptModule.encrypt;
+    decrypt = decryptModule.decrypt;
+  });
+
   beforeEach(() => {
     process.env.MESSAGE_ENCRYPTION_KEY = TEST_KEY;
   });
