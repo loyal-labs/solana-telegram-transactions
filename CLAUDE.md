@@ -12,7 +12,7 @@ Solana Telegram Transactions enables users to deposit SOL for any Telegram usern
 
 ```bash
 bun dev                    # Start dev server (turbopack)
-bun build                  # Production build
+bun run build              # Production build (Next.js)
 bun lint                   # ESLint
 bun db:generate            # Generate Drizzle migrations from schema
 bun db:migrate             # Apply migrations
@@ -55,6 +55,16 @@ anchor test --provider.cluster localnet --skip-local-validator --skip-build --sk
 bun run lint               # prettier --check
 bun run lint:fix           # prettier -w
 ```
+
+### Git Hooks
+
+```bash
+./scripts/setup-git-hooks.sh
+```
+
+- Run once per clone/worktree to enable repo hooks.
+- Hooks enforce commit message format (`commit-msg`) and run app verification before push (`pre-push`: `cd app && bun run lint && bun run build`).
+- Temporary bypass (only when necessary): `SKIP_VERIFY=1 git push`
 
 ## Architecture
 
@@ -138,6 +148,10 @@ Service layer patterns:
   });
   ```
 - **Idempotent Operations**: Use `onConflictDoNothing` or `onConflictDoUpdate` to handle duplicate inserts gracefully
+- **Server/Client Boundaries (Critical)**:
+  - Never import `@/lib/core/config/server` from client code or shared barrels consumed by client code.
+  - Keep server-only entrypoints isolated in dedicated modules (e.g. `server.ts` or `*.server.ts`) and import them only from server contexts (`/app/api`, server actions, other server-only modules).
+  - For dual-use modules (client + server), keep `index.ts` client-safe and expose server-only helpers via a separate server entrypoint.
 
 ## Git Worktree Workflow
 
@@ -221,7 +235,9 @@ refactor(ui): extract pill button component
 - Keep the subject line under 100 characters
 - Use imperative mood in the description ("add", not "added" or "adds")
 - Do not end the subject line with a period
-- Validate locally before pushing: `bun run commitlint:head`
+- Validate locally before pushing:
+  - `bun run commitlint:head`
+  - `cd app && bun run lint && bun run build`
 
 ## Pull Requests
 

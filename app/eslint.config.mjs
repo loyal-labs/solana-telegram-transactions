@@ -87,6 +87,29 @@ const eslintConfig = [
       ],
     },
   },
+  {
+    files: ["src/lib/dflow/**/*.{ts,tsx}"],
+    ignores: ["src/lib/dflow/**/*.server.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "@/lib/core/config/server",
+                "@/lib/core/config/server/*",
+                "**/core/config/server",
+                "**/core/config/server/*",
+              ],
+              message:
+                "Do not import server config into shared/client dflow modules. Use '@/lib/dflow/server' for server-only entrypoints.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

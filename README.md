@@ -12,6 +12,11 @@ bun install
 ./scripts/setup-git-hooks.sh
 ```
 
+Enabled hooks:
+- `commit-msg`: validates Conventional Commit messages.
+- `pre-push`: runs `cd app && bun run lint && bun run build` to block broken pushes.
+- Bypass only when necessary: `SKIP_VERIFY=1 git push`
+
 3. Optional local check:
 ```bash
 echo "feat(scope): short description" | bunx commitlint --verbose

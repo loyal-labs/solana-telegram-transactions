@@ -1,8 +1,4 @@
 import "server-only";
 
-export {
-  convertFromBaseUnits,
-  convertToBaseUnits,
-  fetchQuote,
-  fetchSwapTransaction,
-} from "./client";
+export { fetchQuote, fetchSwapTransaction } from "./api.server";
+export { convertFromBaseUnits, convertToBaseUnits } from "./client";
