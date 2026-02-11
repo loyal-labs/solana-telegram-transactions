@@ -63,8 +63,9 @@ bun run lint:fix           # prettier -w
 ```
 
 - Run once per clone/worktree to enable repo hooks.
-- Hooks enforce commit message format (`commit-msg`) and run app verification before push (`pre-push`: `cd app && bun run lint && bun run build`).
+- Hooks enforce commit message format (`commit-msg`) and run lint before push (`pre-push`: `cd app && bun run lint`).
 - Temporary bypass (only when necessary): `SKIP_VERIFY=1 git push`
+- CI note: app builds are intentionally not run in GitHub Actions; Vercel is the build/deploy gate.
 
 ## Architecture
 
@@ -237,7 +238,7 @@ refactor(ui): extract pill button component
 - Do not end the subject line with a period
 - Validate locally before pushing:
   - `bun run commitlint:head`
-  - `cd app && bun run lint && bun run build`
+  - `cd app && bun run lint`
 
 ## Pull Requests
 

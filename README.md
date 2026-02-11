@@ -14,8 +14,9 @@ bun install
 
 Enabled hooks:
 - `commit-msg`: validates Conventional Commit messages.
-- `pre-push`: runs `cd app && bun run lint && bun run build` to block broken pushes.
+- `pre-push`: runs `cd app && bun run lint` to catch lint issues before push.
 - Bypass only when necessary: `SKIP_VERIFY=1 git push`
+- CI note: app build is not run in GitHub Actions; Vercel is the build/deploy gate.
 
 3. Optional local check:
 ```bash
