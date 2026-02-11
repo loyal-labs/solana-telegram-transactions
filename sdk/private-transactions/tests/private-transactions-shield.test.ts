@@ -5,6 +5,7 @@ import {
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
   PROGRAM_ID,
+  ER_VALIDATOR,
 } from "../index";
 import {
   Connection,
@@ -33,10 +34,6 @@ const PER_WS_ENDPOINT = "wss://tee.magicblock.app";
 
 // const PER_RPC_ENDPOINT = "https://devnet-as.magicblock.app";
 // const PER_WS_ENDPOINT = "wss://devnet-as.magicblock.app";
-
-const ER_VALIDATOR = new PublicKey(
-  "FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA"
-); // TEE ER Validator
 
 export const SECURE_DEVNET_RPC_URL =
   "https://aurora-o23cd4-fast-devnet.helius-rpc.com";

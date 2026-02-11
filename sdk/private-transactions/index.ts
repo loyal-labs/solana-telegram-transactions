@@ -66,6 +66,7 @@ export { isKeypair, isAnchorProvider, isWalletLike } from "./src/types";
 
 // Constants
 export {
+  ER_VALIDATOR,
   PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,

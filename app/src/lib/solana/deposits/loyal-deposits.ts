@@ -5,10 +5,13 @@ import {
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import {
+  ER_VALIDATOR,
+  findDepositPda,
   LoyalPrivateTransactionsClient,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
-} from "@vladarbatov/private-transactions-test";
+  PROGRAM_ID,
+} from "@zotho/private-transactions-test";
 
 import { getConnection } from "../rpc/connection";
 import { getWalletKeypair } from "../wallet/wallet-details";
@@ -73,7 +76,7 @@ export async function shieldTokens(params: {
       user: keypair.publicKey,
       payer: keypair.publicKey,
     });
-    console.log("initializeDepositSig", initializeDepositSig);
+    console.log("initializeDeposit sig", initializeDepositSig);
   }
 
   // 2. Wrap native SOL → wSOL if needed
@@ -87,6 +90,7 @@ export async function shieldTokens(params: {
       payer: keypair,
       lamports: amount,
     });
+    console.log("wrapSolToWSol wsolAta: ", result.wsolAta.toString());
     createdAta = result.createdAta;
   }
 
@@ -112,31 +116,38 @@ export async function shieldTokens(params: {
 
   // Close temporary wSOL ATA if we created it
   if (isNativeSol && createdAta) {
+    console.log("closeWsolAta");
     await closeWsolAta({
       connection,
       payer: keypair,
       wsolAta: userTokenAccount,
     });
+    console.log("closeWsolAta done");
   }
 
   // 4. Create permission (may already exist)
   try {
-    await client.createPermission({
+    console.log("createPermission");
+    const createPermissionSig = await client.createPermission({
       tokenMint,
       user: keypair.publicKey,
       payer: keypair.publicKey,
     });
+    console.log("createPermission sig", createPermissionSig);
   } catch {
     // Permission may already exist, that's fine
   }
 
   // 5. Delegate deposit to PER
   try {
-    await client.delegateDeposit({
+    console.log("delegateDeposit");
+    const delegateDepositSig = await client.delegateDeposit({
       tokenMint,
       user: keypair.publicKey,
       payer: keypair.publicKey,
+      validator: ER_VALIDATOR,
     });
+    console.log("delegateDeposit sig", delegateDepositSig);
   } catch {
     // May already be delegated
   }
@@ -162,16 +173,73 @@ export async function unshieldTokens(params: {
     wsEndpoint: PER_WS_ENDPOINT,
   });
 
-  await perClient.undelegateDeposit({
+  const [depositPda] = findDepositPda(keypair.publicKey, tokenMint);
+
+  const perPepositAccountInfo =
+    await perClient.program.provider.connection.getAccountInfo(depositPda);
+  console.log(
+    "perClient: depositPda owner",
+    perPepositAccountInfo?.owner?.toString() ?? "account not found"
+  );
+
+  const baseClient = await getBaseClient();
+  const baseDepositAccountInfo =
+    await baseClient.program.provider.connection.getAccountInfo(depositPda);
+  console.log(
+    "baseClient: depositPda owner",
+    baseDepositAccountInfo?.owner?.toString() ?? "account not found"
+  );
+
+  // Subscribe to depositPda owner changes on both connections,
+  // resolving when owner matches PROGRAM_ID
+  let perResolve: () => void;
+  let baseResolve: () => void;
+  const perOwnerReady = new Promise<void>((r) => {
+    perResolve = r;
+  });
+  const baseOwnerReady = new Promise<void>((r) => {
+    baseResolve = r;
+  });
+
+  const perSubId = perClient.program.provider.connection.onAccountChange(
+    depositPda,
+    (accountInfo) => {
+      console.log(
+        "perClient: depositPda owner changed ->",
+        accountInfo.owner.toString()
+      );
+      if (accountInfo.owner.equals(PROGRAM_ID)) perResolve();
+    },
+    { commitment: "confirmed" }
+  );
+  const baseSubId = baseClient.program.provider.connection.onAccountChange(
+    depositPda,
+    (accountInfo) => {
+      console.log(
+        "baseClient: depositPda owner changed ->",
+        accountInfo.owner.toString()
+      );
+      if (accountInfo.owner.equals(PROGRAM_ID)) baseResolve();
+    },
+    { commitment: "confirmed" }
+  );
+
+  // If already owned by PROGRAM_ID, resolve immediately
+  if (perPepositAccountInfo?.owner.equals(PROGRAM_ID)) perResolve!();
+  if (baseDepositAccountInfo?.owner.equals(PROGRAM_ID)) baseResolve!();
+
+  console.log("undelegateDeposit");
+  const undelegateDepositSig = await perClient.undelegateDeposit({
     tokenMint,
     user: keypair.publicKey,
     payer: keypair.publicKey,
     magicProgram: MAGIC_PROGRAM_ID,
     magicContext: MAGIC_CONTEXT_ID,
   });
+  console.log("undelegateDeposit sig", undelegateDepositSig);
 
   // 2. Withdraw tokens back to regular wallet
-  const baseClient = await getBaseClient();
+  // const baseClient = await getBaseClient();
   const connection = getConnection();
   const isNativeSol = tokenMint.equals(NATIVE_MINT);
 
@@ -187,6 +255,14 @@ export async function unshieldTokens(params: {
     TOKEN_PROGRAM_ID
   );
 
+  // Wait for both connections to see depositPda owned by PROGRAM_ID
+  console.log(
+    "waiting for depositPda owner to be PROGRAM_ID on both connections..."
+  );
+  await Promise.all([perOwnerReady, baseOwnerReady]);
+  console.log("depositPda owner is PROGRAM_ID on both connections");
+
+  console.log("modifyBalance");
   const { signature } = await baseClient.modifyBalance({
     tokenMint,
     amount,
@@ -195,15 +271,26 @@ export async function unshieldTokens(params: {
     payer: keypair.publicKey,
     userTokenAccount,
   });
+  console.log("modifyBalance sig", signature);
 
   // 3. Unwrap wSOL back to native SOL
   if (isNativeSol) {
+    console.log("closeWsolAta");
     await closeWsolAta({
       connection,
       payer: keypair,
       wsolAta: userTokenAccount,
     });
+    console.log("closeWsolAta done");
   }
+
+  // Clean up account change subscriptions
+  await perClient.program.provider.connection.removeAccountChangeListener(
+    perSubId
+  );
+  await baseClient.program.provider.connection.removeAccountChangeListener(
+    baseSubId
+  );
 
   return signature;
 }
