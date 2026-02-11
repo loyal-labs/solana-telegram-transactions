@@ -3,13 +3,13 @@
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
+import { SWAP_ERRORS } from "@/lib/dflow/constants";
 import {
   convertFromBaseUnits,
   convertToBaseUnits,
   fetchQuote,
   fetchSwapTransaction,
-  SWAP_ERRORS,
-} from "@/lib/dflow";
+} from "@/lib/dflow/server";
 import { getSolanaEnv } from "@/lib/solana/rpc/connection";
 
 type QuoteRequestBody = {
