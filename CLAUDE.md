@@ -52,8 +52,8 @@ anchor test --provider.cluster localnet --skip-local-validator --skip-build --sk
 ### Root Level
 
 ```bash
-npm run lint               # prettier --check
-npm run lint:fix           # prettier -w
+bun run lint               # prettier --check
+bun run lint:fix           # prettier -w
 ```
 
 ## Architecture
@@ -138,6 +138,90 @@ Service layer patterns:
   });
   ```
 - **Idempotent Operations**: Use `onConflictDoNothing` or `onConflictDoUpdate` to handle duplicate inserts gracefully
+
+## Git Worktree Workflow
+
+### Branch Naming Convention
+
+All branches MUST follow the Linear format: `<issue-number-title>`
+
+Example: `ask-328-fix-wrong-token-history-processing`
+
+To find the correct branch name for a Linear issue, use the issue identifier (e.g., ASK-123).
+
+### Creating a Worktree
+
+When asked to work on a new issue/branch:
+
+1. Create the worktree from the repo root:
+
+```bash
+git worktree add ../solana-telegram-transactions-ASK-123 -b ASK-123-short-description main
+```
+
+   - Worktrees live as sibling directories to the main repo
+   - Always branch from `main` (or ask if unclear)
+
+2. `cd` into the new worktree directory before doing any work
+
+### Listing Worktrees
+
+```bash
+git worktree list
+```
+
+### Removing a Worktree
+
+When done with a branch:
+
+```bash
+git worktree remove ../solana-telegram-transactions-ASK-123
+```
+
+Or if already deleted the directory:
+
+```bash
+git worktree prune
+```
+
+### Important Rules
+
+- NEVER switch branches in the main worktree to work on issues — always create a new worktree
+- Each tmux session / Claude Code instance should operate in its own worktree
+- Run `git worktree list` if unsure which worktrees exist
+- After merging a PR, clean up the worktree
+
+## Commit Conventions
+
+This project enforces [Conventional Commits](https://www.conventionalcommits.org/) via `commitlint` with `@commitlint/config-conventional`. A CI workflow (`.github/workflows/commit-style.yml`) validates all commit messages in a PR and the PR title itself.
+
+### Format
+
+```
+type(scope): description
+```
+
+**Allowed types**: `feat`, `fix`, `chore`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `revert`
+
+**Scope** is optional but encouraged — use the area of the codebase being changed (e.g., `wallet`, `ui`, `og`, `sdk`, `ci`, `telegram`).
+
+### Examples
+
+```
+feat(wallet): show SPL token transfers in activity
+fix(sdk): restore delegation PDA helpers
+chore(ci): enforce conventional commit style with commitlint
+docs(sdk): refresh README for PER + auth usage
+refactor(ui): extract pill button component
+```
+
+### Rules
+
+- NEVER add `Co-Authored-By` trailers or any co-author attribution to commits
+- Keep the subject line under 100 characters
+- Use imperative mood in the description ("add", not "added" or "adds")
+- Do not end the subject line with a period
+- Validate locally before pushing: `bun run commitlint:head`
 
 ## Tooling
 
