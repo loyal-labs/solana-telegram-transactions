@@ -21,6 +21,32 @@ All environment variables used by `/app/src/lib/`.
 | `DEPLOYMENT_PK` | `solana/wallet/` | Deployment keypair for gasless transactions (base58) |
 | `NEXT_PUBLIC_GAS_PUBLIC_KEY` | `solana/wallet/` | Public key for gasless payer |
 
+## Cloudflare R2/CDN (Feature-specific)
+
+These are required only when using `core/r2-upload.ts` and `core/cdn-url.ts`.
+
+### R2 Upload Client (`core/r2-upload.ts`)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CLOUDFLARE_R2_ACCOUNT_ID` | Yes | Cloudflare account ID for R2 endpoint construction |
+| `CLOUDFLARE_R2_ACCESS_KEY_ID` | Yes | R2 access key ID (S3-compatible token) |
+| `CLOUDFLARE_R2_SECRET_ACCESS_KEY` | Yes | R2 secret access key |
+| `CLOUDFLARE_R2_BUCKET_NAME` | Yes | Bucket name to upload into |
+| `CLOUDFLARE_R2_S3_ENDPOINT` | No | Custom S3 endpoint override. Default: `https://<account_id>.r2.cloudflarestorage.com` |
+| `CLOUDFLARE_R2_UPLOAD_PREFIX` | No | Prefix prepended to all object keys (e.g. `telegram/photos`) |
+
+### CDN URL Client (`core/cdn-url.ts`)
+
+At least one base URL must be set:
+
+| Variable | Recommended | Description |
+|----------|-------------|-------------|
+| `CLOUDFLARE_CDN_BASE_URL` | Yes | Primary server-side CDN base URL (for example custom domain) |
+| `NEXT_PUBLIC_CLOUDFLARE_CDN_BASE_URL` | Optional | Public CDN base URL accessible in client bundles if needed |
+| `CLOUDFLARE_R2_PUBLIC_DEV_URL` | Dev only | Fallback R2 public dev URL (for example `https://pub-xxxx.r2.dev`) |
+| `NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_DEV_URL` | Dev only | Public variant of the R2 dev URL |
+
 ## Example `.env.local`
 
 ```env
@@ -42,6 +68,23 @@ MESSAGE_ENCRYPTION_KEY=your_base64_key
 
 # Optional - API host
 NEXT_PUBLIC_SERVER_HOST=https://your-api.com
+
+# Optional - Cloudflare R2/CDN
+CLOUDFLARE_R2_ACCOUNT_ID=your_account_id
+CLOUDFLARE_R2_ACCESS_KEY_ID=your_r2_access_key_id
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
+CLOUDFLARE_R2_BUCKET_NAME=your_bucket_name
+# Optional override
+# CLOUDFLARE_R2_S3_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com
+# Optional prefix for object keys
+# CLOUDFLARE_R2_UPLOAD_PREFIX=telegram/photos
+
+# Preferred public URL for frontend links
+CLOUDFLARE_CDN_BASE_URL=https://cdn.your-domain.com
+# Optional public build-time variant
+# NEXT_PUBLIC_CLOUDFLARE_CDN_BASE_URL=https://cdn.your-domain.com
+# Dev fallback if no custom domain exists yet
+# CLOUDFLARE_R2_PUBLIC_DEV_URL=https://pub-xxxx.r2.dev
 ```
 
 ## Localnet Setup

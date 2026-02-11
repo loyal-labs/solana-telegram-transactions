@@ -33,13 +33,59 @@ cn(...inputs) // Merges classes, resolves conflicts
 
 ## `/core`
 
-HTTP utilities and database connections.
+HTTP, database, and storage/CDN utilities.
 
 | File | Exports | Description |
 |------|---------|-------------|
 | `http.ts` | `fetchJson()`, `fetchStream()` | Typed fetch wrappers |
 | `api.ts` | `resolveEndpoint()` | Builds URLs from `NEXT_PUBLIC_SERVER_HOST` |
 | `database.ts` | `getDatabase()` | Neon PostgreSQL connection via Drizzle ORM |
+| `r2-upload.ts` | `createCloudflareR2UploadClient()`, `getCloudflareR2UploadClientFromEnv()` | Server-side Cloudflare R2 image upload client |
+| `cdn-url.ts` | `createCloudflareCdnUrlClient()`, `getCloudflareCdnUrlClientFromEnv()` | Resolves public CDN URLs from object keys |
+
+### `r2-upload.ts` (server-side only)
+
+Minimal upload client for Cloudflare R2 (S3-compatible API), intended for use in API routes and other server functions.
+
+**Key exports:**
+- `isCloudflareR2UploadConfigured()` - checks required env vars
+- `getCloudflareR2UploadClientFromEnv()` - lazy singleton from env config
+- `createCloudflareR2UploadClient(config)` - explicit client factory
+- `uploadImage({ key, body, contentType, ... })` - uploads image bytes to a bucket key
+
+**Behavior:**
+- Keys are normalized (`a//b/` -> `a/b`)
+- Unsafe path segments (`.` or `..`) are rejected
+
+**Required env vars:**
+- `CLOUDFLARE_R2_ACCOUNT_ID`
+- `CLOUDFLARE_R2_ACCESS_KEY_ID`
+- `CLOUDFLARE_R2_SECRET_ACCESS_KEY`
+- `CLOUDFLARE_R2_BUCKET_NAME`
+
+**Optional env vars:**
+- `CLOUDFLARE_R2_S3_ENDPOINT` (defaults to `https://<account_id>.r2.cloudflarestorage.com`)
+- `CLOUDFLARE_R2_UPLOAD_PREFIX` (prepends a key prefix like `telegram/photos`)
+
+### `cdn-url.ts`
+
+Small URL resolver client for converting object keys into public CDN URLs.
+
+**Key exports:**
+- `createCloudflareCdnUrlClient(config)` - explicit client factory
+- `getCloudflareCdnUrlClientFromEnv()` - lazy singleton from env config
+- `resolveUrl({ key, query })` - resolves one URL
+- `resolveUrls(keys, { query })` - resolves many URLs
+
+**Behavior:**
+- Keys are normalized consistently with the upload client
+- Path segments are URL-encoded and unsafe segments (`.`/`..`) are rejected
+
+**Base URL resolution order (`getCloudflareCdnUrlClientFromEnv`)**:
+1. `CLOUDFLARE_CDN_BASE_URL`
+2. `NEXT_PUBLIC_CLOUDFLARE_CDN_BASE_URL`
+3. `CLOUDFLARE_R2_PUBLIC_DEV_URL`
+4. `NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_DEV_URL`
 
 ---
 
