@@ -237,6 +237,10 @@ export async function sendLatestSummary(
     return { sent: false, reason: "not_activated" };
   }
 
+  if (!community.summaryNotificationsEnabled) {
+    return { sent: false, reason: "notifications_disabled" };
+  }
+
   const latestSummary = await db.query.summaries.findFirst({
     where: eq(summaries.communityId, community.id),
     orderBy: [desc(summaries.createdAt)],
@@ -273,6 +277,10 @@ export async function sendSummaryById(
 
   if (!summary.community.isActive) {
     return { sent: false, reason: "not_activated" };
+  }
+
+  if (!summary.community.summaryNotificationsEnabled) {
+    return { sent: false, reason: "notifications_disabled" };
   }
 
   await sendSummaryToChat(

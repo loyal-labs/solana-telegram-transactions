@@ -110,9 +110,11 @@ After successful activation:
 3. Optionally run `/summary`:
 - If no summaries exist yet, expected response is:
 `No summaries available yet. Summaries are generated daily when there's enough activity.`
+- If summary master switch is off for the community, expected response is:
+`Summary notifications are turned off for this community. Use /notifications to turn them on.`
 
 ## Notes
 
 - Summary generation/delivery is scheduled via `/api/cron/summaries`, not immediate at activation time.
 - Activation only enables tracking and eligibility for subsequent summary runs.
-
+- `/summary` and scheduled summary notifications both respect the community notification master switch.

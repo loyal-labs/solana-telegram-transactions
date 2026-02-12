@@ -53,4 +53,4 @@ Each successful change updates the panel and shows:
 
 - Keep this as an admin-only operation controlled by the whitelist.
 - Notification configuration is per-community and can be changed any time.
-
+- If the master switch is `Off`, the bot will not post summary messages to that community chat, including `/summary` command responses and scheduled notifications.

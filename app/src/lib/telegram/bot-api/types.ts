@@ -4,7 +4,10 @@ export type HandleSummaryCommandOptions = {
 
 export type SendSummaryResult =
   | { sent: true }
-  | { sent: false; reason: "not_activated" | "no_summaries" };
+  | {
+      sent: false;
+      reason: "not_activated" | "no_summaries" | "notifications_disabled";
+    };
 
 export type SendLatestSummaryOptions = {
   destinationChatId?: bigint;
