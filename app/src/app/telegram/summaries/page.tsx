@@ -144,11 +144,12 @@ interface Tab {
 }
 
 // Tab data will be computed dynamically
-const getTabsData = (groupCount: number, directCount: number): Tab[] => [
+const getTabsData = (groupCount: number): Tab[] => [
   { id: "groups", label: "Groups", count: groupCount, hasDividerAfter: true },
-  { id: "direct", label: "Direct", count: directCount },
-  { id: "personal", label: "Personal", count: 0 },
-  { id: "work", label: "Work", count: 0 },
+  // Temporarily hidden until non-group summaries are supported.
+  // { id: "direct", label: "Direct", count: directCount },
+  // { id: "personal", label: "Personal", count: 0 },
+  // { id: "work", label: "Work", count: 0 },
 ];
 
 
@@ -226,7 +227,7 @@ export default function SummariesPage() {
     // Initialize from localStorage, default to "groups"
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
-      if (saved === "groups" || saved === "direct" || saved === "personal" || saved === "work") {
+      if (saved === "groups") {
         return saved;
       }
     }
@@ -308,7 +309,7 @@ export default function SummariesPage() {
   const directChats = useMockDMs ? MOCK_DIRECT_CHATS : [];
 
   // Get tabs data and current chat list based on active tab
-  const tabs = getTabsData(groupChats.length, directChats.length);
+  const tabs = getTabsData(groupChats.length);
   const currentChatList =
     activeTab === "groups" ? groupChats :
     activeTab === "direct" ? directChats :
@@ -335,7 +336,13 @@ export default function SummariesPage() {
   const handleSwipe = useCallback(
     (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
       const SWIPE_THRESHOLD = 50;
-      const tabOrder: TabId[] = ["groups", "direct", "personal", "work"];
+      const tabOrder: TabId[] = [
+        "groups",
+        // Temporarily hidden until non-group summaries are supported.
+        // "direct",
+        // "personal",
+        // "work",
+      ];
       const currentIndex = tabOrder.indexOf(activeTab);
 
       if (info.offset.x < -SWIPE_THRESHOLD && currentIndex < tabOrder.length - 1) {
@@ -411,7 +418,13 @@ export default function SummariesPage() {
                   if (hapticFeedback.impactOccurred.isAvailable()) {
                     hapticFeedback.impactOccurred("light");
                   }
-                  const tabOrder: TabId[] = ["groups", "direct", "personal", "work"];
+                  const tabOrder: TabId[] = [
+                    "groups",
+                    // Temporarily hidden until non-group summaries are supported.
+                    // "direct",
+                    // "personal",
+                    // "work",
+                  ];
                   const currentIndex = tabOrder.indexOf(activeTab);
                   const targetIndex = tabOrder.indexOf(tab.id);
                   setSwipeDirection(targetIndex > currentIndex ? 1 : -1);
