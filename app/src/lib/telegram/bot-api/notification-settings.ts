@@ -111,9 +111,9 @@ export function buildNotificationSettingsMessageText(): string {
   return [
     "Notification settings for this community",
     "",
-    "⏱ Time trigger: Off | 24h | 48h",
-    "💬 Message trigger: Off | 500 | 1000",
-    "🔔 Master switch: Off | On",
+    "⏱ <b>Time trigger</b>: Off | 24h | 48h",
+    "💬 <b>Message trigger</b>: Off | 500 | 1000",
+    "🔔 <b>Master switch</b>: Off | On",
     "",
     "Only whitelisted admins can change these settings.",
   ].join("\n");
@@ -227,6 +227,7 @@ export async function sendNotificationSettingsMessage(
   community: NotificationSettingsState
 ): Promise<void> {
   await ctx.reply(buildNotificationSettingsMessageText(), {
+    parse_mode: "HTML",
     reply_markup: buildNotificationSettingsKeyboard(community),
   });
 }
@@ -300,6 +301,7 @@ export async function handleNotificationSettingsCallback(
         callbackMessage.message_id,
         buildNotificationSettingsMessageText(),
         {
+          parse_mode: "HTML",
           reply_markup: buildNotificationSettingsKeyboard(updatedCommunity),
         }
       );
