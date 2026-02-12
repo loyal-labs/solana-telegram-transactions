@@ -262,6 +262,10 @@ export async function handleSummaryCommand(
         await ctx.reply(
           "This community is not activated. Use /activate_community to enable summaries."
         );
+      } else if (result.reason === "notifications_disabled") {
+        await ctx.reply(
+          "Summary notifications are turned off for this community. Use /notifications to turn them on."
+        );
       } else if (result.reason === "no_summaries") {
         await ctx.reply(
           "No summaries available yet. Summaries are generated daily when there's enough activity."
