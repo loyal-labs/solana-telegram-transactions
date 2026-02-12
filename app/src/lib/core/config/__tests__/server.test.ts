@@ -19,6 +19,7 @@ const SERVER_ENV_KEYS = [
   "DEPLOYMENT_PK",
   "ASKLOYAL_TGBOT_KEY",
   "TELEGRAM_SETUP_SECRET",
+  "CRON_SECRET",
   "TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM",
   "TELEGRAM_SUMMARY_PEER_OVERRIDE_TO",
   "CLOUDFLARE_CDN_BASE_URL",
@@ -48,6 +49,7 @@ let serverEnv: {
   deploymentPrivateKey: string;
   askLoyalBotToken: string;
   telegramSetupSecret: string;
+  cronSecret: string;
   telegramSummaryPeerOverride: { fromPeerId: bigint; toPeerId: bigint } | null;
   cloudflareCdnBaseUrl: string | null;
   cloudflareR2UploadPrefix: string | undefined;
@@ -78,14 +80,17 @@ describe("server config", () => {
     expect(() => serverEnv.telegramSetupSecret).toThrow(
       "TELEGRAM_SETUP_SECRET is not set"
     );
+    expect(() => serverEnv.cronSecret).toThrow("CRON_SECRET is not set");
   });
 
   test("returns required values when present", () => {
     process.env.DATABASE_URL = "postgres://db";
     process.env.TELEGRAM_SETUP_SECRET = "secret";
+    process.env.CRON_SECRET = "cron-secret";
 
     expect(serverEnv.databaseUrl).toBe("postgres://db");
     expect(serverEnv.telegramSetupSecret).toBe("secret");
+    expect(serverEnv.cronSecret).toBe("cron-secret");
   });
 
   test("returns optional values when present", () => {
