@@ -86,7 +86,45 @@ bun run lint:fix           # prettier -w
 | `telegram-transfer` | `4ewpzEPF5xrVAHeRkoe7XS1yKFGQBekD7PgFwEz9SaxY` |
 | `telegram-verification` | `9yiphKYd4b69tR1ZPP8rNwtMeUwWgjYXaXdEzyNziNhz` |
 
-### Frontend Library Structure (`/app/src/lib`)
+### Vertical Slice Architecture (Current Implementation + Required Direction)
+
+The current `/app/src` architecture is a hybrid vertical-slice implementation. Feature boundaries are primarily expressed by route segments and feature-scoped component folders:
+
+- Route slices: `/app/src/app/telegram/*` and `/app/src/app/api/*`
+- UI slices: `/app/src/components/wallet`, `/app/src/components/summaries`, `/app/src/components/telegram`
+- Shared cross-slice hooks/types: `/app/src/hooks`, `/app/src/types`
+- Shared integration/domain modules: `/app/src/lib/*`
+
+Current slice mapping:
+
+- **Wallet slice**: `/app/src/app/telegram/wallet/page.tsx` + `/app/src/components/wallet/*` + Solana/Telegram wallet integrations in `/app/src/lib/solana/*` and `/app/src/lib/telegram/mini-app/*`
+- **Summaries slice**: `/app/src/app/telegram/summaries/*` + `/app/src/components/summaries/*` + summaries APIs in `/app/src/app/api/summaries/route.ts`
+- **Telegram platform slice**: `/app/src/app/telegram/layout.tsx` + `/app/src/components/telegram/*` + bot/API modules in `/app/src/lib/telegram/*` and `/app/src/app/api/telegram/*`
+
+Rules for all new feature work:
+
+- Organize by feature first; do not introduce new horizontal folders by technical layer.
+- Extend an existing slice in-place when behavior belongs to wallet/summaries/telegram/profile flows.
+- Keep route handlers and page files as orchestration layers; move reusable business logic out of route/page files and into slice-owned modules.
+- Avoid deep imports across slices (for example, wallet internals imported from summaries).
+- Shared code must be stable and reused by multiple slices before promotion to `/app/src/lib`.
+
+For net-new, substantial features, prefer creating an explicit slice root:
+
+```text
+/app/src/features/<feature-name>/
+  index.ts                 # public entrypoints only
+  ui/
+  server/
+  domain/
+  data/
+  integrations/
+  types.ts
+```
+
+### Shared Platform Libraries (`/app/src/lib`)
+
+Use `/app/src/lib` for cross-slice infrastructure and integration primitives. Existing shared modules include:
 
 | Module | Purpose |
 |--------|---------|
@@ -100,6 +138,10 @@ bun run lint:fix           # prettier -w
 | `telegram/` | User service, bot thread service, bot API handlers |
 | `magicblock/` | SOL/USD price feed via Pyth oracle |
 | `redpill/` | AI chat summaries |
+
+- New feature-specific behavior should stay in its owning slice unless it is clearly shared.
+- Promote code into `/app/src/lib` only after it is proven reusable across multiple slices.
+- Refactor incrementally by slice (wallet, summaries, telegram, etc.), not by file type alone.
 
 ### Key Patterns
 
