@@ -43,7 +43,7 @@ export type {
   WalletSigner,
   WalletLike,
   RpcOptions,
-  EphemeralClientConfig,
+  ClientConfig,
   DepositData,
   UsernameDepositData,
   InitializeDepositParams,

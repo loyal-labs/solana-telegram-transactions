@@ -42,10 +42,12 @@ export interface RpcOptions {
 /**
  * Configuration for creating an ephemeral client
  */
-export interface EphemeralClientConfig {
+export interface ClientConfig {
   signer: WalletSigner;
-  rpcEndpoint: string;
-  wsEndpoint?: string;
+  baseRpcEndpoint: string;
+  baseWsEndpoint?: string;
+  ephemeralRpcEndpoint: string;
+  ephemeralWsEndpoint?: string;
   commitment?: Commitment;
 }
 
