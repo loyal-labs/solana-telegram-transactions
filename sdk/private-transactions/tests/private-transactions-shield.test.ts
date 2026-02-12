@@ -10,6 +10,7 @@ import {
 import {
   Connection,
   Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
   sendAndConfirmTransaction,
   SystemProgram,
@@ -27,6 +28,7 @@ import {
   mintTo,
   NATIVE_MINT,
   TOKEN_PROGRAM_ID,
+  transfer,
 } from "@solana/spl-token";
 
 const PER_RPC_ENDPOINT = "https://tee.magicblock.app";
@@ -41,6 +43,7 @@ export const SECURE_DEVNET_RPC_WS =
   "wss://aurora-o23cd4-fast-devnet.helius-rpc.com";
 
 const solanaConnection = new Connection(SECURE_DEVNET_RPC_URL, {
+  wsEndpoint: SECURE_DEVNET_RPC_WS,
   commitment: "confirmed" as const,
 });
 
@@ -53,18 +56,40 @@ const USER_KP = Keypair.fromSecretKey(
     212, 235, 216, 109, 5, 94, 31, 222, 100, 124, 166, 124, 52, 149, 131,
   ])
 );
+// 3cd5zjx8DAPDUciSrJtbrtniuNpDWhGLSKtk7xxCMCpP
+const OTHER_USER_KP = Keypair.fromSecretKey(
+  Uint8Array.from([
+    112, 50, 255, 102, 148, 177, 8, 136, 48, 146, 49, 69, 16, 165, 113, 81, 123,
+    225, 207, 149, 216, 229, 105, 50, 249, 48, 232, 27, 165, 181, 239, 97, 38,
+    215, 129, 64, 75, 228, 54, 138, 179, 234, 24, 136, 233, 6, 252, 59, 233,
+    186, 135, 194, 87, 255, 97, 59, 189, 140, 157, 56, 221, 35, 43, 56,
+  ])
+);
 
 const USER = USER_KP.publicKey;
+const OTHER_USER = OTHER_USER_KP.publicKey;
 
-const baseLoyalClient = LoyalPrivateTransactionsClient.from(
-  solanaConnection,
-  USER_KP
-);
+const loyalClient = await LoyalPrivateTransactionsClient.fromConfig({
+  signer: USER_KP,
+  baseRpcEndpoint: SECURE_DEVNET_RPC_URL,
+  baseWsEndpoint: SECURE_DEVNET_RPC_WS,
+  ephemeralRpcEndpoint: PER_RPC_ENDPOINT,
+  ephemeralWsEndpoint: PER_WS_ENDPOINT,
+});
+
+const otherLoyalClient = await LoyalPrivateTransactionsClient.fromConfig({
+  signer: OTHER_USER_KP,
+  baseRpcEndpoint: SECURE_DEVNET_RPC_URL,
+  baseWsEndpoint: SECURE_DEVNET_RPC_WS,
+  ephemeralRpcEndpoint: PER_RPC_ENDPOINT,
+  ephemeralWsEndpoint: PER_WS_ENDPOINT,
+});
 
 export const COMMON_MINTS = {
   SOL: "So11111111111111111111111111111111111111112",
   USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
   USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+  CUST: "FiuhQjmbHuCi15VMowXaecYKma5GhovNzaU2EBv3rk6",
 } as const;
 
 export async function wrapSolToWSol(opts: {
@@ -137,12 +162,24 @@ export async function fetchLoyalDeposits(
   const results = await Promise.allSettled(
     tokenMints.map(async (mint) => {
       const mintPubkey = new PublicKey(mint);
-      const deposit = await baseLoyalClient.getDeposit(
+      const baseDeposit = await loyalClient.getBaseDeposit(
         userPublicKey,
         mintPubkey
       );
-      if (deposit && deposit.amount > 0) {
-        deposits.set(mint, Number(deposit.amount));
+      const ephemeralDeposit = await loyalClient.getEphemeralDeposit(
+        userPublicKey,
+        mintPubkey
+      );
+      if (ephemeralDeposit && ephemeralDeposit.amount > 0) {
+        console.log(
+          "ephemeralDeposit",
+          mintPubkey.toString(),
+          ephemeralDeposit.amount
+        );
+        deposits.set(mint, Number(ephemeralDeposit.amount));
+      } else if (baseDeposit && baseDeposit.amount > 0) {
+        console.log("baseDeposit", mintPubkey.toString(), baseDeposit.amount);
+        deposits.set(mint, Number(baseDeposit.amount));
       }
     })
   );
@@ -158,7 +195,78 @@ export async function fetchLoyalDeposits(
 
 const getConnection = () => solanaConnection;
 const getWalletKeypair = async () => USER_KP;
-const getBaseClient = async () => baseLoyalClient;
+const getLoyalClient = async () => loyalClient;
+
+// export async function transferTokensToUsername(params: {
+//   tokenMint: PublicKey;
+//   amount: number;
+//   destination: string;
+// }): Promise<string> {
+//   const startTime = Date.now();
+//   console.log("> transferTokensToUsername");
+//   const keypair = await getWalletKeypair();
+//   const client = await getLoyalClient();
+//   const { tokenMint, amount, destination } = params;
+
+//   console.log(`< transferTokensToUsername (${Date.now() - startTime}ms)`);
+
+//   return "";
+// }
+
+export async function transferTokens(params: {
+  tokenMint: PublicKey;
+  amount: number;
+  destination: PublicKey;
+}): Promise<string> {
+  const startTime = Date.now();
+  console.log("> transferTokens");
+  const keypair = await getWalletKeypair();
+  const client = await getLoyalClient();
+  const { tokenMint, amount, destination } = params;
+
+  const existingBaseDeposit = await client.getBaseDeposit(
+    destination,
+    tokenMint
+  );
+  const existingEphemeralDeposit = await client.getEphemeralDeposit(
+    destination,
+    tokenMint
+  );
+  console.log("existingBaseDeposit", existingBaseDeposit);
+  console.log("existingEphemeralDeposit", existingEphemeralDeposit);
+  if (!existingBaseDeposit && !existingEphemeralDeposit) {
+    console.log("initializeDeposit");
+    const initializeDepositSig = await client.initializeDeposit({
+      tokenMint,
+      user: destination,
+      payer: keypair.publicKey,
+    });
+    console.log("initializeDeposit sig", initializeDepositSig);
+  }
+
+  console.log("delegateDeposit");
+  const delegateDepositSig = await client.delegateDeposit({
+    tokenMint,
+    user: destination,
+    payer: keypair.publicKey,
+    validator: ER_VALIDATOR,
+  });
+  console.log("delegateDeposit sig", delegateDepositSig);
+
+  console.log("transferDeposit");
+  const transferDepositSig = await client.transferDeposit({
+    user: keypair.publicKey,
+    tokenMint,
+    destinationUser: destination,
+    amount,
+    payer: keypair.publicKey,
+  });
+  console.log("transferDeposit sig", transferDepositSig);
+
+  console.log(`< transferTokens (${Date.now() - startTime}ms)`);
+
+  return transferDepositSig;
+}
 
 /**
  * Shield tokens: move from regular wallet into Loyal private deposit.
@@ -168,12 +276,17 @@ export async function shieldTokens(params: {
   tokenMint: PublicKey;
   amount: number;
 }): Promise<string> {
+  const startTime = Date.now();
+  console.log("> shieldTokens");
   const keypair = await getWalletKeypair();
-  const client = await getBaseClient();
+  const client = await getLoyalClient();
   const { tokenMint, amount } = params;
 
   // 1. Initialize deposit if it doesn't exist yet
-  const existingDeposit = await client.getDeposit(keypair.publicKey, tokenMint);
+  const existingDeposit = await client.getBaseDeposit(
+    keypair.publicKey,
+    tokenMint
+  );
   if (!existingDeposit) {
     console.log("initializeDeposit");
     const initializeDepositSig = await client.initializeDeposit({
@@ -257,6 +370,8 @@ export async function shieldTokens(params: {
     // May already be delegated
   }
 
+  console.log(`< shieldTokens (${Date.now() - startTime}ms)`);
+
   return signature;
 }
 
@@ -267,29 +382,34 @@ export async function shieldTokens(params: {
 export async function unshieldTokens(params: {
   tokenMint: PublicKey;
   amount: number;
+  otherClient?: LoyalPrivateTransactionsClient;
+  otherKeypair?: Keypair;
 }): Promise<string> {
-  const keypair = await getWalletKeypair();
-  const { tokenMint, amount } = params;
+  const startTime = Date.now();
+  console.log("> unshieldTokens");
+
+  const { tokenMint, amount, otherClient, otherKeypair } = params;
+
+  const keypair = otherKeypair || (await getWalletKeypair());
 
   // 1. Undelegate from PER
-  const perClient = await LoyalPrivateTransactionsClient.fromEphemeral({
-    signer: keypair,
-    rpcEndpoint: PER_RPC_ENDPOINT,
-    wsEndpoint: PER_WS_ENDPOINT,
-  });
+  const client = otherClient || (await getLoyalClient());
+
+  const connection = getConnection();
 
   const [depositPda] = findDepositPda(keypair.publicKey, tokenMint);
 
   const perPepositAccountInfo =
-    await perClient.program.provider.connection.getAccountInfo(depositPda);
+    await client.ephemeralProgram.provider.connection.getAccountInfo(
+      depositPda
+    );
   console.log(
     "perClient: depositPda owner",
     perPepositAccountInfo?.owner?.toString() ?? "account not found"
   );
 
-  const baseClient = await getBaseClient();
   const baseDepositAccountInfo =
-    await baseClient.program.provider.connection.getAccountInfo(depositPda);
+    await client.baseProgram.provider.connection.getAccountInfo(depositPda);
   console.log(
     "baseClient: depositPda owner",
     baseDepositAccountInfo?.owner?.toString() ?? "account not found"
@@ -306,7 +426,7 @@ export async function unshieldTokens(params: {
     baseResolve = r;
   });
 
-  const perSubId = perClient.program.provider.connection.onAccountChange(
+  const perSubId = client.ephemeralProgram.provider.connection.onAccountChange(
     depositPda,
     (accountInfo) => {
       console.log(
@@ -317,7 +437,7 @@ export async function unshieldTokens(params: {
     },
     { commitment: "confirmed" }
   );
-  const baseSubId = baseClient.program.provider.connection.onAccountChange(
+  const baseSubId = client.baseProgram.provider.connection.onAccountChange(
     depositPda,
     (accountInfo) => {
       console.log(
@@ -334,7 +454,7 @@ export async function unshieldTokens(params: {
   if (baseDepositAccountInfo?.owner.equals(PROGRAM_ID)) baseResolve!();
 
   console.log("undelegateDeposit");
-  const undelegateDepositSig = await perClient.undelegateDeposit({
+  const undelegateDepositSig = await client.undelegateDeposit({
     tokenMint,
     user: keypair.publicKey,
     payer: keypair.publicKey,
@@ -345,7 +465,6 @@ export async function unshieldTokens(params: {
 
   // 2. Withdraw tokens back to regular wallet
   // const baseClient = await getBaseClient();
-  const connection = getConnection();
   const isNativeSol = tokenMint.equals(NATIVE_MINT);
 
   // Ensure wSOL ATA exists for native SOL withdrawals
@@ -368,7 +487,7 @@ export async function unshieldTokens(params: {
   console.log("depositPda owner is PROGRAM_ID on both connections");
 
   console.log("modifyBalance");
-  const { signature } = await baseClient.modifyBalance({
+  const { signature } = await client.modifyBalance({
     tokenMint,
     amount,
     increase: false,
@@ -390,17 +509,20 @@ export async function unshieldTokens(params: {
   }
 
   // Clean up account change subscriptions
-  await perClient.program.provider.connection.removeAccountChangeListener(
+  await client.ephemeralProgram.provider.connection.removeAccountChangeListener(
     perSubId
   );
-  await baseClient.program.provider.connection.removeAccountChangeListener(
+  await client.baseProgram.provider.connection.removeAccountChangeListener(
     baseSubId
   );
+
+  console.log(`< unshieldTokens (${Date.now() - startTime}ms)`);
 
   return signature;
 }
 
 describe("private-transactions shield SDK (PER)", async () => {
+  console.log("_____________");
   console.log("wallet", USER.toString());
 
   const deposits = await fetchLoyalDeposits(USER, Object.values(COMMON_MINTS));
@@ -413,10 +535,12 @@ describe("private-transactions shield SDK (PER)", async () => {
   //   USER, // freeze authority
   //   2 // decimals
   // );
-  const mint = new PublicKey("FiuhQjmbHuCi15VMowXaecYKma5GhovNzaU2EBv3rk6");
+  const mint = NATIVE_MINT;
+  // const mint = new PublicKey("J1rxYKFSSBoTpnfZexXyVJ9HZdDZg99xCHRDXMKw2h3U");
+
   console.log("mint", mint.toString());
 
-  // Mint tokens to wallet's ATA before depositing
+  // // Mint tokens to wallet's ATA before depositing
   // const ata = await getOrCreateAssociatedTokenAccount(
   //   solanaConnection,
   //   USER_KP, // payer
@@ -431,10 +555,60 @@ describe("private-transactions shield SDK (PER)", async () => {
   //   mint, // mint
   //   ata.address, // destination
   //   USER_KP, // mint authority
-  //   1 * 10 ** 2 // amount in base units (9 decimals)
+  //   2 * 10 ** 2 // amount in base units (9 decimals)
   // );
   // console.log(`Minted to wallet`);
 
-  await shieldTokens({ tokenMint: mint, amount: 1 * 10 ** 2 });
-  await unshieldTokens({ tokenMint: mint, amount: 1 * 10 ** 2 });
+  const amount = 100000000; // LAMPORTS_PER_SOL / 10
+  // const amount = 1 * 10 ** 2;
+  const doubleAmount = 2 * amount;
+
+  await shieldTokens({ tokenMint: mint, amount: doubleAmount });
+  await transferTokens({
+    tokenMint: mint,
+    amount,
+    destination: OTHER_USER,
+  });
+  await unshieldTokens({ tokenMint: mint, amount });
+  await unshieldTokens({
+    tokenMint: mint,
+    amount,
+    otherClient: otherLoyalClient,
+    otherKeypair: OTHER_USER_KP,
+  });
+
+  // Transfer back — re-wrap SOL into wSOL if native mint since unshieldTokens closed the ATA
+  const isNativeSol = mint.equals(NATIVE_MINT);
+  if (isNativeSol) {
+    await wrapSolToWSol({
+      connection: solanaConnection,
+      payer: OTHER_USER_KP,
+      lamports: amount,
+    });
+  }
+  const otherUserAta = (
+    await getOrCreateAssociatedTokenAccount(
+      solanaConnection,
+      OTHER_USER_KP,
+      mint,
+      OTHER_USER
+    )
+  ).address;
+  const userAta = (
+    await getOrCreateAssociatedTokenAccount(
+      solanaConnection,
+      OTHER_USER_KP, // payer
+      mint,
+      USER
+    )
+  ).address;
+  const transferSig = await transfer(
+    solanaConnection,
+    OTHER_USER_KP,
+    otherUserAta,
+    userAta,
+    OTHER_USER_KP,
+    amount
+  );
+  console.log("SPL transfer OTHER_USER -> USER sig", transferSig);
 });
