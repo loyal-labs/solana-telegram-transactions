@@ -92,6 +92,9 @@ export const serverEnv = {
   get telegramSetupSecret(): string {
     return getRequiredEnv("TELEGRAM_SETUP_SECRET");
   },
+  get cronSecret(): string {
+    return getRequiredEnv("CRON_SECRET");
+  },
   get telegramSummaryPeerOverride(): TelegramSummaryPeerOverride | null {
     return getTelegramSummaryPeerOverride();
   },

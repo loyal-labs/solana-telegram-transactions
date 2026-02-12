@@ -247,6 +247,12 @@ export const summaries = pgTable(
       .$type<{ title: string; content: string; sources: string[] }[]>()
       .notNull(),
     oneliner: text("oneliner").notNull(),
+    triggerType: text("trigger_type"),
+    triggerKey: text("trigger_key"),
+    notificationSentAt: timestamp("notification_sent_at", { withTimezone: true }),
+    notificationClaimedAt: timestamp("notification_claimed_at", {
+      withTimezone: true,
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -256,6 +262,14 @@ export const summaries = pgTable(
     index("summaries_community_created_idx").on(
       table.communityId,
       table.createdAt
+    ),
+    uniqueIndex("summaries_community_trigger_key_uidx")
+      .on(table.communityId, table.triggerKey)
+      .where(sql`${table.triggerKey} IS NOT NULL`),
+    index("summaries_trigger_key_idx").on(table.triggerKey),
+    index("summaries_notification_sent_idx").on(
+      table.triggerKey,
+      table.notificationSentAt
     ),
   ]
 );
