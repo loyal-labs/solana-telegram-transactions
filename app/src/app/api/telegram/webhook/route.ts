@@ -20,7 +20,10 @@ import {
   START_CAROUSEL_CALLBACK_DATA_REGEX,
 } from "@/lib/telegram/bot-api/start-carousel";
 import { resolveSummaryCommunityPeerId } from "@/lib/telegram/bot-api/summary-chat-id";
-import { handleDirectMessage } from "@/lib/telegram/conversation-service";
+import {
+  handleDirectMessage,
+  handleDirectTopicCreatedMessage,
+} from "@/lib/telegram/conversation-service";
 import { isPrivateChat } from "@/lib/telegram/utils";
 
 const bot = await getBot();
@@ -71,6 +74,15 @@ bot.on("business_connection", async (ctx) => {
   } catch (error) {
     console.error("Failed to handle business connection", error);
   }
+});
+
+bot.on("message:forum_topic_created", async (ctx) => {
+  const chatType = ctx.chat?.type;
+  if (!chatType || !isPrivateChat(chatType)) {
+    return;
+  }
+
+  await handleDirectTopicCreatedMessage(ctx);
 });
 
 bot.on("message:text", async (ctx) => {
