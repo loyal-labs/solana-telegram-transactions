@@ -74,8 +74,9 @@ export type EncryptedMessageContent = {
 // ============================================================================
 
 /**
- * Global admins whitelist - Telegram users who can activate communities.
- * Must be both in this table AND a Telegram group admin to activate.
+ * Global admins whitelist for privileged community actions.
+ * Users in this table can activate/deactivate communities and manage
+ * notification settings.
  */
 export const admins = pgTable(
   "admins",
@@ -118,7 +119,7 @@ export const users = pgTable(
 
 /**
  * Telegram group chats activated for message tracking.
- * Only users in the admins whitelist can activate communities.
+ * Privileged management actions are controlled by the admins whitelist.
  */
 export const communities = pgTable(
   "communities",

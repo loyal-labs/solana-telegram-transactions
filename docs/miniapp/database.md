@@ -4,11 +4,11 @@ Neon PostgreSQL integration using Drizzle ORM.
 
 ## Overview
 
-| File | Purpose |
-|------|---------|
+| File                       | Purpose                       |
+| -------------------------- | ----------------------------- |
 | `src/lib/core/database.ts` | Database connection singleton |
-| `src/lib/core/schema.ts` | Drizzle table definitions |
-| `drizzle.config.ts` | Migration configuration |
+| `src/lib/core/schema.ts`   | Drizzle table definitions     |
+| `drizzle.config.ts`        | Migration configuration       |
 
 ## Usage
 
@@ -37,11 +37,11 @@ export const users = pgTable("users", {
 
 Run from `/app` directory:
 
-| Command | Description |
-|---------|-------------|
+| Command           | Description                             |
+| ----------------- | --------------------------------------- |
 | `bun db:generate` | Generate migrations from schema changes |
-| `bun db:migrate` | Apply migrations to database |
-| `bun db:studio` | Open Drizzle Studio GUI |
+| `bun db:migrate`  | Apply migrations to database            |
+| `bun db:studio`   | Open Drizzle Studio GUI                 |
 
 ## Environment
 
@@ -63,12 +63,12 @@ Use `.$type<T>()` for type-safe JSONB columns:
 // Array of objects
 topics: jsonb("topics")
   .$type<{ title: string; content: string; sources: string[] }[]>()
-  .notNull()
+  .notNull();
 
 // Discriminated union (for encrypted content)
 encryptedContent: jsonb("encrypted_content")
   .$type<EncryptedMessageContent>()
-  .notNull()
+  .notNull();
 ```
 
 ### Relations Setup
@@ -100,22 +100,22 @@ export type InsertUser = typeof users.$inferInsert;
 
 ### Index Strategies
 
-| Index Type | Use Case | Example |
-|------------|----------|---------|
-| `uniqueIndex` | Prevent duplicates, enforce uniqueness | `uniqueIndex().on(table.telegramId)` |
-| Composite `index` | Optimize multi-column queries | `index().on(table.communityId, table.createdAt)` |
-| Filter `index` | Optimize status/flag filtering | `index().on(table.isActive)` |
+| Index Type        | Use Case                               | Example                                          |
+| ----------------- | -------------------------------------- | ------------------------------------------------ |
+| `uniqueIndex`     | Prevent duplicates, enforce uniqueness | `uniqueIndex().on(table.telegramId)`             |
+| Composite `index` | Optimize multi-column queries          | `index().on(table.communityId, table.createdAt)` |
+| Filter `index`    | Optimize status/flag filtering         | `index().on(table.isActive)`                     |
 
 ## Tables Reference
 
-| Table | Purpose |
-|-------|---------|
-| `admins` | Global admin whitelist (Telegram users who can activate communities) |
-| `users` | Telegram users who interact with the bot |
-| `communities` | Activated Telegram group chats for message tracking |
-| `communityMembers` | Many-to-many: users ↔ communities |
-| `messages` | Chat messages from tracked communities |
-| `summaries` | AI-generated daily chat summaries with topics |
-| `businessConnections` | Telegram Business bot connections to user accounts |
-| `botThreads` | Bot conversation sessions (supports Telegram threaded messages) |
-| `botMessages` | Individual encrypted messages within bot threads |
+| Table                 | Purpose                                                                                |
+| --------------------- | -------------------------------------------------------------------------------------- |
+| `admins`              | Global admin whitelist for privileged community actions (activate/deactivate/settings) |
+| `users`               | Telegram users who interact with the bot                                               |
+| `communities`         | Activated Telegram group chats for message tracking                                    |
+| `communityMembers`    | Many-to-many: users ↔ communities                                                      |
+| `messages`            | Chat messages from tracked communities                                                 |
+| `summaries`           | AI-generated daily chat summaries with topics                                          |
+| `businessConnections` | Telegram Business bot connections to user accounts                                     |
+| `botThreads`          | Bot conversation sessions (supports Telegram threaded messages)                        |
+| `botMessages`         | Individual encrypted messages within bot threads                                       |

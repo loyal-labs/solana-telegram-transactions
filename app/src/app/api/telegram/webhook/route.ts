@@ -6,6 +6,7 @@ import {
   handleActivateCommunityCommand,
   handleCaCommand,
   handleDeactivateCommunityCommand,
+  handleNotificationsCommand,
   handleStartCommand,
   handleSummaryCommand,
 } from "@/lib/telegram/bot-api/commands";
@@ -15,6 +16,10 @@ import {
   handleCommunityMessage,
   handleGLoyalReaction,
 } from "@/lib/telegram/bot-api/message-handlers";
+import {
+  handleNotificationSettingsCallback,
+  NOTIFICATION_SETTINGS_CALLBACK_DATA_REGEX,
+} from "@/lib/telegram/bot-api/notification-settings";
 import {
   handleStartCarouselCallback,
   START_CAROUSEL_CALLBACK_DATA_REGEX,
@@ -37,11 +42,11 @@ bot.command("ca", async (ctx: CommandContext<Context>) => {
 });
 
 bot.command("activate_community", async (ctx: CommandContext<Context>) => {
-  await handleActivateCommunityCommand(ctx, bot);
+  await handleActivateCommunityCommand(ctx);
 });
 
 bot.command("deactivate_community", async (ctx: CommandContext<Context>) => {
-  await handleDeactivateCommunityCommand(ctx, bot);
+  await handleDeactivateCommunityCommand(ctx);
 });
 
 bot.command("summary", async (ctx: CommandContext<Context>) => {
@@ -54,12 +59,20 @@ bot.command("summary", async (ctx: CommandContext<Context>) => {
   });
 });
 
+bot.command("notifications", async (ctx: CommandContext<Context>) => {
+  await handleNotificationsCommand(ctx);
+});
+
 bot.on("inline_query", async (ctx) => {
   await handleInlineQuery(ctx as InlineQueryContext<Context>);
 });
 
 bot.callbackQuery(START_CAROUSEL_CALLBACK_DATA_REGEX, async (ctx) => {
   await handleStartCarouselCallback(ctx);
+});
+
+bot.callbackQuery(NOTIFICATION_SETTINGS_CALLBACK_DATA_REGEX, async (ctx) => {
+  await handleNotificationSettingsCallback(ctx);
 });
 
 // Keep this fallback at the end so unknown callback queries don't show

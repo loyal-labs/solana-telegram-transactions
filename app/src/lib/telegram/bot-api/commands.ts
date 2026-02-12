@@ -10,6 +10,7 @@ import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
 import { CA_COMMAND_CHAT_ID } from "./constants";
 import { getChat } from "./get-chat";
 import { downloadTelegramFile } from "./get-file";
+import { sendNotificationSettingsMessage } from "./notification-settings";
 import { sendStartCarousel } from "./start-carousel";
 import { sendLatestSummary } from "./summaries";
 import type { HandleSummaryCommandOptions } from "./types";
@@ -126,8 +127,7 @@ export async function handleCaCommand(
 }
 
 export async function handleActivateCommunityCommand(
-  ctx: CommandContext<Context>,
-  bot: Bot
+  ctx: CommandContext<Context>
 ): Promise<void> {
   if (!ctx.from || !ctx.chat) return;
 
@@ -157,13 +157,6 @@ export async function handleActivateCommunityCommand(
       await ctx.reply(
         "You are not authorized to activate communities. Contact an administrator to be added to the whitelist."
       );
-      return;
-    }
-
-    // Check if user is a Telegram group admin
-    const member = await bot.api.getChatMember(ctx.chat.id, ctx.from.id);
-    if (member.status !== "creator" && member.status !== "administrator") {
-      await ctx.reply("Only group admins can activate community tracking.");
       return;
     }
 
@@ -283,9 +276,41 @@ export async function handleSummaryCommand(
   }
 }
 
+export async function handleNotificationsCommand(
+  ctx: CommandContext<Context>
+): Promise<void> {
+  if (!ctx.chat) return;
+
+  if (!isCommunityChat(ctx.chat.type)) {
+    await ctx.reply("This command can only be used in group chats.");
+    return;
+  }
+
+  try {
+    const db = getDatabase();
+    const chatId = BigInt(ctx.chat.id);
+    const community = await db.query.communities.findFirst({
+      where: eq(communities.chatId, chatId),
+    });
+
+    if (!community || !community.isActive) {
+      await ctx.reply(
+        "This community is not activated. Use /activate_community to enable summaries."
+      );
+      return;
+    }
+
+    await sendNotificationSettingsMessage(ctx, community);
+  } catch (error) {
+    console.error("Failed to send notification settings", error);
+    await ctx.reply(
+      "An error occurred while loading notification settings. Please try again."
+    );
+  }
+}
+
 export async function handleDeactivateCommunityCommand(
-  ctx: CommandContext<Context>,
-  bot: Bot
+  ctx: CommandContext<Context>
 ): Promise<void> {
   if (!ctx.from || !ctx.chat) return;
 
@@ -316,23 +341,8 @@ export async function handleDeactivateCommunityCommand(
 
     if (!admin) {
       await ctx.reply(
-        "You are not authorized to deactivate communities. Contact an administrator."
+        "You are not authorized to deactivate communities. Contact an administrator to be added to the whitelist."
       );
-      return;
-    }
-
-    // Check if user is a Telegram group admin
-    let member;
-    try {
-      member = await bot.api.getChatMember(ctx.chat.id, ctx.from.id);
-    } catch {
-      await ctx.reply(
-        "Unable to verify admin status. Ensure the bot has permission to view chat members."
-      );
-      return;
-    }
-    if (member.status !== "creator" && member.status !== "administrator") {
-      await ctx.reply("Only group admins can deactivate community tracking.");
       return;
     }
 
