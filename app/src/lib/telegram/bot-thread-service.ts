@@ -185,7 +185,7 @@ export async function getUserLatestThread(
 
 /**
  * Adds an encrypted message to a thread.
- * Uses a transaction to ensure message insert and thread update are atomic.
+ * Uses a batch write to ensure message insert and thread update are atomic.
  *
  * @param params.threadId - Thread UUID
  * @param params.senderType - 'user', 'bot', or 'system'
@@ -224,10 +224,9 @@ export async function addMessage(params: {
     metadata: "metadata" in messageContent ? messageContent.metadata : undefined,
   };
 
-  // Use transaction to ensure atomicity of message insert + thread update
-  const messageId = await db.transaction(async (tx) => {
-    // Store message
-    const [message] = await tx
+  // neon-http does not support db.transaction(), so use batch for atomic writes.
+  const [insertedRows] = await db.batch([
+    db
       .insert(botMessages)
       .values({
         threadId: params.threadId,
@@ -235,18 +234,19 @@ export async function addMessage(params: {
         encryptedContent,
         telegramMessageId: params.telegramMessageId,
       })
-      .returning({ id: botMessages.id });
-
-    // Update thread timestamp
-    await tx
+      .returning({ id: botMessages.id }),
+    db
       .update(botThreads)
       .set({ updatedAt: new Date() })
-      .where(eq(botThreads.id, params.threadId));
+      .where(eq(botThreads.id, params.threadId)),
+  ]);
 
-    return message.id;
-  });
+  const insertedMessage = insertedRows[0];
+  if (!insertedMessage?.id) {
+    throw new Error("Failed to insert bot message");
+  }
 
-  return messageId;
+  return insertedMessage.id;
 }
 
 /**

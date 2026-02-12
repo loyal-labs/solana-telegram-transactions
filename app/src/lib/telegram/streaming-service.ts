@@ -38,7 +38,8 @@ export interface StreamResponseResult {
 // CONSTANTS
 // ============================================================================
 
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+// Keep this aligned with the model used in RedPill summary generation.
+const DEFAULT_MODEL = "phala/gpt-oss-120b";
 const UPDATE_INTERVAL_MS = 500; // Update draft every 500ms
 const MAX_MESSAGE_LENGTH = 4096; // Telegram limit
 const CHUNK_BUFFER = 100; // Buffer before max length for safety

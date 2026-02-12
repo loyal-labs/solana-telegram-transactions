@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import type { Bot, CommandContext, Context } from "grammy";
 
 import {
   buildStartCarouselKeyboard,
   calculateNextCarouselIndex,
   encodeStartCarouselCallbackData,
   parseStartCarouselCallbackData,
+  sendStartCarousel,
   START_CAROUSEL_CALLBACK_DATA_REGEX,
   START_CAROUSEL_SLIDES,
 } from "../start-carousel";
@@ -86,5 +88,83 @@ describe("start carousel slides", () => {
       "Send and receive funds without exposing balances or history.",
       "A private AI chat where your questions and conversations stay confidential.",
     ]);
+  });
+});
+
+describe("sendStartCarousel", () => {
+  test("sends carousel inside topic when command message has message_thread_id", async () => {
+    const sendPhotoCalls: Array<{
+      chatId: number;
+      photo: string;
+      options?: {
+        caption?: string;
+        message_thread_id?: number;
+      };
+    }> = [];
+
+    const bot = {
+      api: {
+        sendPhoto: async (
+          chatId: number,
+          photo: string,
+          options?: {
+            caption?: string;
+            message_thread_id?: number;
+          }
+        ) => {
+          sendPhotoCalls.push({ chatId, photo, options });
+          return {} as never;
+        },
+      },
+    } as unknown as Bot;
+
+    const ctx = {
+      chat: { id: 7160600900 },
+      message: { message_thread_id: 799 },
+    } as unknown as CommandContext<Context>;
+
+    await sendStartCarousel(ctx, bot);
+
+    expect(sendPhotoCalls).toHaveLength(1);
+    expect(sendPhotoCalls[0]?.chatId).toBe(7160600900);
+    expect(sendPhotoCalls[0]?.options?.message_thread_id).toBe(799);
+  });
+
+  test("sends carousel without topic when command message has no thread id", async () => {
+    const sendPhotoCalls: Array<{
+      chatId: number;
+      photo: string;
+      options?: {
+        caption?: string;
+        message_thread_id?: number;
+      };
+    }> = [];
+
+    const bot = {
+      api: {
+        sendPhoto: async (
+          chatId: number,
+          photo: string,
+          options?: {
+            caption?: string;
+            message_thread_id?: number;
+          }
+        ) => {
+          sendPhotoCalls.push({ chatId, photo, options });
+          return {} as never;
+        },
+      },
+    } as unknown as Bot;
+
+    const ctx = {
+      chat: { id: 7160600900 },
+      message: {},
+    } as unknown as CommandContext<Context>;
+
+    await sendStartCarousel(ctx, bot);
+
+    expect(sendPhotoCalls).toHaveLength(1);
+    expect(sendPhotoCalls[0]?.chatId).toBe(7160600900);
+    expect(sendPhotoCalls[0]?.options?.message_thread_id).toBeUndefined();
   });
 });

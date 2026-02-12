@@ -119,6 +119,7 @@ export async function sendStartCarousel(
   bot: Bot
 ): Promise<void> {
   const chatId = ctx.chat?.id ?? ctx.from?.id;
+  const messageThreadId = ctx.message?.message_thread_id;
   if (!chatId) {
     console.error("Chat ID not found in start command");
     return;
@@ -129,6 +130,7 @@ export async function sendStartCarousel(
 
   await bot.api.sendPhoto(chatId, getSlideImageUrl(initialIndex), {
     caption: initialSlide.caption,
+    message_thread_id: messageThreadId,
     reply_markup: buildStartCarouselKeyboard(initialIndex),
   });
 }
