@@ -99,7 +99,7 @@ export const validateInitData = (
       return false;
     }
 
-    const result = TELEGRAM_PUBLIC_KEYS.some((publicKeyHex, index) => {
+    const result = TELEGRAM_PUBLIC_KEYS.some((publicKeyHex) => {
       const publicKeyBytes = etc.hexToBytes(publicKeyHex);
 
       if (publicKeyBytes.length !== 32) {

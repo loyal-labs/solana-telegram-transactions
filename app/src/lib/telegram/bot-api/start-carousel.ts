@@ -67,7 +67,12 @@ export function parseStartCarouselCallbackData(
     return null;
   }
 
-  const [, action, rawIndex] = matches;
+  const rawAction = matches[1];
+  const rawIndex = matches[2];
+
+  if (rawAction !== "prev" && rawAction !== "next") {
+    return null;
+  }
 
   const currentIndex = Number(rawIndex);
   if (
@@ -79,7 +84,7 @@ export function parseStartCarouselCallbackData(
   }
 
   return {
-    action,
+    action: rawAction,
     currentIndex,
   };
 }
