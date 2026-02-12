@@ -9,7 +9,7 @@ import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
 
 import { CA_COMMAND_CHAT_ID } from "./constants";
 import { getChat } from "./get-chat";
-import { getFileUrl } from "./get-file";
+import { downloadTelegramFile } from "./get-file";
 import { sendStartCarousel } from "./start-carousel";
 import { sendLatestSummary } from "./summaries";
 import type { HandleSummaryCommandOptions } from "./types";
@@ -31,16 +31,10 @@ async function fetchCommunityPhoto(
     if (!chatInfo.photo?.small_file_id) {
       return undefined;
     }
-    const photoUrl = await getFileUrl(chatInfo.photo.small_file_id);
-    const response = await fetch(photoUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch photo: ${response.status}`);
-    }
-    const contentType = response.headers.get("content-type") || "image/jpeg";
-    const buffer = await response.arrayBuffer();
+    const photo = await downloadTelegramFile(chatInfo.photo.small_file_id);
     return {
-      base64: Buffer.from(buffer).toString("base64"),
-      mimeType: contentType,
+      base64: photo.body.toString("base64"),
+      mimeType: photo.contentType,
     };
   } catch (error) {
     console.warn("Failed to fetch community photo:", error);
