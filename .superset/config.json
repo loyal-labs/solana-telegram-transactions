@@ -1,0 +1,6 @@
+{
+  "setup": [
+    "cp \"$SUPERSET_ROOT_PATH/app/.env\" app/.env\ncp -r \"$SUPERSET_ROOT_PATH/.claude\" ./.claude\nbun i"
+  ],
+  "teardown": []
+}
