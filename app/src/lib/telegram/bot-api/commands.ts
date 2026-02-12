@@ -20,6 +20,15 @@ interface CommunityPhoto {
   mimeType: string;
 }
 
+const COMMUNITY_NOT_ACTIVATED_YET_REPLY_TEXT =
+  "This community is not activated yet. Use /activate_community to enable it.";
+const UNAUTHORIZED_VISIBILITY_REPLY_TEXT =
+  "You are not authorized to manage community visibility. Contact an administrator to be added to the whitelist.";
+const VISIBILITY_UPDATE_ERROR_REPLY_TEXT =
+  "An error occurred while updating community visibility. Please try again.";
+
+type VisibilityAction = "HIDE" | "UNHIDE";
+
 /**
  * Fetches community profile photo and converts to base64.
  * Returns undefined if photo is unavailable or fetch fails.
@@ -41,6 +50,49 @@ async function fetchCommunityPhoto(
     console.warn("Failed to fetch community photo:", error);
     return undefined;
   }
+}
+
+async function assertWhitelistedAdminOrThrow(
+  db: ReturnType<typeof getDatabase>,
+  telegramUserId: bigint,
+  action: VisibilityAction
+): Promise<void> {
+  const admin = await db.query.admins.findFirst({
+    where: eq(admins.telegramId, telegramUserId),
+  });
+
+  if (!admin) {
+    throw new Error(`UNAUTHORIZED_${action}`);
+  }
+}
+
+function isUnauthorizedVisibilityError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.message.startsWith("UNAUTHORIZED_HIDE") ||
+      error.message.startsWith("UNAUTHORIZED_UNHIDE"))
+  );
+}
+
+async function findActiveCommunityOrReply(
+  ctx: CommandContext<Context>,
+  db: ReturnType<typeof getDatabase>
+) {
+  if (!ctx.chat) {
+    return null;
+  }
+
+  const chatId = BigInt(ctx.chat.id);
+  const existingCommunity = await db.query.communities.findFirst({
+    where: eq(communities.chatId, chatId),
+  });
+
+  if (!existingCommunity || !existingCommunity.isActive) {
+    await ctx.reply(COMMUNITY_NOT_ACTIVATED_YET_REPLY_TEXT);
+    return null;
+  }
+
+  return existingCommunity;
 }
 
 export async function handleStartCommand(
@@ -379,5 +431,105 @@ export async function handleDeactivateCommunityCommand(
     await ctx.reply(
       "An error occurred while deactivating the community. Please try again."
     );
+  }
+}
+
+export async function handleHideCommunityCommand(
+  ctx: CommandContext<Context>
+): Promise<void> {
+  if (!ctx.from || !ctx.chat) return;
+
+  try {
+    await ctx.deleteMessage();
+  } catch (error) {
+    console.warn("Failed to delete /hide command message", error);
+  }
+
+  if (!isCommunityChat(ctx.chat.type)) {
+    await ctx.reply("This command can only be used in group chats.");
+    return;
+  }
+
+  const telegramUserId = BigInt(ctx.from.id);
+
+  try {
+    const db = getDatabase();
+    await assertWhitelistedAdminOrThrow(db, telegramUserId, "HIDE");
+
+    const existingCommunity = await findActiveCommunityOrReply(ctx, db);
+    if (!existingCommunity) {
+      return;
+    }
+
+    if (!existingCommunity.isPublic) {
+      await ctx.reply("This community is already hidden.");
+      return;
+    }
+
+    await db
+      .update(communities)
+      .set({ isPublic: false, updatedAt: new Date() })
+      .where(eq(communities.id, existingCommunity.id));
+
+    await ctx.reply("Community hidden from public summaries.");
+  } catch (error) {
+    if (isUnauthorizedVisibilityError(error)) {
+      console.warn("Unauthorized /hide command attempt", error);
+      await ctx.reply(UNAUTHORIZED_VISIBILITY_REPLY_TEXT);
+      return;
+    }
+
+    console.error("Failed to hide community", error);
+    await ctx.reply(VISIBILITY_UPDATE_ERROR_REPLY_TEXT);
+  }
+}
+
+export async function handleUnhideCommunityCommand(
+  ctx: CommandContext<Context>
+): Promise<void> {
+  if (!ctx.from || !ctx.chat) return;
+
+  try {
+    await ctx.deleteMessage();
+  } catch (error) {
+    console.warn("Failed to delete /unhide command message", error);
+  }
+
+  if (!isCommunityChat(ctx.chat.type)) {
+    await ctx.reply("This command can only be used in group chats.");
+    return;
+  }
+
+  const telegramUserId = BigInt(ctx.from.id);
+
+  try {
+    const db = getDatabase();
+    await assertWhitelistedAdminOrThrow(db, telegramUserId, "UNHIDE");
+
+    const existingCommunity = await findActiveCommunityOrReply(ctx, db);
+    if (!existingCommunity) {
+      return;
+    }
+
+    if (existingCommunity.isPublic) {
+      await ctx.reply("This community is already visible.");
+      return;
+    }
+
+    await db
+      .update(communities)
+      .set({ isPublic: true, updatedAt: new Date() })
+      .where(eq(communities.id, existingCommunity.id));
+
+    await ctx.reply("Community is now visible in public summaries.");
+  } catch (error) {
+    if (isUnauthorizedVisibilityError(error)) {
+      console.warn("Unauthorized /unhide command attempt", error);
+      await ctx.reply(UNAUTHORIZED_VISIBILITY_REPLY_TEXT);
+      return;
+    }
+
+    console.error("Failed to unhide community", error);
+    await ctx.reply(VISIBILITY_UPDATE_ERROR_REPLY_TEXT);
   }
 }

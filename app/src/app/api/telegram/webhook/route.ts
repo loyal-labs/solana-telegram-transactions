@@ -6,9 +6,11 @@ import {
   handleActivateCommunityCommand,
   handleCaCommand,
   handleDeactivateCommunityCommand,
+  handleHideCommunityCommand,
   handleNotificationsCommand,
   handleStartCommand,
   handleSummaryCommand,
+  handleUnhideCommunityCommand,
 } from "@/lib/telegram/bot-api/commands";
 import { handleBusinessConnection } from "@/lib/telegram/bot-api/handle-business-connection";
 import { handleInlineQuery } from "@/lib/telegram/bot-api/inline";
@@ -47,6 +49,14 @@ bot.command("activate_community", async (ctx: CommandContext<Context>) => {
 
 bot.command("deactivate_community", async (ctx: CommandContext<Context>) => {
   await handleDeactivateCommunityCommand(ctx);
+});
+
+bot.command("hide", async (ctx: CommandContext<Context>) => {
+  await handleHideCommunityCommand(ctx);
+});
+
+bot.command("unhide", async (ctx: CommandContext<Context>) => {
+  await handleUnhideCommunityCommand(ctx);
 });
 
 bot.command("summary", async (ctx: CommandContext<Context>) => {
