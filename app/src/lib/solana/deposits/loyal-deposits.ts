@@ -7,24 +7,15 @@ import { PublicKey } from "@solana/web3.js";
 import {
   ER_VALIDATOR,
   findDepositPda,
-  LoyalPrivateTransactionsClient,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
   PROGRAM_ID,
-} from "@zotho/private-transactions-test";
+} from "@vladarbatov/private-transactions-test";
 
 import { getConnection } from "../rpc/connection";
 import { getWalletKeypair } from "../wallet/wallet-details";
+import { getBaseClient, getPerClient } from "./private-client";
 import { closeWsolAta, wrapSolToWSol } from "./wsol-utils";
-
-const PER_RPC_ENDPOINT = "https://tee.magicblock.app";
-const PER_WS_ENDPOINT = "wss://tee.magicblock.app";
-
-async function getBaseClient(): Promise<LoyalPrivateTransactionsClient> {
-  const connection = getConnection();
-  const keypair = await getWalletKeypair();
-  return LoyalPrivateTransactionsClient.from(connection, keypair);
-}
 
 /**
  * Check which tokens have Loyal deposits. Returns a map of mint → deposit amount (raw).
@@ -51,6 +42,8 @@ export async function fetchLoyalDeposits(
       console.warn("[loyal-deposits] Failed to check deposit:", result.reason);
     }
   }
+
+  console.log("deposits", deposits);
 
   return deposits;
 }
@@ -79,7 +72,57 @@ export async function shieldTokens(params: {
     console.log("initializeDeposit sig", initializeDepositSig);
   }
 
-  // 2. Wrap native SOL → wSOL if needed
+  // 2. If deposit is already delegated (owned by PER), undelegate first
+  const [depositPda] = findDepositPda(keypair.publicKey, tokenMint);
+  const depositAccountInfo =
+    await client.program.provider.connection.getAccountInfo(depositPda);
+  const wasDelegated =
+    depositAccountInfo && !depositAccountInfo.owner.equals(PROGRAM_ID);
+
+  if (wasDelegated) {
+    console.log(
+      "deposit is delegated (owner:",
+      depositAccountInfo.owner.toString(),
+      "), undelegating first..."
+    );
+    const perClient = await getPerClient();
+
+    // Subscribe to owner changes so we know when undelegation is complete
+    let resolveUndelegation: () => void;
+    const undelegationReady = new Promise<void>((r) => {
+      resolveUndelegation = r;
+    });
+    const subId = client.program.provider.connection.onAccountChange(
+      depositPda,
+      (info) => {
+        console.log(
+          "depositPda owner changed ->",
+          info.owner.toString()
+        );
+        if (info.owner.equals(PROGRAM_ID)) resolveUndelegation();
+      },
+      { commitment: "confirmed" }
+    );
+
+    const undelegateSig = await perClient.undelegateDeposit({
+      tokenMint,
+      user: keypair.publicKey,
+      payer: keypair.publicKey,
+      magicProgram: MAGIC_PROGRAM_ID,
+      magicContext: MAGIC_CONTEXT_ID,
+    });
+    console.log("undelegateDeposit sig", undelegateSig);
+
+    console.log("waiting for undelegation to complete...");
+    await undelegationReady;
+    console.log("undelegation complete");
+
+    await client.program.provider.connection.removeAccountChangeListener(
+      subId
+    );
+  }
+
+  // 3. Wrap native SOL → wSOL if needed
   const isNativeSol = tokenMint.equals(NATIVE_MINT);
   const connection = getConnection();
   let createdAta = false;
@@ -102,7 +145,7 @@ export async function shieldTokens(params: {
   );
   console.log("userTokenAccount", userTokenAccount.toString());
 
-  // 3. Move tokens into the deposit vault
+  // 4. Move tokens into the deposit vault
   console.log("modifyBalance");
   const { signature } = await client.modifyBalance({
     tokenMint,
@@ -125,7 +168,7 @@ export async function shieldTokens(params: {
     console.log("closeWsolAta done");
   }
 
-  // 4. Create permission (may already exist)
+  // 5. Create permission (may already exist)
   try {
     console.log("createPermission");
     const createPermissionSig = await client.createPermission({
@@ -138,7 +181,7 @@ export async function shieldTokens(params: {
     // Permission may already exist, that's fine
   }
 
-  // 5. Delegate deposit to PER
+  // 6. Delegate deposit to PER
   try {
     console.log("delegateDeposit");
     const delegateDepositSig = await client.delegateDeposit({
@@ -167,11 +210,7 @@ export async function unshieldTokens(params: {
   const { tokenMint, amount } = params;
 
   // 1. Undelegate from PER
-  const perClient = await LoyalPrivateTransactionsClient.fromEphemeral({
-    signer: keypair,
-    rpcEndpoint: PER_RPC_ENDPOINT,
-    wsEndpoint: PER_WS_ENDPOINT,
-  });
+  const perClient = await getPerClient();
 
   const [depositPda] = findDepositPda(keypair.publicKey, tokenMint);
 

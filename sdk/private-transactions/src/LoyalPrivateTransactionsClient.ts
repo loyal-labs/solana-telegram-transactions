@@ -809,6 +809,12 @@ export class LoyalPrivateTransactionsClient {
     };
     accounts.sessionToken = sessionToken ?? null;
 
+    console.log("transferDeposit Accounts:");
+    Object.entries(accounts).forEach(([key, value]) => {
+      console.log(key, value && value.toString());
+    });
+    console.log("-----");
+
     const signature = await this.program.methods
       .transferDeposit(new BN(amount.toString()))
       .accountsPartial(accounts)

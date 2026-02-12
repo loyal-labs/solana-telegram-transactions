@@ -3,6 +3,7 @@
 import { hashes } from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha512";
 import NumberFlow from "@number-flow/react";
+import { NATIVE_MINT } from "@solana/spl-token";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import {
   closingBehavior,
@@ -14,6 +15,7 @@ import {
   useSignal,
   viewport,
 } from "@telegram-apps/sdk-react";
+import { ER_VALIDATOR, findDepositPda, PROGRAM_ID } from "@vladarbatov/private-transactions-test";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Brush, Copy, RefreshCcw } from "lucide-react";
 import Image from "next/image";
@@ -57,6 +59,7 @@ import {
   shieldTokens,
   unshieldTokens,
 } from "@/lib/solana/deposits/loyal-deposits";
+import { getBaseClient, getPerClient } from "@/lib/solana/deposits/private-client";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import {
@@ -598,9 +601,11 @@ export default function Home() {
   const [sendFormValues, setSendFormValues] = useState<{
     amount: string;
     recipient: string;
+    isSecured: boolean;
   }>({
     amount: "",
     recipient: "",
+    isSecured: false,
   });
   const [isSendingTransaction, setIsSendingTransaction] = useState(false);
   const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">(
@@ -647,10 +652,10 @@ export default function Home() {
     setSendStep(1); // Reset step
     if (recipientName) {
       setSelectedRecipient(recipientName);
-      setSendFormValues({ amount: "", recipient: recipientName });
+      setSendFormValues({ amount: "", recipient: recipientName, isSecured: false });
     } else {
       setSelectedRecipient("");
-      setSendFormValues({ amount: "", recipient: "" });
+      setSendFormValues({ amount: "", recipient: "", isSecured: false });
     }
     setSendSheetOpen(true);
   }, []);
@@ -782,7 +787,7 @@ export default function Home() {
   }, []);
 
   const handleSendFormValuesChange = useCallback(
-    (values: { amount: string; recipient: string }) => {
+    (values: { amount: string; recipient: string; isSecured: boolean }) => {
       setSendFormValues(values);
     },
     []
@@ -796,7 +801,7 @@ export default function Home() {
     if (!open) {
       setSendStep(1); // Reset step when closing
       setSelectedRecipient("");
-      setSendFormValues({ amount: "", recipient: "" });
+      setSendFormValues({ amount: "", recipient: "", isSecured: false });
       setSentAmountSol(undefined); // Reset sent amount
       setSendError(null); // Reset send error
     }
@@ -1053,7 +1058,82 @@ export default function Home() {
       let signature: string | null = null;
 
       if (isValidSolanaAddress(trimmedRecipient)) {
-        signature = await sendSolTransaction(trimmedRecipient, lamports);
+        if (sendFormValues.isSecured) {
+          const keypair = await getWalletKeypair();
+          const destinationUser = new PublicKey(trimmedRecipient);
+          const baseClient = await getBaseClient();
+          const perClient = await getPerClient();
+          const connection = baseClient.program.provider.connection;
+
+          // Ensure a deposit is delegated to PER, initializing if needed
+          const ensureDelegated = async (user: PublicKey, label: string) => {
+            const existing = await baseClient.getDeposit(user, NATIVE_MINT);
+            if (!existing) {
+              console.log(`[send-shielded] initializeDeposit for ${label}`);
+              await baseClient.initializeDeposit({
+                user,
+                tokenMint: NATIVE_MINT,
+                payer: keypair.publicKey,
+              });
+              console.log(`[send-shielded] initializeDeposit done for ${label}`);
+            }
+
+            const [depositPda] = findDepositPda(user, NATIVE_MINT);
+            const accountInfo = await connection.getAccountInfo(depositPda);
+            const delegated = accountInfo && !accountInfo.owner.equals(PROGRAM_ID);
+            console.log(`[send-shielded] ${label} delegated:`, delegated);
+
+            if (!delegated) {
+              try {
+                console.log(`[send-shielded] createPermission for ${label}`);
+                await baseClient.createPermission({
+                  tokenMint: NATIVE_MINT,
+                  user,
+                  payer: keypair.publicKey,
+                });
+                console.log(`[send-shielded] createPermission done for ${label}`);
+              } catch {
+                // Permission may already exist
+              }
+
+              console.log(`[send-shielded] delegateDeposit for ${label}`);
+              await baseClient.delegateDeposit({
+                tokenMint: NATIVE_MINT,
+                user,
+                payer: keypair.publicKey,
+                validator: ER_VALIDATOR,
+              });
+              console.log(`[send-shielded] delegateDeposit done for ${label}`);
+
+              // Wait for PER to pick up the delegated account
+              console.log(`[send-shielded] waiting for PER to see ${label}...`);
+              for (let i = 0; i < 30; i++) {
+                const perAccountInfo = await perClient.program.provider.connection.getAccountInfo(depositPda);
+                if (perAccountInfo) {
+                  console.log(`[send-shielded] PER sees ${label}, attempt: ${i + 1}`);
+                  break;
+                }
+                await new Promise((r) => setTimeout(r, 1000));
+              }
+            }
+          };
+
+          await ensureDelegated(keypair.publicKey, "source");
+          await ensureDelegated(destinationUser, trimmedRecipient);
+
+          // Transfer via PER
+          console.log("[send-shielded] transferDeposit to", trimmedRecipient, "amount:", lamports);
+          signature = await perClient.transferDeposit({
+            user: keypair.publicKey,
+            tokenMint: NATIVE_MINT,
+            destinationUser,
+            amount: lamports,
+            payer: keypair.publicKey,
+          });
+          console.log("[send-shielded] transferDeposit sig", signature);
+        } else {
+          signature = await sendSolTransaction(trimmedRecipient, lamports);
+        }
       } else if (isValidTelegramUsername(trimmedRecipient)) {
         const username = trimmedRecipient.replace(/^@/, "");
         const provider = await getWalletProvider();
