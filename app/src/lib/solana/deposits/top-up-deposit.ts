@@ -4,6 +4,7 @@ import { LoyalPrivateTransactionsClient } from "@vladarbatov/private-transaction
 
 import type { TelegramDeposit } from "../../../types/deposits";
 import { getDeposit } from "./get-deposit";
+import { getBaseClient, getPerClient } from "./private-client";
 import { closeWsolAta, wrapSolToWSol } from "./wsol-utils";
 
 export type TopUpDepositResult = {
@@ -20,7 +21,8 @@ export const topUpDeposit = async (
     throw new Error("Amount must be greater than 0");
   }
 
-  const privateClient = LoyalPrivateTransactionsClient.fromProvider(provider);
+  const baseClient = await getBaseClient();
+  // const privateClient = await getPerClient();
 
   const payer = provider.wallet.payer!;
   const { wsolAta, createdAta } = await wrapSolToWSol({
@@ -30,13 +32,13 @@ export const topUpDeposit = async (
   });
 
   try {
-    await privateClient.initializeDeposit({
-      tokenMint: NATIVE_MINT,
-      user: provider.publicKey,
-      payer: provider.publicKey,
-    });
+    // await privateClient.initializeDeposit({
+    //   tokenMint: NATIVE_MINT,
+    //   user: provider.publicKey,
+    //   payer: provider.publicKey,
+    // });
 
-    const signature = await privateClient.depositForUsername({
+    const signature = await baseClient.depositForUsername({
       username,
       tokenMint: NATIVE_MINT,
       amount,
