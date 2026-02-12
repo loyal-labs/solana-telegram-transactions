@@ -9,7 +9,7 @@ import type { Signal } from "@telegram-apps/signals";
 import { motion, type PanInfo } from "framer-motion";
 import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getAvatarColor, getFirstLetter } from "@/components/summaries/avatar-utils";
 import { MOCK_SUMMARIES } from "@/components/summaries/mock-data";
@@ -270,7 +270,11 @@ export default function SummariesPage() {
   }, [hasCachedData, cachedSummaries]);
 
   // Fetch fresh data (in background if we have cache)
+  const fetchedRef = useRef(false);
   useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+
     const fetchGroupChats = async () => {
       // Use mock data in development when flag is set
       if (publicEnv.useMockSummaries) {
