@@ -19,7 +19,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
-import { SOL_PRICE_USD } from "@/lib/constants";
+import { SOL_PRICE_USD, SOLANA_FEE_SOL } from "@/lib/constants";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import {
   DEFAULT_TOKEN_ICON,
@@ -500,12 +500,15 @@ export default function SwapSheet({
     }
   }, [open, activeTab, secureToken, secureAmountStr, secureDirection, onSecureParamsChange]);
 
-  // Insufficient balance check
+  // Insufficient balance check (reserve gas fee when swapping from SOL)
   const insufficientBalance = useMemo(() => {
     const val = parseFloat(amountStr);
     if (isNaN(val) || val <= 0) return false;
+    if (fromToken.symbol === "SOL") {
+      return val + SOLANA_FEE_SOL > fromToken.balance;
+    }
     return val > fromToken.balance;
-  }, [amountStr, fromToken.balance]);
+  }, [amountStr, fromToken.balance, fromToken.symbol]);
 
   // Swap from/to tokens
   const handleSwapTokens = useCallback(() => {
@@ -564,11 +567,14 @@ export default function SwapSheet({
     [fromToken, toToken, solPriceUsd, setView]
   );
 
-  // Handle preset percentage
+  // Handle preset percentage (reserve gas fee for SOL at 100%)
   const handlePresetPercentage = useCallback(
     (percentage: number) => {
       hapticFeedback.impactOccurred("light");
-      const amount = fromToken.balance * (percentage / 100);
+      let amount = fromToken.balance * (percentage / 100);
+      if (percentage === 100 && fromToken.symbol === "SOL") {
+        amount = Math.max(0, amount - SOLANA_FEE_SOL);
+      }
       const formatted = amount.toFixed(getMaxDecimals(fromToken.symbol)).replace(/\.?0+$/, "") || "0";
       setAmountStr(formatted);
       amountInputRef.current?.focus({ preventScroll: true });
@@ -600,16 +606,19 @@ export default function SwapSheet({
     [solPriceUsd, setView]
   );
 
-  // Handle secure preset percentage
+  // Handle secure preset percentage (reserve gas fee for SOL shield at 100%)
   const handleSecurePresetPercentage = useCallback(
     (percentage: number) => {
       hapticFeedback.impactOccurred("light");
-      const amount = secureToken.balance * (percentage / 100);
+      let amount = secureToken.balance * (percentage / 100);
+      if (percentage === 100 && secureToken.symbol === "SOL" && secureDirection === "shield") {
+        amount = Math.max(0, amount - SOLANA_FEE_SOL);
+      }
       const formatted = amount.toFixed(getMaxDecimals(secureToken.symbol)).replace(/\.?0+$/, "") || "0";
       setSecureAmountStr(formatted);
       secureAmountInputRef.current?.focus({ preventScroll: true });
     },
-    [secureToken.balance, secureToken.symbol]
+    [secureToken.balance, secureToken.symbol, secureDirection]
   );
 
   // Handler wrappers for TokenSelectView callbacks

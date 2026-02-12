@@ -39,6 +39,34 @@ import {
 const SHEET_TRANSITION = "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)";
 const OVERLAY_TRANSITION = "opacity 0.3s ease";
 
+// Parse raw Solana error into a user-friendly message
+function getFriendlyError(raw: string): { message: string; details: string | null } {
+  const lower = raw.toLowerCase();
+
+  if (lower.includes("insufficient lamports") || lower.includes("not enough sol")) {
+    return { message: "You don't have enough SOL to complete this transaction.", details: null };
+  }
+  if (lower.includes("insufficient funds")) {
+    return { message: "Insufficient funds for this transaction.", details: null };
+  }
+  if (lower.includes("blockhash not found") || lower.includes("block height exceeded")) {
+    return { message: "The transaction expired. Please try again.", details: null };
+  }
+  if (lower.includes("timeout") || lower.includes("timed out")) {
+    return { message: "The transaction timed out. Please try again.", details: null };
+  }
+  if (lower.includes("user rejected") || lower.includes("user cancelled")) {
+    return { message: "Transaction was cancelled.", details: null };
+  }
+  if (lower.includes("simulation failed") || lower.includes("program error")) {
+    return { message: "The transaction could not be processed. Please try again later.", details: raw };
+  }
+  if (raw.length > 120) {
+    return { message: "Something went wrong. Please try again.", details: raw };
+  }
+  return { message: raw, details: null };
+}
+
 export type SendSheetProps = {
   trigger?: ReactNode | null;
   open?: boolean;
@@ -171,6 +199,52 @@ const ArrowUpDownIcon = () => (
     <path d="M18.67 22.75V5.25M18.67 5.25L14.58 9.33M18.67 5.25L22.75 9.33" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
+
+function ErrorResult({ error }: { error: string }) {
+  const [showDetails, setShowDetails] = useState(false);
+  const { message, details } = getFriendlyError(error);
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
+      <div className="relative mb-5">
+        <Image
+          src="/dogs/dog-cry.png"
+          alt="Error"
+          width={96}
+          height={96}
+        />
+      </div>
+      <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
+        <h2 className="text-xl font-semibold text-black leading-6">
+          Transaction failed
+        </h2>
+        <p
+          className="text-base leading-5"
+          style={{ color: "rgba(60, 60, 67, 0.6)" }}
+        >
+          {message}
+        </p>
+        {details && (
+          <button
+            onClick={() => setShowDetails((v) => !v)}
+            className="text-[13px] leading-4 mt-1"
+            style={{ color: "rgba(60, 60, 67, 0.4)" }}
+          >
+            {showDetails ? "Hide details" : "Show details"}
+          </button>
+        )}
+        {details && showDetails && (
+          <p
+            className="text-[11px] leading-[14px] mt-1 break-all max-h-[120px] overflow-y-auto"
+            style={{ color: "rgba(60, 60, 67, 0.3)" }}
+          >
+            {details}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function SendSheet({
   open,
@@ -1143,11 +1217,12 @@ export default function SendSheet({
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     if (currency === 'SOL') {
-                      const maxVal = truncateDecimals(balanceInSol, 4).replace(/\.?0+$/, '');
+                      const maxVal = truncateDecimals(Math.max(0, balanceInSol - SOLANA_FEE_SOL), 4).replace(/\.?0+$/, '');
                       handlePresetAmount(maxVal || '0');
                     } else {
+                      const feeUsd = solPriceUsd ? SOLANA_FEE_SOL * solPriceUsd : 0;
                       const maxVal = balanceInUsd !== null
-                        ? truncateDecimals(balanceInUsd, 2).replace(/\.?0+$/, '')
+                        ? truncateDecimals(Math.max(0, balanceInUsd - feeUsd), 2).replace(/\.?0+$/, '')
                         : '0';
                       handlePresetAmount(maxVal || '0');
                     }
@@ -1268,7 +1343,7 @@ export default function SendSheet({
                     Transfer fee
                   </p>
                   <div className="flex items-baseline text-base leading-5">
-                    <span className="text-black">{SOLANA_FEE_SOL} {tokenSymbol}</span>
+                    <span className="text-black">{SOLANA_FEE_SOL.toFixed(6).replace(/\.?0+$/, '')} {tokenSymbol}</span>
                     <span style={{ color: "rgba(60, 60, 67, 0.6)" }}>
                       {solanaFeeUsd !== null ? ` ≈ $${solanaFeeUsd.toFixed(2)}` : " ≈ $—"}
                     </span>
@@ -1292,8 +1367,9 @@ export default function SendSheet({
                     <span className="text-black">
                       {(() => {
                         const val = parseFloat(amountStr);
+                        const feeStr = SOLANA_FEE_SOL.toFixed(6).replace(/\.?0+$/, '');
                         if (isNaN(val)) {
-                          return `${SOLANA_FEE_SOL} ${tokenSymbol}`;
+                          return `${feeStr} ${tokenSymbol}`;
                         }
                         const solVal =
                           currency === 'SOL'
@@ -1302,7 +1378,7 @@ export default function SendSheet({
                               ? val / solPriceUsd
                               : NaN;
                         const total = solVal + SOLANA_FEE_SOL;
-                        if (isNaN(total)) return `${SOLANA_FEE_SOL} ${tokenSymbol}`;
+                        if (isNaN(total)) return `${feeStr} ${tokenSymbol}`;
                         return `${total.toFixed(6).replace(/\.?0+$/, '')} ${tokenSymbol}`;
                       })()}
                     </span>
@@ -1366,27 +1442,7 @@ export default function SendSheet({
               </div>
             ) : sendError ? (
               /* Error */
-              <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
-                <div className="relative mb-5">
-                  <Image
-                    src="/dogs/dog-cry.png"
-                    alt="Error"
-                    width={96}
-                    height={96}
-                  />
-                </div>
-                <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
-                  <h2 className="text-xl font-semibold text-black leading-6">
-                    Transaction failed
-                  </h2>
-                  <p
-                    className="text-base leading-5"
-                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                  >
-                    {sendError}
-                  </p>
-                </div>
-              </div>
+              <ErrorResult error={sendError} />
             ) : (
               /* Success */
               <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
