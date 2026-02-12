@@ -15,6 +15,10 @@ import {
   handleCommunityMessage,
   handleGLoyalReaction,
 } from "@/lib/telegram/bot-api/message-handlers";
+import {
+  handleStartCarouselCallback,
+  START_CAROUSEL_CALLBACK_DATA_REGEX,
+} from "@/lib/telegram/bot-api/start-carousel";
 import { resolveSummaryCommunityPeerId } from "@/lib/telegram/bot-api/summary-chat-id";
 import { handleDirectMessage } from "@/lib/telegram/conversation-service";
 import { isPrivateChat } from "@/lib/telegram/utils";
@@ -49,6 +53,16 @@ bot.command("summary", async (ctx: CommandContext<Context>) => {
 
 bot.on("inline_query", async (ctx) => {
   await handleInlineQuery(ctx as InlineQueryContext<Context>);
+});
+
+bot.callbackQuery(START_CAROUSEL_CALLBACK_DATA_REGEX, async (ctx) => {
+  await handleStartCarouselCallback(ctx);
+});
+
+// Keep this fallback at the end so unknown callback queries don't show
+// a perpetual loading state in Telegram clients.
+bot.on("callback_query:data", async (ctx) => {
+  await ctx.answerCallbackQuery();
 });
 
 bot.on("business_connection", async (ctx) => {

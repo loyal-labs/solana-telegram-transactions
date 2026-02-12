@@ -7,9 +7,10 @@ import { admins, communities } from "@/lib/core/schema";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
 
-import { CA_COMMAND_CHAT_ID, MINI_APP_LINK } from "./constants";
+import { CA_COMMAND_CHAT_ID } from "./constants";
 import { getChat } from "./get-chat";
 import { getFileUrl } from "./get-file";
+import { sendStartCarousel } from "./start-carousel";
 import { sendLatestSummary } from "./summaries";
 import type { HandleSummaryCommandOptions } from "./types";
 
@@ -51,23 +52,7 @@ export async function handleStartCommand(
   ctx: CommandContext<Context>,
   bot: Bot
 ): Promise<void> {
-  const welcomeText = `<b>Welcome to Loyal!</b>\n\nThis bot utilizes Loyal private AI to summarize, prioritize and filter your Telegram chat.\n\nAll your messages are encrypted, and neither the Loyal team nor our compute providers can see them. For more info, visit our GitHub: https://github.com/loyal-labs\n\nWARNING: this product is in open test phase, so the functionality may be incomplete and you may encounter bugs.\n\nWe appreciate any feedback in our @loyal_tgchat`;
-  const buttonText = "Go Loyal";
-  const keyboard = new InlineKeyboard().url(buttonText, MINI_APP_LINK);
-
-  const user = ctx.from;
-  if (!user) {
-    console.error("User not found in start command");
-    return;
-  }
-  const userId = user.id;
-
-  const welcomeMessage = await bot.api.sendMessage(userId, welcomeText, {
-    reply_markup: keyboard,
-    parse_mode: "HTML",
-  });
-
-  await bot.api.pinChatMessage(userId, welcomeMessage.message_id);
+  await sendStartCarousel(ctx, bot);
 }
 
 export async function handleCaCommand(

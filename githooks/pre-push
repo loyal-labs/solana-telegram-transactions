@@ -16,3 +16,6 @@ fi
 
 echo "[pre-push] Running app lint..."
 (cd app && bun run lint)
+
+echo "[pre-push] Running app build..."
+(cd app && bun run build)
