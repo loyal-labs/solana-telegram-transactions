@@ -1,7 +1,8 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -41,6 +42,16 @@ export type SenderType = "user" | "bot" | "system";
  * Thread status for bot conversations.
  */
 export type ThreadStatus = "active" | "archived" | "closed";
+
+/**
+ * Allowed time-based summary notification frequency options.
+ */
+export type SummaryNotificationTimeHours = 24 | 48;
+
+/**
+ * Allowed message-count summary notification frequency options.
+ */
+export type SummaryNotificationMessageCount = 500 | 1000;
 
 /**
  * Encrypted message content stored as JSONB.
@@ -117,6 +128,18 @@ export const communities = pgTable(
     chatTitle: text("chat_title").notNull(),
     activatedBy: bigint("activated_by", { mode: "bigint" }).notNull(),
     isActive: boolean("is_active").default(true).notNull(),
+    summaryNotificationsEnabled: boolean("summary_notifications_enabled")
+      .default(true)
+      .notNull(),
+    summaryNotificationTimeHours: integer("summary_notification_time_hours")
+      .$type<SummaryNotificationTimeHours | null>()
+      .default(24),
+    summaryNotificationMessageCount: integer(
+      "summary_notification_message_count"
+    )
+      .$type<SummaryNotificationMessageCount | null>()
+      .default(null),
+    isPublic: boolean("is_public").default(true).notNull(),
     settings: jsonb("settings").default({}).notNull(),
     activatedAt: timestamp("activated_at", { withTimezone: true })
       .defaultNow()
@@ -128,6 +151,14 @@ export const communities = pgTable(
   (table) => [
     uniqueIndex("communities_chat_id_idx").on(table.chatId),
     index("communities_is_active_idx").on(table.isActive),
+    check(
+      "communities_summary_notification_time_hours_check",
+      sql`${table.summaryNotificationTimeHours} IS NULL OR ${table.summaryNotificationTimeHours} IN (24, 48)`
+    ),
+    check(
+      "communities_summary_notification_message_count_check",
+      sql`${table.summaryNotificationMessageCount} IS NULL OR ${table.summaryNotificationMessageCount} IN (500, 1000)`
+    ),
   ]
 );
 
