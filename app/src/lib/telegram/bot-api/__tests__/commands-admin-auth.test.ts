@@ -47,6 +47,10 @@ let handleActivateCommunityCommand: (
 let handleDeactivateCommunityCommand: (
   ctx: CommandContext<Context>
 ) => Promise<void>;
+let handleHideCommunityCommand: (ctx: CommandContext<Context>) => Promise<void>;
+let handleUnhideCommunityCommand: (
+  ctx: CommandContext<Context>
+) => Promise<void>;
 
 let adminResult: { id: string } | null;
 let communityResult: Community | null;
@@ -99,6 +103,8 @@ describe("commands admin authorization", () => {
     const loadedModule = await import("../commands");
     handleActivateCommunityCommand = loadedModule.handleActivateCommunityCommand;
     handleDeactivateCommunityCommand = loadedModule.handleDeactivateCommunityCommand;
+    handleHideCommunityCommand = loadedModule.handleHideCommunityCommand;
+    handleUnhideCommunityCommand = loadedModule.handleUnhideCommunityCommand;
   });
 
   beforeEach(() => {
@@ -177,5 +183,105 @@ describe("commands admin authorization", () => {
     expect(replyCalls).toEqual([
       "You are not authorized to deactivate communities. Contact an administrator to be added to the whitelist.",
     ]);
+  });
+
+  test("hide succeeds for whitelisted user and sets isPublic to false", async () => {
+    adminResult = { id: "admin-1" };
+    communityResult = createCommunity({ isActive: true, isPublic: true });
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleHideCommunityCommand(ctx);
+
+    expect(updateValuesCaptured).toHaveLength(1);
+    expect(updateValuesCaptured[0]?.isPublic).toBe(false);
+    expect(updateValuesCaptured[0]?.updatedAt).toBeInstanceOf(Date);
+    expect(replyCalls).toEqual(["Community hidden from public summaries."]);
+  });
+
+  test("unhide succeeds for whitelisted user and sets isPublic to true", async () => {
+    adminResult = { id: "admin-1" };
+    communityResult = createCommunity({ isActive: true, isPublic: false });
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleUnhideCommunityCommand(ctx);
+
+    expect(updateValuesCaptured).toHaveLength(1);
+    expect(updateValuesCaptured[0]?.isPublic).toBe(true);
+    expect(updateValuesCaptured[0]?.updatedAt).toBeInstanceOf(Date);
+    expect(replyCalls).toEqual(["Community is now visible in public summaries."]);
+  });
+
+  test("hide rejects non-whitelisted user", async () => {
+    adminResult = null;
+    communityResult = createCommunity({ isActive: true, isPublic: true });
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleHideCommunityCommand(ctx);
+
+    expect(updateValuesCaptured).toHaveLength(0);
+    expect(replyCalls).toEqual([
+      "You are not authorized to manage community visibility. Contact an administrator to be added to the whitelist.",
+    ]);
+  });
+
+  test("unhide rejects non-whitelisted user", async () => {
+    adminResult = null;
+    communityResult = createCommunity({ isActive: true, isPublic: false });
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleUnhideCommunityCommand(ctx);
+
+    expect(updateValuesCaptured).toHaveLength(0);
+    expect(replyCalls).toEqual([
+      "You are not authorized to manage community visibility. Contact an administrator to be added to the whitelist.",
+    ]);
+  });
+
+  test("hide notifies when community is not activated yet (missing row)", async () => {
+    adminResult = { id: "admin-1" };
+    communityResult = null;
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleHideCommunityCommand(ctx);
+
+    expect(updateValuesCaptured).toHaveLength(0);
+    expect(replyCalls).toEqual([
+      "This community is not activated yet. Use /activate_community to enable it.",
+    ]);
+  });
+
+  test("unhide notifies when community is not activated yet (inactive row)", async () => {
+    adminResult = { id: "admin-1" };
+    communityResult = createCommunity({ isActive: false, isPublic: false });
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleUnhideCommunityCommand(ctx);
+
+    expect(updateValuesCaptured).toHaveLength(0);
+    expect(replyCalls).toEqual([
+      "This community is not activated yet. Use /activate_community to enable it.",
+    ]);
+  });
+
+  test("hide is idempotent when community is already hidden", async () => {
+    adminResult = { id: "admin-1" };
+    communityResult = createCommunity({ isActive: true, isPublic: false });
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleHideCommunityCommand(ctx);
+
+    expect(updateValuesCaptured).toHaveLength(0);
+    expect(replyCalls).toEqual(["This community is already hidden."]);
+  });
+
+  test("unhide is idempotent when community is already visible", async () => {
+    adminResult = { id: "admin-1" };
+    communityResult = createCommunity({ isActive: true, isPublic: true });
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleUnhideCommunityCommand(ctx);
+
+    expect(updateValuesCaptured).toHaveLength(0);
+    expect(replyCalls).toEqual(["This community is already visible."]);
   });
 });

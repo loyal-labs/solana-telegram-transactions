@@ -24,6 +24,14 @@ export async function registerBotCommands(bot: Bot): Promise<void> {
         command: "deactivate_community",
         description: "Disable message tracking (admins only)",
       },
+      {
+        command: "hide",
+        description: "Hide this community from public summaries (admins only)",
+      },
+      {
+        command: "unhide",
+        description: "Show this community in public summaries (admins only)",
+      },
     ],
     { scope: { type: "all_group_chats" } }
   );
