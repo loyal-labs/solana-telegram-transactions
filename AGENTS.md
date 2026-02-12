@@ -172,7 +172,8 @@ Service layer patterns:
   const result = await db.insert(table).values({...}).onConflictDoNothing().returning({ id: table.id });
   if (result.length === 0) { /* query existing record */ }
   ```
-- **Transactions**: Use `db.transaction()` when multiple operations must be atomic
+- **Driver Compatibility (Critical)**: Check `/app/src/lib/core/database.ts` before choosing advanced DB APIs. Do not assume all Drizzle drivers support the same capabilities.
+- **Atomic Multi-step Writes (Neon HTTP)**: This repo uses `drizzle-orm/neon-http`, which does **not** support `db.transaction()`. For atomic multi-statement writes, use `db.batch([...])`. Only use `db.transaction()` if the project is moved to a driver that supports it.
 - **Query Builder**: Prefer `db.query.table.findFirst()` with `with:` for relations over raw SQL
 
 ### Code Patterns
@@ -195,6 +196,10 @@ Service layer patterns:
   - Never import `@/lib/core/config/server` from client code or shared barrels consumed by client code.
   - Keep server-only entrypoints isolated in dedicated modules (e.g. `server.ts` or `*.server.ts`) and import them only from server contexts (`/app/api`, server actions, other server-only modules).
   - For dual-use modules (client + server), keep `index.ts` client-safe and expose server-only helpers via a separate server entrypoint.
+
+### Troubleshooting
+
+- **Runtime vs Code Mismatch**: If logs/stack traces reference code that no longer matches current file contents, restart the local dev server or worker process. Stale processes can keep executing old code after edits.
 
 ## Git Worktree Workflow
 
