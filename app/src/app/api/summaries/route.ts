@@ -4,6 +4,11 @@ import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/core/database";
 import { communities, summaries, type Summary } from "@/lib/core/schema";
 
+type CommunityPhotoSettings = {
+  photoBase64?: string;
+  photoMimeType?: string;
+};
+
 export async function GET(req: Request): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(req.url);
@@ -18,10 +23,7 @@ export async function GET(req: Request): Promise<NextResponse> {
         });
 
     const transformedSummaries = result.map((item) => {
-      const settings = item.community.settings as {
-        photoBase64?: string;
-        photoMimeType?: string;
-      } | null;
+      const settings = item.community.settings as CommunityPhotoSettings | null;
       return {
         id: item.id,
         chatId: String(item.community.chatId),
