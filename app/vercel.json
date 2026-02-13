@@ -2,10 +2,6 @@
   "crons": [
     {
       "path": "/api/cron/summaries",
-      "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/cron/summaries",
       "schedule": "0 6 * * *"
     }
   ]

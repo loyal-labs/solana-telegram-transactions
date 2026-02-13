@@ -26,8 +26,6 @@ import { SUMMARY_INTERVAL_MS } from "@/lib/telegram/utils";
 
 export const runtime = "nodejs";
 
-const LOS_ANGELES_TIME_ZONE = "America/Los_Angeles";
-const TARGET_HOUR_LOCAL = 22;
 const DAILY_TRIGGER_TYPE = "cron_daily_la";
 
 type ActiveCommunityRecord = {
@@ -95,18 +93,6 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const now = new Date();
-  const losAngelesHour = getLosAngelesHour(now);
-  if (!shouldRunDailySummaryCron(now)) {
-    return NextResponse.json({
-      losAngelesHour,
-      ok: true,
-      reason: "outside_scheduled_hour",
-      skipped: true,
-      targetHourLocal: TARGET_HOUR_LOCAL,
-      timeZone: LOS_ANGELES_TIME_ZONE,
-    });
-  }
-
   const run = buildDailySummaryRunContext(now);
   const db = getDatabase();
 
@@ -173,27 +159,11 @@ export async function POST(request: Request): Promise<NextResponse> {
   );
 }
 
-export function getLosAngelesHour(date: Date): number {
-  const hourPart = new Intl.DateTimeFormat("en-US", {
-    hour: "2-digit",
-    hour12: false,
-    timeZone: LOS_ANGELES_TIME_ZONE,
-  })
-    .formatToParts(date)
-    .find((part) => part.type === "hour");
-
-  if (!hourPart) {
-    throw new Error("Unable to resolve Los Angeles local hour");
-  }
-
-  return Number.parseInt(hourPart.value, 10);
-}
-
 export function getLosAngelesDateKey(date: Date): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     day: "2-digit",
     month: "2-digit",
-    timeZone: LOS_ANGELES_TIME_ZONE,
+    timeZone: "America/Los_Angeles",
     year: "numeric",
   }).formatToParts(date);
 
@@ -215,10 +185,6 @@ export function buildDailySummaryRunContext(date: Date = new Date()): SummaryRun
     windowEnd: date,
     windowStart: new Date(date.getTime() - SUMMARY_INTERVAL_MS),
   };
-}
-
-export function shouldRunDailySummaryCron(date: Date = new Date()): boolean {
-  return getLosAngelesHour(date) === TARGET_HOUR_LOCAL;
 }
 
 export function selectCandidateCommunities(input: {

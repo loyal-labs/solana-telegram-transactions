@@ -40,7 +40,6 @@ let POST: (request: Request) => Promise<Response>;
 let buildDailySummaryRunContext: typeof import("./route").buildDailySummaryRunContext;
 let runDailyCommunitySummaries: typeof import("./route").runDailyCommunitySummaries;
 let selectCandidateCommunities: typeof import("./route").selectCandidateCommunities;
-let shouldRunDailySummaryCron: typeof import("./route").shouldRunDailySummaryCron;
 
 describe("cron summaries route", () => {
   beforeAll(async () => {
@@ -49,7 +48,6 @@ describe("cron summaries route", () => {
     POST = loadedModule.POST;
     runDailyCommunitySummaries = loadedModule.runDailyCommunitySummaries;
     selectCandidateCommunities = loadedModule.selectCandidateCommunities;
-    shouldRunDailySummaryCron = loadedModule.shouldRunDailySummaryCron;
   });
 
   beforeEach(() => {
@@ -88,10 +86,22 @@ describe("cron summaries route", () => {
     expect(payload).toEqual({ error: "Unauthorized" });
   });
 
-  test("runs at 10pm Los Angeles across PST and PDT boundaries", () => {
-    expect(shouldRunDailySummaryCron(new Date("2026-01-16T06:00:00Z"))).toBe(true);
-    expect(shouldRunDailySummaryCron(new Date("2026-06-16T05:00:00Z"))).toBe(true);
-    expect(shouldRunDailySummaryCron(new Date("2026-06-16T06:00:00Z"))).toBe(false);
+  test("processes cron requests without LA-hour skip gating", async () => {
+    process.env.CRON_SECRET = "expected-secret";
+    const request = new Request("http://localhost/api/cron/summaries", {
+      method: "POST",
+      headers: { authorization: "Bearer expected-secret" },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+
+    const payload = await response.json();
+    expect(payload.reason).toBeUndefined();
+    expect(payload.skipped).toBe(false);
+    expect(payload.ok).toBe(true);
+    expect(payload.run).toBeDefined();
+    expect(payload.stats).toBeDefined();
   });
 
   test("builds a stable daily trigger key in Los Angeles time", () => {
