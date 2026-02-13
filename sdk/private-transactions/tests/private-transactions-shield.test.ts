@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll } from "bun:test";
+import { describe } from "bun:test";
+import * as anchor from "@coral-xyz/anchor";
 import {
   findDepositPda,
   LoyalPrivateTransactionsClient,
@@ -6,14 +7,18 @@ import {
   MAGIC_PROGRAM_ID,
   PROGRAM_ID,
   ER_VALIDATOR,
+  findUsernameDepositPda,
+  DELEGATION_PROGRAM_ID,
 } from "../index";
 import {
   Connection,
+  Ed25519Program,
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
   sendAndConfirmTransaction,
   SystemProgram,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
   Transaction,
   TransactionInstruction,
 } from "@solana/web3.js";
@@ -30,6 +35,103 @@ import {
   TOKEN_PROGRAM_ID,
   transfer,
 } from "@solana/spl-token";
+import {
+  verifyTeeRpcIntegrity,
+  getAuthToken,
+} from "@magicblock-labs/ephemeral-rollups-sdk";
+import { sign } from "tweetnacl";
+import path from "node:path";
+import type { TelegramVerification } from "../../../target/types/telegram_verification";
+
+const AUTH_TOKEN_CACHE_PATH = path.join(
+  import.meta.dir,
+  ".auth-token-cache.json"
+);
+
+type CachedTokens = Record<string, { token: string; expiresAt: number }>;
+
+async function loadTokenCache(): Promise<CachedTokens> {
+  const file = Bun.file(AUTH_TOKEN_CACHE_PATH);
+  if (!(await file.exists())) return {};
+  try {
+    return await file.json();
+  } catch {
+    return {};
+  }
+}
+
+async function saveTokenCache(cache: CachedTokens): Promise<void> {
+  await Bun.write(AUTH_TOKEN_CACHE_PATH, JSON.stringify(cache, null, 2));
+}
+
+async function getOrCacheAuthToken(
+  ephemeralRpcEndpoint: string,
+  keypair: Keypair
+): Promise<{ token: string; expiresAt: number }> {
+  const cacheKey = `${ephemeralRpcEndpoint}:${keypair.publicKey.toBase58()}`;
+  const cache = await loadTokenCache();
+  const cached = cache[cacheKey];
+
+  if (cached && cached.expiresAt > Date.now() / 1000 + 60) {
+    console.log(`Using cached auth token for ${keypair.publicKey.toBase58()}`);
+    return cached;
+  }
+
+  const isVerified = await verifyTeeRpcIntegrity(ephemeralRpcEndpoint);
+  if (!isVerified) {
+    throw new Error("TEE RPC integrity verification failed");
+  }
+
+  const signMessage = (message: Uint8Array) =>
+    Promise.resolve(sign.detached(message, keypair.secretKey));
+
+  const result = await getAuthToken(
+    ephemeralRpcEndpoint,
+    keypair.publicKey,
+    signMessage
+  );
+
+  cache[cacheKey] = result;
+  await saveTokenCache(cache);
+  console.log(`Cached new auth token for ${keypair.publicKey.toBase58()}`);
+  return result;
+}
+
+const VALIDATION_BYTES: Uint8Array = new Uint8Array([
+  56, 48, 54, 53, 49, 52, 48, 52, 57, 57, 58, 87, 101, 98, 65, 112, 112, 68, 97,
+  116, 97, 10, 97, 117, 116, 104, 95, 100, 97, 116, 101, 61, 49, 55, 54, 51, 53,
+  57, 56, 51, 55, 53, 10, 99, 104, 97, 116, 95, 105, 110, 115, 116, 97, 110, 99,
+  101, 61, 45, 52, 53, 57, 55, 56, 48, 55, 53, 56, 53, 54, 55, 51, 56, 52, 53,
+  53, 55, 49, 10, 99, 104, 97, 116, 95, 116, 121, 112, 101, 61, 115, 101, 110,
+  100, 101, 114, 10, 117, 115, 101, 114, 61, 123, 34, 105, 100, 34, 58, 56, 49,
+  51, 56, 55, 57, 55, 55, 54, 55, 44, 34, 102, 105, 114, 115, 116, 95, 110, 97,
+  109, 101, 34, 58, 34, 84, 114, 97, 118, 105, 115, 34, 44, 34, 108, 97, 115,
+  116, 95, 110, 97, 109, 101, 34, 58, 34, 34, 44, 34, 117, 115, 101, 114, 110,
+  97, 109, 101, 34, 58, 34, 100, 105, 103, 49, 51, 51, 55, 49, 51, 51, 51, 55,
+  34, 44, 34, 108, 97, 110, 103, 117, 97, 103, 101, 95, 99, 111, 100, 101, 34,
+  58, 34, 101, 110, 34, 44, 34, 97, 108, 108, 111, 119, 115, 95, 119, 114, 105,
+  116, 101, 95, 116, 111, 95, 112, 109, 34, 58, 116, 114, 117, 101, 44, 34, 112,
+  104, 111, 116, 111, 95, 117, 114, 108, 34, 58, 34, 104, 116, 116, 112, 115,
+  58, 92, 47, 92, 47, 116, 46, 109, 101, 92, 47, 105, 92, 47, 117, 115, 101,
+  114, 112, 105, 99, 92, 47, 51, 50, 48, 92, 47, 120, 99, 90, 85, 85, 85, 87,
+  51, 117, 74, 50, 99, 79, 80, 86, 73, 81, 85, 111, 99, 104, 105, 119, 72, 99,
+  56, 113, 118, 114, 56, 106, 114, 108, 66, 56, 74, 45, 72, 88, 120, 105, 112,
+  98, 83, 74, 76, 122, 122, 118, 120, 73, 99, 79, 106, 55, 103, 55, 70, 49, 69,
+  78, 116, 72, 71, 46, 115, 118, 103, 34, 125,
+]);
+
+const VALIDATION_SIGNATURE_BYTES: Uint8Array = new Uint8Array([
+  139, 171, 57, 233, 145, 1, 218, 227, 29, 106, 55, 30, 237, 207, 28, 229, 22,
+  234, 202, 160, 221, 31, 219, 251, 151, 181, 118, 207, 216, 254, 57, 79, 209,
+  9, 176, 4, 81, 224, 69, 253, 250, 110, 16, 143, 73, 60, 35, 61, 66, 177, 139,
+  178, 153, 248, 2, 121, 161, 49, 224, 103, 190, 108, 234, 4,
+]);
+
+const VALIDATION_USERNAME = "dig133713337";
+const TELEGRAM_ED25519_PUBKEY = Buffer.from(
+  "e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d",
+  "hex"
+);
 
 const PER_RPC_ENDPOINT = "https://tee.magicblock.app";
 const PER_WS_ENDPOINT = "wss://tee.magicblock.app";
@@ -69,12 +171,36 @@ const OTHER_USER_KP = Keypair.fromSecretKey(
 const USER = USER_KP.publicKey;
 const OTHER_USER = OTHER_USER_KP.publicKey;
 
+function prettyStringify(obj: unknown): string {
+  const json = JSON.stringify(
+    obj,
+    (_key, value) => {
+      if (value instanceof PublicKey) return value.toBase58();
+      if (typeof value === "bigint") return value.toString();
+      return value;
+    },
+    2
+  );
+  // Collapse arrays onto single lines
+  return json.replace(/\[\s+(\d[\d,\s]*\d)\s+\]/g, (_match, inner) => {
+    const items = inner.split(/,\s*/).map((s: string) => s.trim());
+    return `[${items.join(", ")}]`;
+  });
+}
+
+const userAuthToken = await getOrCacheAuthToken(PER_RPC_ENDPOINT, USER_KP);
+const otherAuthToken = await getOrCacheAuthToken(
+  PER_RPC_ENDPOINT,
+  OTHER_USER_KP
+);
+
 const loyalClient = await LoyalPrivateTransactionsClient.fromConfig({
   signer: USER_KP,
   baseRpcEndpoint: SECURE_DEVNET_RPC_URL,
   baseWsEndpoint: SECURE_DEVNET_RPC_WS,
   ephemeralRpcEndpoint: PER_RPC_ENDPOINT,
   ephemeralWsEndpoint: PER_WS_ENDPOINT,
+  authToken: userAuthToken,
 });
 
 const otherLoyalClient = await LoyalPrivateTransactionsClient.fromConfig({
@@ -83,6 +209,7 @@ const otherLoyalClient = await LoyalPrivateTransactionsClient.fromConfig({
   baseWsEndpoint: SECURE_DEVNET_RPC_WS,
   ephemeralRpcEndpoint: PER_RPC_ENDPOINT,
   ephemeralWsEndpoint: PER_WS_ENDPOINT,
+  authToken: otherAuthToken,
 });
 
 export const COMMON_MINTS = {
@@ -196,22 +323,134 @@ export async function fetchLoyalDeposits(
 const getConnection = () => solanaConnection;
 const getWalletKeypair = async () => USER_KP;
 const getLoyalClient = async () => loyalClient;
+const getOtherLoyalClient = async () => otherLoyalClient;
 
-// export async function transferTokensToUsername(params: {
-//   tokenMint: PublicKey;
-//   amount: number;
-//   destination: string;
-// }): Promise<string> {
-//   const startTime = Date.now();
-//   console.log("> transferTokensToUsername");
-//   const keypair = await getWalletKeypair();
-//   const client = await getLoyalClient();
-//   const { tokenMint, amount, destination } = params;
+async function waitForAccount(
+  client: LoyalPrivateTransactionsClient,
+  pda: PublicKey,
+  maxAttempts = 30
+): Promise<void> {
+  const connection = client.baseProgram.provider.connection;
+  for (let i = 0; i < maxAttempts; i++) {
+    const info = await connection.getAccountInfo(pda);
+    if (info) return;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
 
-//   console.log(`< transferTokensToUsername (${Date.now() - startTime}ms)`);
+export async function claimTokens(params: {
+  tokenMint: PublicKey;
+  amount: number;
+  username: string;
+  destination: PublicKey;
+  session: PublicKey;
+}): Promise<string> {
+  const startTime = Date.now();
+  console.log("> claimTokens");
+  const client = await getOtherLoyalClient();
+  const { tokenMint, amount, username, destination, session } = params;
 
-//   return "";
-// }
+  console.log("claimUsernameDepositToDeposit");
+  const claimUsernameDepositToDepositSig =
+    await client.claimUsernameDepositToDeposit({
+      username,
+      tokenMint,
+      amount,
+      recipient: destination,
+      session,
+    });
+  console.log(
+    "claimUsernameDepositToDeposit sig",
+    claimUsernameDepositToDepositSig
+  );
+
+  console.log(`< claimTokens (${Date.now() - startTime}ms)`);
+
+  return claimUsernameDepositToDepositSig;
+}
+
+export async function transferTokensToUsername(params: {
+  tokenMint: PublicKey;
+  amount: number;
+  destinationUsername: string;
+}): Promise<string> {
+  const startTime = Date.now();
+  console.log("> transferTokensToUsername");
+  const keypair = await getWalletKeypair();
+  const client = await getLoyalClient();
+  const { tokenMint, amount, destinationUsername } = params;
+
+  const existingBaseUsernameDeposit = await client.getBaseUsernameDeposit(
+    destinationUsername,
+    tokenMint
+  );
+  const existingEphemeralUsernameDeposit =
+    await client.getEphemeralUsernameDeposit(destinationUsername, tokenMint);
+  console.log(
+    "existingBaseUsernameDeposit",
+    prettyStringify(existingBaseUsernameDeposit)
+  );
+  console.log(
+    "existingEphemeralUsernameDeposit",
+    prettyStringify(existingEphemeralUsernameDeposit)
+  );
+  if (!existingBaseUsernameDeposit && !existingEphemeralUsernameDeposit) {
+    console.log("initializeUsernameDeposit");
+    const initializeUsernameDepositSig = await client.initializeUsernameDeposit(
+      {
+        tokenMint,
+        username: destinationUsername,
+        payer: keypair.publicKey,
+      }
+    );
+    console.log("initializeUsernameDeposit sig", initializeUsernameDepositSig);
+    const [depositPda] = findUsernameDepositPda(destinationUsername, tokenMint);
+    await waitForAccount(client, depositPda);
+  }
+
+  const [depositPda] = findUsernameDepositPda(destinationUsername, tokenMint);
+  const baseAccountInfo =
+    await client.baseProgram.provider.connection.getAccountInfo(depositPda);
+  const ephemeralAccountInfo =
+    await client.ephemeralProgram.provider.connection.getAccountInfo(
+      depositPda
+    );
+  console.log(
+    "delegateUsernameDeposit baseAccountInfo",
+    prettyStringify(baseAccountInfo)
+  );
+  console.log(
+    "delegateUsernameDeposit ephemeralAccountInfo",
+    prettyStringify(ephemeralAccountInfo)
+  );
+
+  const isDelegated = baseAccountInfo?.owner.equals(DELEGATION_PROGRAM_ID);
+
+  if (!isDelegated) {
+    console.log("delegateUsernameDeposit");
+    const delegateUsernameDepositSig = await client.delegateUsernameDeposit({
+      tokenMint,
+      username: destinationUsername,
+      payer: keypair.publicKey,
+      validator: ER_VALIDATOR,
+    });
+    console.log("delegateUsernameDeposit sig", delegateUsernameDepositSig);
+  }
+
+  console.log("transferToUsernameDeposit");
+  const transferToUsernameDepositSig = await client.transferToUsernameDeposit({
+    username: destinationUsername,
+    user: keypair.publicKey,
+    tokenMint,
+    amount,
+    payer: keypair.publicKey,
+  });
+  console.log("transferToUsernameDeposit sig", transferToUsernameDepositSig);
+
+  console.log(`< transferTokensToUsername (${Date.now() - startTime}ms)`);
+
+  return transferToUsernameDepositSig;
+}
 
 export async function transferTokens(params: {
   tokenMint: PublicKey;
@@ -232,8 +471,11 @@ export async function transferTokens(params: {
     destination,
     tokenMint
   );
-  console.log("existingBaseDeposit", existingBaseDeposit);
-  console.log("existingEphemeralDeposit", existingEphemeralDeposit);
+  console.log("existingBaseDeposit", prettyStringify(existingBaseDeposit));
+  console.log(
+    "existingEphemeralDeposit",
+    prettyStringify(existingEphemeralDeposit)
+  );
   if (!existingBaseDeposit && !existingEphemeralDeposit) {
     console.log("initializeDeposit");
     const initializeDepositSig = await client.initializeDeposit({
@@ -242,16 +484,28 @@ export async function transferTokens(params: {
       payer: keypair.publicKey,
     });
     console.log("initializeDeposit sig", initializeDepositSig);
+
+    const [depositPda] = findDepositPda(destination, tokenMint);
+    await waitForAccount(client, depositPda);
   }
 
-  console.log("delegateDeposit");
-  const delegateDepositSig = await client.delegateDeposit({
-    tokenMint,
-    user: destination,
-    payer: keypair.publicKey,
-    validator: ER_VALIDATOR,
-  });
-  console.log("delegateDeposit sig", delegateDepositSig);
+  const [depositPda] = findDepositPda(destination, tokenMint);
+  const depositPdaAccountInfo =
+    await client.baseProgram.provider.connection.getAccountInfo(depositPda);
+  const isDelegated = depositPdaAccountInfo?.owner.equals(
+    DELEGATION_PROGRAM_ID
+  );
+
+  if (!isDelegated) {
+    console.log("delegateDeposit");
+    const delegateDepositSig = await client.delegateDeposit({
+      tokenMint,
+      user: destination,
+      payer: keypair.publicKey,
+      validator: ER_VALIDATOR,
+    });
+    console.log("delegateDeposit sig", delegateDepositSig);
+  }
 
   console.log("transferDeposit");
   const transferDepositSig = await client.transferDeposit({
@@ -295,6 +549,8 @@ export async function shieldTokens(params: {
       payer: keypair.publicKey,
     });
     console.log("initializeDeposit sig", initializeDepositSig);
+    const [depositPda] = findDepositPda(keypair.publicKey, tokenMint);
+    await waitForAccount(client, depositPda);
   }
 
   // 2. Wrap native SOL → wSOL if needed
@@ -320,7 +576,23 @@ export async function shieldTokens(params: {
   );
   console.log("userTokenAccount", userTokenAccount.toString());
 
-  // 3. Move tokens into the deposit vault
+  // 3. Undelegate if currently delegated (modifyBalance requires base layer ownership)
+  const [depositPda] = findDepositPda(keypair.publicKey, tokenMint);
+  const depositAccountInfo =
+    await client.baseProgram.provider.connection.getAccountInfo(depositPda);
+  if (depositAccountInfo?.owner.equals(DELEGATION_PROGRAM_ID)) {
+    console.log("undelegateDeposit (deposit is delegated, undelegating first)");
+    const undelegateSig = await client.undelegateDeposit({
+      tokenMint,
+      user: keypair.publicKey,
+      payer: keypair.publicKey,
+      magicProgram: MAGIC_PROGRAM_ID,
+      magicContext: MAGIC_CONTEXT_ID,
+    });
+    console.log("undelegateDeposit sig", undelegateSig);
+  }
+
+  // 4. Move tokens into the deposit vault
   console.log("modifyBalance");
   const { signature } = await client.modifyBalance({
     tokenMint,
@@ -343,7 +615,7 @@ export async function shieldTokens(params: {
     console.log("closeWsolAta done");
   }
 
-  // 4. Create permission (may already exist)
+  // 5. Create permission (may already exist)
   try {
     console.log("createPermission");
     const createPermissionSig = await client.createPermission({
@@ -356,7 +628,7 @@ export async function shieldTokens(params: {
     // Permission may already exist, that's fine
   }
 
-  // 5. Delegate deposit to PER
+  // 6. Delegate deposit to PER
   try {
     console.log("delegateDeposit");
     const delegateDepositSig = await client.delegateDeposit({
@@ -392,66 +664,10 @@ export async function unshieldTokens(params: {
 
   const keypair = otherKeypair || (await getWalletKeypair());
 
-  // 1. Undelegate from PER
+  // 1. Undelegate from PER (waits for owner to be PROGRAM_ID on both connections)
   const client = otherClient || (await getLoyalClient());
 
   const connection = getConnection();
-
-  const [depositPda] = findDepositPda(keypair.publicKey, tokenMint);
-
-  const perPepositAccountInfo =
-    await client.ephemeralProgram.provider.connection.getAccountInfo(
-      depositPda
-    );
-  console.log(
-    "perClient: depositPda owner",
-    perPepositAccountInfo?.owner?.toString() ?? "account not found"
-  );
-
-  const baseDepositAccountInfo =
-    await client.baseProgram.provider.connection.getAccountInfo(depositPda);
-  console.log(
-    "baseClient: depositPda owner",
-    baseDepositAccountInfo?.owner?.toString() ?? "account not found"
-  );
-
-  // Subscribe to depositPda owner changes on both connections,
-  // resolving when owner matches PROGRAM_ID
-  let perResolve: () => void;
-  let baseResolve: () => void;
-  const perOwnerReady = new Promise<void>((r) => {
-    perResolve = r;
-  });
-  const baseOwnerReady = new Promise<void>((r) => {
-    baseResolve = r;
-  });
-
-  const perSubId = client.ephemeralProgram.provider.connection.onAccountChange(
-    depositPda,
-    (accountInfo) => {
-      console.log(
-        "perClient: depositPda owner changed ->",
-        accountInfo.owner.toString()
-      );
-      if (accountInfo.owner.equals(PROGRAM_ID)) perResolve();
-    },
-    { commitment: "confirmed" }
-  );
-  const baseSubId = client.baseProgram.provider.connection.onAccountChange(
-    depositPda,
-    (accountInfo) => {
-      console.log(
-        "baseClient: depositPda owner changed ->",
-        accountInfo.owner.toString()
-      );
-      if (accountInfo.owner.equals(PROGRAM_ID)) baseResolve();
-    },
-    { commitment: "confirmed" }
-  );
-
-  // If already owned by PROGRAM_ID, resolve immediately
-  if (perPepositAccountInfo?.owner.equals(PROGRAM_ID)) perResolve!();
-  if (baseDepositAccountInfo?.owner.equals(PROGRAM_ID)) baseResolve!();
 
   console.log("undelegateDeposit");
   const undelegateDepositSig = await client.undelegateDeposit({
@@ -464,7 +680,6 @@ export async function unshieldTokens(params: {
   console.log("undelegateDeposit sig", undelegateDepositSig);
 
   // 2. Withdraw tokens back to regular wallet
-  // const baseClient = await getBaseClient();
   const isNativeSol = tokenMint.equals(NATIVE_MINT);
 
   // Ensure wSOL ATA exists for native SOL withdrawals
@@ -478,13 +693,6 @@ export async function unshieldTokens(params: {
     false,
     TOKEN_PROGRAM_ID
   );
-
-  // Wait for both connections to see depositPda owned by PROGRAM_ID
-  console.log(
-    "waiting for depositPda owner to be PROGRAM_ID on both connections..."
-  );
-  await Promise.all([perOwnerReady, baseOwnerReady]);
-  console.log("depositPda owner is PROGRAM_ID on both connections");
 
   console.log("modifyBalance");
   const { signature } = await client.modifyBalance({
@@ -508,13 +716,25 @@ export async function unshieldTokens(params: {
     console.log("closeWsolAta done");
   }
 
-  // Clean up account change subscriptions
-  await client.ephemeralProgram.provider.connection.removeAccountChangeListener(
-    perSubId
+  // 4. Re-delegate if there are remaining tokens in the deposit
+  const remainingDeposit = await client.getBaseDeposit(
+    keypair.publicKey,
+    tokenMint
   );
-  await client.baseProgram.provider.connection.removeAccountChangeListener(
-    baseSubId
-  );
+  if (remainingDeposit && remainingDeposit.amount > 0n) {
+    console.log(
+      "delegateDeposit (remaining balance:",
+      remainingDeposit.amount.toString(),
+      ")"
+    );
+    const delegateDepositSig = await client.delegateDeposit({
+      tokenMint,
+      user: keypair.publicKey,
+      payer: keypair.publicKey,
+      validator: ER_VALIDATOR,
+    });
+    console.log("delegateDeposit sig", delegateDepositSig);
+  }
 
   console.log(`< unshieldTokens (${Date.now() - startTime}ms)`);
 
@@ -528,51 +748,234 @@ describe("private-transactions shield SDK (PER)", async () => {
   const deposits = await fetchLoyalDeposits(USER, Object.values(COMMON_MINTS));
   console.log("deposits", deposits);
 
-  // const mint = await createMint(
-  //   solanaConnection,
-  //   USER_KP, // payer
-  //   USER, // mint authority
-  //   USER, // freeze authority
-  //   2 // decimals
-  // );
-  const mint = NATIVE_MINT;
-  // const mint = new PublicKey("J1rxYKFSSBoTpnfZexXyVJ9HZdDZg99xCHRDXMKw2h3U");
+  const MINT_CACHE_PATH = path.join(import.meta.dir, ".mint-cache.json");
+  const MINT_DECIMALS = 2;
+
+  enum MintMode {
+    CreateNew = "create_new",
+    UseCached = "use_cached",
+    NativeMint = "native_mint",
+  }
+
+  const MINT_MODE = MintMode.CreateNew as MintMode;
+
+  let mint: PublicKey;
+
+  if (MINT_MODE === MintMode.NativeMint) {
+    mint = NATIVE_MINT;
+    console.log("Using native mint:", mint.toString());
+  } else if (MINT_MODE === MintMode.UseCached) {
+    const cacheFile = Bun.file(MINT_CACHE_PATH);
+    if (!(await cacheFile.exists())) {
+      throw new Error(
+        `Mint cache not found at ${MINT_CACHE_PATH}. Use MintMode.CreateNew first.`
+      );
+    }
+    const cached = await cacheFile.json();
+    mint = new PublicKey(cached.mint);
+    console.log("Using cached mint:", mint.toString());
+  } else {
+    // MintMode.CreateNew
+    mint = await createMint(
+      solanaConnection,
+      USER_KP, // payer
+      USER, // mint authority
+      USER, // freeze authority
+      MINT_DECIMALS // decimals
+    );
+    await Bun.write(
+      MINT_CACHE_PATH,
+      JSON.stringify({ mint: mint.toString() }, null, 2)
+    );
+    console.log("Created new mint (cached):", mint.toString());
+  }
 
   console.log("mint", mint.toString());
 
-  // // Mint tokens to wallet's ATA before depositing
-  // const ata = await getOrCreateAssociatedTokenAccount(
-  //   solanaConnection,
-  //   USER_KP, // payer
-  //   mint, // mint
-  //   USER // owner
-  // );
-  // console.log("ATA:", ata.address.toString());
+  if (MINT_MODE === MintMode.CreateNew) {
+    // Mint tokens to wallet's ATA before depositing
+    const ata = await getOrCreateAssociatedTokenAccount(
+      solanaConnection,
+      USER_KP, // payer
+      mint, // mint
+      USER // owner
+    );
+    console.log("ATA:", ata.address.toString());
 
-  // await mintTo(
-  //   solanaConnection,
-  //   USER_KP, // payer
-  //   mint, // mint
-  //   ata.address, // destination
-  //   USER_KP, // mint authority
-  //   2 * 10 ** 2 // amount in base units (9 decimals)
-  // );
-  // console.log(`Minted to wallet`);
+    await mintTo(
+      solanaConnection,
+      USER_KP, // payer
+      mint, // mint
+      ata.address, // destination
+      USER_KP, // mint authority
+      3 * 10 ** MINT_DECIMALS // amount in base units
+    );
+    console.log(`Minted to wallet`);
+  }
 
-  const amount = 100000000; // LAMPORTS_PER_SOL / 10
-  // const amount = 1 * 10 ** 2;
+  const verificationIdl = JSON.parse(
+    await Bun.file("../../target/idl/telegram_verification.json").text()
+  ) as TelegramVerification;
+  const verificationProvider = new anchor.AnchorProvider(
+    loyalClient.baseProgram.provider.connection,
+    new anchor.Wallet(OTHER_USER_KP)
+  );
+  const verificationProgram = new anchor.Program<TelegramVerification>(
+    verificationIdl,
+    verificationProvider
+  );
+  const [sessionPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("tg_session"), OTHER_USER.toBuffer()],
+    verificationProgram.programId
+  );
+
+  const subEmitter = verificationProgram.account.telegramSession.subscribe(
+    sessionPda,
+    "confirmed"
+  );
+  subEmitter.addListener("change", (arg) => {
+    console.log("telegramSession changed: verified", arg.verified);
+  });
+
+  const showSession = async (tag: string) => {
+    const telegramSessionAccountInfo =
+      await verificationProgram.account.telegramSession.fetch(sessionPda);
+    console.log(
+      "telegramSessionAccountInfo",
+      tag,
+      sessionPda.toString(),
+      telegramSessionAccountInfo.verified
+    );
+  };
+
+  console.log("[sdk-test] store + verify telegram initData");
+  await showSession("before store");
+  console.log("store");
+  const waitForVerified = (target: boolean) =>
+    new Promise<void>((resolve) => {
+      const listener = (arg: { verified: boolean }) => {
+        if (arg.verified === target) {
+          subEmitter.removeListener("change", listener);
+          resolve();
+        }
+      };
+      subEmitter.addListener("change", listener);
+    });
+  const verifiedBecameFalse = waitForVerified(false);
+  await verificationProgram.methods
+    .store(Buffer.from(VALIDATION_BYTES))
+    .accounts({
+      payer: OTHER_USER,
+      user: OTHER_USER,
+      // @ts-ignore
+      session: sessionPda,
+      systemProgram: SystemProgram.programId,
+    })
+    .signers([OTHER_USER_KP])
+    .rpc({ commitment: "confirmed" });
+  console.log("store done, waiting for verified=false...");
+  const currentSession =
+    await verificationProgram.account.telegramSession.fetch(sessionPda);
+  if (!currentSession.verified) {
+    console.log("verified is already false");
+  } else {
+    await verifiedBecameFalse;
+  }
+  console.log("verified became false");
+  await showSession("after store");
+
+  const verifiedBecameTrue = waitForVerified(true);
+  const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
+    publicKey: Uint8Array.from(TELEGRAM_ED25519_PUBKEY),
+    message: VALIDATION_BYTES,
+    signature: VALIDATION_SIGNATURE_BYTES,
+  });
+  const verifyIx = await verificationProgram.methods
+    .verifyTelegramInitData()
+    .accounts({
+      session: sessionPda,
+      instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
+    })
+    .instruction();
+  const verifyTx = new Transaction().add(ed25519Ix, verifyIx);
+  const { blockhash } = await solanaConnection.getLatestBlockhash();
+  verifyTx.feePayer = OTHER_USER;
+  verifyTx.recentBlockhash = blockhash;
+  verifyTx.sign(OTHER_USER_KP);
+  const verifySig = await solanaConnection.sendRawTransaction(
+    verifyTx.serialize()
+  );
+  console.log("verifySig", verifySig);
+  await solanaConnection.confirmTransaction(verifySig, "confirmed");
+  console.log("verifySig confirmed");
+
+  const currentSessionAfterVerify =
+    await verificationProgram.account.telegramSession.fetch(sessionPda);
+  if (currentSessionAfterVerify.verified) {
+    console.log("verified is already true");
+  } else {
+    await verifiedBecameTrue;
+  }
+  console.log("verified became true");
+
+  await showSession("after verify");
+
+  await verificationProgram.account.telegramSession.unsubscribe(sessionPda);
+
+  let amount;
+  if (MINT_MODE === MintMode.NativeMint) {
+    amount = 100000000; // LAMPORTS_PER_SOL / 10
+  } else {
+    amount = 1 * 10 ** 2;
+  }
   const doubleAmount = 2 * amount;
 
+  const username = VALIDATION_USERNAME;
+
+  await shieldTokens({ tokenMint: mint, amount: amount });
   await shieldTokens({ tokenMint: mint, amount: doubleAmount });
+
+  await transferTokensToUsername({
+    tokenMint: mint,
+    amount: amount / 2,
+    destinationUsername: username,
+  });
+  await transferTokensToUsername({
+    tokenMint: mint,
+    amount: amount / 2,
+    destinationUsername: username,
+  });
+
   await transferTokens({
     tokenMint: mint,
-    amount,
+    amount: amount / 2,
     destination: OTHER_USER,
   });
+  await transferTokens({
+    tokenMint: mint,
+    amount: amount / 2,
+    destination: OTHER_USER,
+  });
+
+  await claimTokens({
+    tokenMint: mint,
+    amount: amount / 2,
+    username,
+    destination: OTHER_USER,
+    session: sessionPda,
+  });
+  await claimTokens({
+    tokenMint: mint,
+    amount: amount / 2,
+    username,
+    destination: OTHER_USER,
+    session: sessionPda,
+  });
+
   await unshieldTokens({ tokenMint: mint, amount });
   await unshieldTokens({
     tokenMint: mint,
-    amount,
+    amount: doubleAmount,
     otherClient: otherLoyalClient,
     otherKeypair: OTHER_USER_KP,
   });
@@ -583,7 +986,7 @@ describe("private-transactions shield SDK (PER)", async () => {
     await wrapSolToWSol({
       connection: solanaConnection,
       payer: OTHER_USER_KP,
-      lamports: amount,
+      lamports: doubleAmount,
     });
   }
   const otherUserAta = (
@@ -597,7 +1000,7 @@ describe("private-transactions shield SDK (PER)", async () => {
   const userAta = (
     await getOrCreateAssociatedTokenAccount(
       solanaConnection,
-      OTHER_USER_KP, // payer
+      OTHER_USER_KP,
       mint,
       USER
     )
@@ -608,7 +1011,7 @@ describe("private-transactions shield SDK (PER)", async () => {
     otherUserAta,
     userAta,
     OTHER_USER_KP,
-    amount
+    doubleAmount
   );
   console.log("SPL transfer OTHER_USER -> USER sig", transferSig);
 });

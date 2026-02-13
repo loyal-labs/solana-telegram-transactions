@@ -22,7 +22,8 @@ import {
   getAuthToken,
 } from "@magicblock-labs/ephemeral-rollups-sdk";
 import { sign } from "tweetnacl";
-import { IDL, type TelegramPrivateTransfer } from "./idl";
+import type { TelegramPrivateTransfer } from "./idl/telegram_private_transfer.ts";
+import idl from "./idl/telegram_private_transfer.json";
 import {
   PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
@@ -60,7 +61,26 @@ import type {
   UndelegateUsernameDepositParams,
   TransferDepositParams,
   TransferToUsernameDepositParams,
+  InitializeUsernameDepositParams,
+  ClaimUsernameDepositToDepositParams,
 } from "./types";
+
+function prettyStringify(obj: unknown): string {
+  const json = JSON.stringify(
+    obj,
+    (_key, value) => {
+      if (value instanceof PublicKey) return value.toBase58();
+      if (typeof value === "bigint") return value.toString();
+      return value;
+    },
+    2
+  );
+  // Collapse arrays onto single lines
+  return json.replace(/\[\s+(\d[\d,\s]*\d)\s+\]/g, (_match, inner) => {
+    const items = inner.split(/,\s*/).map((s: string) => s.trim());
+    return `[${items.join(", ")}]`;
+  });
+}
 
 /**
  * Create a typed Program instance from the IDL
@@ -68,7 +88,7 @@ import type {
 function createProgram(
   provider: AnchorProvider
 ): Program<TelegramPrivateTransfer> {
-  return new Program(IDL as TelegramPrivateTransfer, provider);
+  return new Program(idl as TelegramPrivateTransfer, provider);
 }
 
 function programFromRpc(
@@ -300,6 +320,7 @@ export class LoyalPrivateTransactionsClient {
       ephemeralRpcEndpoint,
       ephemeralWsEndpoint,
       commitment = "confirmed",
+      authToken,
     } = config;
 
     const adapter = InternalWalletAdapter.from(signer);
@@ -313,33 +334,31 @@ export class LoyalPrivateTransactionsClient {
 
     let finalEphemeralRpcEndpoint = ephemeralRpcEndpoint;
     let finalEphemeralWsEndpoint = ephemeralWsEndpoint;
-    let token: string | undefined;
-    let expiresAt: number | undefined;
 
     if (ephemeralRpcEndpoint.includes("tee")) {
-      const isVerified = await verifyTeeRpcIntegrity(ephemeralRpcEndpoint);
-      if (!isVerified) {
-        throw new Error("TEE RPC integrity verification failed");
+      let token: string;
+      let expiresAt: number;
+      if (!authToken) {
+        const isVerified = await verifyTeeRpcIntegrity(ephemeralRpcEndpoint);
+        if (!isVerified) {
+          throw new Error("TEE RPC integrity verification failed");
+        }
+
+        const signMessage = deriveMessageSigner(signer);
+
+        ({ token, expiresAt } = await getAuthToken(
+          ephemeralRpcEndpoint,
+          adapter.publicKey,
+          signMessage
+        ));
+      } else {
+        token = authToken.token;
       }
-
-      const signMessage = deriveMessageSigner(signer);
-
-      console.log("getAuthToken");
-      ({ token, expiresAt } = await getAuthToken(
-        ephemeralRpcEndpoint,
-        adapter.publicKey,
-        signMessage
-      ));
-      console.log("getAuthToken token", token);
-      console.log("getAuthToken expiresAt", expiresAt);
 
       finalEphemeralRpcEndpoint = `${ephemeralRpcEndpoint}?token=${token}`;
       finalEphemeralWsEndpoint = ephemeralWsEndpoint
         ? `${ephemeralWsEndpoint}?token=${token}`
         : undefined;
-
-      console.log("authedEphemeralRpcEndpoint", finalEphemeralRpcEndpoint);
-      console.log("authedEphemeralWsEndpoint", finalEphemeralWsEndpoint);
     }
 
     const ephemeralProgram = programFromRpc(
@@ -375,6 +394,32 @@ export class LoyalPrivateTransactionsClient {
       .accountsPartial({
         payer,
         user,
+        tokenMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc(rpcOptions);
+
+    return signature;
+  }
+
+  async initializeUsernameDeposit(
+    params: InitializeUsernameDepositParams
+  ): Promise<string> {
+    const { username, tokenMint, payer, rpcOptions } = params;
+
+    const [usernameDepositPda] = findUsernameDepositPda(username, tokenMint);
+
+    await this.ensureNotDelegated(
+      usernameDepositPda,
+      "modifyBalance-depositPda",
+      true
+    );
+
+    const signature = await this.baseProgram.methods
+      .initializeUsernameDeposit(username)
+      .accountsPartial({
+        payer,
         tokenMint,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
@@ -547,6 +592,50 @@ export class LoyalPrivateTransactionsClient {
     return signature;
   }
 
+  async claimUsernameDepositToDeposit(
+    params: ClaimUsernameDepositToDepositParams
+  ): Promise<string> {
+    const { username, tokenMint, amount, recipient, session, rpcOptions } =
+      params;
+
+    this.validateUsername(username);
+
+    const [sourceUsernameDeposit] = findUsernameDepositPda(username, tokenMint);
+    const [destinationDeposit] = findDepositPda(recipient, tokenMint);
+
+    await this.ensureDelegated(
+      sourceUsernameDeposit,
+      "claimUsernameDepositToDeposit-sourceUsernameDeposit"
+    );
+    await this.ensureDelegated(
+      destinationDeposit,
+      "claimUsernameDepositToDeposit-destinationDeposit"
+    );
+
+    const accounts: Record<string, PublicKey | null> = {
+      user: recipient,
+      sourceUsernameDeposit,
+      destinationDeposit,
+      tokenMint,
+      session,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    };
+    console.log("claimUsernameDepositToDeposit", prettyStringify(accounts));
+
+    const sim = await this.ephemeralProgram.methods
+      .claimUsernameDepositToDeposit(new BN(amount.toString()))
+      .accountsPartial(accounts)
+      .simulate();
+    console.log("Simulation logs:", sim.raw); // contains logs array
+
+    const signature = await this.ephemeralProgram.methods
+      .claimUsernameDepositToDeposit(new BN(amount.toString()))
+      .accountsPartial(accounts)
+      .rpc({ skipPreflight: true, commitment: "confirmed" });
+
+    return signature;
+  }
+
   // ============================================================
   // Permission Operations
   // ============================================================
@@ -680,8 +769,14 @@ export class LoyalPrivateTransactionsClient {
   async delegateUsernameDeposit(
     params: DelegateUsernameDepositParams
   ): Promise<string> {
-    const { username, tokenMint, session, payer, validator, rpcOptions } =
-      params;
+    const {
+      username,
+      tokenMint,
+      // session,
+      payer,
+      validator,
+      rpcOptions,
+    } = params;
 
     this.validateUsername(username);
 
@@ -697,7 +792,7 @@ export class LoyalPrivateTransactionsClient {
 
     const accounts: Record<string, PublicKey | null> = {
       payer,
-      session,
+      // session,
       bufferDeposit: bufferPda,
       delegationRecordDeposit: delegationRecordPda,
       delegationMetadataDeposit: delegationMetadataPda,
@@ -718,7 +813,9 @@ export class LoyalPrivateTransactionsClient {
   }
 
   /**
-   * Undelegate a deposit account from the ephemeral rollup
+   * Undelegate a deposit account from the ephemeral rollup.
+   * Waits for both base and ephemeral connections to confirm the deposit
+   * is owned by PROGRAM_ID before returning.
    */
   async undelegateDeposit(params: UndelegateDepositParams): Promise<string> {
     const {
@@ -735,40 +832,69 @@ export class LoyalPrivateTransactionsClient {
     console.log("undelegateDeposit user", user.toString());
     console.log("undelegateDeposit tokenMint", tokenMint.toString());
     console.log("undelegateDeposit depositPda", depositPda.toString());
-    const depositAccountInfo =
+
+    const perDepositAccountInfo =
       await this.ephemeralProgram.provider.connection.getAccountInfo(
         depositPda
       );
     console.log(
-      "undelegateDeposit depositPda owner",
-      depositAccountInfo?.owner?.toString() ?? "account not found"
+      "undelegateDeposit perClient depositPda owner",
+      perDepositAccountInfo?.owner?.toString() ?? "account not found"
+    );
+
+    const baseDepositAccountInfo =
+      await this.baseProgram.provider.connection.getAccountInfo(depositPda);
+    console.log(
+      "undelegateDeposit baseClient depositPda owner",
+      baseDepositAccountInfo?.owner?.toString() ?? "account not found"
     );
 
     await this.ensureDelegated(depositPda, "undelegateDeposit-depositPda");
 
-    /*
-      /getDelegationStatus for 9aK4zwcYaJsAQaonegfjCyzNbayMMduAbAom8WwL8tsh
-      {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {
-          "isDelegated": true,
-          "fqdn": "https://devnet-as.magicblock.app/",
-          "delegationRecord": {
-            "authority": "MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57",
-            "owner": "97FzQdWi26mFNR21AbQNg4KqofiCLqQydQfAvRQMcXhV",
-            "delegationSlot": 441399826,
-            "lamports": 1447680
-          }
-        }
-      }
-      */
+    // Subscribe to depositPda owner changes on both connections,
+    // resolving when owner matches PROGRAM_ID
+    let perResolve: () => void;
+    let baseResolve: () => void;
+    const perOwnerReady = new Promise<void>((r) => {
+      perResolve = r;
+    });
+    const baseOwnerReady = new Promise<void>((r) => {
+      baseResolve = r;
+    });
+
+    const perSubId = this.ephemeralProgram.provider.connection.onAccountChange(
+      depositPda,
+      (accountInfo) => {
+        console.log(
+          "undelegateDeposit perClient: depositPda owner changed ->",
+          accountInfo.owner.toString()
+        );
+        if (accountInfo.owner.equals(PROGRAM_ID)) perResolve();
+      },
+      { commitment: "confirmed" }
+    );
+    const baseSubId = this.baseProgram.provider.connection.onAccountChange(
+      depositPda,
+      (accountInfo) => {
+        console.log(
+          "undelegateDeposit baseClient: depositPda owner changed ->",
+          accountInfo.owner.toString()
+        );
+        if (accountInfo.owner.equals(PROGRAM_ID)) baseResolve();
+      },
+      { commitment: "confirmed" }
+    );
+
+    // If already owned by PROGRAM_ID, resolve immediately
+    if (perDepositAccountInfo?.owner.equals(PROGRAM_ID)) perResolve!();
+    if (baseDepositAccountInfo?.owner.equals(PROGRAM_ID)) baseResolve!();
+
     const accounts: Record<string, PublicKey | null> = {
-      user, // CcWNCNvWhuvdAaLyFCJknzuaNhEfkyVzoGtXunLMtTuF
-      payer, // CcWNCNvWhuvdAaLyFCJknzuaNhEfkyVzoGtXunLMtTuF
-      deposit: depositPda, // 9aK4zwcYaJsAQaonegfjCyzNbayMMduAbAom8WwL8tsh
-      magicProgram, // Magic11111111111111111111111111111111111111
-      magicContext, // MagicContext1111111111111111111111111111111
+      user,
+      payer,
+      deposit: depositPda,
+      magicProgram,
+      magicContext,
     };
     accounts.sessionToken = sessionToken ?? null;
 
@@ -782,6 +908,23 @@ export class LoyalPrivateTransactionsClient {
       .undelegate()
       .accountsPartial(accounts)
       .rpc(rpcOptions);
+
+    // Wait for both connections to see depositPda owned by PROGRAM_ID
+    console.log(
+      "undelegateDeposit: waiting for depositPda owner to be PROGRAM_ID on both connections..."
+    );
+    await Promise.all([perOwnerReady, baseOwnerReady]);
+    console.log(
+      "undelegateDeposit: depositPda owner is PROGRAM_ID on both connections"
+    );
+
+    // Clean up account change subscriptions
+    await this.ephemeralProgram.provider.connection.removeAccountChangeListener(
+      perSubId
+    );
+    await this.baseProgram.provider.connection.removeAccountChangeListener(
+      baseSubId
+    );
 
     return signature;
   }
@@ -1155,16 +1298,13 @@ export class LoyalPrivateTransactionsClient {
       const resJson = await res.json();
 
       console.error(
-        `Account is not delegated to ER: ${displayName}${account.toString()}`
+        `Account is delegated to ER: ${displayName}${account.toString()}`
       );
       console.error("/getDelegationStatus", JSON.stringify(resJson, null, 2));
-      console.error(
-        "baseAccountInfo",
-        JSON.stringify(baseAccountInfo, null, 2)
-      );
+      console.error("baseAccountInfo", prettyStringify(baseAccountInfo));
       console.error(
         "ephemeralAccountInfo",
-        JSON.stringify(ephemeralAccountInfo, null, 2)
+        prettyStringify(ephemeralAccountInfo)
       );
 
       throw new Error(
@@ -1212,13 +1352,10 @@ export class LoyalPrivateTransactionsClient {
         `Account is not delegated to ER: ${displayName}${account.toString()}`
       );
       console.error("/getDelegationStatus:", JSON.stringify(resJson, null, 2));
-      console.error(
-        "baseAccountInfo",
-        JSON.stringify(baseAccountInfo, null, 2)
-      );
+      console.error("baseAccountInfo", prettyStringify(baseAccountInfo));
       console.error(
         "ephemeralAccountInfo",
-        JSON.stringify(ephemeralAccountInfo, null, 2)
+        prettyStringify(ephemeralAccountInfo)
       );
 
       throw new Error(
