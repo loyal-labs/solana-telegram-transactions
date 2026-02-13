@@ -121,7 +121,7 @@ import type {
 hashes.sha512 = sha512;
 
 // ─── Mock data for development ─────────────────────────────────────────────
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 
 const MOCK_WALLET_ADDRESS = "UQAt7f8Kq9xZ3mNpR2vL5wYcD4bJ6hTgSoAeWnFqZir";
 const MOCK_BALANCE_LAMPORTS = 1_267_476_540_000; // ~1267.47654 SOL
@@ -3011,8 +3011,16 @@ export default function Home() {
                                   </div>
                                   <div className="absolute bottom-0 right-0 w-8 h-8">
                                     <Image
-                                      src={isSecureTransaction ? "/icons/Shield_32.png" : "/icons/Unshield_32.png"}
-                                      alt={isSecureTransaction ? "Shielded" : "Unshielded"}
+                                      src={
+                                        isSecureTransaction
+                                          ? "/icons/Shield_32.png"
+                                          : "/icons/Unshield_32.png"
+                                      }
+                                      alt={
+                                        isSecureTransaction
+                                          ? "Shielded"
+                                          : "Unshielded"
+                                      }
                                       width={32}
                                       height={32}
                                     />
@@ -3023,7 +3031,9 @@ export default function Home() {
                               {/* Middle - Text */}
                               <div className="flex-1 py-2.5 flex flex-col gap-0.5">
                                 <p className="text-base text-black leading-5">
-                                  {isSecureTransaction ? "Shielded" : "Unshielded"}
+                                  {isSecureTransaction
+                                    ? "Shielded"
+                                    : "Unshielded"}
                                 </p>
                                 <p
                                   className="text-[13px] leading-4"
