@@ -8,19 +8,18 @@ const screens = [
   {
     title: "Group Summaries",
     description:
-      "Catch up on any group chat instantly with clear AI summaries",
+      "Filter noise and Instantly see what’s happening in group chats you don’t have time to read.",
     image: "/onboarding/on1.png",
   },
   {
     title: "Swipe Through Your DMs",
-    description:
-      "Review your messages, mark as read or keep unread with quick swipes — like Tinder for messages",
+    description: "Quickly review and manage your Telegram DMs in one place.",
     image: "/onboarding/on2.png",
   },
   {
-    title: "Shielded Assets",
+    title: "Private Transactions",
     description:
-      "Shield your assets and make your transactions fully private",
+      "Send crypto privately over Telegram username. Don’t reveal your address and sensitive data onchain.",
     image: "/onboarding/on3.png",
   },
 ];
@@ -63,7 +62,10 @@ const textVariants = {
 export default function Onboarding({
   onDone,
   headerHeight,
-}: { onDone: () => void; headerHeight: number }) {
+}: {
+  onDone: () => void;
+  headerHeight: number;
+}) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [[page, direction], setPage] = useState([0, 0]);
   const isLast = currentIndex === screens.length - 1;
@@ -86,7 +88,7 @@ export default function Onboarding({
       setCurrentIndex(next);
       setPage([page + newDirection, newDirection]);
     },
-    [currentIndex, page],
+    [currentIndex, page]
   );
 
   const handleNext = () => {
@@ -119,9 +121,7 @@ export default function Onboarding({
               className="h-[8px] w-[8px] rounded-full transition-colors duration-300"
               style={{
                 backgroundColor:
-                  i === currentIndex
-                    ? "#F9363C"
-                    : "rgba(249, 54, 60, 0.25)",
+                  i === currentIndex ? "#F9363C" : "rgba(249, 54, 60, 0.25)",
               }}
             />
           ))}
