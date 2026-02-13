@@ -43,7 +43,7 @@ export type {
   WalletSigner,
   WalletLike,
   RpcOptions,
-  EphemeralClientConfig,
+  ClientConfig,
   DepositData,
   UsernameDepositData,
   InitializeDepositParams,
@@ -66,6 +66,7 @@ export { isKeypair, isAnchorProvider, isWalletLike } from "./src/types";
 
 // Constants
 export {
+  ER_VALIDATOR,
   PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
@@ -96,5 +97,6 @@ export {
 } from "./src/pda";
 
 // IDL (for advanced users)
-export { IDL } from "./src/idl";
-export type { TelegramPrivateTransfer } from "./src/idl";
+import idl from "./src/idl/telegram_private_transfer.json";
+export const IDL = idl;
+export type { TelegramPrivateTransfer } from "./src/idl/telegram_private_transfer.ts";

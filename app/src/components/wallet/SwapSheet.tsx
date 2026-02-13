@@ -1,21 +1,9 @@
 "use client";
 
 import { hapticFeedback, retrieveLaunchParams } from "@telegram-apps/sdk-react";
-import {
-  ArrowDownUp,
-  ArrowLeft,
-  ChevronRight,
-  Search,
-  X,
-} from "lucide-react";
+import { ArrowDownUp, ArrowLeft, ChevronRight, Search, X } from "lucide-react";
 import Image from "next/image";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
@@ -47,7 +35,9 @@ export type Token = {
 // Helpers
 
 function getTokenIcon(holding: TokenHolding): string {
-  return holding.imageUrl ?? KNOWN_TOKEN_ICONS[holding.mint] ?? DEFAULT_TOKEN_ICON;
+  return (
+    holding.imageUrl ?? KNOWN_TOKEN_ICONS[holding.mint] ?? DEFAULT_TOKEN_ICON
+  );
 }
 
 function getMaxDecimals(symbol: string): number {
@@ -117,7 +107,12 @@ function holdingToToken(holding: TokenHolding): Token {
   };
 }
 
-export type SwapView = "main" | "selectFrom" | "selectTo" | "confirm" | "result";
+export type SwapView =
+  | "main"
+  | "selectFrom"
+  | "selectTo"
+  | "confirm"
+  | "result";
 
 export type SwapSheetProps = {
   open?: boolean;
@@ -186,7 +181,9 @@ export default function SwapSheet({
   });
 
   // State
-  const [internalActiveTab, setInternalActiveTab] = useState<"swap" | "secure">("swap");
+  const [internalActiveTab, setInternalActiveTab] = useState<"swap" | "secure">(
+    "swap"
+  );
   const [internalView, setInternalView] = useState<SwapView>("main");
 
   // Use controlled tab if provided, otherwise internal
@@ -217,7 +214,9 @@ export default function SwapSheet({
   );
 
   // Secure direction: shield or unshield
-  const [internalSecureDirection, setInternalSecureDirection] = useState<"shield" | "unshield">("shield");
+  const [internalSecureDirection, setInternalSecureDirection] = useState<
+    "shield" | "unshield"
+  >("shield");
   const secureDirection = secureDirectionProp ?? internalSecureDirection;
   const setSecureDirection = useCallback(
     (dir: "shield" | "unshield") => {
@@ -281,13 +280,19 @@ export default function SwapSheet({
   useEffect(() => {
     if (solPriceUsd) {
       setFromToken((prev) =>
-        prev.mint === NATIVE_SOL_MINT ? { ...prev, priceUsd: solPriceUsd } : prev
+        prev.mint === NATIVE_SOL_MINT
+          ? { ...prev, priceUsd: solPriceUsd }
+          : prev
       );
       setToToken((prev) =>
-        prev.mint === NATIVE_SOL_MINT ? { ...prev, priceUsd: solPriceUsd } : prev
+        prev.mint === NATIVE_SOL_MINT
+          ? { ...prev, priceUsd: solPriceUsd }
+          : prev
       );
       setSecureToken((prev) =>
-        prev.mint === NATIVE_SOL_MINT ? { ...prev, priceUsd: solPriceUsd } : prev
+        prev.mint === NATIVE_SOL_MINT
+          ? { ...prev, priceUsd: solPriceUsd }
+          : prev
       );
     }
   }, [solPriceUsd]);
@@ -359,21 +364,21 @@ export default function SwapSheet({
         ...firstToken,
         priceUsd:
           firstToken.mint === NATIVE_SOL_MINT
-            ? (solPriceUsd ?? SOL_PRICE_USD)
+            ? solPriceUsd ?? SOL_PRICE_USD
             : firstToken.priceUsd,
       });
       setToToken({
         ...secondToken,
         priceUsd:
           secondToken.mint === NATIVE_SOL_MINT
-            ? (solPriceUsd ?? SOL_PRICE_USD)
+            ? solPriceUsd ?? SOL_PRICE_USD
             : secondToken.priceUsd,
       });
       setSecureToken({
         ...firstToken,
         priceUsd:
           firstToken.mint === NATIVE_SOL_MINT
-            ? (solPriceUsd ?? SOL_PRICE_USD)
+            ? solPriceUsd ?? SOL_PRICE_USD
             : firstToken.priceUsd,
       });
     }
@@ -497,7 +502,14 @@ export default function SwapSheet({
         direction: secureDirection,
       });
     }
-  }, [open, activeTab, secureToken, secureAmountStr, secureDirection, onSecureParamsChange]);
+  }, [
+    open,
+    activeTab,
+    secureToken,
+    secureAmountStr,
+    secureDirection,
+    onSecureParamsChange,
+  ]);
 
   // Insufficient balance check
   const insufficientBalance = useMemo(() => {
@@ -524,11 +536,14 @@ export default function SwapSheet({
   }, [fromToken, toToken, amountStr]);
 
   // Open token selector
-  const handleOpenTokenSelect = useCallback((type: "from" | "to") => {
-    hapticFeedback.impactOccurred("light");
-    setSearchQuery("");
-    setView(type === "from" ? "selectFrom" : "selectTo");
-  }, [setView]);
+  const handleOpenTokenSelect = useCallback(
+    (type: "from" | "to") => {
+      hapticFeedback.impactOccurred("light");
+      setSearchQuery("");
+      setView(type === "from" ? "selectFrom" : "selectTo");
+    },
+    [setView]
+  );
 
   // Select token
   const handleSelectToken = useCallback(
@@ -542,7 +557,7 @@ export default function SwapSheet({
         ...token,
         priceUsd:
           token.mint === NATIVE_SOL_MINT
-            ? (solPriceUsd ?? SOL_PRICE_USD)
+            ? solPriceUsd ?? SOL_PRICE_USD
             : token.priceUsd,
       };
 
@@ -568,7 +583,10 @@ export default function SwapSheet({
     (percentage: number) => {
       hapticFeedback.impactOccurred("light");
       const amount = fromToken.balance * (percentage / 100);
-      const formatted = amount.toFixed(getMaxDecimals(fromToken.symbol)).replace(/\.?0+$/, "") || "0";
+      const formatted =
+        amount
+          .toFixed(getMaxDecimals(fromToken.symbol))
+          .replace(/\.?0+$/, "") || "0";
       setAmountStr(formatted);
       amountInputRef.current?.focus({ preventScroll: true });
     },
@@ -591,7 +609,7 @@ export default function SwapSheet({
         ...token,
         priceUsd:
           token.mint === NATIVE_SOL_MINT
-            ? (solPriceUsd ?? SOL_PRICE_USD)
+            ? solPriceUsd ?? SOL_PRICE_USD
             : token.priceUsd,
       });
       setView("main");
@@ -604,7 +622,10 @@ export default function SwapSheet({
     (percentage: number) => {
       hapticFeedback.impactOccurred("light");
       const amount = secureToken.balance * (percentage / 100);
-      const formatted = amount.toFixed(getMaxDecimals(secureToken.symbol)).replace(/\.?0+$/, "") || "0";
+      const formatted =
+        amount
+          .toFixed(getMaxDecimals(secureToken.symbol))
+          .replace(/\.?0+$/, "") || "0";
       setSecureAmountStr(formatted);
       secureAmountInputRef.current?.focus({ preventScroll: true });
     },
@@ -679,7 +700,7 @@ export default function SwapSheet({
         unmount();
       }
     },
-    [unmount],
+    [unmount]
   );
 
   // Close when parent sets open=false while sheet is still showing
@@ -734,7 +755,9 @@ export default function SwapSheet({
   useEffect(() => {
     if (rendered) {
       document.body.style.overflow = "hidden";
-      return () => { document.body.style.overflow = ""; };
+      return () => {
+        document.body.style.overflow = "";
+      };
     }
   }, [rendered]);
 
@@ -743,9 +766,9 @@ export default function SwapSheet({
   const sheetTopOffset = headerHeight || 56;
 
   // Rate display for confirmation
-  const rateDisplay = `1 ${toToken.symbol} ≈ ${(toToken.priceUsd / fromToken.priceUsd).toFixed(
-    fromToken.symbol === "SOL" ? 4 : 2
-  )} ${fromToken.symbol}`;
+  const rateDisplay = `1 ${toToken.symbol} ≈ ${(
+    toToken.priceUsd / fromToken.priceUsd
+  ).toFixed(fromToken.symbol === "SOL" ? 4 : 2)} ${fromToken.symbol}`;
 
   const content = (
     <>
@@ -850,7 +873,12 @@ export default function SwapSheet({
                 }}
                 className="absolute left-3 w-[30px] h-[30px] flex items-center justify-center active:scale-95 transition-all duration-150"
               >
-                <Image src="/icons/arrow-left.svg" alt="Back" width={30} height={30} />
+                <Image
+                  src="/icons/arrow-left.svg"
+                  alt="Back"
+                  width={30}
+                  height={30}
+                />
               </button>
               <span className="text-[17px] font-semibold text-black leading-[22px]">
                 Select asset
@@ -862,7 +890,9 @@ export default function SwapSheet({
           {(view === "confirm" || view === "result") && (
             <span className="text-[17px] font-semibold text-black leading-[22px]">
               {activeTab === "secure"
-                ? `${secureDirection === "shield" ? "Secure" : "Unshield"} ${secureToken.symbol}`
+                ? `${secureDirection === "shield" ? "Secure" : "Unshield"} ${
+                    secureToken.symbol
+                  }`
                 : `Swap ${fromToken.symbol} to ${toToken.symbol}`}
             </span>
           )}
@@ -934,7 +964,9 @@ export default function SwapSheet({
                       <p
                         ref={amountTextRef}
                         className="text-[28px] font-semibold leading-8"
-                        style={{ color: insufficientBalance ? "#f9363c" : "#000" }}
+                        style={{
+                          color: insufficientBalance ? "#f9363c" : "#000",
+                        }}
                       >
                         {amountStr || ""}
                       </p>
@@ -988,7 +1020,11 @@ export default function SwapSheet({
                         className="w-5 h-5 rounded-full flex items-center justify-center"
                         style={{ background: "rgba(0, 0, 0, 0.06)" }}
                       >
-                        <ArrowDownUp size={12} strokeWidth={2} style={{ color: "rgba(60, 60, 67, 0.6)" }} />
+                        <ArrowDownUp
+                          size={12}
+                          strokeWidth={2}
+                          style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                        />
                       </div>
                       <p
                         className="text-[13px] leading-4"
@@ -1002,7 +1038,8 @@ export default function SwapSheet({
                       style={{ color: "rgba(60, 60, 67, 0.6)" }}
                     >
                       {fromToken.balance.toLocaleString("en-US", {
-                        maximumFractionDigits: fromToken.symbol === "SOL" ? 4 : 2,
+                        maximumFractionDigits:
+                          fromToken.symbol === "SOL" ? 4 : 2,
                       })}
                     </p>
                   </div>
@@ -1013,7 +1050,11 @@ export default function SwapSheet({
                     className="absolute -bottom-[18px] left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-white flex items-center justify-center active:scale-95 transition-transform z-10 shadow-sm"
                     style={{ border: "1px solid rgba(0, 0, 0, 0.06)" }}
                   >
-                    <ArrowDownUp size={16} strokeWidth={2} className="text-black" />
+                    <ArrowDownUp
+                      size={16}
+                      strokeWidth={2}
+                      className="text-black"
+                    />
                   </button>
                 </div>
 
@@ -1032,7 +1073,9 @@ export default function SwapSheet({
                   <div className="flex gap-1 items-center h-12">
                     <div className="flex-1 flex items-baseline">
                       <p
-                        className={`text-[28px] font-semibold leading-8 ${receiveAmount > 0 ? "text-black" : "text-black/30"}`}
+                        className={`text-[28px] font-semibold leading-8 ${
+                          receiveAmount > 0 ? "text-black" : "text-black/30"
+                        }`}
                       >
                         {receiveAmountDisplay}
                       </p>
@@ -1093,7 +1136,10 @@ export default function SwapSheet({
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => handlePresetPercentage(pct)}
                       className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm leading-5 text-center active:opacity-70 transition-opacity"
-                      style={{ background: "rgba(249, 54, 60, 0.14)", color: "#f9363c" }}
+                      style={{
+                        background: "rgba(249, 54, 60, 0.14)",
+                        color: "#f9363c",
+                      }}
                     >
                       {pct}%
                     </button>
@@ -1102,7 +1148,10 @@ export default function SwapSheet({
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handlePresetPercentage(100)}
                     className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm leading-5 text-center active:opacity-70 transition-opacity"
-                    style={{ background: "rgba(249, 54, 60, 0.14)", color: "#f9363c" }}
+                    style={{
+                      background: "rgba(249, 54, 60, 0.14)",
+                      color: "#f9363c",
+                    }}
                   >
                     Max
                   </button>
@@ -1110,7 +1159,10 @@ export default function SwapSheet({
 
                 {/* Insufficient balance error */}
                 {insufficientBalance && (
-                  <p className="text-[13px] leading-4 px-1" style={{ color: "#f9363c" }}>
+                  <p
+                    className="text-[13px] leading-4 px-1"
+                    style={{ color: "#f9363c" }}
+                  >
                     Insufficient balance
                   </p>
                 )}
@@ -1129,7 +1181,9 @@ export default function SwapSheet({
                     className="text-base leading-5"
                     style={{ color: "rgba(60, 60, 67, 0.6)" }}
                   >
-                    {secureDirection === "shield" ? "You secure" : "You unshield"}
+                    {secureDirection === "shield"
+                      ? "You secure"
+                      : "You unshield"}
                   </p>
 
                   <div className="flex gap-1 items-center h-12">
@@ -1220,13 +1274,18 @@ export default function SwapSheet({
                         className="w-5 h-5 rounded-full flex items-center justify-center"
                         style={{ background: "rgba(0, 0, 0, 0.06)" }}
                       >
-                        <ArrowDownUp size={12} strokeWidth={2} style={{ color: "rgba(60, 60, 67, 0.6)" }} />
+                        <ArrowDownUp
+                          size={12}
+                          strokeWidth={2}
+                          style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                        />
                       </div>
                       <p
                         className="text-[13px] leading-4"
                         style={{ color: "rgba(60, 60, 67, 0.6)" }}
                       >
-                        1 {secureToken.symbol} ≈ ${secureToken.priceUsd.toFixed(4)}
+                        1 {secureToken.symbol} ≈ $
+                        {secureToken.priceUsd.toFixed(4)}
                       </p>
                     </div>
                     <p
@@ -1234,7 +1293,8 @@ export default function SwapSheet({
                       style={{ color: "rgba(60, 60, 67, 0.6)" }}
                     >
                       {secureToken.balance.toLocaleString("en-US", {
-                        maximumFractionDigits: secureToken.symbol === "SOL" ? 4 : 2,
+                        maximumFractionDigits:
+                          secureToken.symbol === "SOL" ? 4 : 2,
                       })}
                     </p>
                   </div>
@@ -1245,7 +1305,11 @@ export default function SwapSheet({
                     className="absolute -bottom-[18px] left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-white flex items-center justify-center active:scale-95 transition-transform z-10 shadow-sm"
                     style={{ border: "1px solid rgba(0, 0, 0, 0.06)" }}
                   >
-                    <ArrowDownUp size={16} strokeWidth={2} className="text-black" />
+                    <ArrowDownUp
+                      size={16}
+                      strokeWidth={2}
+                      className="text-black"
+                    />
                   </button>
                 </div>
 
@@ -1263,7 +1327,11 @@ export default function SwapSheet({
 
                   <div className="flex gap-1 items-center h-12">
                     <div className="flex-1 flex items-baseline">
-                      <p className={`text-[28px] font-semibold leading-8 ${secureAmountStr ? "text-black" : "text-black/30"}`}>
+                      <p
+                        className={`text-[28px] font-semibold leading-8 ${
+                          secureAmountStr ? "text-black" : "text-black/30"
+                        }`}
+                      >
                         {secureAmountStr || "0"}
                       </p>
                     </div>
@@ -1324,7 +1392,10 @@ export default function SwapSheet({
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => handleSecurePresetPercentage(pct)}
                       className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm leading-5 text-center active:opacity-70 transition-opacity"
-                      style={{ background: "rgba(249, 54, 60, 0.14)", color: "#f9363c" }}
+                      style={{
+                        background: "rgba(249, 54, 60, 0.14)",
+                        color: "#f9363c",
+                      }}
                     >
                       {pct}%
                     </button>
@@ -1333,7 +1404,10 @@ export default function SwapSheet({
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handleSecurePresetPercentage(100)}
                     className="flex-1 min-w-[64px] px-4 py-2 rounded-[40px] text-sm leading-5 text-center active:opacity-70 transition-opacity"
-                    style={{ background: "rgba(249, 54, 60, 0.14)", color: "#f9363c" }}
+                    style={{
+                      background: "rgba(249, 54, 60, 0.14)",
+                      color: "#f9363c",
+                    }}
                   >
                     Max
                   </button>
@@ -1345,7 +1419,10 @@ export default function SwapSheet({
                   if (isNaN(val) || val <= 0) return null;
                   if (val > secureToken.balance) {
                     return (
-                      <p className="text-[13px] leading-4 px-1" style={{ color: "#f9363c" }}>
+                      <p
+                        className="text-[13px] leading-4 px-1"
+                        style={{ color: "#f9363c" }}
+                      >
                         Insufficient balance
                       </p>
                     );
@@ -1391,7 +1468,9 @@ export default function SwapSheet({
             <div className="flex-1 overflow-y-auto">
               {filteredFromTokens.map((token) => (
                 <button
-                  key={token.mint ?? token.symbol}
+                  key={`${token.mint ?? token.symbol}${
+                    token.isSecured ? "-secured" : ""
+                  }`}
                   onClick={() =>
                     activeTab === "secure"
                       ? handleSelectSecureToken(token)
@@ -1402,22 +1481,38 @@ export default function SwapSheet({
                   <div className="py-1.5 pr-3">
                     <div className="w-12 h-12 relative">
                       <div className="w-12 h-12 rounded-full overflow-hidden bg-[#f2f2f7]">
-                        <Image src={token.icon} alt={token.symbol} width={48} height={48} />
+                        <Image
+                          src={token.icon}
+                          alt={token.symbol}
+                          width={48}
+                          height={48}
+                        />
                       </div>
                       {token.isSecured && (
                         <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
-                          <Image src="/Shield.svg" alt="Secured" width={20} height={20} />
+                          <Image
+                            src="/Shield.svg"
+                            alt="Secured"
+                            width={20}
+                            height={20}
+                          />
                         </div>
                       )}
                     </div>
                   </div>
                   <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                    <p className="text-[17px] font-medium text-black leading-[22px] text-left">{token.symbol}</p>
+                    <p className="text-[17px] font-medium text-black leading-[22px] text-left">
+                      {token.symbol}
+                    </p>
                     <p
                       className="text-[15px] leading-5 text-left"
                       style={{ color: "rgba(60, 60, 67, 0.6)" }}
                     >
-                      ${token.priceUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      $
+                      {token.priceUsd.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </p>
                   </div>
                   <div className="flex flex-col gap-0.5 items-end py-2.5 pl-3">
@@ -1430,10 +1525,14 @@ export default function SwapSheet({
                       className="text-[15px] leading-5 text-right"
                       style={{ color: "rgba(60, 60, 67, 0.6)" }}
                     >
-                      ${(token.balance * token.priceUsd).toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                      $
+                      {(token.balance * token.priceUsd).toLocaleString(
+                        "en-US",
+                        {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        }
+                      )}
                     </p>
                   </div>
                 </button>
@@ -1476,29 +1575,47 @@ export default function SwapSheet({
             <div className="flex-1 overflow-y-auto">
               {filteredToTokens.map((token) => (
                 <button
-                  key={token.mint ?? token.symbol}
+                  key={`${token.mint ?? token.symbol}${
+                    token.isSecured ? "-secured" : ""
+                  }`}
                   onClick={() => handleSelectToToken(token)}
                   className="w-full flex items-center px-4 active:bg-black/[0.03] transition-colors"
                 >
                   <div className="py-1.5 pr-3">
                     <div className="w-12 h-12 relative">
                       <div className="w-12 h-12 rounded-full overflow-hidden bg-[#f2f2f7]">
-                        <Image src={token.icon} alt={token.symbol} width={48} height={48} />
+                        <Image
+                          src={token.icon}
+                          alt={token.symbol}
+                          width={48}
+                          height={48}
+                        />
                       </div>
                       {token.isSecured && (
                         <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
-                          <Image src="/Shield.svg" alt="Secured" width={20} height={20} />
+                          <Image
+                            src="/Shield.svg"
+                            alt="Secured"
+                            width={20}
+                            height={20}
+                          />
                         </div>
                       )}
                     </div>
                   </div>
                   <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                    <p className="text-[17px] font-medium text-black leading-[22px] text-left">{token.symbol}</p>
+                    <p className="text-[17px] font-medium text-black leading-[22px] text-left">
+                      {token.symbol}
+                    </p>
                     <p
                       className="text-[15px] leading-5 text-left"
                       style={{ color: "rgba(60, 60, 67, 0.6)" }}
                     >
-                      ${token.priceUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      $
+                      {token.priceUsd.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </p>
                   </div>
                   <div className="flex flex-col gap-0.5 items-end py-2.5 pl-3">
@@ -1511,10 +1628,14 @@ export default function SwapSheet({
                       className="text-[15px] leading-5 text-right"
                       style={{ color: "rgba(60, 60, 67, 0.6)" }}
                     >
-                      ${(token.balance * token.priceUsd).toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                      $
+                      {(token.balance * token.priceUsd).toLocaleString(
+                        "en-US",
+                        {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        }
+                      )}
                     </p>
                   </div>
                 </button>
@@ -1548,7 +1669,10 @@ export default function SwapSheet({
                 </div>
                 {/* To amount (positive, green) */}
                 <div className="flex gap-2 items-baseline">
-                  <p className="text-[32px] font-semibold leading-[38px]" style={{ color: "#34C759" }}>
+                  <p
+                    className="text-[32px] font-semibold leading-[38px]"
+                    style={{ color: "#34C759" }}
+                  >
                     +{receiveAmountDisplay}
                   </p>
                   <p
@@ -1563,7 +1687,11 @@ export default function SwapSheet({
                   className="text-base leading-[22px] mt-1"
                   style={{ color: "rgba(60, 60, 67, 0.6)" }}
                 >
-                  ≈${receiveUsdValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ≈$
+                  {receiveUsdValue.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </p>
               </div>
             </div>
@@ -1628,16 +1756,35 @@ export default function SwapSheet({
                   <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
                     <div className="flex items-center gap-2 mb-5">
                       <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
-                        <Image src={fromToken.icon} alt={fromToken.symbol} width={56} height={56} />
+                        <Image
+                          src={fromToken.icon}
+                          alt={fromToken.symbol}
+                          width={56}
+                          height={56}
+                        />
                       </div>
-                      <ChevronRight size={20} strokeWidth={2} style={{ color: "rgba(60, 60, 67, 0.3)" }} />
+                      <ChevronRight
+                        size={20}
+                        strokeWidth={2}
+                        style={{ color: "rgba(60, 60, 67, 0.3)" }}
+                      />
                       <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
-                        <Image src={toToken.icon} alt={toToken.symbol} width={56} height={56} />
+                        <Image
+                          src={toToken.icon}
+                          alt={toToken.symbol}
+                          width={56}
+                          height={56}
+                        />
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
-                      <h2 className="text-xl font-semibold text-black leading-6">Swapping...</h2>
-                      <p className="text-base leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                      <h2 className="text-xl font-semibold text-black leading-6">
+                        Swapping...
+                      </h2>
+                      <p
+                        className="text-base leading-5"
+                        style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                      >
                         You can close this screen and continue using the app
                       </p>
                     </div>
@@ -1645,11 +1792,21 @@ export default function SwapSheet({
                 ) : swapError ? (
                   <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
                     <div className="relative mb-5">
-                      <Image src="/dogs/dog-cry.png" alt="Error" width={96} height={96} />
+                      <Image
+                        src="/dogs/dog-cry.png"
+                        alt="Error"
+                        width={96}
+                        height={96}
+                      />
                     </div>
                     <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
-                      <h2 className="text-xl font-semibold text-black leading-6">Swap failed</h2>
-                      <p className="text-base leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                      <h2 className="text-xl font-semibold text-black leading-6">
+                        Swap failed
+                      </h2>
+                      <p
+                        className="text-base leading-5"
+                        style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                      >
                         {swapError}
                       </p>
                     </div>
@@ -1657,16 +1814,27 @@ export default function SwapSheet({
                 ) : (
                   <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
                     <div className="relative mb-5">
-                      <Image src="/dogs/dog-green.png" alt="Success" width={96} height={96} />
+                      <Image
+                        src="/dogs/dog-green.png"
+                        alt="Success"
+                        width={96}
+                        height={96}
+                      />
                     </div>
                     <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
-                      <h2 className="text-xl font-semibold text-black leading-6">Swap Completed</h2>
-                      <p className="text-base leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                      <h2 className="text-xl font-semibold text-black leading-6">
+                        Swap Completed
+                      </h2>
+                      <p
+                        className="text-base leading-5"
+                        style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                      >
                         <span className="text-black">
-                          {swappedToAmount?.toFixed(4).replace(/\.?0+$/, "") || "0"}{" "}
+                          {swappedToAmount?.toFixed(4).replace(/\.?0+$/, "") ||
+                            "0"}{" "}
                           {swappedToSymbol || ""}
-                        </span>
-                        {" "}has been deposited to your wallet
+                        </span>{" "}
+                        has been deposited to your wallet
                       </p>
                     </div>
                   </div>
@@ -1682,30 +1850,63 @@ export default function SwapSheet({
                       {secureDirection === "shield" ? (
                         <>
                           <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
-                            <Image src={secureToken.icon} alt={secureToken.symbol} width={56} height={56} />
+                            <Image
+                              src={secureToken.icon}
+                              alt={secureToken.symbol}
+                              width={56}
+                              height={56}
+                            />
                           </div>
-                          <ChevronRight size={20} strokeWidth={2} style={{ color: "rgba(60, 60, 67, 0.3)" }} />
+                          <ChevronRight
+                            size={20}
+                            strokeWidth={2}
+                            style={{ color: "rgba(60, 60, 67, 0.3)" }}
+                          />
                           <div className="w-[56px] h-[56px] flex items-center justify-center">
-                            <Image src="/Shield.svg" alt="Shield" width={56} height={56} />
+                            <Image
+                              src="/Shield.svg"
+                              alt="Shield"
+                              width={56}
+                              height={56}
+                            />
                           </div>
                         </>
                       ) : (
                         <>
                           <div className="w-[56px] h-[56px] flex items-center justify-center">
-                            <Image src="/Shield.svg" alt="Shield" width={56} height={56} />
+                            <Image
+                              src="/Shield.svg"
+                              alt="Shield"
+                              width={56}
+                              height={56}
+                            />
                           </div>
-                          <ChevronRight size={20} strokeWidth={2} style={{ color: "rgba(60, 60, 67, 0.3)" }} />
+                          <ChevronRight
+                            size={20}
+                            strokeWidth={2}
+                            style={{ color: "rgba(60, 60, 67, 0.3)" }}
+                          />
                           <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
-                            <Image src={secureToken.icon} alt={secureToken.symbol} width={56} height={56} />
+                            <Image
+                              src={secureToken.icon}
+                              alt={secureToken.symbol}
+                              width={56}
+                              height={56}
+                            />
                           </div>
                         </>
                       )}
                     </div>
                     <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
                       <h2 className="text-xl font-semibold text-black leading-6">
-                        {secureDirection === "shield" ? "Securing..." : "Unshielding..."}
+                        {secureDirection === "shield"
+                          ? "Securing..."
+                          : "Unshielding..."}
                       </h2>
-                      <p className="text-base leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                      <p
+                        className="text-base leading-5"
+                        style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                      >
                         You can close this screen and continue using the app
                       </p>
                     </div>
@@ -1713,13 +1914,23 @@ export default function SwapSheet({
                 ) : swapError ? (
                   <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
                     <div className="relative mb-5">
-                      <Image src="/dogs/dog-cry.png" alt="Error" width={96} height={96} />
+                      <Image
+                        src="/dogs/dog-cry.png"
+                        alt="Error"
+                        width={96}
+                        height={96}
+                      />
                     </div>
                     <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
                       <h2 className="text-xl font-semibold text-black leading-6">
-                        {secureDirection === "shield" ? "Securing failed" : "Unshielding failed"}
+                        {secureDirection === "shield"
+                          ? "Securing failed"
+                          : "Unshielding failed"}
                       </h2>
-                      <p className="text-base leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                      <p
+                        className="text-base leading-5"
+                        style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                      >
                         {swapError}
                       </p>
                     </div>
@@ -1727,19 +1938,33 @@ export default function SwapSheet({
                 ) : (
                   <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
                     <div className="relative mb-5">
-                      <Image src="/dogs/dog-green.png" alt="Success" width={96} height={96} />
+                      <Image
+                        src="/dogs/dog-green.png"
+                        alt="Success"
+                        width={96}
+                        height={96}
+                      />
                     </div>
                     <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
                       <h2 className="text-xl font-semibold text-black leading-6">
                         {swappedToSymbol || secureToken.symbol}{" "}
-                        {secureDirection === "shield" ? "Secured" : "Unshielded"}
+                        {secureDirection === "shield"
+                          ? "Secured"
+                          : "Unshielded"}
                       </h2>
-                      <p className="text-base leading-5" style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                      <p
+                        className="text-base leading-5"
+                        style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                      >
                         <span className="text-black">
-                          {swappedToAmount?.toFixed(4).replace(/\.?0+$/, "") || "0"}{" "}
+                          {swappedToAmount?.toFixed(4).replace(/\.?0+$/, "") ||
+                            "0"}{" "}
                           {swappedToSymbol || secureToken.symbol}
-                        </span>
-                        {" "}moved to your {secureDirection === "shield" ? "secure balance" : "main balance"}
+                        </span>{" "}
+                        moved to your{" "}
+                        {secureDirection === "shield"
+                          ? "secure balance"
+                          : "main balance"}
                       </p>
                     </div>
                   </div>

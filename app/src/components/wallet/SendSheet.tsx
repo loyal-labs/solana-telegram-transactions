@@ -43,7 +43,7 @@ export type SendSheetProps = {
   onOpenChange?: (open: boolean) => void;
   initialRecipient?: string;
   onValidationChange?: (isValid: boolean) => void;
-  onFormValuesChange?: (values: { amount: string; recipient: string }) => void;
+  onFormValuesChange?: (values: { amount: string; recipient: string; isSecured: boolean }) => void;
   step: 1 | 2 | 3 | 4 | 5;
   onStepChange: (step: 1 | 2 | 3 | 4 | 5) => void;
   balance?: number | null;
@@ -245,8 +245,9 @@ export default function SendSheet({
   const amountTextRef = useRef<HTMLParagraphElement>(null);
   const [caretLeft, setCaretLeft] = useState(0);
 
-  // Convert balance from lamports to SOL
-  const balanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
+  // Use the selected token's balance if available, otherwise fall back to wallet SOL balance
+  const walletBalanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
+  const balanceInSol = selectedToken ? selectedToken.balance : walletBalanceInSol;
   const isUsingExternalPrice =
     solPriceUsdProp !== undefined || isSolPriceLoadingProp !== undefined;
   const solPriceUsd = isUsingExternalPrice
@@ -417,9 +418,9 @@ export default function SendSheet({
             : "";
         }
       }
-      onFormValuesChange({ amount: finalAmount, recipient });
+      onFormValuesChange({ amount: finalAmount, recipient, isSecured: !!selectedToken?.isSecured });
     }
-  }, [amountStr, recipient, currency, onFormValuesChange, solPriceUsd]);
+  }, [amountStr, recipient, currency, onFormValuesChange, solPriceUsd, selectedToken]);
 
   // Validation Logic
   useEffect(() => {
@@ -811,14 +812,26 @@ export default function SendSheet({
                   className="flex items-center px-4 active:bg-black/[0.03] transition-colors"
                 >
                   <div className="py-1.5 pr-3">
-                    <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
-                      {token.imageUrl && (
-                        <Image
-                          src={token.imageUrl}
-                          alt={displaySymbol}
-                          fill
-                          className="object-cover"
-                        />
+                    <div className="w-12 h-12 relative">
+                      <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                        {token.imageUrl && (
+                          <Image
+                            src={token.imageUrl}
+                            alt={displaySymbol}
+                            fill
+                            className="object-cover"
+                          />
+                        )}
+                      </div>
+                      {token.isSecured && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
+                          <Image
+                            src="/Shield.svg"
+                            alt="Secured"
+                            width={20}
+                            height={20}
+                          />
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1170,13 +1183,25 @@ export default function SendSheet({
                 className="flex items-center pl-3 pr-4 py-1 overflow-hidden"
               >
                 <div className="py-1.5 pr-3">
-                  <div className="w-12 h-12 overflow-hidden flex items-center justify-center">
-                    <Image
-                      src="/tokens/solana-sol-logo.png"
-                      alt="Solana"
-                      width={48}
-                      height={48}
-                    />
+                  <div className="w-12 h-12 relative">
+                    <div className="w-12 h-12 overflow-hidden flex items-center justify-center">
+                      <Image
+                        src="/tokens/solana-sol-logo.png"
+                        alt="Solana"
+                        width={48}
+                        height={48}
+                      />
+                    </div>
+                    {selectedToken?.isSecured && (
+                      <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
+                        <Image
+                          src="/Shield.svg"
+                          alt="Secured"
+                          width={20}
+                          height={20}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex-1 flex flex-col gap-0.5 py-2.5">

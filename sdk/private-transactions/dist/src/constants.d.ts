@@ -1,5 +1,9 @@
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 /**
+ * TEE ER Validator
+ */
+export declare const ER_VALIDATOR: PublicKey;
+/**
  * Telegram Private Transfer program ID
  */
 export declare const PROGRAM_ID: PublicKey;

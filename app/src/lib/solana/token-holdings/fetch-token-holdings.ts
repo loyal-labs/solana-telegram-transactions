@@ -59,7 +59,7 @@ function mapNativeBalance(nativeBalance: HeliusNativeBalance | undefined): Token
     decimals: NATIVE_SOL_DECIMALS,
     priceUsd: price_per_sol ?? null,
     valueUsd: total_price ?? null,
-    imageUrl: null,
+    imageUrl: "/tokens/solana-sol-logo.png",
   };
 }
 

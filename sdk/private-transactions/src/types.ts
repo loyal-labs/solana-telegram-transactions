@@ -42,11 +42,17 @@ export interface RpcOptions {
 /**
  * Configuration for creating an ephemeral client
  */
-export interface EphemeralClientConfig {
+export interface ClientConfig {
   signer: WalletSigner;
-  rpcEndpoint: string;
-  wsEndpoint?: string;
+  baseRpcEndpoint: string;
+  baseWsEndpoint?: string;
+  ephemeralRpcEndpoint: string;
+  ephemeralWsEndpoint?: string;
   commitment?: Commitment;
+  authToken?: {
+    token: string;
+    expiresAt: number;
+  };
 }
 
 /**
@@ -74,6 +80,13 @@ export interface UsernameDepositData {
  */
 export interface InitializeDepositParams {
   user: PublicKey;
+  tokenMint: PublicKey;
+  payer: PublicKey;
+  rpcOptions?: RpcOptions;
+}
+
+export interface InitializeUsernameDepositParams {
+  username: string;
   tokenMint: PublicKey;
   payer: PublicKey;
   rpcOptions?: RpcOptions;
@@ -126,6 +139,15 @@ export interface ClaimUsernameDepositParams {
   rpcOptions?: RpcOptions;
 }
 
+export interface ClaimUsernameDepositToDepositParams {
+  username: string;
+  tokenMint: PublicKey;
+  amount: number | bigint;
+  recipient: PublicKey;
+  session: PublicKey;
+  rpcOptions?: RpcOptions;
+}
+
 /**
  * Parameters for creating a permission for a deposit
  */
@@ -165,7 +187,7 @@ export interface DelegateDepositParams {
 export interface DelegateUsernameDepositParams {
   username: string;
   tokenMint: PublicKey;
-  session: PublicKey;
+  // session: PublicKey;
   payer: PublicKey;
   validator?: PublicKey;
   rpcOptions?: RpcOptions;
