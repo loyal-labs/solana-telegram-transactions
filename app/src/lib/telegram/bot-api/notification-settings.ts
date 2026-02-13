@@ -112,7 +112,6 @@ export function buildNotificationSettingsMessageText(): string {
     "Notification settings for this community",
     "",
     "⏱ <b>Time trigger</b>: Off | 24h | 48h",
-    "💬 <b>Message trigger</b>: Off | 500 | 1000",
     "🔔 <b>Master switch</b>: Off | On",
     "",
     "Only whitelisted admins can change these settings.",
@@ -145,34 +144,6 @@ export function buildNotificationSettingsKeyboard(
         communityId: community.id,
         dimension: "time",
         value: 48,
-      })
-    )
-    .row()
-    .text(
-      renderButtonLabel("💬 Off", community.summaryNotificationMessageCount === null),
-      encodeNotificationSettingsCallbackData({
-        communityId: community.id,
-        dimension: "msg",
-        value: "off",
-      })
-    )
-    .text(
-      renderButtonLabel("💬 500", community.summaryNotificationMessageCount === 500),
-      encodeNotificationSettingsCallbackData({
-        communityId: community.id,
-        dimension: "msg",
-        value: 500,
-      })
-    )
-    .text(
-      renderButtonLabel(
-        "💬 1000",
-        community.summaryNotificationMessageCount === 1000
-      ),
-      encodeNotificationSettingsCallbackData({
-        communityId: community.id,
-        dimension: "msg",
-        value: 1000,
       })
     )
     .row()
