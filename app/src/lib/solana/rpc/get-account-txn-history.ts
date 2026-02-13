@@ -353,6 +353,9 @@ const findSystemTransfer = (
 /** Threshold below which third-party transactions with no token change are treated as dust/noise */
 const DUST_LAMPORTS_THRESHOLD = 10_000;
 
+/** Jupiter V6 Aggregator program ID for deterministic swap detection */
+const JUPITER_PROGRAM_ID = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
+
 const mapTransactionToTransfer = (
   tx: ParsedTransactionWithMeta,
   signature: string,
@@ -486,9 +489,28 @@ const mapTransactionToTransfer = (
 
   const isTokenTransfer = type === "transfer" && tokenChange !== null;
 
+  // Deterministic swap detection: check if any instruction targets Jupiter
+  const isJupiterSwap =
+    type === "transfer" &&
+    [
+      ...(message.instructions as (ParsedInstruction | PartiallyDecodedInstruction)[]),
+      ...((innerInstructions ?? []) as ParsedInnerInstruction[]).flatMap(
+        (ix: ParsedInnerInstruction) =>
+          (ix.instructions ?? []) as (ParsedInstruction | PartiallyDecodedInstruction)[]
+      ),
+    ].some(
+      (ix) =>
+        "programId" in ix &&
+        ix.programId?.toBase58?.() === JUPITER_PROGRAM_ID
+    );
+
+  if (isJupiterSwap) {
+    type = "swap";
+  }
+
   // Swap detection: wallet is signer + opposing SOL/token movements
   let swapFields: Partial<WalletTransfer> = {};
-  if (isSigner && type === "transfer" && allTokenChanges.length > 0) {
+  if (allTokenChanges.length > 0 && (type === "swap" || (isSigner && type === "transfer"))) {
     const tokenIn = allTokenChanges.find((c) => c.direction === "in");
     const tokenOut = allTokenChanges.find((c) => c.direction === "out");
     const solOut = netChangeLamports < -DUST_LAMPORTS_THRESHOLD;
