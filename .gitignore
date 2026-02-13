@@ -66,6 +66,8 @@ test-ledger
 my-ledger-1/
 test-ledger-magicblock/
 sdk/private-transactions/.cache/devnet-mint.json
+sdk/private-transactions/tests/.auth-token-cache.json
+sdk/private-transactions/tests/.mint-cache.json
 
 /app/testing.ts
 .vercel
