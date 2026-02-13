@@ -18,13 +18,11 @@ type SummaryWithCommunityRecord = {
   };
   createdAt: Date;
   id: string;
-  notificationSentAt: Date | null;
   oneliner: string;
 } | null;
 
 let communityResult: CommunityRecord | null = null;
 let summaryResult: SummaryWithCommunityRecord = null;
-let updateCallCount = 0;
 
 mock.module("@/lib/core/database", () => ({
   getDatabase: () => ({
@@ -36,39 +34,120 @@ mock.module("@/lib/core/database", () => ({
         findFirst: async () => summaryResult,
       },
     },
-    update: () => {
-      updateCallCount += 1;
-      return {
-        set: () => ({
-          where: () => ({
-            returning: async () => [],
-          }),
-        }),
-      };
-    },
   }),
 }));
 
 mock.module("@/lib/redpill", () => ({
   chatCompletion: async () => {
-    throw new Error("chatCompletion should not be called in delivery guard tests");
+    throw new Error("chatCompletion should not be called in delivery tests");
   },
 }));
 
-let attemptSummaryNotificationDelivery: typeof import("../summaries").attemptSummaryNotificationDelivery;
 let sendLatestSummary: typeof import("../summaries").sendLatestSummary;
+let sendSummaryById: typeof import("../summaries").sendSummaryById;
 
 describe("summary delivery guards", () => {
   beforeAll(async () => {
     const loadedModule = await import("../summaries");
-    attemptSummaryNotificationDelivery = loadedModule.attemptSummaryNotificationDelivery;
     sendLatestSummary = loadedModule.sendLatestSummary;
+    sendSummaryById = loadedModule.sendSummaryById;
   });
 
   beforeEach(() => {
     communityResult = null;
     summaryResult = null;
-    updateCallCount = 0;
+  });
+
+  test("sendSummaryById sends summary when community is active and enabled", async () => {
+    const sendMessageCalls: unknown[] = [];
+    const bot = {
+      api: {
+        sendMessage: async (...args: unknown[]) => {
+          sendMessageCalls.push(args);
+          return {} as never;
+        },
+      },
+    } as unknown as Bot;
+
+    summaryResult = {
+      community: {
+        chatId: BigInt("-1001234567890"),
+        isActive: true,
+        summaryNotificationsEnabled: true,
+      },
+      createdAt: new Date("2026-02-12T00:00:00Z"),
+      id: "summary-1",
+      oneliner: "Daily recap",
+    };
+
+    const result = await sendSummaryById(bot, "summary-1");
+
+    expect(result).toEqual({ sent: true });
+    expect(sendMessageCalls).toHaveLength(1);
+  });
+
+  test("sendSummaryById returns no_summaries when summary does not exist", async () => {
+    const bot = { api: { sendMessage: async () => ({}) as never } } as unknown as Bot;
+
+    const result = await sendSummaryById(bot, "missing");
+
+    expect(result).toEqual({ sent: false, reason: "no_summaries" });
+  });
+
+  test("sendSummaryById returns notifications_disabled and does not send", async () => {
+    const sendMessageCalls: unknown[] = [];
+    const bot = {
+      api: {
+        sendMessage: async (...args: unknown[]) => {
+          sendMessageCalls.push(args);
+          return {} as never;
+        },
+      },
+    } as unknown as Bot;
+
+    summaryResult = {
+      community: {
+        chatId: BigInt("-1001234567890"),
+        isActive: true,
+        summaryNotificationsEnabled: false,
+      },
+      createdAt: new Date("2026-02-12T00:00:00Z"),
+      id: "summary-1",
+      oneliner: "Daily recap",
+    };
+
+    const result = await sendSummaryById(bot, "summary-1");
+
+    expect(result).toEqual({ sent: false, reason: "notifications_disabled" });
+    expect(sendMessageCalls).toHaveLength(0);
+  });
+
+  test("sendSummaryById returns not_activated when community is inactive", async () => {
+    const sendMessageCalls: unknown[] = [];
+    const bot = {
+      api: {
+        sendMessage: async (...args: unknown[]) => {
+          sendMessageCalls.push(args);
+          return {} as never;
+        },
+      },
+    } as unknown as Bot;
+
+    summaryResult = {
+      community: {
+        chatId: BigInt("-1001234567890"),
+        isActive: false,
+        summaryNotificationsEnabled: true,
+      },
+      createdAt: new Date("2026-02-12T00:00:00Z"),
+      id: "summary-1",
+      oneliner: "Daily recap",
+    };
+
+    const result = await sendSummaryById(bot, "summary-1");
+
+    expect(result).toEqual({ sent: false, reason: "not_activated" });
+    expect(sendMessageCalls).toHaveLength(0);
   });
 
   test("sendLatestSummary returns notifications_disabled and does not send to chat", async () => {
@@ -93,38 +172,5 @@ describe("summary delivery guards", () => {
 
     expect(result).toEqual({ sent: false, reason: "notifications_disabled" });
     expect(sendMessageCalls).toHaveLength(0);
-  });
-
-  test("attemptSummaryNotificationDelivery returns notifications_disabled and does not send", async () => {
-    const sendMessageCalls: unknown[] = [];
-    const bot = {
-      api: {
-        sendMessage: async (...args: unknown[]) => {
-          sendMessageCalls.push(args);
-          return {} as never;
-        },
-      },
-    } as unknown as Bot;
-
-    summaryResult = {
-      community: {
-        chatId: BigInt("-1001234567890"),
-        isActive: true,
-        summaryNotificationsEnabled: false,
-      },
-      createdAt: new Date("2026-02-12T00:00:00Z"),
-      id: "summary-1",
-      notificationSentAt: null,
-      oneliner: "Daily recap",
-    };
-
-    const result = await attemptSummaryNotificationDelivery(bot, "summary-1");
-
-    expect(result).toEqual({
-      delivered: false,
-      reason: "notifications_disabled",
-    });
-    expect(sendMessageCalls).toHaveLength(0);
-    expect(updateCallCount).toBe(0);
   });
 });

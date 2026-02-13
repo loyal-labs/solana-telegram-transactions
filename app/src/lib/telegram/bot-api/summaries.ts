@@ -4,10 +4,7 @@ import {
   desc,
   eq,
   gte,
-  isNull,
-  lt,
   lte,
-  or,
   sql,
 } from "drizzle-orm";
 import { type Bot, InlineKeyboard } from "grammy";
@@ -26,9 +23,8 @@ import { buildSummaryMessageWithPreview } from "./build-summary-og-url";
 import { MINI_APP_FEED_LINK } from "./constants";
 import type { SendLatestSummaryOptions, SendSummaryResult } from "./types";
 
-export const MIN_MESSAGES_FOR_SUMMARY = 5;
+export const MIN_MESSAGES_FOR_SUMMARY = 3;
 const MAX_SUMMARY_INPUT_CHARS = 12_000;
-const NOTIFICATION_CLAIM_STALE_MS = 15 * 60 * 1000;
 
 export const SYSTEM_PROMPT = `You summarize group chat conversations into topics. Output JSON:
 {"topics":[{"title":"Topic Name","content":"Summary paragraph","sources":["Name1","Name2"]}]}
@@ -37,8 +33,8 @@ Keep summaries concise. List 1-5 topics. Sources are participant names who contr
 export const ONELINER_PROMPT = `Given these discussion topics from a group chat, write a single catchy sentence (max 110 characters) that captures the essence of daily conversation. Output only the sentence, no quotes or formatting.`;
 
 export type SummaryRunContext = {
-  triggerKey: string;
-  triggerType: string;
+  dayEndUtc: Date;
+  dayStartUtc: Date;
   windowEnd: Date;
   windowStart: Date;
 };
@@ -47,18 +43,6 @@ export type GenerateOrGetSummaryForRunResult =
   | { status: "created"; summaryId: string; messageCount: number }
   | { status: "existing"; summaryId: string; messageCount: number }
   | { status: "not_enough_messages"; messageCount: number };
-
-export type AttemptSummaryNotificationDeliveryResult =
-  | { delivered: true }
-  | {
-      delivered: false;
-      reason:
-        | "already_sent"
-        | "not_claimed"
-        | "not_found"
-        | "not_activated"
-        | "notifications_disabled";
-    };
 
 type SummaryWithCommunity = Summary & {
   community: {
@@ -80,9 +64,10 @@ export async function generateOrGetSummaryForRun(input: {
     return { status: "not_enough_messages", messageCount };
   }
 
-  const existingSummary = await findSummaryForRun(
+  const existingSummary = await findTodaySummary(
     input.communityId,
-    input.run.triggerKey
+    input.run.dayStartUtc,
+    input.run.dayEndUtc
   );
   if (existingSummary) {
     return {
@@ -136,37 +121,19 @@ export async function generateOrGetSummaryForRun(input: {
       fromMessageId: recentMessages[0].telegramMessageId,
       toMessageId: recentMessages[recentMessages.length - 1].telegramMessageId,
       messageCount,
-      notificationClaimedAt: null,
-      notificationSentAt: null,
       oneliner,
       topics,
-      triggerKey: input.run.triggerKey,
-      triggerType: input.run.triggerType,
     })
-    .onConflictDoNothing({ target: [summaries.communityId, summaries.triggerKey] })
     .returning({ id: summaries.id, messageCount: summaries.messageCount });
 
-  if (insertedSummary.length > 0) {
-    return {
-      status: "created",
-      summaryId: insertedSummary[0].id,
-      messageCount: insertedSummary[0].messageCount,
-    };
-  }
-
-  const conflictedSummary = await findSummaryForRun(
-    input.communityId,
-    input.run.triggerKey
-  );
-
-  if (!conflictedSummary) {
-    throw new Error("Failed to resolve summary after onConflictDoNothing");
+  if (insertedSummary.length === 0) {
+    throw new Error("Failed to create summary");
   }
 
   return {
-    status: "existing",
-    summaryId: conflictedSummary.id,
-    messageCount: conflictedSummary.messageCount,
+    status: "created",
+    summaryId: insertedSummary[0].id,
+    messageCount: insertedSummary[0].messageCount,
   };
 }
 
@@ -298,81 +265,6 @@ export async function sendSummaryById(
   return { sent: true };
 }
 
-export async function attemptSummaryNotificationDelivery(
-  bot: Bot,
-  summaryId: string
-): Promise<AttemptSummaryNotificationDeliveryResult> {
-  const summary = await getSummaryWithCommunity(summaryId);
-  if (!summary) {
-    return { delivered: false, reason: "not_found" };
-  }
-
-  if (!summary.community.isActive) {
-    return { delivered: false, reason: "not_activated" };
-  }
-
-  if (!summary.community.summaryNotificationsEnabled) {
-    return { delivered: false, reason: "notifications_disabled" };
-  }
-
-  if (summary.notificationSentAt) {
-    return { delivered: false, reason: "already_sent" };
-  }
-
-  const db = getDatabase();
-  const staleBefore = new Date(Date.now() - NOTIFICATION_CLAIM_STALE_MS);
-  const claimTime = new Date();
-
-  const claimedRows = await db
-    .update(summaries)
-    .set({ notificationClaimedAt: claimTime })
-    .where(
-      and(
-        eq(summaries.id, summaryId),
-        isNull(summaries.notificationSentAt),
-        or(
-          isNull(summaries.notificationClaimedAt),
-          lt(summaries.notificationClaimedAt, staleBefore)
-        )
-      )
-    )
-    .returning({ id: summaries.id });
-
-  if (claimedRows.length === 0) {
-    return { delivered: false, reason: "not_claimed" };
-  }
-
-  try {
-    await sendSummaryToChat(
-      bot,
-      {
-        createdAt: summary.createdAt,
-        oneliner: summary.oneliner,
-      },
-      {
-        destinationChatId: summary.community.chatId,
-      }
-    );
-
-    await db
-      .update(summaries)
-      .set({
-        notificationClaimedAt: null,
-        notificationSentAt: new Date(),
-      })
-      .where(eq(summaries.id, summaryId));
-
-    return { delivered: true };
-  } catch (error) {
-    await db
-      .update(summaries)
-      .set({ notificationClaimedAt: null })
-      .where(and(eq(summaries.id, summaryId), isNull(summaries.notificationSentAt)));
-
-    throw error;
-  }
-}
-
 async function countMessagesInWindow(
   communityId: string,
   run: SummaryRunContext
@@ -392,16 +284,18 @@ async function countMessagesInWindow(
   return Number(result?.count ?? 0);
 }
 
-async function findSummaryForRun(
+async function findTodaySummary(
   communityId: string,
-  triggerKey: string
+  dayStartUtc: Date,
+  dayEndUtc: Date
 ): Promise<Summary | null> {
   const db = getDatabase();
   return (
     (await db.query.summaries.findFirst({
       where: and(
         eq(summaries.communityId, communityId),
-        eq(summaries.triggerKey, triggerKey)
+        gte(summaries.createdAt, dayStartUtc),
+        lte(summaries.createdAt, dayEndUtc)
       ),
       orderBy: [desc(summaries.createdAt)],
     })) ?? null
