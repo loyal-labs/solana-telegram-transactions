@@ -121,7 +121,7 @@ import type {
 hashes.sha512 = sha512;
 
 // ─── Mock data for development ─────────────────────────────────────────────
-const USE_MOCK_DATA = false;
+const USE_MOCK_DATA = true;
 
 const MOCK_WALLET_ADDRESS = "UQAt7f8Kq9xZ3mNpR2vL5wYcD4bJ6hTgSoAeWnFqZir";
 const MOCK_BALANCE_LAMPORTS = 1_267_476_540_000; // ~1267.47654 SOL
@@ -2996,7 +2996,7 @@ export default function Home() {
                               {/* Left - Icon */}
                               <div className="py-1.5 pr-3">
                                 <div className="w-12 h-12 relative">
-                                  <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                                  <div className="absolute left-0 top-0 w-8 h-8 rounded-full overflow-hidden bg-[#f2f2f7]">
                                     <Image
                                       src={
                                         transaction.secureTokenIcon ||
@@ -3009,23 +3009,21 @@ export default function Home() {
                                       className="object-cover"
                                     />
                                   </div>
-                                  {isSecureTransaction && (
-                                    <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
-                                      <Image
-                                        src="/Shield.svg"
-                                        alt="Shield"
-                                        width={20}
-                                        height={20}
-                                      />
-                                    </div>
-                                  )}
+                                  <div className="absolute bottom-0 right-0 w-8 h-8">
+                                    <Image
+                                      src={isSecureTransaction ? "/icons/Shield_32.png" : "/icons/Unshield_32.png"}
+                                      alt={isSecureTransaction ? "Shielded" : "Unshielded"}
+                                      width={32}
+                                      height={32}
+                                    />
+                                  </div>
                                 </div>
                               </div>
 
                               {/* Middle - Text */}
                               <div className="flex-1 py-2.5 flex flex-col gap-0.5">
                                 <p className="text-base text-black leading-5">
-                                  {isSecureTransaction ? "Secure" : "Unshield"}
+                                  {isSecureTransaction ? "Shielded" : "Unshielded"}
                                 </p>
                                 <p
                                   className="text-[13px] leading-4"
