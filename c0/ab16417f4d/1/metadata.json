@@ -1,0 +1,34 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "c0ab16417f4d",
+  "session_id": "5578c985-dc03-4bdb-b9cc-0f00e464a6fd",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-13T18:32:22.622258Z",
+  "branch": "main",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "app/src/app/telegram/summaries/page.tsx",
+    "app/src/components/wallet/SendSheet.tsx",
+    "app/src/components/wallet/SwapSheet.tsx",
+    "app/src/hooks/useEstimatedFee.ts",
+    "app/src/lib/solana/estimate-fee.ts"
+  ],
+  "agent": "Claude Code",
+  "transcript_identifier_at_start": "31b94fa4-036d-4080-8743-591c35843a82",
+  "token_usage": {
+    "input_tokens": 447,
+    "cache_creation_tokens": 125852,
+    "cache_read_tokens": 14746309,
+    "output_tokens": 38110,
+    "api_call_count": 133
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-13T18:32:22.35208Z",
+    "agent_lines": 103,
+    "human_added": 948,
+    "human_modified": 71,
+    "human_removed": 0,
+    "total_committed": 1122,
+    "agent_percentage": 9.180035650623886
+  }
+}
