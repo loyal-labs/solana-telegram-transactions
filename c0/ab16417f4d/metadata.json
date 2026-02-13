@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "c0ab16417f4d",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 4,
+  "files_touched": [
+    "admin/.env.example",
+    "admin/.next/server/chunks/ssr/79bc6_ff8b133b._.js",
+    "admin/.next/server/chunks/ssr/79bc6_ff8b133b._.js.map",
+    "admin/CLAUDE.md",
+    "admin/bun.lock",
+    "admin/next.config.ts",
+    "admin/package.json",
+    "admin/postcss.config.mjs",
+    "admin/src/app/globals.css",
+    "admin/src/app/layout.tsx",
+    "admin/src/app/page.tsx",
+    "admin/src/app/schema/page.tsx",
+    "admin/src/lib/db.ts",
+    "admin/src/lib/schema.ts",
+    "admin/tsconfig.json"
+  ],
+  "sessions": [
+    {
+      "metadata": "/c0/ab16417f4d/0/metadata.json",
+      "transcript": "/c0/ab16417f4d/0/full.jsonl",
+      "context": "/c0/ab16417f4d/0/context.md",
+      "content_hash": "/c0/ab16417f4d/0/content_hash.txt",
+      "prompt": "/c0/ab16417f4d/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1410,
+    "cache_creation_tokens": 66429,
+    "cache_read_tokens": 2148768,
+    "output_tokens": 17414,
+    "api_call_count": 34
+  }
+}

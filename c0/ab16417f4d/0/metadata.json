@@ -1,0 +1,44 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "c0ab16417f4d",
+  "session_id": "54f7c913-6cd2-41ba-8ac5-cac794ad9524",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-13T18:32:22.127888Z",
+  "branch": "main",
+  "checkpoints_count": 4,
+  "files_touched": [
+    "admin/.env.example",
+    "admin/.next/server/chunks/ssr/79bc6_ff8b133b._.js",
+    "admin/.next/server/chunks/ssr/79bc6_ff8b133b._.js.map",
+    "admin/CLAUDE.md",
+    "admin/bun.lock",
+    "admin/next.config.ts",
+    "admin/package.json",
+    "admin/postcss.config.mjs",
+    "admin/src/app/globals.css",
+    "admin/src/app/layout.tsx",
+    "admin/src/app/page.tsx",
+    "admin/src/app/schema/page.tsx",
+    "admin/src/lib/db.ts",
+    "admin/src/lib/schema.ts",
+    "admin/tsconfig.json"
+  ],
+  "agent": "Claude Code",
+  "transcript_identifier_at_start": "672247d6-fbc7-4d9d-91ae-a718434da3d2",
+  "token_usage": {
+    "input_tokens": 1410,
+    "cache_creation_tokens": 66429,
+    "cache_read_tokens": 2148768,
+    "output_tokens": 17414,
+    "api_call_count": 34
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-13T18:32:22.086854Z",
+    "agent_lines": 0,
+    "human_added": 278794,
+    "human_modified": 19491,
+    "human_removed": 0,
+    "total_committed": 298285,
+    "agent_percentage": 0
+  }
+}
