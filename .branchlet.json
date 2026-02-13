@@ -1,0 +1,14 @@
+{
+  "worktreeCopyPatterns": [".env*", ".claude", ".entire"],
+  "worktreeCopyIgnores": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.git/**",
+    "**/Thumbs.db",
+    "**/.DS_Store"
+  ],
+  "worktreePathTemplate": "$BASE_PATH.worktree",
+  "postCreateCmd": ["bun i --cwd app"],
+  "terminalCommand": "zed .",
+  "deleteBranchWithWorktree": true
+}

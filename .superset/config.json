@@ -1,6 +1,6 @@
 {
   "setup": [
-    "cp \"$SUPERSET_ROOT_PATH/app/.env\" app/.env\ncp -r \"$SUPERSET_ROOT_PATH/.claude\" ./.claude\ncd app\nbun i"
+    "mkdir -p app .claude && cp -f \"$SUPERSET_ROOT_PATH/app/.env\" app/.env && rsync -a --delete \"$SUPERSET_ROOT_PATH/.claude/\" .claude/ && bun i --cwd app && claude"
   ],
   "teardown": []
 }
