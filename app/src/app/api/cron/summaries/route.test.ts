@@ -16,17 +16,7 @@ mock.module("@/lib/core/database", () => ({
       communities: {
         findMany: async () => [],
       },
-      summaries: {
-        findMany: async () => [],
-      },
     },
-    select: () => ({
-      from: () => ({
-        where: () => ({
-          groupBy: async () => [],
-        }),
-      }),
-    }),
   }),
 }));
 
@@ -39,7 +29,6 @@ mock.module("@/lib/telegram/bot-api/bot", () => ({
 let POST: (request: Request) => Promise<Response>;
 let buildDailySummaryRunContext: typeof import("./route").buildDailySummaryRunContext;
 let runDailyCommunitySummaries: typeof import("./route").runDailyCommunitySummaries;
-let selectCandidateCommunities: typeof import("./route").selectCandidateCommunities;
 
 describe("cron summaries route", () => {
   beforeAll(async () => {
@@ -47,7 +36,6 @@ describe("cron summaries route", () => {
     buildDailySummaryRunContext = loadedModule.buildDailySummaryRunContext;
     POST = loadedModule.POST;
     runDailyCommunitySummaries = loadedModule.runDailyCommunitySummaries;
-    selectCandidateCommunities = loadedModule.selectCandidateCommunities;
   });
 
   beforeEach(() => {
@@ -86,7 +74,7 @@ describe("cron summaries route", () => {
     expect(payload).toEqual({ error: "Unauthorized" });
   });
 
-  test("processes cron requests without LA-hour skip gating", async () => {
+  test("processes cron requests", async () => {
     process.env.CRON_SECRET = "expected-secret";
     const request = new Request("http://localhost/api/cron/summaries", {
       method: "POST",
@@ -104,15 +92,18 @@ describe("cron summaries route", () => {
     expect(payload.stats).toBeDefined();
   });
 
-  test("builds a stable daily trigger key in Los Angeles time", () => {
+  test("builds a stable UTC daily run context", () => {
     const run = buildDailySummaryRunContext(new Date("2026-06-16T05:00:00Z"));
-    expect(run.triggerType).toBe("cron_daily_la");
-    expect(run.triggerKey).toBe("cron-daily-la:2026-06-15");
+    expect(run.dayStartUtc.toISOString()).toBe("2026-06-16T00:00:00.000Z");
+    expect(run.dayEndUtc.toISOString()).toBe("2026-06-16T23:59:59.999Z");
   });
 
-  test("selects only communities with enough messages and no existing summary", () => {
-    const candidates = selectCandidateCommunities({
-      activeCommunities: [
+  test("runs communities in one pass and applies master-switch gating during delivery", async () => {
+    const deliveredSummaryIds: string[] = [];
+
+    const result = await runDailyCommunitySummaries({
+      activeCommunityCount: 3,
+      communities: [
         {
           id: "community-1",
           chatId: BigInt(101),
@@ -123,7 +114,7 @@ describe("cron summaries route", () => {
           id: "community-2",
           chatId: BigInt(202),
           chatTitle: "B",
-          summaryNotificationsEnabled: true,
+          summaryNotificationsEnabled: false,
         },
         {
           id: "community-3",
@@ -132,69 +123,28 @@ describe("cron summaries route", () => {
           summaryNotificationsEnabled: true,
         },
       ],
-      existingSummaryCommunityIds: new Set(["community-2"]),
-      messageCountsByCommunityId: new Map([
-        ["community-1", 7],
-        ["community-2", 9],
-        ["community-3", 2],
-      ]),
-    });
-
-    expect(candidates.map((item) => item.id)).toEqual(["community-1"]);
-  });
-
-  test("tracks generation and delivery stats with notification filtering", async () => {
-    const deliveredSummaryIds: string[] = [];
-
-    const result = await runDailyCommunitySummaries({
-      activeCommunityCount: 3,
-      candidateCommunities: [
-        {
-          id: "community-1",
-          chatId: BigInt(101),
-          chatTitle: "A",
-          summaryNotificationsEnabled: true,
-        },
-        {
-          id: "community-2",
-          chatId: BigInt(202),
-          chatTitle: "B",
-          summaryNotificationsEnabled: true,
-        },
-      ],
       deliverSummary: async (summaryId) => {
         deliveredSummaryIds.push(summaryId);
-        return { delivered: true };
+        return { sent: true };
       },
       generateSummaryForRun: async (communityId) => {
         if (communityId === "community-1") {
-          return { status: "created", summaryId: "s1", messageCount: 7 };
+          return { status: "created", summaryId: "s1", messageCount: 3 };
         }
-        return { status: "existing", summaryId: "s2", messageCount: 8 };
+        if (communityId === "community-2") {
+          return { status: "created", summaryId: "s2", messageCount: 4 };
+        }
+        return { status: "not_enough_messages", messageCount: 1 };
       },
-      listPendingDeliveries: async () => [
-        {
-          chatId: BigInt(101),
-          communityId: "community-1",
-          isActive: true,
-          summaryId: "s1",
-          summaryNotificationsEnabled: true,
-        },
-        {
-          chatId: BigInt(202),
-          communityId: "community-2",
-          isActive: true,
-          summaryId: "s2",
-          summaryNotificationsEnabled: false,
-        },
-      ],
     });
 
     expect(deliveredSummaryIds).toEqual(["s1"]);
     expect(result.stats.activeCommunities).toBe(3);
-    expect(result.stats.candidates).toBe(2);
-    expect(result.stats.generated).toBe(1);
-    expect(result.stats.existingForRun).toBe(1);
+    expect(result.stats.processed).toBe(3);
+    expect(result.stats.generated).toBe(2);
+    expect(result.stats.existingToday).toBe(0);
+    expect(result.stats.skippedByMasterSwitch).toBe(1);
+    expect(result.stats.skippedNotEnoughMessages).toBe(1);
     expect(result.stats.deliveryAttempted).toBe(1);
     expect(result.stats.deliverySucceeded).toBe(1);
     expect(result.stats.deliveryFailed).toBe(0);
@@ -204,23 +154,22 @@ describe("cron summaries route", () => {
   test("captures delivery failure and reports error", async () => {
     const result = await runDailyCommunitySummaries({
       activeCommunityCount: 1,
-      candidateCommunities: [],
+      communities: [
+        {
+          id: "community-1",
+          chatId: BigInt(101),
+          chatTitle: "A",
+          summaryNotificationsEnabled: true,
+        },
+      ],
       deliverSummary: async () => {
         throw new Error("telegram send failed");
       },
       generateSummaryForRun: async () => ({
-        status: "not_enough_messages",
-        messageCount: 0,
+        status: "created",
+        summaryId: "s1",
+        messageCount: 3,
       }),
-      listPendingDeliveries: async () => [
-        {
-          chatId: BigInt(101),
-          communityId: "community-1",
-          isActive: true,
-          summaryId: "s1",
-          summaryNotificationsEnabled: true,
-        },
-      ],
     });
 
     expect(result.stats.deliveryAttempted).toBe(1);
@@ -228,5 +177,86 @@ describe("cron summaries route", () => {
     expect(result.stats.deliverySucceeded).toBe(0);
     expect(result.stats.errors).toBe(1);
     expect(result.errors[0]?.scope).toBe("delivery");
+  });
+
+  test("attempts delivery only for created and existing summaries", async () => {
+    const deliveredSummaryIds: string[] = [];
+
+    const result = await runDailyCommunitySummaries({
+      activeCommunityCount: 3,
+      communities: [
+        {
+          id: "community-1",
+          chatId: BigInt(111),
+          chatTitle: "A",
+          summaryNotificationsEnabled: true,
+        },
+        {
+          id: "community-2",
+          chatId: BigInt(222),
+          chatTitle: "B",
+          summaryNotificationsEnabled: true,
+        },
+        {
+          id: "community-3",
+          chatId: BigInt(333),
+          chatTitle: "C",
+          summaryNotificationsEnabled: true,
+        },
+      ],
+      deliverSummary: async (summaryId) => {
+        deliveredSummaryIds.push(summaryId);
+        return { sent: true };
+      },
+      generateSummaryForRun: async (communityId) => {
+        if (communityId === "community-1") {
+          return { status: "existing", summaryId: "existing-summary", messageCount: 8 };
+        }
+        if (communityId === "community-2") {
+          return { status: "created", summaryId: "new-summary", messageCount: 8 };
+        }
+        return { status: "not_enough_messages", messageCount: 1 };
+      },
+    });
+
+    expect(deliveredSummaryIds).toEqual(["existing-summary", "new-summary"]);
+    expect(result.stats.processed).toBe(3);
+    expect(result.stats.generated).toBe(1);
+    expect(result.stats.existingToday).toBe(1);
+    expect(result.stats.skippedByMasterSwitch).toBe(0);
+    expect(result.stats.skippedNotEnoughMessages).toBe(1);
+    expect(result.stats.deliveryAttempted).toBe(2);
+    expect(result.stats.deliverySucceeded).toBe(2);
+    expect(result.stats.deliveryFailed).toBe(0);
+    expect(result.stats.errors).toBe(0);
+  });
+
+  test("allows duplicate sends across repeated daily cron runs", async () => {
+    const deliveredSummaryIds: string[] = [];
+    const options = {
+      activeCommunityCount: 1,
+      communities: [
+        {
+          id: "community-1",
+          chatId: BigInt(111),
+          chatTitle: "A",
+          summaryNotificationsEnabled: true,
+        },
+      ],
+      deliverSummary: async (summaryId: string) => {
+        deliveredSummaryIds.push(summaryId);
+        return { sent: true } as const;
+      },
+      generateSummaryForRun: async () => ({
+        status: "existing" as const,
+        summaryId: "existing-summary",
+        messageCount: 8,
+      }),
+    };
+
+    await runDailyCommunitySummaries(options);
+    await runDailyCommunitySummaries(options);
+
+    expect(deliveredSummaryIds).toEqual(["existing-summary", "existing-summary"]);
   });
 });
