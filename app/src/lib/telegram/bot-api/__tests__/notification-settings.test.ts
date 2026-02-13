@@ -246,7 +246,7 @@ describe("notification settings helpers", () => {
     ).toBe(false);
   });
 
-  test("builds a three-row keyboard with active markers and callback payloads", () => {
+  test("builds a two-row keyboard with active markers and callback payloads", () => {
     const community = createCommunity({
       summaryNotificationsEnabled: true,
       summaryNotificationTimeHours: 24,
@@ -255,21 +255,16 @@ describe("notification settings helpers", () => {
     const keyboard = buildNotificationSettingsKeyboard(community);
     const rows = keyboard.inline_keyboard;
 
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveLength(3);
-    expect(rows[1]).toHaveLength(3);
-    expect(rows[2]).toHaveLength(2);
+    expect(rows[1]).toHaveLength(2);
 
     expect(rows[0][1]?.text).toContain("✅");
     expect(rows[0][1]?.callback_data).toBe(
       "notif:settings:550e8400-e29b-41d4-a716-446655440000:time:24"
     );
-    expect(rows[1][0]?.text).toContain("✅");
-    expect(rows[1][0]?.callback_data).toBe(
-      "notif:settings:550e8400-e29b-41d4-a716-446655440000:msg:off"
-    );
-    expect(rows[2][1]?.text).toContain("✅");
-    expect(rows[2][1]?.callback_data).toBe(
+    expect(rows[1][1]?.text).toContain("✅");
+    expect(rows[1][1]?.callback_data).toBe(
       "notif:settings:550e8400-e29b-41d4-a716-446655440000:master:on"
     );
   });
