@@ -490,8 +490,10 @@ const mapTransactionToTransfer = (
   const isTokenTransfer = type === "transfer" && tokenChange !== null;
 
   // Deterministic swap detection: check if any instruction targets Jupiter
+  // Requires token balance changes so downstream consumers always get populated swapFields
   const isJupiterSwap =
     type === "transfer" &&
+    allTokenChanges.length > 0 &&
     [
       ...(message.instructions as (ParsedInstruction | PartiallyDecodedInstruction)[]),
       ...((innerInstructions ?? []) as ParsedInnerInstruction[]).flatMap(
