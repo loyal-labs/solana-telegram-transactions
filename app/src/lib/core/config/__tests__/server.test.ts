@@ -13,7 +13,7 @@ mock.module("server-only", () => ({}));
 const SERVER_ENV_KEYS = [
   "DATABASE_URL",
   "REDPILL_AI_API_KEY",
-  "DFLOW_API_KEY",
+  "JUPITER_API_KEY",
   "IRYS_SOLANA_KEY",
   "MESSAGE_ENCRYPTION_KEY",
   "DEPLOYMENT_PK",
@@ -43,7 +43,7 @@ function clearServerEnv(): void {
 let serverEnv: {
   databaseUrl: string;
   redpillApiKey: string;
-  dflowApiKey: string;
+  jupiterApiKey: string;
   irysSolanaKey: string;
   messageEncryptionKey: string | undefined;
   deploymentPrivateKey: string;
