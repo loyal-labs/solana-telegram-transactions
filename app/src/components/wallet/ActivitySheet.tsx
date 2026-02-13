@@ -518,6 +518,10 @@ export default function ActivitySheet({
                         transaction.swapToSymbol ||
                         (toInfo ? toInfo.symbol : "?");
                       const toIcon = toInfo?.icon || "/tokens/solana-sol-logo.png";
+                      const fromInfo = transaction.swapFromMint
+                        ? resolveTokenInfo(transaction.swapFromMint, tokenHoldings)
+                        : null;
+                      const fromIcon = fromInfo?.icon || "/tokens/solana-sol-logo.png";
                       const toAmount = transaction.swapToAmount;
 
                       return (
@@ -526,15 +530,25 @@ export default function ActivitySheet({
                           onClick={() => onTransactionClick(transaction)}
                           className="flex items-center px-4 w-full text-left active:opacity-70 transition-opacity"
                         >
-                          {/* Icon */}
+                          {/* Swap token icons - from (back) + to (front) */}
                           <div className="py-1.5 pr-3">
-                            <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
-                              <Image
-                                src={toIcon}
-                                alt={toSymbol}
-                                fill
-                                className="object-contain"
-                              />
+                            <div className="w-12 h-12 relative">
+                              <div className="absolute left-0.5 top-0.5 w-7 h-7 rounded-full border-2 border-white overflow-hidden bg-[#f2f2f7]">
+                                <Image
+                                  src={fromIcon}
+                                  alt={fromSymbol}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div className="absolute right-0.5 bottom-0.5 w-7 h-7 rounded-full border-2 border-white overflow-hidden bg-[#f2f2f7]">
+                                <Image
+                                  src={toIcon}
+                                  alt={toSymbol}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
                             </div>
                           </div>
 

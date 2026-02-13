@@ -267,6 +267,8 @@ const MOCK_WALLET_TRANSACTIONS: Transaction[] = [
     timestamp: Date.now() - 86400000 * 2,
     status: "completed",
     signature: "mock-sig-1",
+    swapFromMint: "usdc",
+    swapToMint: "sol",
     swapFromSymbol: "USDC",
     swapToSymbol: "SOL",
     swapToAmount: 0.25,
@@ -3044,6 +3046,134 @@ export default function Home() {
                                     : `${formatTransactionAmount(
                                         transaction.amountLamports
                                       )} SOL`}
+                                </p>
+                                <p
+                                  className="text-[13px] leading-4"
+                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                >
+                                  {timestamp.toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                  ,{" "}
+                                  {timestamp.toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })}
+                                </p>
+                              </div>
+                            </motion.button>
+                          );
+                        }
+
+                        // Swap transaction view
+                        if (transaction.transferType === "swap") {
+                          const swapFromHolding = transaction.swapFromMint
+                            ? tokenHoldings.find(
+                                (h) => h.mint === transaction.swapFromMint
+                              )
+                            : undefined;
+                          const swapToHolding = transaction.swapToMint
+                            ? tokenHoldings.find(
+                                (h) => h.mint === transaction.swapToMint
+                              )
+                            : undefined;
+                          const swapFromIcon = transaction.swapFromMint
+                            ? resolveTokenIcon({
+                                mint: transaction.swapFromMint,
+                                imageUrl: swapFromHolding?.imageUrl,
+                              })
+                            : "/tokens/solana-sol-logo.png";
+                          const swapToIcon = transaction.swapToMint
+                            ? resolveTokenIcon({
+                                mint: transaction.swapToMint,
+                                imageUrl: swapToHolding?.imageUrl,
+                              })
+                            : "/tokens/solana-sol-logo.png";
+                          const swapFromSymbol =
+                            transaction.swapFromSymbol ||
+                            swapFromHolding?.symbol ||
+                            "?";
+                          const swapToSymbol =
+                            transaction.swapToSymbol ||
+                            swapToHolding?.symbol ||
+                            "?";
+                          const swapToAmount = transaction.swapToAmount;
+
+                          return (
+                            <motion.button
+                              key={transaction.id}
+                              layout
+                              initial={
+                                isNewTransaction
+                                  ? { opacity: 0, scale: 0.85, y: -10 }
+                                  : false
+                              }
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.85 }}
+                              transition={{
+                                layout: {
+                                  type: "spring",
+                                  stiffness: 500,
+                                  damping: 35,
+                                },
+                                opacity: { duration: 0.25 },
+                                scale: {
+                                  duration: 0.3,
+                                  ease: [0.34, 1.56, 0.64, 1],
+                                },
+                              }}
+                              onClick={() =>
+                                handleOpenWalletTransactionDetails(transaction)
+                              }
+                              className="flex items-center px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
+                            >
+                              {/* Swap token icons - from (back) + to (front) */}
+                              <div className="py-1.5 pr-3">
+                                <div className="w-12 h-12 relative">
+                                  <div className="absolute left-0.5 top-0.5 w-7 h-7 rounded-full border-2 border-white overflow-hidden bg-[#f2f2f7]">
+                                    <Image
+                                      src={swapFromIcon}
+                                      alt={swapFromSymbol}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                  <div className="absolute right-0.5 bottom-0.5 w-7 h-7 rounded-full border-2 border-white overflow-hidden bg-[#f2f2f7]">
+                                    <Image
+                                      src={swapToIcon}
+                                      alt={swapToSymbol}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Middle - Text */}
+                              <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                                <p className="text-base text-black leading-5">
+                                  Swap
+                                </p>
+                                <p
+                                  className="text-[13px] leading-4"
+                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                >
+                                  {swapFromSymbol} to {swapToSymbol}
+                                </p>
+                              </div>
+
+                              {/* Right - Value */}
+                              <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
+                                <p
+                                  className="text-base leading-5"
+                                  style={{ color: "#32e55e" }}
+                                >
+                                  {swapToAmount != null
+                                    ? `+${swapToAmount.toLocaleString("en-US", {
+                                        maximumFractionDigits: 4,
+                                      })} ${swapToSymbol}`
+                                    : "Swap"}
                                 </p>
                                 <p
                                   className="text-[13px] leading-4"
