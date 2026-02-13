@@ -88,8 +88,8 @@ const eslintConfig = [
     },
   },
   {
-    files: ["src/lib/dflow/**/*.{ts,tsx}"],
-    ignores: ["src/lib/dflow/**/*.server.ts"],
+    files: ["src/lib/jupiter/**/*.{ts,tsx}"],
+    ignores: ["src/lib/jupiter/**/*.server.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -103,7 +103,7 @@ const eslintConfig = [
                 "**/core/config/server/*",
               ],
               message:
-                "Do not import server config into shared/client dflow modules. Use '@/lib/dflow/server' for server-only entrypoints.",
+                "Do not import server config into shared/client jupiter modules. Use '@/lib/jupiter/server' for server-only entrypoints.",
             },
           ],
         },

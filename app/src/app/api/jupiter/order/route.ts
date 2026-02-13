@@ -3,15 +3,10 @@
 import { PublicKey } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
-import { SWAP_ERRORS } from "@/lib/dflow/constants";
-import {
-  convertFromBaseUnits,
-  convertToBaseUnits,
-  fetchQuote,
-  fetchSwapTransaction,
-} from "@/lib/dflow/server";
+import { SWAP_ERRORS } from "@/lib/jupiter/constants";
+import { convertFromBaseUnits, convertToBaseUnits, fetchOrder } from "@/lib/jupiter/server";
 
-type QuoteRequestBody = {
+type OrderRequestBody = {
   fromMint: string;
   toMint: string;
   fromAmount: number;
@@ -56,7 +51,7 @@ export async function POST(req: Request) {
       fromDecimals,
       toDecimals,
       userPublicKey,
-    } = JSON.parse(bodyString) as QuoteRequestBody;
+    } = JSON.parse(bodyString) as OrderRequestBody;
 
     if (!fromMint || !toMint || !fromAmount || !userPublicKey) {
       return NextResponse.json(
@@ -95,32 +90,31 @@ export async function POST(req: Request) {
 
     const amountInBaseUnits = convertToBaseUnits(fromAmount, fromDecimals);
 
-    const quoteResponse = await fetchQuote({
+    const orderResponse = await fetchOrder({
       inputMint: fromMint,
       outputMint: toMint,
       amount: amountInBaseUnits,
-      slippageBps: "auto",
-      userPublicKey,
+      taker: userPublicKey,
     });
 
-    const swapResponse = await fetchSwapTransaction(quoteResponse, userPublicKey);
-
     const expectedOutAmount = convertFromBaseUnits(
-      quoteResponse.outAmount,
+      orderResponse.outAmount,
       toDecimals
     );
-    const priceImpactPct = parseFloat(quoteResponse.priceImpactPct);
+    const priceImpactPct = parseFloat(orderResponse.priceImpactPct);
 
     return NextResponse.json({
-      transaction: swapResponse.swapTransaction,
-      lastValidBlockHeight: swapResponse.lastValidBlockHeight,
+      transaction: orderResponse.transaction,
+      requestId: orderResponse.requestId,
       expectedOutAmount,
       priceImpactPct,
       inAmount: fromAmount,
       outAmount: expectedOutAmount,
+      gasless: orderResponse.gasless,
+      swapType: orderResponse.swapType,
     });
   } catch (error) {
-    console.error("[dflow][quote] Error:", error);
+    console.error("[jupiter][order] Error:", error);
 
     if (error instanceof Error) {
       if (error.message.includes("HTTP")) {

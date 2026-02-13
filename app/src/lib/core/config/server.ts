@@ -74,8 +74,8 @@ export const serverEnv = {
   get redpillApiKey(): string {
     return getRequiredEnv("REDPILL_AI_API_KEY");
   },
-  get dflowApiKey(): string {
-    return getRequiredEnv("DFLOW_API_KEY");
+  get jupiterApiKey(): string {
+    return getRequiredEnv("JUPITER_API_KEY");
   },
   get irysSolanaKey(): string {
     return getRequiredEnv("IRYS_SOLANA_KEY");

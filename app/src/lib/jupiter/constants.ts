@@ -1,4 +1,7 @@
-export const DFLOW_API_BASE_URL = "https://b.quote-api.dflow.net";
+export const JUPITER_API_BASE_URL = "https://api.jup.ag";
+
+/** Jupiter V6 Aggregator program — used for deterministic on-chain swap detection */
+export const JUPITER_PROGRAM_ID = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
 
 export const COMMON_MINTS = {
   SOL: "So11111111111111111111111111111111111111112",
@@ -15,6 +18,6 @@ export const SWAP_ERRORS = {
   CONFIRMATION_TIMEOUT: "Transaction confirmation timed out.",
   INVALID_RESPONSE: "Invalid response from swap API.",
   MISSING_API_KEY: "Swap service is not configured.",
+  ORDER_EXPIRED: "Swap order expired. Please try again.",
+  EXECUTION_FAILED: "Swap execution failed. Please try again.",
 } as const;
-
-export const DEFAULT_PRIORITY_FEE_LAMPORTS = 100000;
