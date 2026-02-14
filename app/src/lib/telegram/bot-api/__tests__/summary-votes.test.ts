@@ -264,6 +264,7 @@ describe("handleSummaryVoteCallback", () => {
     expect(editCalls).toHaveLength(0);
     expect(answerCalls).toEqual([
       {
+        cache_time: 300,
         show_alert: true,
         text: "You've voted already!",
       },

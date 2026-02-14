@@ -29,6 +29,7 @@ export type SummaryVoteTotals = {
 
 const SUMMARY_ID_REGEX_PART =
   "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+const DUPLICATE_VOTE_ALERT_CACHE_TIME_SECONDS = 300;
 
 export const SUMMARY_VOTE_CALLBACK_DATA_REGEX = new RegExp(
   `^sv:(u|d|s):(${SUMMARY_ID_REGEX_PART})$`
@@ -205,6 +206,7 @@ export async function handleSummaryVoteCallback(
 
     if (insertedVote.length === 0) {
       await ctx.answerCallbackQuery({
+        cache_time: DUPLICATE_VOTE_ALERT_CACHE_TIME_SECONDS,
         show_alert: true,
         text: "You've voted already!",
       });
