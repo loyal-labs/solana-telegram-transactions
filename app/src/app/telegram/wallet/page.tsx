@@ -25,11 +25,7 @@ import { ActionButton } from "@/components/wallet/ActionButton";
 import ActivitySheet from "@/components/wallet/ActivitySheet";
 import BalanceBackgroundPicker from "@/components/wallet/BalanceBackgroundPicker";
 import ReceiveSheet from "@/components/wallet/ReceiveSheet";
-import SendSheet, {
-  addRecentRecipient,
-  isValidSolanaAddress,
-  isValidTelegramUsername,
-} from "@/components/wallet/SendSheet";
+import SendSheet, { addRecentRecipient } from "@/components/wallet/SendSheet";
 import SwapSheet, {
   type SecureFormValues,
   type SwapFormValues,
@@ -46,6 +42,7 @@ import {
   TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
 } from "@/lib/constants";
+import { track } from "@/lib/core/analytics";
 import {
   refundDeposit,
   subscribeToDepositsWithUsername,
@@ -118,10 +115,38 @@ import type {
   TransactionDetailsData,
 } from "@/types/wallet";
 
+import {
+  CLAIM_SOURCES,
+  type ClaimSource,
+  getSendMethod,
+  SEND_METHODS,
+  SWAP_METHODS,
+  type SwapMethod,
+  WALLET_ANALYTICS_EVENTS,
+  WALLET_ANALYTICS_PATH,
+} from "./wallet-analytics";
+
 hashes.sha512 = sha512;
 
 // ─── Mock data for development ─────────────────────────────────────────────
 const USE_MOCK_DATA = false;
+
+function getAnalyticsErrorProperties(error: unknown): {
+  error_name: string;
+  error_message: string;
+} {
+  if (error instanceof Error) {
+    return {
+      error_name: error.name || "Error",
+      error_message: error.message || "Unknown error",
+    };
+  }
+
+  return {
+    error_name: "UnknownError",
+    error_message: typeof error === "string" ? error : "Unknown error",
+  };
+}
 
 const MOCK_WALLET_ADDRESS = "UQAt7f8Kq9xZ3mNpR2vL5wYcD4bJ6hTgSoAeWnFqZir";
 const MOCK_BALANCE_LAMPORTS = 1_267_476_540_000; // ~1267.47654 SOL
@@ -618,6 +643,9 @@ export default function Home() {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
+    track(WALLET_ANALYTICS_EVENTS.openSend, {
+      path: WALLET_ANALYTICS_PATH,
+    });
     setSendStep(1); // Reset step
     if (recipientName) {
       setSelectedRecipient(recipientName);
@@ -633,7 +661,18 @@ export default function Home() {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
+    track(WALLET_ANALYTICS_EVENTS.openReceive, {
+      path: WALLET_ANALYTICS_PATH,
+    });
     setReceiveSheetOpen(true);
+  }, []);
+
+  const handleOpenSwapSheet = useCallback(() => {
+    hapticFeedback.impactOccurred("light");
+    track(WALLET_ANALYTICS_EVENTS.openSwap, {
+      path: WALLET_ANALYTICS_PATH,
+    });
+    setSwapSheetOpen(true);
   }, []);
   const handleOpenWalletTransactionDetails = useCallback(
     (transaction: Transaction) => {
@@ -730,6 +769,7 @@ export default function Home() {
       return;
     }
 
+    const swapMethod: SwapMethod = SWAP_METHODS.regular;
     setIsSwapping(true);
     hapticFeedback.impactOccurred("medium");
 
@@ -743,6 +783,14 @@ export default function Home() {
         setSwappedToSymbol(result.toSymbol);
         setSwapError(null);
         setSwapView("result");
+        track(WALLET_ANALYTICS_EVENTS.swapTokens, {
+          path: WALLET_ANALYTICS_PATH,
+          method: swapMethod,
+          from_symbol: result.fromSymbol,
+          to_symbol: result.toSymbol,
+          from_amount: result.fromAmount,
+          to_amount: result.toAmount,
+        });
 
         // Inject swap transaction immediately for instant feedback
         if (result.signature && swapFormValues) {
@@ -774,11 +822,22 @@ export default function Home() {
       } else {
         setSwapError(result.error || "Swap failed");
         setSwapView("result");
+        track(WALLET_ANALYTICS_EVENTS.swapTokensFailed, {
+          path: WALLET_ANALYTICS_PATH,
+          method: swapMethod,
+          error_name: "SwapError",
+          error_message: result.error || "Swap failed",
+        });
       }
     } catch (error) {
       console.error("[swap] Error:", error);
       setSwapError(error instanceof Error ? error.message : "Swap failed");
       setSwapView("result");
+      track(WALLET_ANALYTICS_EVENTS.swapTokensFailed, {
+        path: WALLET_ANALYTICS_PATH,
+        method: swapMethod,
+        ...getAnalyticsErrorProperties(error),
+      });
     } finally {
       setIsSwapping(false);
     }
@@ -788,6 +847,7 @@ export default function Home() {
   const handleSubmitSecure = useCallback(async () => {
     if (!secureFormValues || !isSwapFormValid || isSwapping) return;
 
+    const swapMethod: SwapMethod = SWAP_METHODS.secure;
     setIsSwapping(true);
     hapticFeedback.impactOccurred("medium");
 
@@ -800,16 +860,29 @@ export default function Home() {
       setSwappedToSymbol(secureFormValues.symbol);
       setSwapError(null);
       setSwapView("result");
+      track(WALLET_ANALYTICS_EVENTS.swapTokens, {
+        path: WALLET_ANALYTICS_PATH,
+        method: swapMethod,
+        secure_direction: secureDirection,
+        token_symbol: secureFormValues.symbol,
+        amount: secureFormValues.amount,
+      });
       void refreshWalletBalance(true);
     } catch (error) {
       console.error("[secure] Error:", error);
       setSwapError(error instanceof Error ? error.message : "Operation failed");
       setSwapView("result");
+      track(WALLET_ANALYTICS_EVENTS.swapTokensFailed, {
+        path: WALLET_ANALYTICS_PATH,
+        method: swapMethod,
+        secure_direction: secureDirection,
+        ...getAnalyticsErrorProperties(error),
+      });
     } finally {
       setIsSwapping(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secureFormValues, isSwapFormValid, isSwapping]);
+  }, [secureDirection, secureFormValues, isSwapFormValid, isSwapping]);
 
   const refreshWalletBalance = useCallback(
     async (forceRefresh = false) => {
@@ -1047,6 +1120,7 @@ export default function Home() {
     }
 
     const trimmedRecipient = sendFormValues.recipient.trim();
+    const sendMethod = getSendMethod(trimmedRecipient);
     const amountSol = parseFloat(sendFormValues.amount);
     if (Number.isNaN(amountSol) || amountSol <= 0) {
       return;
@@ -1063,9 +1137,9 @@ export default function Home() {
     try {
       let signature: string | null = null;
 
-      if (isValidSolanaAddress(trimmedRecipient)) {
+      if (sendMethod === SEND_METHODS.walletAddress) {
         signature = await sendSolTransaction(trimmedRecipient, lamports);
-      } else if (isValidTelegramUsername(trimmedRecipient)) {
+      } else if (sendMethod === SEND_METHODS.telegram) {
         const username = trimmedRecipient.replace(/^@/, "");
         const provider = await getWalletProvider();
         const transferProgram = getTelegramTransferProgram(provider);
@@ -1089,11 +1163,22 @@ export default function Home() {
       // Calculate and save the sent amount in SOL for the success screen
       const sentSolAmount = lamports / LAMPORTS_PER_SOL;
       setSentAmountSol(sentSolAmount);
+      track(WALLET_ANALYTICS_EVENTS.sendFunds, {
+        path: WALLET_ANALYTICS_PATH,
+        method: sendMethod,
+        amount_sol: sentSolAmount,
+        amount_lamports: lamports,
+      });
     } catch (error) {
       console.error("Failed to send transaction", error);
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred("error");
       }
+      track(WALLET_ANALYTICS_EVENTS.sendFundsFailed, {
+        path: WALLET_ANALYTICS_PATH,
+        method: sendMethod,
+        ...getAnalyticsErrorProperties(error),
+      });
 
       const errorMessage =
         error instanceof Error
@@ -1279,8 +1364,17 @@ export default function Home() {
     void openQrScanner();
   }, []);
 
+  const handleSwapTabChange = useCallback((tab: "swap" | "secure") => {
+    setSwapActiveTab(tab);
+    if (tab === "secure") {
+      track(WALLET_ANALYTICS_EVENTS.openSecureSwap, {
+        path: WALLET_ANALYTICS_PATH,
+      });
+    }
+  }, []);
+
   const handleApproveTransaction = useCallback(
-    async (transactionId: string) => {
+    async (transactionId: string, claimSource: ClaimSource) => {
       if (!rawInitData) {
         console.error("Cannot verify init data: raw init data missing");
         return;
@@ -1337,6 +1431,12 @@ export default function Home() {
 
         await refreshWalletBalance(true);
         void loadWalletTransactions({ force: true });
+        track(WALLET_ANALYTICS_EVENTS.claimFunds, {
+          path: WALLET_ANALYTICS_PATH,
+          claim_source: claimSource,
+          transaction_id: transactionId,
+          amount_lamports: amountLamports,
+        });
 
         // Trigger confetti celebration
         setShowConfetti(true);
@@ -1550,7 +1650,7 @@ export default function Home() {
     // Auto-claim the first available transaction
     const firstTransaction = incomingTransactions[0];
     if (firstTransaction) {
-      void handleApproveTransaction(firstTransaction.id);
+      void handleApproveTransaction(firstTransaction.id, CLAIM_SOURCES.auto);
     }
   }, [incomingTransactions, isClaimingTransaction, handleApproveTransaction]);
 
@@ -1908,7 +2008,10 @@ export default function Home() {
           showMainButton({
             text: "Claim",
             onClick: () =>
-              handleApproveTransaction(selectedIncomingTransaction.id),
+              handleApproveTransaction(
+                selectedIncomingTransaction.id,
+                CLAIM_SOURCES.manual
+              ),
           });
         }
       } else {
@@ -2535,10 +2638,7 @@ export default function Home() {
             <ActionButton
               icon={<RefreshCcw />}
               label="Swap"
-              onClick={() => {
-                hapticFeedback.impactOccurred("light");
-                setSwapSheetOpen(true);
-              }}
+              onClick={handleOpenSwapSheet}
             />
             <ActionButton
               icon={<ScanIcon />}
@@ -3407,7 +3507,7 @@ export default function Home() {
         onSwapParamsChange={handleSwapParamsChange}
         onSecureParamsChange={handleSecureParamsChange}
         activeTab={swapActiveTab}
-        onTabChange={setSwapActiveTab}
+        onTabChange={handleSwapTabChange}
         secureDirection={secureDirection}
         onSecureDirectionChange={setSecureDirection}
         view={swapView}

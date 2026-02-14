@@ -3,6 +3,7 @@ import { isStrictTrue, normalizeOptionalValue } from "./shared";
 export type PublicSolanaEnv = "mainnet" | "testnet" | "devnet" | "localnet";
 
 const DEFAULT_SOLANA_ENV: PublicSolanaEnv = "devnet";
+const DEFAULT_MIXPANEL_PROXY_PATH = "/ingest";
 
 const PUBLIC_SOLANA_ENV_VALUES: readonly PublicSolanaEnv[] = [
   "mainnet",
@@ -32,5 +33,19 @@ export const publicEnv = {
     return isStrictTrue(
       normalizeOptionalValue(process.env.NEXT_PUBLIC_USE_MOCK_SUMMARIES)
     );
+  },
+  get mixpanelToken(): string | undefined {
+    return normalizeOptionalValue(process.env.NEXT_PUBLIC_MIXPANEL_TOKEN);
+  },
+  get mixpanelProxyPath(): string {
+    const value = normalizeOptionalValue(
+      process.env.NEXT_PUBLIC_MIXPANEL_PROXY_PATH
+    );
+
+    if (!value) {
+      return DEFAULT_MIXPANEL_PROXY_PATH;
+    }
+
+    return value.startsWith("/") ? value : `/${value}`;
   },
 } as const;

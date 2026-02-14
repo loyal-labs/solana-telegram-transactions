@@ -196,10 +196,33 @@ Service layer patterns:
   - Never import `@/lib/core/config/server` from client code or shared barrels consumed by client code.
   - Keep server-only entrypoints isolated in dedicated modules (e.g. `server.ts` or `*.server.ts`) and import them only from server contexts (`/app/api`, server actions, other server-only modules).
   - For dual-use modules (client + server), keep `index.ts` client-safe and expose server-only helpers via a separate server entrypoint.
+  - Components imported by `app/src/app/layout.tsx` and other root wrappers must be verified as SSR-safe before merge.
+  - Browser-only SDKs (`@telegram-apps/*`, `window`/`document`/`localStorage` dependent modules, Mixpanel browser SDK, etc.) must be loaded behind `dynamic(..., { ssr: false })` in a Client Component, or via a dedicated client-only wrapper component imported from layout.
+  - If a component must stay client-only but is imported in layout/provider trees, use lazy client entrypoints and keep browser globals behind `useEffect` or client-guarded code paths.
+- **Root Layout Change Checklist**:
+  - After any change to `app/src/app/layout.tsx`, `/app/src/app/**/layout.tsx`, or global provider trees, run `cd app && bun run build`.
+  - Verify production build/`_not-found` prerender path succeeds without `ReferenceError: window is not defined`.
+  - Check changed modules for top-level browser API usage and ensure any browser-only dependencies are behind client-only boundaries.
 
 ### Troubleshooting
 
 - **Runtime vs Code Mismatch**: If logs/stack traces reference code that no longer matches current file contents, restart the local dev server or worker process. Stale processes can keep executing old code after edits.
+
+### Telegram SDK + Cloud Storage Guardrails
+
+- Keep `app/src/app/layout.tsx` free of Telegram SDK/UI imports. Telegram wrappers/providers belong under `app/src/app/telegram/*` route scope only.
+- Do not top-level import `@telegram-apps/sdk` or `@telegram-apps/sdk-react` from modules that can be pulled into server/root graphs (`/`, `/_not-found`, metadata, shared root providers).
+- If Telegram SDK access is needed from shared utilities, load it lazily inside runtime functions (`await import("@telegram-apps/sdk")`) and guard with `typeof window !== "undefined"`.
+- `next/dynamic(..., { ssr: false })` is only valid in a Client Component. Do not use it directly in a Server Component.
+- Cloud storage policy is strict for wallet key material: no local/session fallback for keypair persistence. Use Telegram Cloud Storage only.
+- Cloud storage readiness can race during early app boot. Critical writes (wallet keypair persistence) must use bounded retry/backoff before throwing.
+- After changing any of these files, run `cd app && bun run build` and confirm no prerender failures on `/`, `/_not-found`, and `/telegram`:
+- `app/src/app/layout.tsx`
+- `app/src/app/telegram/layout.tsx`
+- `app/src/lib/telegram/mini-app/cloud-storage.ts`
+- `app/src/components/telegram/*`
+- `app/src/lib/solana/wallet/wallet-keypair-logic.ts`
+- Manual smoke check after SDK/cloud-storage changes: open wallet in Telegram mini-app and confirm keypair persistence succeeds without `Failed to persist generated wallet keypair`.
 
 ## Git Worktree Workflow
 

@@ -18,6 +18,12 @@ function SummaryFeedContent() {
     return selectedSummary?.title;
   }, [chatId, allSummaries]);
 
+  const groupChatId = useMemo(() => {
+    if (!chatId || allSummaries.length === 0) return undefined;
+    const selectedSummary = allSummaries.find((s) => s.id === chatId);
+    return selectedSummary?.chatId;
+  }, [chatId, allSummaries]);
+
   // Filter summaries to only include those from the same group
   const groupSummaries = useMemo(() => {
     if (!groupTitle || allSummaries.length === 0) return undefined;
@@ -29,6 +35,7 @@ function SummaryFeedContent() {
     <SummaryFeed
       initialChatId={chatId}
       summaries={groupSummaries}
+      groupChatId={groupChatId}
       groupTitle={groupTitle}
     />
   );

@@ -15,6 +15,85 @@ export const cleanInitData = (initData: string) => {
   return sortedInitData;
 };
 
+type ParsedTelegramUser = {
+  id?: unknown;
+  first_name?: unknown;
+  last_name?: unknown;
+  username?: unknown;
+  photo_url?: unknown;
+  language_code?: unknown;
+  is_premium?: unknown;
+};
+
+const parseTelegramUserField = (userField: unknown): ParsedTelegramUser | null => {
+  if (typeof userField === "string") {
+    try {
+      const parsedUser = JSON.parse(userField);
+      if (parsedUser && typeof parsedUser === "object") {
+        return parsedUser as ParsedTelegramUser;
+      }
+    } catch (error) {
+      console.warn("Failed to parse Telegram user data", error);
+      return null;
+    }
+  }
+
+  if (typeof userField === "object" && userField !== null) {
+    return userField as ParsedTelegramUser;
+  }
+
+  return null;
+};
+
+const normalizeOptionalString = (value: unknown): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+};
+
+const normalizeTelegramId = (value: unknown): string | null => {
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      return null;
+    }
+    return value.toString();
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    if (!/^\d+$/.test(normalized)) {
+      return null;
+    }
+    return normalized;
+  }
+
+  return null;
+};
+
+const normalizeOptionalBoolean = (value: unknown): boolean | undefined => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    if (value === "true") {
+      return true;
+    }
+    if (value === "false") {
+      return false;
+    }
+  }
+
+  return undefined;
+};
+
 export const createValidationString = (
   botId: string,
   data: Record<string, unknown>
@@ -139,72 +218,122 @@ export const createValidationBytesFromRawInitData = (
 export const parseUsernameFromInitData = (
   initData: Record<string, unknown>
 ): string | null => {
-  const userField = initData["user"];
-
-  if (typeof userField === "string") {
-    try {
-      const parsedUser = JSON.parse(userField);
-      if (parsedUser && typeof parsedUser.username === "string") {
-        return parsedUser.username;
-      }
-    } catch (error) {
-      console.warn("Failed to parse Telegram user data", error);
-    }
-  } else if (
-    typeof userField === "object" &&
-    userField !== null &&
-    "username" in userField
-  ) {
-    const username = (userField as { username?: unknown }).username;
-    if (typeof username === "string") {
-      return username;
-    }
+  const user = parseTelegramUserField(initData["user"]);
+  const parsedUsername = normalizeOptionalString(user?.username);
+  if (parsedUsername) {
+    return parsedUsername;
   }
 
   const usernameField = initData["username"];
-  if (typeof usernameField === "string") {
-    return usernameField;
+  const fallbackUsername = normalizeOptionalString(usernameField);
+  if (fallbackUsername) {
+    return fallbackUsername;
   }
 
   return null;
 };
 
-export type UserData = {
+export type TelegramIdentity = {
+  telegramId: string;
   firstName: string;
   lastName?: string;
   username?: string;
   photoUrl?: string;
+  languageCode?: string;
+  isPremium?: boolean;
 };
 
-export function parseUserFromInitData(
+export type TelegramLaunchContext = {
+  startParamRaw?: string;
+  chatType?: string;
+  chatInstance?: string;
+};
+
+export type TelegramAnalyticsContext = {
+  identity: TelegramIdentity | null;
+  launchContext: TelegramLaunchContext;
+};
+
+export type UserData = {
+  telegramId: string;
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  photoUrl?: string;
+  languageCode?: string;
+  isPremium?: boolean;
+};
+
+const parseTelegramIdentityFromCleanInitData = (
+  cleanData: Record<string, unknown>
+): TelegramIdentity | null => {
+  const user = parseTelegramUserField(cleanData["user"]);
+  if (!user) {
+    return null;
+  }
+
+  const telegramId = normalizeTelegramId(user.id);
+  if (!telegramId) {
+    return null;
+  }
+
+  return {
+    telegramId,
+    firstName: normalizeOptionalString(user.first_name) ?? "User",
+    lastName: normalizeOptionalString(user.last_name),
+    username: normalizeOptionalString(user.username),
+    photoUrl: normalizeOptionalString(user.photo_url),
+    languageCode: normalizeOptionalString(user.language_code),
+    isPremium: normalizeOptionalBoolean(user.is_premium),
+  };
+};
+
+const parseTelegramLaunchContextFromCleanInitData = (
+  cleanData: Record<string, unknown>
+): TelegramLaunchContext => ({
+  startParamRaw: normalizeOptionalString(cleanData["start_param"]),
+  chatType: normalizeOptionalString(cleanData["chat_type"]),
+  chatInstance: normalizeOptionalString(cleanData["chat_instance"]),
+});
+
+export function parseTelegramAnalyticsContextFromInitData(
   rawInitData: string | undefined
-): UserData | null {
+): TelegramAnalyticsContext | null {
   if (!rawInitData) return null;
 
   try {
     const cleanData = cleanInitData(rawInitData);
-    const userField = cleanData["user"];
-
-    if (typeof userField === "string") {
-      const parsedUser = JSON.parse(userField);
-      return {
-        firstName: parsedUser.first_name || "User",
-        lastName: parsedUser.last_name,
-        username: parsedUser.username,
-        photoUrl: parsedUser.photo_url,
-      };
-    } else if (typeof userField === "object" && userField !== null) {
-      const user = userField as Record<string, unknown>;
-      return {
-        firstName: (user.first_name as string) || "User",
-        lastName: user.last_name as string | undefined,
-        username: user.username as string | undefined,
-        photoUrl: user.photo_url as string | undefined,
-      };
-    }
+    return {
+      identity: parseTelegramIdentityFromCleanInitData(cleanData),
+      launchContext: parseTelegramLaunchContextFromCleanInitData(cleanData),
+    };
   } catch (error) {
     console.warn("Failed to parse user data from initData", error);
+    return null;
+  }
+}
+
+export function parseTelegramIdentityFromInitData(
+  rawInitData: string | undefined
+): TelegramIdentity | null {
+  return parseTelegramAnalyticsContextFromInitData(rawInitData)?.identity ?? null;
+}
+
+export function parseUserFromInitData(
+  rawInitData: string | undefined
+): UserData | null {
+  const identity = parseTelegramIdentityFromInitData(rawInitData);
+  if (!identity) {
+    return null;
   }
 
-  return null;
+  return {
+    telegramId: identity.telegramId,
+    firstName: identity.firstName,
+    lastName: identity.lastName,
+    username: identity.username,
+    photoUrl: identity.photoUrl,
+    languageCode: identity.languageCode,
+    isPremium: identity.isPremium,
+  };
 }
