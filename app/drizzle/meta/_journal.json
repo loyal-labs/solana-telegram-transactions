@@ -43,6 +43,13 @@
       "when": 1770876327749,
       "tag": "0005_puzzling_lady_ursula",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771046097651,
+      "tag": "0006_known_thunderbolt_ross",
+      "breakpoints": true
     }
   ]
 }
