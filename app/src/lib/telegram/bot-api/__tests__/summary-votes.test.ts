@@ -124,15 +124,18 @@ describe("summary vote keyboard", () => {
     expect(rows[1]).toHaveLength(1);
 
     expect(rows[0][0]?.text).toBe("👍👍👍");
+    expect(rows[0][0]?.style).toBe("success");
     expect(rows[0][0]?.callback_data).toBe(`sv:u:${SUMMARY_ID}`);
 
     expect(rows[0][1]?.text).toBe("Score: 3");
     expect(rows[0][1]?.callback_data).toBe(`sv:s:${SUMMARY_ID}`);
 
     expect(rows[0][2]?.text).toBe("👎👎👎");
+    expect(rows[0][2]?.style).toBe("danger");
     expect(rows[0][2]?.callback_data).toBe(`sv:d:${SUMMARY_ID}`);
 
-    expect(rows[1][0]?.text).toBe("Read in full");
+    expect(rows[1][0]?.text).toBe("Open");
+    expect(rows[1][0]?.style).toBe("primary");
     expect(rows[1][0]?.url).toBe(MINI_APP_FEED_LINK);
   });
 });
@@ -215,7 +218,9 @@ describe("handleSummaryVoteCallback", () => {
       number,
       {
         reply_markup: {
-          inline_keyboard: Array<Array<{ callback_data?: string; text?: string }>>;
+          inline_keyboard: Array<
+            Array<{ callback_data?: string; style?: string; text?: string }>
+          >;
         };
       },
     ];
@@ -223,10 +228,12 @@ describe("handleSummaryVoteCallback", () => {
     expect(payload.reply_markup.inline_keyboard[0]?.[0]?.callback_data).toBe(
       `sv:u:${SUMMARY_ID}`
     );
+    expect(payload.reply_markup.inline_keyboard[0]?.[0]?.style).toBe("success");
     expect(payload.reply_markup.inline_keyboard[0]?.[1]?.text).toBe("Score: 1");
     expect(payload.reply_markup.inline_keyboard[0]?.[1]?.callback_data).toBe(
       `sv:s:${SUMMARY_ID}`
     );
+    expect(payload.reply_markup.inline_keyboard[0]?.[2]?.style).toBe("danger");
 
     expect(answerCalls).toEqual([undefined]);
   });

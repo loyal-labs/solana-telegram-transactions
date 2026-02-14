@@ -71,7 +71,10 @@ export function buildSummaryVoteKeyboard(
 
   return new InlineKeyboard()
     .text(
-      "👍👍👍",
+      {
+        style: "success",
+        text: "👍👍👍",
+      },
       encodeSummaryVoteCallbackData({
         action: "u",
         summaryId,
@@ -85,14 +88,23 @@ export function buildSummaryVoteKeyboard(
       })
     )
     .text(
-      "👎👎👎",
+      {
+        style: "danger",
+        text: "👎👎👎",
+      },
       encodeSummaryVoteCallbackData({
         action: "d",
         summaryId,
       })
     )
     .row()
-    .url("Read in full", MINI_APP_FEED_LINK);
+    .url(
+      {
+        style: "primary",
+        text: "Open",
+      },
+      MINI_APP_FEED_LINK
+    );
 }
 
 export async function getSummaryVoteTotals(

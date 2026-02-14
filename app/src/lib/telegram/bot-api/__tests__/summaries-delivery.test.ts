@@ -115,7 +115,12 @@ describe("summary delivery guards", () => {
       {
         reply_markup: {
           inline_keyboard: Array<
-            Array<{ callback_data?: string; text?: string; url?: string }>
+            Array<{
+              callback_data?: string;
+              style?: string;
+              text?: string;
+              url?: string;
+            }>
           >;
         };
       },
@@ -125,9 +130,13 @@ describe("summary delivery guards", () => {
     expect(rows[0]).toHaveLength(3);
     expect(rows[1]).toHaveLength(1);
     expect(rows[0][0]?.callback_data).toBe(`sv:u:${SUMMARY_ID}`);
+    expect(rows[0][0]?.style).toBe("success");
     expect(rows[0][1]?.text).toBe("Score: 3");
     expect(rows[0][1]?.callback_data).toBe(`sv:s:${SUMMARY_ID}`);
     expect(rows[0][2]?.callback_data).toBe(`sv:d:${SUMMARY_ID}`);
+    expect(rows[0][2]?.style).toBe("danger");
+    expect(rows[1][0]?.text).toBe("Open");
+    expect(rows[1][0]?.style).toBe("primary");
     expect(rows[1][0]?.url).toBe(MINI_APP_FEED_LINK);
   });
 
