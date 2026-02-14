@@ -13,7 +13,6 @@ import {
 } from "@/lib/core/analytics";
 import { parseTelegramAnalyticsContextFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
 
-const PAGE_VIEW_EVENT = "Page View";
 const IDENTITY_WAIT_TIMEOUT_MS = 1500;
 
 type ShouldTrackTelegramPageViewParams = {
@@ -43,6 +42,9 @@ export const shouldTrackTelegramPageView = ({
 
   return true;
 };
+
+export const getTelegramPageViewEventName = (pathname: string): string =>
+  `View ${pathname}`;
 
 export function AnalyticsBootstrap() {
   const pathname = usePathname();
@@ -118,7 +120,7 @@ export function AnalyticsBootstrap() {
     lastTrackedPathRef.current = pathname;
     didTrackFirstTelegramPageRef.current = true;
 
-    track(PAGE_VIEW_EVENT, { path: pathname });
+    track(getTelegramPageViewEventName(pathname), { path: pathname });
   }, [canTrackWithoutIdentity, pathname, telegramIdentity]);
 
   return null;

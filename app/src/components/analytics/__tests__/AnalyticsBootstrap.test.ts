@@ -1,6 +1,23 @@
 import { describe, expect, test } from "bun:test";
 
-import { shouldTrackTelegramPageView } from "../AnalyticsBootstrap";
+import {
+  getTelegramPageViewEventName,
+  shouldTrackTelegramPageView,
+} from "../AnalyticsBootstrap";
+
+describe("getTelegramPageViewEventName", () => {
+  test("formats wallet path into View event name", () => {
+    expect(getTelegramPageViewEventName("/telegram/wallet")).toBe(
+      "View /telegram/wallet"
+    );
+  });
+
+  test("formats feed path into View event name", () => {
+    expect(getTelegramPageViewEventName("/telegram/feed")).toBe(
+      "View /telegram/feed"
+    );
+  });
+});
 
 describe("shouldTrackTelegramPageView", () => {
   test("returns true for first Telegram pageview when identity is ready", () => {
@@ -56,5 +73,16 @@ describe("shouldTrackTelegramPageView", () => {
         canTrackWithoutIdentity: true,
       })
     ).toBe(true);
+  });
+
+  test("returns false for non-Telegram paths", () => {
+    expect(
+      shouldTrackTelegramPageView({
+        pathname: "/profile",
+        didTrackForCurrentPath: false,
+        hasIdentity: true,
+        canTrackWithoutIdentity: true,
+      })
+    ).toBe(false);
   });
 });
