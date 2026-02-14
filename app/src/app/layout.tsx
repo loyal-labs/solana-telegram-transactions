@@ -1,13 +1,9 @@
 import "@telegram-apps/telegram-ui/dist/styles.css";
 import "./globals.css";
 
-import { AppRoot } from "@telegram-apps/telegram-ui";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
-
-import { AnalyticsBootstrapClient } from "@/components/analytics/AnalyticsBootstrapClient";
-import { TelegramProvider } from "@/components/telegram/TelegramProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,12 +43,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
-        <AppRoot suppressHydrationWarning>
-          <AnalyticsBootstrapClient />
-          <TelegramProvider>
-            {children}
-          </TelegramProvider>
-        </AppRoot>
+        {children}
       </body>
     </html>
   );

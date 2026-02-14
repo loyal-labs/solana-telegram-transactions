@@ -12,6 +12,9 @@ import {
   setCloudValue,
 } from "../../telegram/mini-app/cloud-storage";
 
+const PERSIST_RETRY_ATTEMPTS = 3;
+const PERSIST_RETRY_DELAY_MS = 120;
+
 const serializeSecretKey = (secretKey: Uint8Array): string =>
   JSON.stringify(Array.from(secretKey));
 
@@ -66,6 +69,26 @@ const persistKeypair = async (keypair: Keypair): Promise<boolean> => {
   return true;
 };
 
+const wait = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const persistKeypairWithRetry = async (keypair: Keypair): Promise<boolean> => {
+  for (let attempt = 1; attempt <= PERSIST_RETRY_ATTEMPTS; attempt += 1) {
+    const persisted = await persistKeypair(keypair);
+    if (persisted) {
+      return true;
+    }
+
+    if (attempt < PERSIST_RETRY_ATTEMPTS) {
+      await wait(PERSIST_RETRY_DELAY_MS);
+    }
+  }
+
+  return false;
+};
+
 const instantiateKeypair = (stored: StoredKeypairStrings): Keypair | null => {
   const secretKey = deserializeSecretKey(stored.secretKey);
   if (!secretKey) return null;
@@ -97,7 +120,7 @@ export const ensureWalletKeypair = async (): Promise<WalletKeypairResult> => {
 
   const generatedKeypair = Keypair.generate();
 
-  const persisted = await persistKeypair(generatedKeypair);
+  const persisted = await persistKeypairWithRetry(generatedKeypair);
 
   if (!persisted) {
     throw new Error("Failed to persist generated wallet keypair");

@@ -11,11 +11,20 @@ import type { Signal } from "@telegram-apps/signals";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  SUMMARIES_ANALYTICS_EVENTS,
+  SUMMARIES_ANALYTICS_PATH,
+  SUMMARY_SELECTION_SOURCES,
+  type SummarySelectionSource,
+} from "@/app/telegram/summaries/summaries-analytics";
+import { track } from "@/lib/core/analytics";
+
 import { getAvatarColor, getFirstLetter } from "./avatar-utils";
 import DatePicker from "./DatePicker";
 
 export type ChatSummary = {
   id: string;
+  chatId?: string;
   title: string;
   messageCount?: number;
   createdAt?: string;
@@ -146,6 +155,8 @@ export type SummaryFeedProps = {
   initialChatId?: string;
   /** All summaries for the group (pre-fetched) */
   summaries?: ChatSummary[];
+  /** Telegram community chat ID for tracking */
+  groupChatId?: string;
   /** Group title (optional, derived from summaries if not provided) */
   groupTitle?: string;
 };
@@ -153,6 +164,7 @@ export type SummaryFeedProps = {
 export default function SummaryFeed({
   initialChatId,
   summaries: initialSummaries,
+  groupChatId,
   groupTitle: initialGroupTitle,
 }: SummaryFeedProps) {
   const router = useRouter();
@@ -224,6 +236,10 @@ export default function SummaryFeed({
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return availableDates[0] || toDateKey(new Date().toISOString());
   });
+  const pendingSelectionSourceRef = useRef<SummarySelectionSource>(
+    SUMMARY_SELECTION_SOURCES.initial
+  );
+  const hasTrackedInitialViewRef = useRef(false);
 
   // Only reset selectedDate when the data itself changes (not on every selectedDate change)
   useEffect(() => {
@@ -237,6 +253,27 @@ export default function SummaryFeed({
       });
     }
   }, [availableDates]);
+
+  useEffect(() => {
+    if (!groupChatId || !groupTitle || !selectedDate) {
+      return;
+    }
+
+    const selectionSource = hasTrackedInitialViewRef.current
+      ? pendingSelectionSourceRef.current
+      : SUMMARY_SELECTION_SOURCES.initial;
+
+    track(SUMMARIES_ANALYTICS_EVENTS.viewCommunitySummaryDay, {
+      path: SUMMARIES_ANALYTICS_PATH,
+      community_chat_id: groupChatId,
+      community_title: groupTitle,
+      summary_date: selectedDate,
+      selection_source: selectionSource,
+    });
+
+    hasTrackedInitialViewRef.current = true;
+    pendingSelectionSourceRef.current = SUMMARY_SELECTION_SOURCES.initial;
+  }, [groupChatId, groupTitle, selectedDate]);
 
   const messageCount = useMemo(
     () => getMessageCountForDate(summariesByDate, selectedDate),
@@ -377,6 +414,7 @@ export default function SummaryFeed({
         if (hapticFeedback.impactOccurred.isAvailable()) {
           hapticFeedback.impactOccurred("light");
         }
+        pendingSelectionSourceRef.current = SUMMARY_SELECTION_SOURCES.swipe;
         const slideDir = direction === "next" ? "left" : "right";
         setOldTopics(topics);
         setSlideDirection(slideDir);
@@ -463,11 +501,15 @@ export default function SummaryFeed({
 
   // Handle date selection with slide animation
   const handleDateSelect = useCallback(
-    (date: string) => {
+    (
+      date: string,
+      source: SummarySelectionSource = SUMMARY_SELECTION_SOURCES.datePicker
+    ) => {
       if (date === selectedDate) return;
 
       setIsHeaderHidden(false);
       setOldTopics(topics);
+      pendingSelectionSourceRef.current = source;
 
       const direction = date > prevDateRef.current ? "left" : "right";
       setSlideDirection(direction);
@@ -494,7 +536,7 @@ export default function SummaryFeed({
       hapticFeedback.impactOccurred("light");
     }
     const today = toDateKey(new Date().toISOString());
-    handleDateSelect(today);
+    handleDateSelect(today, SUMMARY_SELECTION_SOURCES.todayButton);
   }, [handleDateSelect]);
 
   // Page entrance animation
