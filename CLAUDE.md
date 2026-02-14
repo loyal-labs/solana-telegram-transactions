@@ -196,6 +196,13 @@ Service layer patterns:
   - Never import `@/lib/core/config/server` from client code or shared barrels consumed by client code.
   - Keep server-only entrypoints isolated in dedicated modules (e.g. `server.ts` or `*.server.ts`) and import them only from server contexts (`/app/api`, server actions, other server-only modules).
   - For dual-use modules (client + server), keep `index.ts` client-safe and expose server-only helpers via a separate server entrypoint.
+  - Components imported by `app/src/app/layout.tsx` and other root wrappers must be verified as SSR-safe before merge.
+  - Browser-only SDKs (`@telegram-apps/*`, `window`/`document`/`localStorage` dependent modules, Mixpanel browser SDK, etc.) must be loaded behind `dynamic(..., { ssr: false })` in a Client Component, or via a dedicated client-only wrapper component imported from layout.
+  - If a component must stay client-only but is imported in layout/provider trees, use lazy client entrypoints and keep browser globals behind `useEffect` or client-guarded code paths.
+- **Root Layout Change Checklist**:
+  - After any change to `app/src/app/layout.tsx`, `/app/src/app/**/layout.tsx`, or global provider trees, run `cd app && bun run build`.
+  - Verify production build/`_not-found` prerender path succeeds without `ReferenceError: window is not defined`.
+  - Check changed modules for top-level browser API usage and ensure any browser-only dependencies are behind client-only boundaries.
 
 ### Troubleshooting
 
