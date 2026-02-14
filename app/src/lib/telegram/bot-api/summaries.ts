@@ -7,7 +7,7 @@ import {
   lte,
   sql,
 } from "drizzle-orm";
-import { type Bot, InlineKeyboard } from "grammy";
+import { type Bot } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
 import {
@@ -20,7 +20,7 @@ import {
 import { chatCompletion } from "@/lib/redpill";
 
 import { buildSummaryMessageWithPreview } from "./build-summary-og-url";
-import { MINI_APP_FEED_LINK } from "./constants";
+import { buildSummaryVoteKeyboard } from "./summary-votes";
 import type { SendLatestSummaryOptions, SendSummaryResult } from "./types";
 
 export const MIN_MESSAGES_FOR_SUMMARY = 3;
@@ -221,6 +221,7 @@ export async function sendLatestSummary(
     bot,
     {
       createdAt: latestSummary.createdAt,
+      id: latestSummary.id,
       oneliner: latestSummary.oneliner,
     },
     {
@@ -254,6 +255,7 @@ export async function sendSummaryById(
     bot,
     {
       createdAt: summary.createdAt,
+      id: summary.id,
       oneliner: summary.oneliner,
     },
     {
@@ -346,7 +348,7 @@ function buildSummaryInput(
 
 async function sendSummaryToChat(
   bot: Bot,
-  summary: Pick<Summary, "createdAt" | "oneliner">,
+  summary: Pick<Summary, "createdAt" | "id" | "oneliner">,
   options: {
     destinationChatId: bigint;
     replyToMessageId?: number;
@@ -361,7 +363,7 @@ async function sendSummaryToChat(
     summary.createdAt
   );
 
-  const keyboard = new InlineKeyboard().url("Read in full", MINI_APP_FEED_LINK);
+  const keyboard = buildSummaryVoteKeyboard(summary.id, 0, 0);
 
   const messageOptions = {
     parse_mode: "HTML" as const,

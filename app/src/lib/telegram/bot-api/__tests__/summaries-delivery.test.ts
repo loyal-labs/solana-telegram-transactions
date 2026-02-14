@@ -1,7 +1,11 @@
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Bot } from "grammy";
 
+import { MINI_APP_FEED_LINK } from "../constants";
+
 mock.module("server-only", () => ({}));
+
+const SUMMARY_ID = "123e4567-e89b-12d3-a456-426614174000";
 
 type CommunityRecord = {
   chatId: bigint;
@@ -76,14 +80,33 @@ describe("summary delivery guards", () => {
         summaryNotificationsEnabled: true,
       },
       createdAt: new Date("2026-02-12T00:00:00Z"),
-      id: "summary-1",
+      id: SUMMARY_ID,
       oneliner: "Daily recap",
     };
 
-    const result = await sendSummaryById(bot, "summary-1");
+    const result = await sendSummaryById(bot, SUMMARY_ID);
 
     expect(result).toEqual({ sent: true });
     expect(sendMessageCalls).toHaveLength(1);
+    const [, , messageOptions] = sendMessageCalls[0] as [
+      number,
+      string,
+      {
+        reply_markup: {
+          inline_keyboard: Array<
+            Array<{ callback_data?: string; text?: string; url?: string }>
+          >;
+        };
+      },
+    ];
+    const rows = messageOptions.reply_markup.inline_keyboard;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveLength(3);
+    expect(rows[1]).toHaveLength(1);
+    expect(rows[0][0]?.callback_data).toBe(`sv:u:${SUMMARY_ID}:0:0`);
+    expect(rows[0][1]?.callback_data).toBe(`sv:s:${SUMMARY_ID}:0:0`);
+    expect(rows[0][2]?.callback_data).toBe(`sv:d:${SUMMARY_ID}:0:0`);
+    expect(rows[1][0]?.url).toBe(MINI_APP_FEED_LINK);
   });
 
   test("sendSummaryById returns no_summaries when summary does not exist", async () => {

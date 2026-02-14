@@ -11,6 +11,8 @@ import {
   type SummaryNotificationTimeHours,
 } from "@/lib/core/schema";
 
+import { isMessageNotModifiedError } from "./callback-query-utils";
+
 export const NOTIFICATION_SETTINGS_CALLBACK_PREFIX = "notif";
 export const NOTIFICATION_SETTINGS_CONTEXT = "settings";
 export const NOTIFICATION_SETTINGS_CALLBACK_DATA_REGEX =
@@ -294,22 +296,4 @@ export async function handleNotificationSettingsCallback(
 
 function renderButtonLabel(label: string, isActive: boolean): string {
   return isActive ? `✅ ${label}` : label;
-}
-
-function isMessageNotModifiedError(error: unknown): boolean {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-
-  const maybeError = error as {
-    description?: unknown;
-    message?: unknown;
-  };
-
-  return (
-    (typeof maybeError.description === "string" &&
-      maybeError.description.includes("message is not modified")) ||
-    (typeof maybeError.message === "string" &&
-      maybeError.message.includes("message is not modified"))
-  );
 }

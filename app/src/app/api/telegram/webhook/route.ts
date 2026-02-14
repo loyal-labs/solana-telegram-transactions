@@ -28,6 +28,10 @@ import {
 } from "@/lib/telegram/bot-api/start-carousel";
 import { resolveSummaryCommunityPeerId } from "@/lib/telegram/bot-api/summary-chat-id";
 import {
+  handleSummaryVoteCallback,
+  SUMMARY_VOTE_CALLBACK_DATA_REGEX,
+} from "@/lib/telegram/bot-api/summary-votes";
+import {
   handleDirectMessage,
   handleDirectTopicCreatedMessage,
 } from "@/lib/telegram/conversation-service";
@@ -83,6 +87,10 @@ bot.callbackQuery(START_CAROUSEL_CALLBACK_DATA_REGEX, async (ctx) => {
 
 bot.callbackQuery(NOTIFICATION_SETTINGS_CALLBACK_DATA_REGEX, async (ctx) => {
   await handleNotificationSettingsCallback(ctx);
+});
+
+bot.callbackQuery(SUMMARY_VOTE_CALLBACK_DATA_REGEX, async (ctx) => {
+  await handleSummaryVoteCallback(ctx);
 });
 
 // Keep this fallback at the end so unknown callback queries don't show
