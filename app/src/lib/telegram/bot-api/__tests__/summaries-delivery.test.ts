@@ -27,6 +27,10 @@ type SummaryWithCommunityRecord = {
 
 let communityResult: CommunityRecord | null = null;
 let summaryResult: SummaryWithCommunityRecord = null;
+let summaryVoteTotalsResult: { dislikes: number; likes: number } = {
+  dislikes: 0,
+  likes: 0,
+};
 
 mock.module("@/lib/core/database", () => ({
   getDatabase: () => ({
@@ -38,6 +42,15 @@ mock.module("@/lib/core/database", () => ({
         findFirst: async () => summaryResult,
       },
     },
+    select: () => ({
+      from: () => ({
+        leftJoin: () => ({
+          where: () => ({
+            groupBy: async () => [summaryVoteTotalsResult],
+          }),
+        }),
+      }),
+    }),
   }),
 }));
 
@@ -60,6 +73,10 @@ describe("summary delivery guards", () => {
   beforeEach(() => {
     communityResult = null;
     summaryResult = null;
+    summaryVoteTotalsResult = {
+      dislikes: 0,
+      likes: 0,
+    };
   });
 
   test("sendSummaryById sends summary when community is active and enabled", async () => {
@@ -83,6 +100,10 @@ describe("summary delivery guards", () => {
       id: SUMMARY_ID,
       oneliner: "Daily recap",
     };
+    summaryVoteTotalsResult = {
+      dislikes: 2,
+      likes: 5,
+    };
 
     const result = await sendSummaryById(bot, SUMMARY_ID);
 
@@ -103,9 +124,10 @@ describe("summary delivery guards", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveLength(3);
     expect(rows[1]).toHaveLength(1);
-    expect(rows[0][0]?.callback_data).toBe(`sv:u:${SUMMARY_ID}:0:0`);
-    expect(rows[0][1]?.callback_data).toBe(`sv:s:${SUMMARY_ID}:0:0`);
-    expect(rows[0][2]?.callback_data).toBe(`sv:d:${SUMMARY_ID}:0:0`);
+    expect(rows[0][0]?.callback_data).toBe(`sv:u:${SUMMARY_ID}`);
+    expect(rows[0][1]?.text).toBe("Score: 3");
+    expect(rows[0][1]?.callback_data).toBe(`sv:s:${SUMMARY_ID}`);
+    expect(rows[0][2]?.callback_data).toBe(`sv:d:${SUMMARY_ID}`);
     expect(rows[1][0]?.url).toBe(MINI_APP_FEED_LINK);
   });
 

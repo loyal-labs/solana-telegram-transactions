@@ -20,7 +20,7 @@ import {
 import { chatCompletion } from "@/lib/redpill";
 
 import { buildSummaryMessageWithPreview } from "./build-summary-og-url";
-import { buildSummaryVoteKeyboard } from "./summary-votes";
+import { buildSummaryVoteKeyboard, getSummaryVoteTotals } from "./summary-votes";
 import type { SendLatestSummaryOptions, SendSummaryResult } from "./types";
 
 export const MIN_MESSAGES_FOR_SUMMARY = 3;
@@ -363,7 +363,12 @@ async function sendSummaryToChat(
     summary.createdAt
   );
 
-  const keyboard = buildSummaryVoteKeyboard(summary.id, 0, 0);
+  const voteTotals = await getSummaryVoteTotals(summary.id);
+  const keyboard = buildSummaryVoteKeyboard(
+    summary.id,
+    voteTotals.likes,
+    voteTotals.dislikes
+  );
 
   const messageOptions = {
     parse_mode: "HTML" as const,

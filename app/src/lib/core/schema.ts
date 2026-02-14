@@ -44,6 +44,11 @@ export type SenderType = "user" | "bot" | "system";
 export type ThreadStatus = "active" | "archived" | "closed";
 
 /**
+ * Allowed user actions for summary voting.
+ */
+export type SummaryVoteAction = "LIKE" | "DISLIKE";
+
+/**
  * Allowed time-based summary notification frequency options.
  */
 export type SummaryNotificationTimeHours = 24 | 48;
@@ -275,6 +280,41 @@ export const summaries = pgTable(
 );
 
 /**
+ * User votes for summaries.
+ * A user can vote only once per summary.
+ */
+export const summaryVotes = pgTable(
+  "summary_votes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    summaryId: uuid("summary_id")
+      .notNull()
+      .references(() => summaries.id, { onDelete: "cascade" }),
+    action: text("action").$type<SummaryVoteAction>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("summary_votes_summary_user_uidx").on(
+      table.summaryId,
+      table.userId
+    ),
+    index("summary_votes_summary_action_idx").on(table.summaryId, table.action),
+    check(
+      "summary_votes_action_check",
+      sql`${table.action} IN ('LIKE', 'DISLIKE')`
+    ),
+  ]
+);
+
+/**
  * Telegram Business connections - tracks bot connections to user business accounts.
  * One connection per user; soft-deleted by setting isEnabled to false.
  */
@@ -377,6 +417,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   communityMemberships: many(communityMembers),
   businessConnection: one(businessConnections),
   botThreads: many(botThreads),
+  summaryVotes: many(summaryVotes),
 }));
 
 export const communitiesRelations = relations(communities, ({ many }) => ({
@@ -410,10 +451,22 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
-export const summariesRelations = relations(summaries, ({ one }) => ({
+export const summariesRelations = relations(summaries, ({ one, many }) => ({
   community: one(communities, {
     fields: [summaries.communityId],
     references: [communities.id],
+  }),
+  summaryVotes: many(summaryVotes),
+}));
+
+export const summaryVotesRelations = relations(summaryVotes, ({ one }) => ({
+  summary: one(summaries, {
+    fields: [summaryVotes.summaryId],
+    references: [summaries.id],
+  }),
+  user: one(users, {
+    fields: [summaryVotes.userId],
+    references: [users.id],
   }),
 }));
 
@@ -463,6 +516,9 @@ export type InsertMessage = typeof messages.$inferInsert;
 
 export type Summary = typeof summaries.$inferSelect;
 export type InsertSummary = typeof summaries.$inferInsert;
+
+export type SummaryVote = typeof summaryVotes.$inferSelect;
+export type InsertSummaryVote = typeof summaryVotes.$inferInsert;
 
 export type BusinessConnection = typeof businessConnections.$inferSelect;
 export type InsertBusinessConnection = typeof businessConnections.$inferInsert;
