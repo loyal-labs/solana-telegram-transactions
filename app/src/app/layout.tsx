@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 
+import { AnalyticsBootstrap } from "@/components/analytics/AnalyticsBootstrap";
 import { TelegramProvider } from "@/components/telegram/TelegramProvider";
 
 const geistSans = Geist({
@@ -47,6 +48,7 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
         <AppRoot suppressHydrationWarning>
+          <AnalyticsBootstrap />
           <TelegramProvider>
             {children}
           </TelegramProvider>
