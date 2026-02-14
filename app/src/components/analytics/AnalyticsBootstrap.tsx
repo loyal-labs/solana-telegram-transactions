@@ -1,15 +1,61 @@
 "use client";
 
+import { useRawInitData } from "@telegram-apps/sdk-react";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { initAnalytics, track } from "@/lib/core/analytics";
+import {
+  clearTelegramLaunchContext,
+  identifyTelegramUser,
+  initAnalytics,
+  setTelegramLaunchContext,
+  track,
+} from "@/lib/core/analytics";
+import { parseTelegramAnalyticsContextFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
 
 const PAGE_VIEW_EVENT = "Page View";
+const IDENTITY_WAIT_TIMEOUT_MS = 1500;
+
+type ShouldTrackTelegramPageViewParams = {
+  pathname: string | null;
+  didTrackForCurrentPath: boolean;
+  hasIdentity: boolean;
+  canTrackWithoutIdentity: boolean;
+};
+
+export const shouldTrackTelegramPageView = ({
+  pathname,
+  didTrackForCurrentPath,
+  hasIdentity,
+  canTrackWithoutIdentity,
+}: ShouldTrackTelegramPageViewParams): boolean => {
+  if (!pathname || !pathname.startsWith("/telegram")) {
+    return false;
+  }
+
+  if (didTrackForCurrentPath) {
+    return false;
+  }
+
+  if (!hasIdentity && !canTrackWithoutIdentity) {
+    return false;
+  }
+
+  return true;
+};
 
 export function AnalyticsBootstrap() {
   const pathname = usePathname();
+  const rawInitData = useRawInitData();
+  const telegramAnalyticsContext = useMemo(
+    () => parseTelegramAnalyticsContextFromInitData(rawInitData),
+    [rawInitData]
+  );
+  const telegramIdentity = telegramAnalyticsContext?.identity ?? null;
+  const telegramLaunchContext = telegramAnalyticsContext?.launchContext ?? null;
   const lastTrackedPathRef = useRef<string | null>(null);
+  const didTrackFirstTelegramPageRef = useRef(false);
+  const [canTrackWithoutIdentity, setCanTrackWithoutIdentity] = useState(false);
 
   useEffect(() => {
     initAnalytics();
@@ -17,17 +63,63 @@ export function AnalyticsBootstrap() {
 
   useEffect(() => {
     if (!pathname || !pathname.startsWith("/telegram")) {
+      clearTelegramLaunchContext();
       return;
     }
 
-    if (lastTrackedPathRef.current === pathname) {
+    setTelegramLaunchContext(telegramLaunchContext);
+
+    if (telegramIdentity) {
+      identifyTelegramUser(telegramIdentity);
+    }
+  }, [pathname, telegramIdentity, telegramLaunchContext]);
+
+  useEffect(() => {
+    if (!pathname || !pathname.startsWith("/telegram")) {
+      setCanTrackWithoutIdentity(false);
+      return;
+    }
+
+    if (rawInitData) {
+      setCanTrackWithoutIdentity(true);
+      return;
+    }
+
+    setCanTrackWithoutIdentity(false);
+    const timeoutId = window.setTimeout(() => {
+      setCanTrackWithoutIdentity(true);
+    }, IDENTITY_WAIT_TIMEOUT_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [pathname, rawInitData]);
+
+  useEffect(() => {
+    if (!pathname || !pathname.startsWith("/telegram")) {
+      return;
+    }
+
+    if (lastTrackedPathRef.current !== pathname) {
+      didTrackFirstTelegramPageRef.current = false;
+    }
+
+    if (
+      !shouldTrackTelegramPageView({
+        pathname,
+        didTrackForCurrentPath: didTrackFirstTelegramPageRef.current,
+        hasIdentity: Boolean(telegramIdentity),
+        canTrackWithoutIdentity,
+      })
+    ) {
       return;
     }
 
     lastTrackedPathRef.current = pathname;
+    didTrackFirstTelegramPageRef.current = true;
 
     track(PAGE_VIEW_EVENT, { path: pathname });
-  }, [pathname]);
+  }, [canTrackWithoutIdentity, pathname, telegramIdentity]);
 
   return null;
 }
