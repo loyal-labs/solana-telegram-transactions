@@ -24,6 +24,7 @@ import { ScanIcon } from "@/components/ui/icons/ScanIcon";
 import { ActionButton } from "@/components/wallet/ActionButton";
 import ActivitySheet from "@/components/wallet/ActivitySheet";
 import BalanceBackgroundPicker from "@/components/wallet/BalanceBackgroundPicker";
+import BannerCarousel from "@/components/wallet/BannerCarousel";
 import ReceiveSheet from "@/components/wallet/ReceiveSheet";
 import SendSheet, { addRecentRecipient } from "@/components/wallet/SendSheet";
 import SwapSheet, {
@@ -2647,6 +2648,9 @@ export default function Home() {
               disabled={!isMobilePlatform}
             />
           </div>
+
+          {/* Banner Carousel */}
+          <BannerCarousel isMobilePlatform={isMobilePlatform} />
 
           {/* Tokens Section */}
           {(() => {
