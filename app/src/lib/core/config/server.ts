@@ -92,6 +92,9 @@ export const serverEnv = {
   get telegramSetupSecret(): string {
     return getRequiredEnv("TELEGRAM_SETUP_SECRET");
   },
+  get mixpanelToken(): string | undefined {
+    return getOptionalEnv("NEXT_PUBLIC_MIXPANEL_TOKEN");
+  },
   get cronSecret(): string {
     return getRequiredEnv("CRON_SECRET");
   },

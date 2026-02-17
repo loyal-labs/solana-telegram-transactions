@@ -1,7 +1,9 @@
 import { eq, sql } from "drizzle-orm";
 import type { CallbackQueryContext, Context } from "grammy";
 import { InlineKeyboard } from "grammy";
+import Mixpanel from "mixpanel";
 
+import { serverEnv } from "@/lib/core/config/server";
 import { getDatabase } from "@/lib/core/database";
 import {
   summaries,
@@ -15,6 +17,7 @@ import { getTelegramDisplayName } from "@/lib/telegram/utils";
 import { isMessageNotModifiedError } from "./callback-query-utils";
 
 type SummaryVoteAction = "u" | "d" | "s";
+type MixpanelTrackProperties = Record<string, boolean | null | number | string>;
 
 type SummaryVoteCallbackData = {
   action: SummaryVoteAction;
@@ -32,6 +35,51 @@ const SUMMARY_ID_REGEX_PART =
   "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 const GROUP_CHAT_ID_REGEX_PART = "-?\\d+";
 const DUPLICATE_VOTE_ALERT_CACHE_TIME_SECONDS = 300;
+const BOT_SUMMARY_LIKE_EVENT = "Bot Summary Like";
+const BOT_SUMMARY_DISLIKE_EVENT = "Bot Summary Dislike";
+
+function getVoteEventName(
+  voteAction: PersistedSummaryVoteAction
+): string | null {
+  if (voteAction === "LIKE") {
+    return BOT_SUMMARY_LIKE_EVENT;
+  }
+
+  if (voteAction === "DISLIKE") {
+    return BOT_SUMMARY_DISLIKE_EVENT;
+  }
+
+  return null;
+}
+
+async function trackSummaryVoteEvent(
+  voteAction: PersistedSummaryVoteAction,
+  properties: MixpanelTrackProperties
+): Promise<void> {
+  const eventName = getVoteEventName(voteAction);
+  if (!eventName) {
+    return;
+  }
+
+  const token = serverEnv.mixpanelToken;
+  if (!token) {
+    return;
+  }
+
+  try {
+    const mixpanel = Mixpanel.init(token);
+    await new Promise<void>((resolve) => {
+      mixpanel.track(eventName, properties, (error: unknown) => {
+        if (error) {
+          console.error(`Failed to track Mixpanel event: ${eventName}`, error);
+        }
+        resolve();
+      });
+    });
+  } catch (error) {
+    console.error(`Failed to track Mixpanel event: ${eventName}`, error);
+  }
+}
 
 export const SUMMARY_VOTE_CALLBACK_DATA_REGEX = new RegExp(
   `^sv:(u|d|s):(${SUMMARY_ID_REGEX_PART}):(${GROUP_CHAT_ID_REGEX_PART})$`
@@ -232,6 +280,16 @@ export async function handleSummaryVoteCallback(
       });
       return;
     }
+
+    await trackSummaryVoteEvent(voteAction, {
+      distinct_id: `tg:${ctx.from.id}`,
+      group_chat_id: callbackData.groupChatId,
+      summary_id: callbackData.summaryId,
+      telegram_chat_id: callbackMessage.chat.id.toString(),
+      telegram_chat_type: callbackMessage.chat.type ?? null,
+      telegram_user_id: ctx.from.id.toString(),
+      vote_action: voteAction,
+    });
 
     const voteTotals = await getSummaryVoteTotals(callbackData.summaryId);
 

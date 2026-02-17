@@ -1,4 +1,12 @@
-import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  mock,
+  test,
+} from "bun:test";
 import type { CallbackQueryContext, Context } from "grammy";
 
 import { buildSummaryFeedMiniAppUrl } from "@/lib/telegram/mini-app/start-param";
@@ -19,6 +27,29 @@ let insertBehavior: "inserted" | "duplicate" | "throw" = "inserted";
 let insertCalls: InsertedVoteValues[] = [];
 let getOrCreateUserCalls: unknown[] = [];
 let userIdResult = "user-1";
+const mixpanelInitTokens: string[] = [];
+const mixpanelTrackCalls: Array<{
+  eventName: string;
+  properties: Record<string, unknown>;
+}> = [];
+
+mock.module("mixpanel", () => ({
+  default: {
+    init: (token: string) => {
+      mixpanelInitTokens.push(token);
+      return {
+        track: (
+          eventName: string,
+          properties: Record<string, unknown>,
+          callback?: (error?: unknown) => void
+        ) => {
+          mixpanelTrackCalls.push({ eventName, properties });
+          callback?.();
+        },
+      };
+    },
+  },
+}));
 
 mock.module("@/lib/core/database", () => ({
   getDatabase: () => ({
@@ -78,11 +109,18 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
+  process.env.NEXT_PUBLIC_MIXPANEL_TOKEN = "test-mixpanel-token";
   currentVoteTotals = { likes: 0, dislikes: 0 };
   insertBehavior = "inserted";
   insertCalls = [];
   getOrCreateUserCalls = [];
   userIdResult = "user-1";
+  mixpanelInitTokens.length = 0;
+  mixpanelTrackCalls.length = 0;
+});
+
+afterEach(() => {
+  delete process.env.NEXT_PUBLIC_MIXPANEL_TOKEN;
 });
 
 describe("summary vote callback parser", () => {
@@ -180,6 +218,7 @@ describe("handleSummaryVoteCallback", () => {
         text: "Current summary score is 3.",
       },
     ]);
+    expect(mixpanelTrackCalls).toHaveLength(0);
   });
 
   test("creates first vote and updates keyboard with DB totals", async () => {
@@ -246,6 +285,59 @@ describe("handleSummaryVoteCallback", () => {
     expect(payload.reply_markup.inline_keyboard[0]?.[2]?.style).toBe("danger");
 
     expect(answerCalls).toEqual([undefined]);
+    expect(mixpanelTrackCalls).toEqual([
+      {
+        eventName: "Bot Summary Like",
+        properties: {
+          distinct_id: "tg:123",
+          group_chat_id: GROUP_CHAT_ID,
+          summary_id: SUMMARY_ID,
+          telegram_chat_id: "-1001234",
+          telegram_chat_type: null,
+          telegram_user_id: "123",
+          vote_action: "LIKE",
+        },
+      },
+    ]);
+  });
+
+  test("tracks dislike event when dislike vote is inserted", async () => {
+    currentVoteTotals = { likes: 2, dislikes: 4 };
+
+    const ctx = {
+      answerCallbackQuery: async () => {},
+      api: {
+        editMessageReplyMarkup: async () => ({}) as never,
+      },
+      callbackQuery: {
+        data: `sv:d:${SUMMARY_ID}:${GROUP_CHAT_ID}`,
+        message: {
+          chat: { id: -1001234 },
+          message_id: 99,
+        },
+      },
+      from: {
+        first_name: "Test",
+        id: 123,
+      },
+    } as unknown as CallbackQueryContext<Context>;
+
+    await handleSummaryVoteCallback(ctx);
+
+    expect(mixpanelTrackCalls).toEqual([
+      {
+        eventName: "Bot Summary Dislike",
+        properties: {
+          distinct_id: "tg:123",
+          group_chat_id: GROUP_CHAT_ID,
+          summary_id: SUMMARY_ID,
+          telegram_chat_id: "-1001234",
+          telegram_chat_type: null,
+          telegram_user_id: "123",
+          vote_action: "DISLIKE",
+        },
+      },
+    ]);
   });
 
   test("shows duplicate vote alert when user already voted", async () => {
@@ -286,6 +378,7 @@ describe("handleSummaryVoteCallback", () => {
         text: "You've voted already!",
       },
     ]);
+    expect(mixpanelTrackCalls).toHaveLength(0);
   });
 
   test("answers callback when vote callback has no message payload", async () => {
@@ -311,6 +404,7 @@ describe("handleSummaryVoteCallback", () => {
 
     expect(insertCalls).toHaveLength(0);
     expect(answerCalls).toEqual([undefined]);
+    expect(mixpanelTrackCalls).toHaveLength(0);
   });
 
   test("silently handles message-is-not-modified edit errors", async () => {
@@ -345,5 +439,19 @@ describe("handleSummaryVoteCallback", () => {
     await handleSummaryVoteCallback(ctx);
 
     expect(answerCalls).toEqual([undefined]);
+    expect(mixpanelTrackCalls).toEqual([
+      {
+        eventName: "Bot Summary Like",
+        properties: {
+          distinct_id: "tg:123",
+          group_chat_id: GROUP_CHAT_ID,
+          summary_id: SUMMARY_ID,
+          telegram_chat_id: "-1001234",
+          telegram_chat_type: null,
+          telegram_user_id: "123",
+          vote_action: "LIKE",
+        },
+      },
+    ]);
   });
 });

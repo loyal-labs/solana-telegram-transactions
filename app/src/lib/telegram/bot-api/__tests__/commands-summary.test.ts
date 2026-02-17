@@ -1,4 +1,12 @@
-import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  mock,
+  test,
+} from "bun:test";
 import type { Bot, CommandContext, Context } from "grammy";
 
 mock.module("server-only", () => ({}));
@@ -12,6 +20,31 @@ type MockSendSummaryResult =
 
 let sendLatestSummaryResult: MockSendSummaryResult = { sent: true };
 const sendLatestSummaryCalls: unknown[] = [];
+const mixpanelInitTokens: string[] = [];
+const mixpanelTrackCalls: Array<{
+  eventName: string;
+  properties: Record<string, unknown>;
+}> = [];
+let sendStartCarouselShouldThrow = false;
+let sendStartCarouselCalls = 0;
+
+mock.module("mixpanel", () => ({
+  default: {
+    init: (token: string) => {
+      mixpanelInitTokens.push(token);
+      return {
+        track: (
+          eventName: string,
+          properties: Record<string, unknown>,
+          callback?: (error?: unknown) => void
+        ) => {
+          mixpanelTrackCalls.push({ eventName, properties });
+          callback?.();
+        },
+      };
+    },
+  },
+}));
 
 mock.module("@/lib/core/database", () => ({
   getDatabase: () => ({}),
@@ -33,7 +66,12 @@ mock.module("@/lib/telegram/user-service", () => ({
 }));
 
 mock.module("../start-carousel", () => ({
-  sendStartCarousel: async () => {},
+  sendStartCarousel: async () => {
+    sendStartCarouselCalls += 1;
+    if (sendStartCarouselShouldThrow) {
+      throw new Error("start carousel failed");
+    }
+  },
 }));
 
 mock.module("../notification-settings", () => ({
@@ -47,7 +85,22 @@ mock.module("../summaries", () => ({
   },
 }));
 
+let handleStartCommand: typeof import("../commands").handleStartCommand;
 let handleSummaryCommand: typeof import("../commands").handleSummaryCommand;
+
+function createStartCommandContext() {
+  const ctx = {
+    chat: {
+      id: -1009876543210,
+      type: "supergroup",
+    },
+    from: {
+      id: 123456789,
+    },
+  } as unknown as CommandContext<Context>;
+
+  return { ctx };
+}
 
 function createSummaryCommandContext() {
   const replyCalls: string[] = [];
@@ -60,6 +113,9 @@ function createSummaryCommandContext() {
     msg: {
       message_id: 789,
     },
+    from: {
+      id: 123456789,
+    },
     reply: async (text: string) => {
       replyCalls.push(text);
       return {} as never;
@@ -69,15 +125,78 @@ function createSummaryCommandContext() {
   return { ctx, replyCalls };
 }
 
-describe("handleSummaryCommand", () => {
+describe("commands analytics tracking", () => {
   beforeAll(async () => {
     const loadedModule = await import("../commands");
+    handleStartCommand = loadedModule.handleStartCommand;
     handleSummaryCommand = loadedModule.handleSummaryCommand;
   });
 
   beforeEach(() => {
+    process.env.NEXT_PUBLIC_MIXPANEL_TOKEN = "test-mixpanel-token";
     sendLatestSummaryResult = { sent: true };
     sendLatestSummaryCalls.length = 0;
+    mixpanelInitTokens.length = 0;
+    mixpanelTrackCalls.length = 0;
+    sendStartCarouselCalls = 0;
+    sendStartCarouselShouldThrow = false;
+  });
+
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_MIXPANEL_TOKEN;
+  });
+
+  test("tracks /start only when start response succeeds", async () => {
+    const { ctx } = createStartCommandContext();
+
+    await handleStartCommand(ctx, {} as Bot);
+
+    expect(sendStartCarouselCalls).toBe(1);
+    expect(mixpanelInitTokens).toEqual(["test-mixpanel-token"]);
+    expect(mixpanelTrackCalls).toEqual([
+      {
+        eventName: "Bot /start Command",
+        properties: {
+          distinct_id: "tg:123456789",
+          telegram_chat_id: "-1009876543210",
+          telegram_chat_type: "supergroup",
+          telegram_user_id: "123456789",
+        },
+      },
+    ]);
+  });
+
+  test("does not track /start when start response fails", async () => {
+    sendStartCarouselShouldThrow = true;
+    const { ctx } = createStartCommandContext();
+
+    await expect(handleStartCommand(ctx, {} as Bot)).rejects.toThrow(
+      "start carousel failed"
+    );
+
+    expect(mixpanelTrackCalls).toHaveLength(0);
+  });
+
+  test("tracks /summary when summary is sent successfully", async () => {
+    sendLatestSummaryResult = { sent: true };
+    const { ctx, replyCalls } = createSummaryCommandContext();
+
+    await handleSummaryCommand(ctx, {} as Bot);
+
+    expect(replyCalls).toHaveLength(0);
+    expect(mixpanelTrackCalls).toEqual([
+      {
+        eventName: "Bot /summary Command",
+        properties: {
+          distinct_id: "tg:123456789",
+          summary_destination_chat_id: "-1009876543210",
+          summary_source_chat_id: "-1009876543210",
+          telegram_chat_id: "-1009876543210",
+          telegram_chat_type: "supergroup",
+          telegram_user_id: "123456789",
+        },
+      },
+    ]);
   });
 
   test("replies when summary notifications are disabled for community", async () => {
@@ -101,6 +220,7 @@ describe("handleSummaryCommand", () => {
         replyToMessageId: 789,
       },
     ]);
+    expect(mixpanelTrackCalls).toHaveLength(0);
   });
 
   test("keeps existing not_activated behavior", async () => {
