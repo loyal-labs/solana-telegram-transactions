@@ -40,6 +40,29 @@ function getTokenIcon(holding: TokenHolding): string {
   );
 }
 
+function getSafeTokenSymbol(holding: TokenHolding): string {
+  const symbol =
+    typeof holding.symbol === "string" ? holding.symbol.trim() : "";
+  if (symbol.length > 0) return symbol;
+  if (holding.mint === NATIVE_SOL_MINT) return "SOL";
+  return "TOKEN";
+}
+
+function getSafeTokenName(holding: TokenHolding, symbol: string): string {
+  const name = typeof holding.name === "string" ? holding.name.trim() : "";
+  return name.length > 0 ? name : symbol;
+}
+
+function getTokenIconAlt(token: Pick<Token, "symbol" | "name">): string {
+  const symbol = token.symbol?.trim();
+  if (symbol) return `${symbol} token icon`;
+
+  const name = token.name?.trim();
+  if (name) return `${name} token icon`;
+
+  return "Token icon";
+}
+
 function getMaxDecimals(symbol: string): number {
   return symbol === "SOL" ? 6 : 2;
 }
@@ -95,9 +118,11 @@ const FALLBACK_TOKENS: Token[] = [
 ];
 
 function holdingToToken(holding: TokenHolding): Token {
+  const symbol = getSafeTokenSymbol(holding);
+
   return {
-    symbol: holding.symbol,
-    name: holding.name,
+    symbol,
+    name: getSafeTokenName(holding, symbol),
     icon: getTokenIcon(holding),
     decimals: holding.decimals,
     balance: holding.balance,
@@ -275,6 +300,56 @@ export default function SwapSheet({
 
   // Use prop price or fetch
   const solPriceUsd = solPriceUsdProp ?? solPriceUsdState;
+
+  // Switch secureToken to the correct variant when direction changes.
+  // "shield" mode sources from regular token, "unshield" sources from secured token.
+  useEffect(() => {
+    if (activeTab !== "secure") return;
+
+    const needsSecured = secureDirection === "unshield";
+    const currentIsSecured = secureToken.isSecured === true;
+    if (needsSecured === currentIsSecured) return;
+
+    const counterpart = availableTokens.find(
+      (t) =>
+        t.mint === secureToken.mint && (t.isSecured === true) === needsSecured
+    );
+
+    if (counterpart) {
+      setSecureToken({
+        ...counterpart,
+        priceUsd:
+          counterpart.mint === NATIVE_SOL_MINT
+            ? solPriceUsd ?? SOL_PRICE_USD
+            : counterpart.priceUsd,
+      });
+    } else if (needsSecured) {
+      // No secured counterpart — show 0 balance
+      setSecureToken((prev) => ({ ...prev, balance: 0, isSecured: true }));
+    } else {
+      // Switching back to shield — restore regular variant
+      const regular = availableTokens.find(
+        (t) => t.mint === secureToken.mint && !t.isSecured
+      );
+      if (regular) {
+        setSecureToken({
+          ...regular,
+          priceUsd:
+            regular.mint === NATIVE_SOL_MINT
+              ? solPriceUsd ?? SOL_PRICE_USD
+              : regular.priceUsd,
+        });
+      }
+    }
+    setSecureAmountStr("");
+  }, [
+    secureDirection,
+    activeTab,
+    secureToken.mint,
+    secureToken.isSecured,
+    availableTokens,
+    solPriceUsd,
+  ]);
 
   // Update SOL price in tokens when available
   useEffect(() => {
@@ -996,7 +1071,7 @@ export default function SwapSheet({
                         <div className="w-7 h-7 rounded-full overflow-hidden">
                           <Image
                             src={fromToken.icon}
-                            alt={fromToken.symbol}
+                            alt={getTokenIconAlt(fromToken)}
                             width={28}
                             height={28}
                           />
@@ -1091,7 +1166,7 @@ export default function SwapSheet({
                         <div className="w-7 h-7 rounded-full overflow-hidden">
                           <Image
                             src={toToken.icon}
-                            alt={toToken.symbol}
+                            alt={getTokenIconAlt(toToken)}
                             width={28}
                             height={28}
                           />
@@ -1238,7 +1313,7 @@ export default function SwapSheet({
                           <div className="w-7 h-7 rounded-full overflow-hidden">
                             <Image
                               src={secureToken.icon}
-                              alt={secureToken.symbol}
+                              alt={getTokenIconAlt(secureToken)}
                               width={28}
                               height={28}
                             />
@@ -1343,7 +1418,7 @@ export default function SwapSheet({
                           <div className="w-7 h-7 rounded-full overflow-hidden">
                             <Image
                               src={secureToken.icon}
-                              alt={secureToken.symbol}
+                              alt={getTokenIconAlt(secureToken)}
                               width={28}
                               height={28}
                             />
@@ -1483,7 +1558,7 @@ export default function SwapSheet({
                       <div className="w-12 h-12 rounded-full overflow-hidden bg-[#f2f2f7]">
                         <Image
                           src={token.icon}
-                          alt={token.symbol}
+                          alt={getTokenIconAlt(token)}
                           width={48}
                           height={48}
                         />
@@ -1586,7 +1661,7 @@ export default function SwapSheet({
                       <div className="w-12 h-12 rounded-full overflow-hidden bg-[#f2f2f7]">
                         <Image
                           src={token.icon}
-                          alt={token.symbol}
+                          alt={getTokenIconAlt(token)}
                           width={48}
                           height={48}
                         />
@@ -1758,7 +1833,7 @@ export default function SwapSheet({
                       <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
                         <Image
                           src={fromToken.icon}
-                          alt={fromToken.symbol}
+                          alt={getTokenIconAlt(fromToken)}
                           width={56}
                           height={56}
                         />
@@ -1771,7 +1846,7 @@ export default function SwapSheet({
                       <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
                         <Image
                           src={toToken.icon}
-                          alt={toToken.symbol}
+                          alt={getTokenIconAlt(toToken)}
                           width={56}
                           height={56}
                         />
@@ -1852,7 +1927,7 @@ export default function SwapSheet({
                           <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
                             <Image
                               src={secureToken.icon}
-                              alt={secureToken.symbol}
+                              alt={getTokenIconAlt(secureToken)}
                               width={56}
                               height={56}
                             />
@@ -1889,7 +1964,7 @@ export default function SwapSheet({
                           <div className="w-[56px] h-[56px] rounded-full overflow-hidden bg-[#f2f2f7]">
                             <Image
                               src={secureToken.icon}
-                              alt={secureToken.symbol}
+                              alt={getTokenIconAlt(secureToken)}
                               width={56}
                               height={56}
                             />
