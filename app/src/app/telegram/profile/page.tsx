@@ -5,9 +5,11 @@ import {
   hapticFeedback,
   openTelegramLink,
   retrieveLaunchParams,
+  useRawInitData,
 } from "@telegram-apps/sdk-react";
 import {
   ArrowUpRight,
+  Bell,
   Check,
   ChevronDown,
   ChevronRight,
@@ -16,12 +18,14 @@ import {
   Globe,
   Network,
   Smile,
+  Sparkle,
 } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTelegramUser } from "@/components/telegram/TelegramProvider";
 import { Skeleton } from "@/components/ui/skeleton";
+import { resolveEndpoint } from "@/lib/core/api";
 import { getSolanaEnv } from "@/lib/solana/rpc/connection";
 import type { SolanaEnv } from "@/lib/solana/rpc/types";
 import { setLoyalEmojiStatus } from "@/lib/telegram/mini-app/emoji-status";
@@ -183,6 +187,7 @@ function SettingsSection({ children }: { children: React.ReactNode }) {
 
 export default function ProfilePage() {
   const { userData, cachedAvatar, isAvatarLoading } = useTelegramUser();
+  const rawInitData = useRawInitData();
 
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
@@ -190,6 +195,28 @@ export default function ProfilePage() {
   const [networkEnv, setNetworkEnv] = useState<SolanaEnv>(getSolanaEnv);
   const [isNetworkDropdownOpen, setIsNetworkDropdownOpen] = useState(false);
   const networkDropdownRef = useRef<HTMLDivElement>(null);
+  const [botNotifications, setBotNotifications] = useState(true);
+  const [isNotificationsLoading, setIsNotificationsLoading] = useState(true);
+  const [assistantModel, setAssistantModel] = useState("qwen-2.5");
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch user settings on mount
+  useEffect(() => {
+    if (!rawInitData) return;
+    const endpoint = resolveEndpoint(
+      `api/telegram/settings?initData=${encodeURIComponent(rawInitData)}`,
+    );
+    fetch(endpoint)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setBotNotifications(data.notifications);
+        }
+      })
+      .catch((err) => console.error("Failed to load user settings", err))
+      .finally(() => setIsNotificationsLoading(false));
+  }, [rawInitData]);
 
   // Detect platform on mount
   useEffect(() => {
@@ -263,6 +290,28 @@ export default function ProfilePage() {
     { value: "devnet", label: "Devnet" },
   ];
 
+  const modelOptions = [
+    { value: "qwen-2.5", label: "Qwen 2.5" },
+    { value: "deepseek", label: "DeepSeek" },
+    { value: "llama-3", label: "Llama 3" },
+    { value: "mixtral", label: "Mixtral" },
+  ];
+
+  const handleModelSelect = useCallback(
+    (value: string) => {
+      if (value === assistantModel) {
+        setIsModelDropdownOpen(false);
+        return;
+      }
+      if (hapticFeedback.impactOccurred.isAvailable()) {
+        hapticFeedback.impactOccurred("light");
+      }
+      setAssistantModel(value);
+      setIsModelDropdownOpen(false);
+    },
+    [assistantModel],
+  );
+
   const handleNetworkSelect = useCallback((env: SolanaEnv) => {
     if (env === networkEnv) {
       setIsNetworkDropdownOpen(false);
@@ -282,12 +331,15 @@ export default function ProfilePage() {
       if (networkDropdownRef.current && !networkDropdownRef.current.contains(e.target as Node)) {
         setIsNetworkDropdownOpen(false);
       }
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
+        setIsModelDropdownOpen(false);
+      }
     };
-    if (isNetworkDropdownOpen) {
+    if (isNetworkDropdownOpen || isModelDropdownOpen) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isNetworkDropdownOpen]);
+  }, [isNetworkDropdownOpen, isModelDropdownOpen]);
 
   return (
     <main className="min-h-screen bg-white font-sans overflow-hidden relative">
@@ -339,7 +391,7 @@ export default function ProfilePage() {
 
         {/* Settings Sections */}
         <div className="flex flex-col gap-4 px-4 pb-4">
-          {/* Section 1: Language */}
+          {/* Section 1: Language, Notifications, Model */}
           <SettingsSection>
             <ProfileCell
               icon={<Globe size={28} strokeWidth={1.5} />}
@@ -347,6 +399,95 @@ export default function ProfilePage() {
               rightDetail="English"
               disabled
             />
+            <ProfileCell
+              icon={<Bell size={28} strokeWidth={1.5} />}
+              title="Bot Notifications"
+              disabled={isNotificationsLoading}
+              toggle={{
+                checked: botNotifications,
+                onChange: (checked) => {
+                  setBotNotifications(checked);
+                  if (!rawInitData) return;
+                  const endpoint = resolveEndpoint("api/telegram/settings");
+                  fetch(endpoint, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      rawInitData,
+                      notifications: checked,
+                    }),
+                  }).catch((err) => {
+                    console.error("Failed to update notifications", err);
+                    setBotNotifications(!checked);
+                  });
+                },
+                activeColor: "#f9363c",
+              }}
+            />
+            <div ref={modelDropdownRef} className="relative">
+              <button
+                onClick={() => {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
+                  setIsModelDropdownOpen((prev) => !prev);
+                }}
+                className="w-full text-left active:opacity-80 transition-opacity"
+              >
+                <div className="flex items-center w-full overflow-hidden px-4">
+                  <div className="flex items-center pr-3 py-1.5">
+                    <div className="flex items-center justify-center pr-1 py-2.5">
+                      <div className="text-black/60">
+                        <Sparkle size={28} strokeWidth={1.5} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 flex flex-col min-w-0 py-[13px]">
+                    <p className="text-[17px] font-medium leading-[22px] tracking-[-0.187px] text-black">
+                      Assistant Model
+                    </p>
+                  </div>
+                  <div className="pl-3 flex items-center gap-1 py-[13px]">
+                    <p className="text-[17px] font-normal leading-[22px] text-[rgba(60,60,67,0.6)]">
+                      {modelOptions.find((o) => o.value === assistantModel)?.label}
+                    </p>
+                    <ChevronDown
+                      size={16}
+                      className={cn(
+                        "text-[rgba(60,60,67,0.3)] transition-transform duration-200",
+                        isModelDropdownOpen && "rotate-180",
+                      )}
+                    />
+                  </div>
+                </div>
+              </button>
+
+              {isModelDropdownOpen && (
+                <div className="absolute right-4 top-full -mt-1 z-50 min-w-[180px] backdrop-blur-[8px] bg-white/70 rounded-[20px] shadow-[0px_0px_4px_1px_rgba(0,0,0,0.04),0px_32px_64px_0px_rgba(0,0,0,0.16)] overflow-hidden">
+                  {modelOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleModelSelect(option.value)}
+                      className="w-full flex items-center justify-between px-4 h-12 active:bg-black/5 transition-colors"
+                    >
+                      <span
+                        className={cn(
+                          "text-[17px] leading-[22px] text-black",
+                          option.value === assistantModel
+                            ? "font-medium"
+                            : "font-normal",
+                        )}
+                      >
+                        {option.label}
+                      </span>
+                      {option.value === assistantModel && (
+                        <Check size={18} className="text-[#f9363c]" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </SettingsSection>
 
           {/* Section 2: Actions */}
