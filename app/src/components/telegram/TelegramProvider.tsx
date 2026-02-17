@@ -99,7 +99,7 @@ function TelegramProviderInner({ children }: PropsWithChildren) {
   // Save page
   useEffect(() => {
     if (!isRestored || !pathname) return;
-    if (pathname.startsWith('/telegram')) {
+    if (pathname.startsWith('/telegram') && !pathname.startsWith('/telegram/verify')) {
       setCloudValue(LAST_PAGE_CACHE_KEY, pathname).catch((e) =>
         console.error('Failed to save page', e)
       );

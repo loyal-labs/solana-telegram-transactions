@@ -2,7 +2,10 @@
 
 import { retrieveLaunchParams } from "@telegram-apps/sdk-react";
 
-import { parseSummaryFeedStartParam } from "@/lib/telegram/mini-app/start-param";
+import {
+  isBioStartParam,
+  parseSummaryFeedStartParam,
+} from "@/lib/telegram/mini-app/start-param";
 
 /**
  * Extract start_param from the native Telegram WebApp bridge object.
@@ -34,6 +37,11 @@ export function getStartParamRoute(): string | undefined {
   if (typeof window === "undefined") return undefined;
 
   const mapStartParamToRoute = (startParam: string | null | undefined): string | undefined => {
+    // Check for bio (verification) deeplink first
+    if (isBioStartParam(startParam)) {
+      return "/telegram/verify";
+    }
+
     const parsed = parseSummaryFeedStartParam(startParam ?? null);
     if (!parsed) {
       return undefined;
