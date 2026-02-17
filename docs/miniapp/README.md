@@ -25,6 +25,7 @@ Quick reference for `/app/src/lib/`.
 - [Environment Variables](./environment-vars.md) - Required setup
 - [Folder Reference](./folder-reference.md) - Detailed breakdown
 - [Database](./database.md) - Drizzle ORM schema and migrations
+- [Deep Links and Start Param](./deeplinks-start-param.md) - Summary mini-app context link format and routing
 - [Onboarding Overview](../onboarding/README.md) - Add bot, activate communities, configure notifications
 - [Activate Community Guide](../onboarding/add-bot-and-activate-community.md) - Step-by-step activation flow
 - [Notification Settings Guide](../onboarding/notifications.md) - Configure summary notifications
