@@ -2,8 +2,8 @@
 
 import { useSignal, viewport } from "@telegram-apps/sdk-react";
 import type { Signal } from "@telegram-apps/signals";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import { AnalyticsBootstrapClient } from "@/components/analytics/AnalyticsBootstrapClient";
 import Header from "@/components/Header";
@@ -11,6 +11,7 @@ import BottomNav from "@/components/telegram/BottomNav";
 import Onboarding from "@/components/telegram/Onboarding";
 import { TelegramAppRootClient } from "@/components/telegram/TelegramAppRootClient";
 import { TelegramProvider } from "@/components/telegram/TelegramProvider";
+import { getStartParamRoute } from "@/hooks/useStartParam";
 import {
   getCloudValue,
   setCloudValue,
@@ -23,12 +24,27 @@ export default function TelegramLayoutClient({
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const safeAreaInsetTop = useSignal(
     viewport.safeAreaInsetTop as Signal<number>
   );
   const pathname = usePathname();
+  const hasCheckedDeeplink = useRef(false);
   // null = loading, true = show, false = don't show
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+
+  // Deeplink detection: when Telegram reopens a cached mini-app at the
+  // last-visited page (bypassing the splash screen at /), we still need
+  // to honour start_param and redirect to the target route.
+  useEffect(() => {
+    if (hasCheckedDeeplink.current) return;
+    hasCheckedDeeplink.current = true;
+
+    const deeplinkRoute = getStartParamRoute();
+    if (deeplinkRoute && pathname !== deeplinkRoute.split("?")[0]) {
+      router.replace(deeplinkRoute);
+    }
+  }, [pathname, router]);
 
   // Check cloud storage for onboarding completion
   useEffect(() => {

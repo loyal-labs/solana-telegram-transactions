@@ -18,18 +18,8 @@ export default function SplashPage() {
     if (hasRedirected.current) return;
 
     const redirect = async () => {
-      // Diagnostic: log everything available on the splash page
-      console.warn("[splash] href:", window.location.href);
-      console.warn("[splash] hash:", window.location.hash);
-      console.warn(
-        "[splash] native start_param:",
-        (window as { Telegram?: { WebApp?: { initDataUnsafe?: { start_param?: string } } } })
-          .Telegram?.WebApp?.initDataUnsafe?.start_param
-      );
-
       // 1. Check startParam first (highest priority - deeplinks)
       const deeplinkRoute = getStartParamRoute();
-      console.warn("[splash] deeplinkRoute:", deeplinkRoute);
 
       if (deeplinkRoute) {
         hasRedirected.current = true;
