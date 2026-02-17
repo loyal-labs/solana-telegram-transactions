@@ -3,11 +3,11 @@
 import mixpanel from "mixpanel-browser";
 
 import { publicEnv } from "@/lib/core/config/public";
-import { parseSummaryFeedStartParam } from "@/lib/telegram/mini-app/start-param";
 import type {
   TelegramIdentity,
   TelegramLaunchContext,
 } from "@/lib/telegram/mini-app/init-data-transform";
+import { parseSummaryFeedStartParam } from "@/lib/telegram/mini-app/start-param";
 
 type AnalyticsProperties = Record<string, unknown>;
 
