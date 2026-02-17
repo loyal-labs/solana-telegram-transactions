@@ -101,3 +101,16 @@ export function buildSummaryFeedMiniAppUrl(
   const startParam = buildSummaryFeedStartParam(groupChatId, summaryId);
   return `${MINI_APP_LINK}?startapp=${encodeURIComponent(startParam)}`;
 }
+
+// --- Biometrics verification deeplink ("bio") ---
+
+const BIO_START_PARAM = "bio";
+
+export function isBioStartParam(raw: string | null | undefined): boolean {
+  if (!raw) return false;
+  return raw.trim() === BIO_START_PARAM;
+}
+
+export function buildBioMiniAppUrl(): string {
+  return `${MINI_APP_LINK}?startapp=${BIO_START_PARAM}`;
+}

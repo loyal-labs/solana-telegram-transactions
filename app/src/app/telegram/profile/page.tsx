@@ -21,6 +21,7 @@ import {
   Sparkle,
 } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTelegramUser } from "@/components/telegram/TelegramProvider";
@@ -185,11 +186,40 @@ function SettingsSection({ children }: { children: React.ReactNode }) {
   );
 }
 
+const VERIFY_TAP_COUNT = 5;
+const VERIFY_TAP_TIMEOUT = 2000;
+
 export default function ProfilePage() {
   const { userData, cachedAvatar, isAvatarLoading } = useTelegramUser();
   const rawInitData = useRawInitData();
+  const router = useRouter();
 
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
+
+  // Hidden 5-tap trigger for verification flow
+  const verifyTapCount = useRef(0);
+  const verifyTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleAvatarTap = useCallback(() => {
+    verifyTapCount.current += 1;
+
+    if (verifyTapTimer.current) {
+      clearTimeout(verifyTapTimer.current);
+    }
+
+    if (verifyTapCount.current >= VERIFY_TAP_COUNT) {
+      verifyTapCount.current = 0;
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred("success");
+      }
+      router.push("/telegram/verify");
+      return;
+    }
+
+    verifyTapTimer.current = setTimeout(() => {
+      verifyTapCount.current = 0;
+    }, VERIFY_TAP_TIMEOUT);
+  }, [router]);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [isImageError, setIsImageError] = useState(false);
   const [networkEnv, setNetworkEnv] = useState<SolanaEnv>(getSolanaEnv);
@@ -346,7 +376,13 @@ export default function ProfilePage() {
       <div className="pb-32 max-w-md mx-auto flex flex-col min-h-screen">
         {/* Avatar and Name Section */}
         <div className="flex flex-col gap-4 items-center justify-center pt-8 pb-6 px-8">
-          {/* Avatar */}
+          {/* Avatar — tap 5 times to open verification */}
+          <button
+            type="button"
+            onClick={handleAvatarTap}
+            className="appearance-none focus:outline-none"
+            aria-label="Profile avatar"
+          >
           {userData?.photoUrl && !isImageError ? (
             <div className="relative w-24 h-24">
               {(!isImageLoaded || isAvatarLoading) && (
@@ -375,6 +411,7 @@ export default function ProfilePage() {
               </span>
             </div>
           )}
+          </button>
 
           {/* Name and Username */}
           <div className="flex flex-col gap-1 items-center text-center w-full">

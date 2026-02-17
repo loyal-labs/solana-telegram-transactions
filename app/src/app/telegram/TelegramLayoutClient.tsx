@@ -4,6 +4,7 @@ import { useSignal, viewport } from "@telegram-apps/sdk-react";
 import type { Signal } from "@telegram-apps/signals";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Toaster } from "sileo";
 
 import { AnalyticsBootstrapClient } from "@/components/analytics/AnalyticsBootstrapClient";
 import Header from "@/components/Header";
@@ -94,6 +95,17 @@ export default function TelegramLayoutClient({
 
   return (
     <TelegramAppRootClient>
+      <Toaster
+        position="top-center"
+        offset={130}
+        options={{
+          fill: "black",
+          styles: {
+            title: "text-white!",
+            description: "text-white/75!",
+          },
+        }}
+      />
       <AnalyticsBootstrapClient />
       <TelegramProvider>
         <div
@@ -109,7 +121,7 @@ export default function TelegramLayoutClient({
           ) : showOnboarding === false ? (
             <>
               <div
-                className="flex-1"
+                className="flex flex-1 flex-col"
                 style={{ paddingTop: headerHeight }}
               >
                 {children}
