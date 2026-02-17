@@ -19,6 +19,7 @@ const SERVER_ENV_KEYS = [
   "DEPLOYMENT_PK",
   "ASKLOYAL_TGBOT_KEY",
   "TELEGRAM_SETUP_SECRET",
+  "NEXT_PUBLIC_MIXPANEL_TOKEN",
   "CRON_SECRET",
   "TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM",
   "TELEGRAM_SUMMARY_PEER_OVERRIDE_TO",
@@ -49,6 +50,7 @@ let serverEnv: {
   deploymentPrivateKey: string;
   askLoyalBotToken: string;
   telegramSetupSecret: string;
+  mixpanelToken: string | undefined;
   cronSecret: string;
   telegramSummaryPeerOverride: { fromPeerId: bigint; toPeerId: bigint } | null;
   cloudflareCdnBaseUrl: string | null;
@@ -95,10 +97,12 @@ describe("server config", () => {
 
   test("returns optional values when present", () => {
     process.env.MESSAGE_ENCRYPTION_KEY = "  key  ";
+    process.env.NEXT_PUBLIC_MIXPANEL_TOKEN = "  token  ";
     process.env.CLOUDFLARE_R2_S3_ENDPOINT = "  https://r2.example.com  ";
     process.env.CLOUDFLARE_R2_UPLOAD_PREFIX = "  uploads  ";
 
     expect(serverEnv.messageEncryptionKey).toBe("key");
+    expect(serverEnv.mixpanelToken).toBe("token");
     expect(serverEnv.cloudflareR2S3Endpoint).toBe("https://r2.example.com");
     expect(serverEnv.cloudflareR2UploadPrefix).toBe("uploads");
   });

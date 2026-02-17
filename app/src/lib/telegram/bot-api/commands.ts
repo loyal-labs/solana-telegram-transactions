@@ -1,7 +1,9 @@
 import { eq } from "drizzle-orm";
 import type { CommandContext, Context } from "grammy";
 import { Bot, InlineKeyboard } from "grammy";
+import Mixpanel from "mixpanel";
 
+import { serverEnv } from "@/lib/core/config/server";
 import { getDatabase } from "@/lib/core/database";
 import { admins, communities } from "@/lib/core/schema";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
@@ -28,6 +30,57 @@ const VISIBILITY_UPDATE_ERROR_REPLY_TEXT =
   "An error occurred while updating community visibility. Please try again.";
 
 type VisibilityAction = "HIDE" | "UNHIDE";
+type MixpanelTrackProperties = Record<string, boolean | null | number | string>;
+
+const BOT_START_COMMAND_EVENT = "Bot /start Command";
+const BOT_SUMMARY_COMMAND_EVENT = "Bot /summary Command";
+
+function resolveDistinctId(ctx: CommandContext<Context>): string {
+  if (ctx.from?.id) {
+    return `tg:${ctx.from.id}`;
+  }
+
+  if (ctx.chat?.id) {
+    return `tg-chat:${ctx.chat.id}`;
+  }
+
+  return "tg:unknown";
+}
+
+function createCommandTrackingProperties(
+  ctx: CommandContext<Context>
+): MixpanelTrackProperties {
+  return {
+    distinct_id: resolveDistinctId(ctx),
+    telegram_chat_id: ctx.chat?.id.toString() ?? null,
+    telegram_chat_type: ctx.chat?.type ?? null,
+    telegram_user_id: ctx.from?.id.toString() ?? null,
+  };
+}
+
+async function trackBotCommandEvent(
+  eventName: string,
+  properties: MixpanelTrackProperties
+): Promise<void> {
+  const token = serverEnv.mixpanelToken;
+  if (!token) {
+    return;
+  }
+
+  try {
+    const mixpanel = Mixpanel.init(token);
+    await new Promise<void>((resolve) => {
+      mixpanel.track(eventName, properties, (error: unknown) => {
+        if (error) {
+          console.error(`Failed to track Mixpanel event: ${eventName}`, error);
+        }
+        resolve();
+      });
+    });
+  } catch (error) {
+    console.error(`Failed to track Mixpanel event: ${eventName}`, error);
+  }
+}
 
 /**
  * Fetches community profile photo and converts to base64.
@@ -100,6 +153,10 @@ export async function handleStartCommand(
   bot: Bot
 ): Promise<void> {
   await sendStartCarousel(ctx, bot);
+  await trackBotCommandEvent(
+    BOT_START_COMMAND_EVENT,
+    createCommandTrackingProperties(ctx)
+  );
 }
 
 export async function handleCaCommand(
@@ -309,20 +366,27 @@ export async function handleSummaryCommand(
       replyToMessageId: ctx.msg?.message_id,
     });
 
-    if (!result.sent) {
-      if (result.reason === "not_activated") {
-        await ctx.reply(
-          "This community is not activated. Use /activate_community to enable summaries."
-        );
-      } else if (result.reason === "notifications_disabled") {
-        await ctx.reply(
-          "Summary notifications are turned off for this community. Use /notifications to turn them on."
-        );
-      } else if (result.reason === "no_summaries") {
-        await ctx.reply(
-          "No summaries available yet. Summaries are generated daily when there's enough activity."
-        );
-      }
+    if (result.sent) {
+      await trackBotCommandEvent(BOT_SUMMARY_COMMAND_EVENT, {
+        ...createCommandTrackingProperties(ctx),
+        summary_destination_chat_id: requestChatId.toString(),
+        summary_source_chat_id: summarySourceChatId.toString(),
+      });
+      return;
+    }
+
+    if (result.reason === "not_activated") {
+      await ctx.reply(
+        "This community is not activated. Use /activate_community to enable summaries."
+      );
+    } else if (result.reason === "notifications_disabled") {
+      await ctx.reply(
+        "Summary notifications are turned off for this community. Use /notifications to turn them on."
+      );
+    } else if (result.reason === "no_summaries") {
+      await ctx.reply(
+        "No summaries available yet. Summaries are generated daily when there's enough activity."
+      );
     }
   } catch (error) {
     console.error("Failed to send summary", error);
