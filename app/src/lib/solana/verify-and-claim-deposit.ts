@@ -5,12 +5,25 @@ import {
   NATIVE_MINT,
 } from "@solana/spl-token";
 import { PublicKey, Transaction } from "@solana/web3.js";
+import {
+  DELEGATION_PROGRAM_ID,
+  ER_VALIDATOR,
+  findDepositPda,
+  findUsernameDepositPda,
+  waitForAccountOwnerChange,
+} from "@vladarbatov/private-transactions-test";
 
 import { resolveEndpoint } from "../core/api";
 import { claimDeposit } from "./deposits/claim-deposit";
-import { getTelegramVerificationProgram } from "./solana-helpers";
+import { prettyStringify, waitForAccount } from "./deposits/loyal-deposits";
+import { getPrivateClient } from "./deposits/private-client";
+import {
+  getSessionPda,
+  getTelegramVerificationProgram,
+} from "./solana-helpers";
 import { storeInitData, verifyInitData } from "./verification";
 import { storeInitDataGasless } from "./verification/store-init-data";
+import { getWalletKeypair, getWalletProvider } from "./wallet/wallet-details";
 
 export const verifyAndClaimDeposit = async (
   provider: AnchorProvider,
@@ -108,6 +121,146 @@ export const prepareCloseWsolTxn = async (
   return closeTx;
 };
 
+export async function claimTokens(params: {
+  tokenMint: PublicKey;
+  amount: number;
+  username: string;
+  destination: PublicKey;
+  session: PublicKey;
+}): Promise<string> {
+  const startTime = Date.now();
+  console.log("> claimTokens");
+  const client = await getPrivateClient();
+  const { tokenMint, amount, username, destination, session } = params;
+
+  const [usernameDepositPda] = findUsernameDepositPda(username, tokenMint);
+  const baseUsernameDepositPda =
+    await client.baseProgram.provider.connection.getAccountInfo(
+      usernameDepositPda
+    );
+  const ephemeralUsernameDepositPda =
+    await client.ephemeralProgram.provider.connection.getAccountInfo(
+      usernameDepositPda
+    );
+  console.log(
+    "claimTokens baseUsernameDepositPda",
+    prettyStringify(baseUsernameDepositPda)
+  );
+  console.log(
+    "claimTokens ephemeralUsernameDepositPda",
+    prettyStringify(ephemeralUsernameDepositPda)
+  );
+
+  const isUsernameDepositDelegated = baseUsernameDepositPda?.owner.equals(
+    DELEGATION_PROGRAM_ID
+  );
+
+  const keypair = await getWalletKeypair();
+
+  if (!isUsernameDepositDelegated) {
+    console.log("delegateUsernameDeposit (not delegated on base chain)");
+    const delegationWatcher = waitForAccountOwnerChange(
+      client.baseProgram.provider.connection,
+      usernameDepositPda,
+      DELEGATION_PROGRAM_ID
+    );
+    try {
+      const delegateUsernameDepositSig = await client.delegateUsernameDeposit({
+        tokenMint,
+        username,
+        payer: keypair.publicKey,
+        validator: ER_VALIDATOR,
+      });
+      console.log("delegateUsernameDeposit sig", delegateUsernameDepositSig);
+      console.log("waiting for usernameDeposit to be delegated...");
+      await delegationWatcher.wait();
+    } catch (e) {
+      await delegationWatcher.cancel();
+      throw e;
+    }
+  } else {
+    console.log("delegateUsernameDeposit skipped (already delegated on base)");
+  }
+
+  const [depositPda] = findDepositPda(destination, tokenMint);
+  const existingBaseDeposit = await client.getBaseDeposit(
+    destination,
+    tokenMint
+  );
+  console.log("existingBaseDeposit", prettyStringify(existingBaseDeposit));
+
+  if (!existingBaseDeposit) {
+    console.log("initializeDeposit for destination user");
+    const initializeDepositSig = await client.initializeDeposit({
+      tokenMint,
+      user: destination,
+      payer: keypair.publicKey,
+    });
+    console.log("initializeDeposit sig", initializeDepositSig);
+
+    await waitForAccount(client, depositPda);
+  }
+
+  const baseDepositPda =
+    await client.baseProgram.provider.connection.getAccountInfo(depositPda);
+  const ephemeralDepositPda =
+    await client.ephemeralProgram.provider.connection.getAccountInfo(
+      depositPda
+    );
+  console.log("claimTokens baseDepositPda", prettyStringify(baseDepositPda));
+  console.log(
+    "claimTokens ephemeralDepositPda",
+    prettyStringify(ephemeralDepositPda)
+  );
+
+  const isDepositDelegated = baseDepositPda?.owner.equals(
+    DELEGATION_PROGRAM_ID
+  );
+
+  if (!isDepositDelegated) {
+    console.log("delegateDeposit (not delegated on base chain)");
+    const delegationWatcher = waitForAccountOwnerChange(
+      client.baseProgram.provider.connection,
+      depositPda,
+      DELEGATION_PROGRAM_ID
+    );
+    try {
+      const delegateDepositSig = await client.delegateDeposit({
+        user: destination,
+        tokenMint,
+        payer: keypair.publicKey,
+        validator: ER_VALIDATOR,
+      });
+      console.log("delegateDepositSig sig", delegateDepositSig);
+      console.log("waiting for deposit to be delegated...");
+      await delegationWatcher.wait();
+    } catch (e) {
+      await delegationWatcher.cancel();
+      throw e;
+    }
+  } else {
+    console.log("delegateDeposit skipped (already delegated on base)");
+  }
+
+  console.log("claimUsernameDepositToDeposit");
+  const claimUsernameDepositToDepositSig =
+    await client.claimUsernameDepositToDeposit({
+      username,
+      tokenMint,
+      amount,
+      recipient: destination,
+      session,
+    });
+  console.log(
+    "claimUsernameDepositToDeposit sig",
+    claimUsernameDepositToDepositSig
+  );
+
+  console.log(`< claimTokens (${Date.now() - startTime}ms)`);
+
+  return claimUsernameDepositToDepositSig;
+}
+
 export const sendStoreInitDataTxn = async (
   storeTx: Transaction,
   recipientPubKey: PublicKey,
@@ -116,7 +269,8 @@ export const sendStoreInitDataTxn = async (
   processedInitDataBytes: Uint8Array,
   telegramSignatureBytes: Uint8Array,
   telegramPublicKeyBytes: Uint8Array,
-  closeTx?: Transaction
+  closeTx?: Transaction,
+  perAuthToken?: string
 ) => {
   const serializedStoreTx = storeTx
     .serialize({ requireAllSignatures: false })
@@ -139,6 +293,7 @@ export const sendStoreInitDataTxn = async (
       telegramSignatureBytes: encodeBytes(telegramSignatureBytes),
       telegramPublicKeyBytes: encodeBytes(telegramPublicKeyBytes),
       closeTx: serializedCloseTx,
+      perAuthToken: perAuthToken ?? null,
     }),
   });
   if (!response.ok) {
@@ -172,5 +327,18 @@ export const sendStoreInitDataTxn = async (
       `Failed to send store init data transaction: ${errorDetails}`
     );
   }
+
+  const provider = await getWalletProvider();
+  const verificationProgram = getTelegramVerificationProgram(provider);
+  const sessionPda = getSessionPda(recipientPubKey, verificationProgram);
+  // Claim tokens on client side
+  await claimTokens({
+    tokenMint: NATIVE_MINT,
+    amount,
+    username,
+    destination: recipientPubKey,
+    session: sessionPda,
+  });
+
   return response.json();
 };

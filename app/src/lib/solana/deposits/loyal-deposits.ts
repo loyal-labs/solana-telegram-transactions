@@ -5,17 +5,107 @@ import {
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import {
+  DELEGATION_PROGRAM_ID,
   ER_VALIDATOR,
   findDepositPda,
+  LoyalPrivateTransactionsClient,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
-  PROGRAM_ID,
 } from "@vladarbatov/private-transactions-test";
 
 import { getConnection } from "../rpc/connection";
 import { getWalletKeypair } from "../wallet/wallet-details";
-import { getBaseClient, getPerClient } from "./private-client";
+import { getPrivateClient } from "./private-client";
 import { closeWsolAta, wrapSolToWSol } from "./wsol-utils";
+
+export async function waitForAccount(
+  client: LoyalPrivateTransactionsClient,
+  pda: PublicKey,
+  maxAttempts = 30
+): Promise<void> {
+  const connection = client.baseProgram.provider.connection;
+  for (let i = 0; i < maxAttempts; i++) {
+    const info = await connection.getAccountInfo(pda);
+    if (info) return;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
+export function prettyStringify(obj: unknown): string {
+  const json = JSON.stringify(
+    obj,
+    (_key, value) => {
+      if (value instanceof PublicKey) return value.toBase58();
+      if (typeof value === "bigint") return value.toString();
+      return value;
+    },
+    2
+  );
+  // Collapse arrays onto single lines
+  return json.replace(/\[\s+(\d[\d,\s]*\d)\s+\]/g, (_match, inner) => {
+    const items = inner.split(/,\s*/).map((s: string) => s.trim());
+    return `[${items.join(", ")}]`;
+  });
+}
+
+/**
+ * Subscribe to secure (Loyal deposit) balance changes for the user's
+ * NATIVE_MINT deposit on the ephemeral connection.
+ * Mirrors subscribeToWalletBalance but watches the deposit PDA.
+ */
+export const subscribeToSecureBalance = async (
+  onChange: (lamports: number) => void
+): Promise<() => Promise<void>> => {
+  const keypair = await getWalletKeypair();
+  const privateClient = await getPrivateClient();
+  const [depositPda] = findDepositPda(keypair.publicKey, NATIVE_MINT);
+
+  const connection = privateClient.ephemeralProgram.provider.connection;
+
+  // Fetch initial value so we can deduplicate
+  let lastAmount: number | undefined;
+  try {
+    const deposit = await privateClient.getEphemeralDeposit(
+      keypair.publicKey,
+      NATIVE_MINT
+    );
+    if (deposit) {
+      lastAmount = Number(deposit.amount);
+      onChange(lastAmount);
+    }
+  } catch (e) {
+    console.warn("[subscribeToSecureBalance] initial fetch error:", e);
+  }
+
+  const subscriptionId = connection.onAccountChange(
+    depositPda,
+    async () => {
+      try {
+        const deposit = await privateClient.getEphemeralDeposit(
+          keypair.publicKey,
+          NATIVE_MINT
+        );
+        const amount = deposit ? Number(deposit.amount) : 0;
+        if (typeof lastAmount === "number" && amount === lastAmount) {
+          return;
+        }
+        lastAmount = amount;
+        onChange(amount);
+      } catch (error) {
+        console.error("Failed to fetch secure balance on change", error);
+      }
+    },
+    { commitment: "confirmed" }
+  );
+
+  return async () => {
+    try {
+      await connection.removeAccountChangeListener(subscriptionId);
+    } catch (error) {
+      console.error("Failed to remove secure balance subscription", error);
+    }
+  };
+};
 
 /**
  * Check which tokens have Loyal deposits. Returns a map of mint → deposit amount (raw).
@@ -24,13 +114,16 @@ export async function fetchLoyalDeposits(
   userPublicKey: PublicKey,
   tokenMints: string[]
 ): Promise<Map<string, number>> {
-  const client = await getBaseClient();
+  const privateClient = await getPrivateClient();
   const deposits = new Map<string, number>();
 
   const results = await Promise.allSettled(
     tokenMints.map(async (mint) => {
       const mintPubkey = new PublicKey(mint);
-      const deposit = await client.getDeposit(userPublicKey, mintPubkey);
+      const deposit = await privateClient.getEphemeralDeposit(
+        userPublicKey,
+        mintPubkey
+      );
       if (deposit && deposit.amount > 0) {
         deposits.set(mint, Number(deposit.amount));
       }
@@ -43,8 +136,6 @@ export async function fetchLoyalDeposits(
     }
   }
 
-  console.log("deposits", deposits);
-
   return deposits;
 }
 
@@ -56,12 +147,17 @@ export async function shieldTokens(params: {
   tokenMint: PublicKey;
   amount: number;
 }): Promise<string> {
+  const startTime = Date.now();
+  console.log("> shieldTokens");
   const keypair = await getWalletKeypair();
-  const client = await getBaseClient();
+  const client = await getPrivateClient();
   const { tokenMint, amount } = params;
 
   // 1. Initialize deposit if it doesn't exist yet
-  const existingDeposit = await client.getDeposit(keypair.publicKey, tokenMint);
+  const existingDeposit = await client.getBaseDeposit(
+    keypair.publicKey,
+    tokenMint
+  );
   if (!existingDeposit) {
     console.log("initializeDeposit");
     const initializeDepositSig = await client.initializeDeposit({
@@ -70,64 +166,17 @@ export async function shieldTokens(params: {
       payer: keypair.publicKey,
     });
     console.log("initializeDeposit sig", initializeDepositSig);
+    const [depositPda] = findDepositPda(keypair.publicKey, tokenMint);
+    await waitForAccount(client, depositPda);
   }
 
-  // 2. If deposit is already delegated (owned by PER), undelegate first
-  const [depositPda] = findDepositPda(keypair.publicKey, tokenMint);
-  const depositAccountInfo =
-    await client.program.provider.connection.getAccountInfo(depositPda);
-  const wasDelegated =
-    depositAccountInfo && !depositAccountInfo.owner.equals(PROGRAM_ID);
-
-  if (wasDelegated) {
-    console.log(
-      "deposit is delegated (owner:",
-      depositAccountInfo.owner.toString(),
-      "), undelegating first..."
-    );
-    const perClient = await getPerClient();
-
-    // Subscribe to owner changes so we know when undelegation is complete
-    let resolveUndelegation: () => void;
-    const undelegationReady = new Promise<void>((r) => {
-      resolveUndelegation = r;
-    });
-    const subId = client.program.provider.connection.onAccountChange(
-      depositPda,
-      (info) => {
-        console.log(
-          "depositPda owner changed ->",
-          info.owner.toString()
-        );
-        if (info.owner.equals(PROGRAM_ID)) resolveUndelegation();
-      },
-      { commitment: "confirmed" }
-    );
-
-    const undelegateSig = await perClient.undelegateDeposit({
-      tokenMint,
-      user: keypair.publicKey,
-      payer: keypair.publicKey,
-      magicProgram: MAGIC_PROGRAM_ID,
-      magicContext: MAGIC_CONTEXT_ID,
-    });
-    console.log("undelegateDeposit sig", undelegateSig);
-
-    console.log("waiting for undelegation to complete...");
-    await undelegationReady;
-    console.log("undelegation complete");
-
-    await client.program.provider.connection.removeAccountChangeListener(
-      subId
-    );
-  }
-
-  // 3. Wrap native SOL → wSOL if needed
+  // 2. Wrap native SOL → wSOL if needed
   const isNativeSol = tokenMint.equals(NATIVE_MINT);
   const connection = getConnection();
   let createdAta = false;
 
   if (isNativeSol) {
+    console.log("wrapSolToWSol");
     const result = await wrapSolToWSol({
       connection,
       payer: keypair,
@@ -144,6 +193,22 @@ export async function shieldTokens(params: {
     TOKEN_PROGRAM_ID
   );
   console.log("userTokenAccount", userTokenAccount.toString());
+
+  // 3. Undelegate if currently delegated (modifyBalance requires base layer ownership)
+  const [depositPda] = findDepositPda(keypair.publicKey, tokenMint);
+  const depositAccountInfo =
+    await client.baseProgram.provider.connection.getAccountInfo(depositPda);
+  if (depositAccountInfo?.owner.equals(DELEGATION_PROGRAM_ID)) {
+    console.log("undelegateDeposit (deposit is delegated, undelegating first)");
+    const undelegateSig = await client.undelegateDeposit({
+      tokenMint,
+      user: keypair.publicKey,
+      payer: keypair.publicKey,
+      magicProgram: MAGIC_PROGRAM_ID,
+      magicContext: MAGIC_CONTEXT_ID,
+    });
+    console.log("undelegateDeposit sig", undelegateSig);
+  }
 
   // 4. Move tokens into the deposit vault
   console.log("modifyBalance");
@@ -195,80 +260,31 @@ export async function shieldTokens(params: {
     // May already be delegated
   }
 
+  console.log(`< shieldTokens (${Date.now() - startTime}ms)`);
+
   return signature;
 }
 
 /**
  * Unshield tokens: move from Loyal private deposit back to regular wallet.
- * Flow: undelegateDeposit (via PER) → modifyBalance(decrease) on base layer
+ * Flow: undelegateDeposit (from PER to base layer) → modifyBalance(decrease) → unwrap wSOL if native → re-delegate remaining
  */
 export async function unshieldTokens(params: {
   tokenMint: PublicKey;
   amount: number;
 }): Promise<string> {
-  const keypair = await getWalletKeypair();
+  const startTime = Date.now();
+  console.log("> unshieldTokens");
+
   const { tokenMint, amount } = params;
 
-  // 1. Undelegate from PER
-  const perClient = await getPerClient();
+  const keypair = await getWalletKeypair();
+  const client = await getPrivateClient();
+  const connection = getConnection();
 
-  const [depositPda] = findDepositPda(keypair.publicKey, tokenMint);
-
-  const perPepositAccountInfo =
-    await perClient.program.provider.connection.getAccountInfo(depositPda);
-  console.log(
-    "perClient: depositPda owner",
-    perPepositAccountInfo?.owner?.toString() ?? "account not found"
-  );
-
-  const baseClient = await getBaseClient();
-  const baseDepositAccountInfo =
-    await baseClient.program.provider.connection.getAccountInfo(depositPda);
-  console.log(
-    "baseClient: depositPda owner",
-    baseDepositAccountInfo?.owner?.toString() ?? "account not found"
-  );
-
-  // Subscribe to depositPda owner changes on both connections,
-  // resolving when owner matches PROGRAM_ID
-  let perResolve: () => void;
-  let baseResolve: () => void;
-  const perOwnerReady = new Promise<void>((r) => {
-    perResolve = r;
-  });
-  const baseOwnerReady = new Promise<void>((r) => {
-    baseResolve = r;
-  });
-
-  const perSubId = perClient.program.provider.connection.onAccountChange(
-    depositPda,
-    (accountInfo) => {
-      console.log(
-        "perClient: depositPda owner changed ->",
-        accountInfo.owner.toString()
-      );
-      if (accountInfo.owner.equals(PROGRAM_ID)) perResolve();
-    },
-    { commitment: "confirmed" }
-  );
-  const baseSubId = baseClient.program.provider.connection.onAccountChange(
-    depositPda,
-    (accountInfo) => {
-      console.log(
-        "baseClient: depositPda owner changed ->",
-        accountInfo.owner.toString()
-      );
-      if (accountInfo.owner.equals(PROGRAM_ID)) baseResolve();
-    },
-    { commitment: "confirmed" }
-  );
-
-  // If already owned by PROGRAM_ID, resolve immediately
-  if (perPepositAccountInfo?.owner.equals(PROGRAM_ID)) perResolve!();
-  if (baseDepositAccountInfo?.owner.equals(PROGRAM_ID)) baseResolve!();
-
+  // 1. Undelegate from PER (waits for owner to be PROGRAM_ID on both connections)
   console.log("undelegateDeposit");
-  const undelegateDepositSig = await perClient.undelegateDeposit({
+  const undelegateDepositSig = await client.undelegateDeposit({
     tokenMint,
     user: keypair.publicKey,
     payer: keypair.publicKey,
@@ -278,14 +294,13 @@ export async function unshieldTokens(params: {
   console.log("undelegateDeposit sig", undelegateDepositSig);
 
   // 2. Withdraw tokens back to regular wallet
-  // const baseClient = await getBaseClient();
-  const connection = getConnection();
   const isNativeSol = tokenMint.equals(NATIVE_MINT);
 
   // Ensure wSOL ATA exists for native SOL withdrawals
   if (isNativeSol) {
     await wrapSolToWSol({ connection, payer: keypair, lamports: 0 });
   }
+  // FIXME(zotho): ensure ATA exist for any token mints
 
   const userTokenAccount = getAssociatedTokenAddressSync(
     tokenMint,
@@ -294,15 +309,8 @@ export async function unshieldTokens(params: {
     TOKEN_PROGRAM_ID
   );
 
-  // Wait for both connections to see depositPda owned by PROGRAM_ID
-  console.log(
-    "waiting for depositPda owner to be PROGRAM_ID on both connections..."
-  );
-  await Promise.all([perOwnerReady, baseOwnerReady]);
-  console.log("depositPda owner is PROGRAM_ID on both connections");
-
   console.log("modifyBalance");
-  const { signature } = await baseClient.modifyBalance({
+  const { signature } = await client.modifyBalance({
     tokenMint,
     amount,
     increase: false,
@@ -323,13 +331,25 @@ export async function unshieldTokens(params: {
     console.log("closeWsolAta done");
   }
 
-  // Clean up account change subscriptions
-  await perClient.program.provider.connection.removeAccountChangeListener(
-    perSubId
+  // 4. Re-delegate if there are remaining tokens in the deposit
+  const remainingDeposit = await client.getBaseDeposit(
+    keypair.publicKey,
+    tokenMint
   );
-  await baseClient.program.provider.connection.removeAccountChangeListener(
-    baseSubId
-  );
+  if (remainingDeposit && remainingDeposit.amount > BigInt(0)) {
+    console.log(
+      `delegateDeposit (remaining balance: ${remainingDeposit.amount.toString()})`
+    );
+    const delegateDepositSig = await client.delegateDeposit({
+      tokenMint,
+      user: keypair.publicKey,
+      payer: keypair.publicKey,
+      validator: ER_VALIDATOR,
+    });
+    console.log("delegateDeposit sig", delegateDepositSig);
+  }
+
+  console.log(`< unshieldTokens (${Date.now() - startTime}ms)`);
 
   return signature;
 }

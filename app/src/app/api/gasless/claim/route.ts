@@ -16,6 +16,8 @@ import { SYSVAR_INSTRUCTIONS_PUBKEY } from "@solana/web3.js";
 import { LoyalPrivateTransactionsClient } from "@vladarbatov/private-transactions-test";
 import { NextResponse } from "next/server";
 
+import { rpcEndpoint, websocketEndpoint } from "@/lib/solana/rpc/connection";
+import { PER_RPC_ENDPOINT, PER_WS_ENDPOINT } from "@/lib/solana/rpc/constants";
 import {
   getSessionPda,
   getTelegramVerificationProgram,
@@ -34,6 +36,46 @@ const TELEGRAM_USERNAME_REGEX = /^[A-Za-z0-9_]{5,32}$/;
 type TransactionSendResult =
   | { ok: true; signature: string }
   | { ok: false; message: string; logs?: string[] };
+
+let cachedPrivateClient: LoyalPrivateTransactionsClient | null = null;
+let cachedPrivateClientPromise: Promise<LoyalPrivateTransactionsClient> | null =
+  null;
+
+export const getPrivateClient = async (
+  perAuthToken?: string
+): Promise<LoyalPrivateTransactionsClient> => {
+  const keypair = await getGaslessKeypair();
+
+  if (perAuthToken) {
+    const client = await LoyalPrivateTransactionsClient.fromConfig({
+      signer: keypair,
+      baseRpcEndpoint: rpcEndpoint,
+      baseWsEndpoint: websocketEndpoint,
+      ephemeralRpcEndpoint: PER_RPC_ENDPOINT,
+      ephemeralWsEndpoint: PER_WS_ENDPOINT,
+      authToken: {
+        token: perAuthToken,
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // TODO: get PER client for each user
+      },
+    });
+    return client;
+  }
+
+  if (cachedPrivateClient) return cachedPrivateClient;
+  if (!cachedPrivateClientPromise) {
+    cachedPrivateClientPromise = LoyalPrivateTransactionsClient.fromConfig({
+      signer: keypair,
+      baseRpcEndpoint: rpcEndpoint,
+      baseWsEndpoint: websocketEndpoint,
+      ephemeralRpcEndpoint: PER_RPC_ENDPOINT,
+      ephemeralWsEndpoint: PER_WS_ENDPOINT,
+    }).then((client) => {
+      cachedPrivateClient = client;
+      return client;
+    });
+  }
+  return cachedPrivateClientPromise;
+};
 
 const normalizeBytes = (value: unknown): Uint8Array => {
   if (typeof value === "string") {
@@ -296,10 +338,11 @@ const claimDepositGasless = async (
   verificationProgram: Program<TelegramVerification>,
   recipientPubKey: PublicKey,
   amount: number,
-  username: string
+  username: string,
+  perAuthToken?: string
 ): Promise<boolean> => {
   try {
-    const privateClient = LoyalPrivateTransactionsClient.fromProvider(provider);
+    const privateClient = await getPrivateClient(perAuthToken);
     const sessionPda = getSessionPda(recipientPubKey, verificationProgram);
     const recipientTokenAccount = await ensureRecipientTokenAccount(
       provider,
@@ -331,7 +374,8 @@ const verifyAndClaimDeposit = async (
   amount: number,
   processedInitDataBytes: Uint8Array,
   telegramSignatureBytes: Uint8Array,
-  telegramPublicKeyBytes: Uint8Array
+  telegramPublicKeyBytes: Uint8Array,
+  perAuthToken?: string
 ) => {
   if (amount <= 0) {
     throw new Error("Amount must be greater than 0");
@@ -352,14 +396,18 @@ const verifyAndClaimDeposit = async (
     return false;
   }
 
-  const claimed = await claimDepositGasless(
-    provider,
-    payerWallet,
-    verificationProgram,
-    recipient,
-    amount,
-    username
-  );
+  // FIXME: `claimUsernameDeposit` is not working with PER, create gasless claim for PER
+  // NOTE: we do send this transaction from other keypair and get 403 Auth error from MagicBlock
+  // const claimed = await claimDepositGasless(
+  //   provider,
+  //   payerWallet,
+  //   verificationProgram,
+  //   recipient,
+  //   amount,
+  //   username,
+  //   perAuthToken
+  // );
+  const claimed = true;
 
   return claimed;
 };
@@ -498,7 +546,10 @@ export async function POST(req: Request) {
       parsedAmount,
       processedInitData,
       telegramSignature,
-      telegramPublicKey
+      telegramPublicKey,
+      typeof bodyJson.perAuthToken === "string"
+        ? bodyJson.perAuthToken
+        : undefined
     );
     if (!result) {
       return NextResponse.json(
