@@ -24,17 +24,8 @@ export async function transferTokens(params: {
     destination,
     tokenMint
   );
-  const existingEphemeralDeposit = await client.getEphemeralDeposit(
-    destination,
-    tokenMint
-  );
   console.log("existingBaseDeposit", prettyStringify(existingBaseDeposit));
-  console.log(
-    "existingEphemeralDeposit",
-    prettyStringify(existingEphemeralDeposit)
-  );
-  if (!existingBaseDeposit && !existingEphemeralDeposit) {
-    // FIXME: ephemeralDeposit could not exist
+  if (!existingBaseDeposit) {
     console.log("initializeDeposit for destination user");
     const initializeDepositSig = await client.initializeDeposit({
       tokenMint,
