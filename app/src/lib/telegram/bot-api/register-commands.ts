@@ -3,7 +3,13 @@ import type { Bot } from "grammy";
 export async function registerBotCommands(bot: Bot): Promise<void> {
   // Commands for private chats
   await bot.api.setMyCommands(
-    [{ command: "start", description: "Start the bot and get help" }],
+    [
+      { command: "start", description: "Start the bot and get help" },
+      {
+        command: "settings",
+        description: "Manage your private notification settings",
+      },
+    ],
     { scope: { type: "all_private_chats" } }
   );
 
