@@ -97,7 +97,7 @@ export default function TelegramLayoutClient({
     <TelegramAppRootClient>
       <Toaster
         position="top-center"
-        offset={130}
+        offset={headerHeight}
         options={{
           fill: "black",
           styles: {
