@@ -32,15 +32,22 @@ export function getStartParamRoute(): string | undefined {
     return `/telegram/summaries/feed?${params.toString()}`;
   };
 
+  // TODO: remove diagnostic logs after deeplink debugging
+  console.warn("[deeplink] href:", window.location.href);
+  console.warn("[deeplink] hash:", window.location.hash);
+  console.warn("[deeplink] search:", window.location.search);
+
   // 1. Try SDK extraction (handles all Telegram client variations)
   try {
     const launchParams = retrieveLaunchParams();
+    console.warn("[deeplink] SDK tgWebAppStartParam:", launchParams.tgWebAppStartParam);
     const routeFromSdk = mapStartParamToRoute(launchParams.tgWebAppStartParam);
     if (routeFromSdk) {
+      console.warn("[deeplink] route from SDK:", routeFromSdk);
       return routeFromSdk;
     }
-  } catch {
-    // SDK extraction failed (e.g. not in Telegram context) — fall through
+  } catch (e) {
+    console.warn("[deeplink] SDK extraction failed:", e);
   }
 
   // 2. Fallback: manual hash / search-param parsing
@@ -49,6 +56,7 @@ export function getStartParamRoute(): string | undefined {
     if (hash) {
       const params = new URLSearchParams(hash.slice(1));
       const startParam = params.get("tgWebAppStartParam");
+      console.warn("[deeplink] hash startParam:", startParam);
       const routeFromHash = mapStartParamToRoute(startParam);
       if (routeFromHash) {
         return routeFromHash;
@@ -57,6 +65,7 @@ export function getStartParamRoute(): string | undefined {
 
     const searchParams = new URLSearchParams(window.location.search);
     const startParam = searchParams.get("tgWebAppStartParam");
+    console.warn("[deeplink] search startParam:", startParam);
     const routeFromSearch = mapStartParamToRoute(startParam);
     if (routeFromSearch) {
       return routeFromSearch;
@@ -65,5 +74,6 @@ export function getStartParamRoute(): string | undefined {
     console.debug("Failed to parse startParam from URL:", error);
   }
 
+  console.warn("[deeplink] no route found, falling back");
   return undefined;
 }
