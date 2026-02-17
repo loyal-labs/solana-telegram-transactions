@@ -466,7 +466,12 @@ export default function SendSheet({
     }
 
     if (step === 4) {
-      const hasEnoughSolForFee = balanceInSol >= amountInSol + SOLANA_FEE_SOL;
+      // Secured token tx fees are paid from the regular SOL wallet,
+      // not the token balance. For regular SOL, both come from the same balance.
+      const isSecuredTransfer = selectedToken?.isSecured === true;
+      const hasEnoughSolForFee = isSecuredTransfer
+        ? walletBalanceInSol >= SOLANA_FEE_SOL
+        : balanceInSol >= amountInSol + SOLANA_FEE_SOL;
 
       const isValid =
         isAmountValid &&
@@ -479,7 +484,7 @@ export default function SendSheet({
     }
 
     onValidationChange?.(false);
-  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, solPriceUsd]);
+  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, walletBalanceInSol, selectedToken, solPriceUsd]);
 
 
   const handleRecipientSelect = (selected: string) => {
