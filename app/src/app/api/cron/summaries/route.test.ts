@@ -1,5 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
+import type { SendSummaryResult } from "@/lib/telegram/bot-api/types";
+
 mock.module("server-only", () => ({}));
 
 const TEST_ENV_KEYS = ["CRON_SECRET"] as const;
@@ -8,6 +10,20 @@ function clearTestEnv(): void {
   for (const key of TEST_ENV_KEYS) {
     delete process.env[key];
   }
+}
+
+function createDeliveredSummaryResult(
+  chatId: bigint,
+  messageId: number
+): SendSummaryResult {
+  return {
+    deliveredMessage: {
+      destinationChatId: chatId,
+      messageId,
+      sourceCommunityChatId: chatId,
+    },
+    sent: true as const,
+  };
 }
 
 mock.module("@/lib/core/database", () => ({
@@ -125,7 +141,7 @@ describe("cron summaries route", () => {
       ],
       deliverSummary: async (summaryId) => {
         deliveredSummaryIds.push(summaryId);
-        return { sent: true };
+        return createDeliveredSummaryResult(BigInt(101), 5001);
       },
       generateSummaryForRun: async (communityId) => {
         if (communityId === "community-1") {
@@ -206,7 +222,7 @@ describe("cron summaries route", () => {
       ],
       deliverSummary: async (summaryId) => {
         deliveredSummaryIds.push(summaryId);
-        return { sent: true };
+        return createDeliveredSummaryResult(BigInt(111), 5002);
       },
       generateSummaryForRun: async (communityId) => {
         if (communityId === "community-1") {
@@ -245,7 +261,7 @@ describe("cron summaries route", () => {
       ],
       deliverSummary: async (summaryId: string) => {
         deliveredSummaryIds.push(summaryId);
-        return { sent: true } as const;
+        return createDeliveredSummaryResult(BigInt(111), 5003);
       },
       generateSummaryForRun: async () => ({
         status: "existing" as const,
@@ -258,5 +274,114 @@ describe("cron summaries route", () => {
     await runDailyCommunitySummaries(options);
 
     expect(deliveredSummaryIds).toEqual(["existing-summary", "existing-summary"]);
+  });
+
+  test("forwards delivered summaries through quality control callback", async () => {
+    const forwardedCalls: Array<{
+      deliveredMessage: {
+        destinationChatId: bigint;
+        messageId: number;
+        sourceCommunityChatId: bigint;
+      };
+      summaryId: string;
+    }> = [];
+
+    const result = await runDailyCommunitySummaries({
+      activeCommunityCount: 1,
+      communities: [
+        {
+          id: "community-1",
+          chatId: BigInt(111),
+          chatTitle: "A",
+          summaryNotificationsEnabled: true,
+        },
+      ],
+      deliverSummary: async () => createDeliveredSummaryResult(BigInt(111), 9001),
+      forwardDeliveredSummary: async (summaryId, deliveredMessage) => {
+        forwardedCalls.push({ deliveredMessage, summaryId });
+      },
+      generateSummaryForRun: async () => ({
+        status: "created",
+        summaryId: "new-summary",
+        messageCount: 8,
+      }),
+    });
+
+    expect(forwardedCalls).toEqual([
+      {
+        deliveredMessage: {
+          destinationChatId: BigInt(111),
+          messageId: 9001,
+          sourceCommunityChatId: BigInt(111),
+        },
+        summaryId: "new-summary",
+      },
+    ]);
+    expect(result.stats.deliverySucceeded).toBe(1);
+    expect(result.stats.deliveryFailed).toBe(0);
+    expect(result.stats.errors).toBe(0);
+  });
+
+  test("keeps cron delivery successful when quality control forwarding fails", async () => {
+    const result = await runDailyCommunitySummaries({
+      activeCommunityCount: 1,
+      communities: [
+        {
+          id: "community-1",
+          chatId: BigInt(111),
+          chatTitle: "A",
+          summaryNotificationsEnabled: true,
+        },
+      ],
+      deliverSummary: async () => createDeliveredSummaryResult(BigInt(111), 9002),
+      forwardDeliveredSummary: async () => {
+        throw new Error("qc forward failed");
+      },
+      generateSummaryForRun: async () => ({
+        status: "created",
+        summaryId: "new-summary",
+        messageCount: 8,
+      }),
+    });
+
+    expect(result.stats.deliverySucceeded).toBe(1);
+    expect(result.stats.deliveryFailed).toBe(0);
+    expect(result.stats.errors).toBe(0);
+    expect(result.errors).toEqual([]);
+  });
+
+  test("does not forward when summary delivery is rejected", async () => {
+    let forwardedCallCount = 0;
+
+    const result = await runDailyCommunitySummaries({
+      activeCommunityCount: 1,
+      communities: [
+        {
+          id: "community-1",
+          chatId: BigInt(111),
+          chatTitle: "A",
+          summaryNotificationsEnabled: true,
+        },
+      ],
+      deliverSummary: async () => ({
+        sent: false as const,
+        reason: "notifications_disabled" as const,
+      }),
+      forwardDeliveredSummary: async () => {
+        forwardedCallCount += 1;
+      },
+      generateSummaryForRun: async () => ({
+        status: "created",
+        summaryId: "new-summary",
+        messageCount: 8,
+      }),
+    });
+
+    expect(forwardedCallCount).toBe(0);
+    expect(result.stats.deliveryAttempted).toBe(1);
+    expect(result.stats.deliverySucceeded).toBe(0);
+    expect(result.stats.deliveryFailed).toBe(1);
+    expect(result.stats.errors).toBe(1);
+    expect(result.errors[0]?.error).toContain("Summary delivery rejected");
   });
 });

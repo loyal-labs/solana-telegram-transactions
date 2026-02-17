@@ -12,10 +12,14 @@ import {
   sendSummaryById,
   type SummaryRunContext,
 } from "@/lib/telegram/bot-api/summaries";
-import type { SendSummaryResult } from "@/lib/telegram/bot-api/types";
+import type {
+  SendSummaryResult,
+  SummaryDeliveredMessage,
+} from "@/lib/telegram/bot-api/types";
 import { SUMMARY_INTERVAL_MS } from "@/lib/telegram/utils";
 
 export const runtime = "nodejs";
+const SUMMARY_QUALITY_CONTROL_CHAT_ID = BigInt("-5173720920");
 
 type ActiveCommunityRecord = {
   id: string;
@@ -49,6 +53,10 @@ type RunDailyCommunitySummariesOptions = {
   activeCommunityCount: number;
   communities: ActiveCommunityRecord[];
   deliverSummary: (summaryId: string) => Promise<SendSummaryResult>;
+  forwardDeliveredSummary?: (
+    summaryId: string,
+    deliveredMessage: SummaryDeliveredMessage
+  ) => Promise<void>;
   generateSummaryForRun: (
     communityId: string,
     chatTitle: string
@@ -85,15 +93,26 @@ export async function POST(request: Request): Promise<NextResponse> {
   });
 
   let botPromise: Promise<Awaited<ReturnType<typeof getBot>>> | null = null;
+  const getOrCreateBot = async () => {
+    if (!botPromise) {
+      botPromise = getBot();
+    }
+
+    return botPromise;
+  };
+
   const result = await runDailyCommunitySummaries({
     activeCommunityCount: activeCommunities.length,
     communities: activeCommunities,
     deliverSummary: async (summaryId) => {
-      if (!botPromise) {
-        botPromise = getBot();
-      }
-
-      return sendSummaryById(await botPromise, summaryId);
+      return sendSummaryById(await getOrCreateBot(), summaryId);
+    },
+    forwardDeliveredSummary: async (summaryId, deliveredMessage) => {
+      await forwardSummaryToQualityControl(
+        await getOrCreateBot(),
+        summaryId,
+        deliveredMessage
+      );
     },
     generateSummaryForRun: (communityId, chatTitle) =>
       generateOrGetSummaryForRun({
@@ -202,6 +221,22 @@ export async function runDailyCommunitySummaries(
       }
 
       stats.deliverySucceeded += 1;
+
+      if (options.forwardDeliveredSummary) {
+        // Quality-control forwarding is intentionally non-blocking.
+        try {
+          await options.forwardDeliveredSummary(
+            generationResult.summaryId,
+            deliveryResult.deliveredMessage
+          );
+        } catch (error) {
+          logQualityControlForwardFailure(
+            generationResult.summaryId,
+            deliveryResult.deliveredMessage,
+            error
+          );
+        }
+      }
     } catch (error) {
       stats.deliveryFailed += 1;
       stats.errors += 1;
@@ -216,6 +251,41 @@ export async function runDailyCommunitySummaries(
   }
 
   return { errors, stats };
+}
+
+async function forwardSummaryToQualityControl(
+  bot: Awaited<ReturnType<typeof getBot>>,
+  summaryId: string,
+  deliveredMessage: SummaryDeliveredMessage
+): Promise<void> {
+  await bot.api.forwardMessage(
+    Number(SUMMARY_QUALITY_CONTROL_CHAT_ID),
+    Number(deliveredMessage.destinationChatId),
+    deliveredMessage.messageId
+  );
+
+  console.log("[cron/summaries] Forwarded summary to quality control chat", {
+    destinationChatId: String(deliveredMessage.destinationChatId),
+    messageId: deliveredMessage.messageId,
+    qualityControlChatId: String(SUMMARY_QUALITY_CONTROL_CHAT_ID),
+    sourceCommunityChatId: String(deliveredMessage.sourceCommunityChatId),
+    summaryId,
+  });
+}
+
+function logQualityControlForwardFailure(
+  summaryId: string,
+  deliveredMessage: SummaryDeliveredMessage,
+  error: unknown
+): void {
+  console.error("[cron/summaries] Failed to forward summary to quality control chat", {
+    destinationChatId: String(deliveredMessage.destinationChatId),
+    error: error instanceof Error ? error.message : String(error),
+    messageId: deliveredMessage.messageId,
+    qualityControlChatId: String(SUMMARY_QUALITY_CONTROL_CHAT_ID),
+    sourceCommunityChatId: String(deliveredMessage.sourceCommunityChatId),
+    summaryId,
+  });
 }
 
 function validateAuthHeader(request: Request): NextResponse | null {

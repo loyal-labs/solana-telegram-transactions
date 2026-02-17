@@ -21,7 +21,11 @@ import { chatCompletion } from "@/lib/redpill";
 
 import { buildSummaryMessageWithPreview } from "./build-summary-og-url";
 import { buildSummaryVoteKeyboard, getSummaryVoteTotals } from "./summary-votes";
-import type { SendLatestSummaryOptions, SendSummaryResult } from "./types";
+import type {
+  SendLatestSummaryOptions,
+  SendSummaryResult,
+  SummaryDeliveredMessage,
+} from "./types";
 
 export const MIN_MESSAGES_FOR_SUMMARY = 3;
 const MAX_SUMMARY_INPUT_CHARS = 12_000;
@@ -217,7 +221,7 @@ export async function sendLatestSummary(
     return { sent: false, reason: "no_summaries" };
   }
 
-  await sendSummaryToChat(
+  const deliveredMessage = await sendSummaryToChat(
     bot,
     {
       createdAt: latestSummary.createdAt,
@@ -231,7 +235,7 @@ export async function sendLatestSummary(
     }
   );
 
-  return { sent: true };
+  return { deliveredMessage, sent: true };
 }
 
 export async function sendSummaryById(
@@ -252,7 +256,7 @@ export async function sendSummaryById(
     return { sent: false, reason: "notifications_disabled" };
   }
 
-  await sendSummaryToChat(
+  const deliveredMessage = await sendSummaryToChat(
     bot,
     {
       createdAt: summary.createdAt,
@@ -266,7 +270,7 @@ export async function sendSummaryById(
     }
   );
 
-  return { sent: true };
+  return { deliveredMessage, sent: true };
 }
 
 async function countMessagesInWindow(
@@ -356,7 +360,7 @@ async function sendSummaryToChat(
     sourceCommunityChatId: bigint;
     replyToMessageId?: number;
   }
-): Promise<void> {
+): Promise<SummaryDeliveredMessage> {
   const safeOneliner = escapeTelegramHtml(summary.oneliner);
   const messageBody = `Summary: ${safeOneliner}`;
 
@@ -382,21 +386,35 @@ async function sendSummaryToChat(
 
   if (options.replyToMessageId) {
     try {
-      await bot.api.sendMessage(Number(options.destinationChatId), messageWithPreview, {
-        ...messageOptions,
-        reply_parameters: { message_id: options.replyToMessageId },
-      });
-      return;
+      const sentMessage = await bot.api.sendMessage(
+        Number(options.destinationChatId),
+        messageWithPreview,
+        {
+          ...messageOptions,
+          reply_parameters: { message_id: options.replyToMessageId },
+        }
+      );
+      return {
+        destinationChatId: options.destinationChatId,
+        messageId: sentMessage.message_id,
+        sourceCommunityChatId: options.sourceCommunityChatId,
+      };
     } catch (error) {
       console.log("Failed to send summary as reply, sending without reply", error);
     }
   }
 
-  await bot.api.sendMessage(
+  const sentMessage = await bot.api.sendMessage(
     Number(options.destinationChatId),
     messageWithPreview,
     messageOptions
   );
+
+  return {
+    destinationChatId: options.destinationChatId,
+    messageId: sentMessage.message_id,
+    sourceCommunityChatId: options.sourceCommunityChatId,
+  };
 }
 
 function escapeTelegramHtml(text: string): string {

@@ -63,6 +63,19 @@ mock.module("@/lib/redpill", () => ({
 let sendLatestSummary: typeof import("../summaries").sendLatestSummary;
 let sendSummaryById: typeof import("../summaries").sendSummaryById;
 
+function createActiveSummaryRecord(): Exclude<SummaryWithCommunityRecord, null> {
+  return {
+    community: {
+      chatId: BigInt("-1001234567890"),
+      isActive: true,
+      summaryNotificationsEnabled: true,
+    },
+    createdAt: new Date("2026-02-12T00:00:00Z"),
+    id: SUMMARY_ID,
+    oneliner: "Daily recap",
+  };
+}
+
 describe("summary delivery guards", () => {
   beforeAll(async () => {
     const loadedModule = await import("../summaries");
@@ -85,21 +98,12 @@ describe("summary delivery guards", () => {
       api: {
         sendMessage: async (...args: unknown[]) => {
           sendMessageCalls.push(args);
-          return {} as never;
+          return { message_id: 321 } as never;
         },
       },
     } as unknown as Bot;
 
-    summaryResult = {
-      community: {
-        chatId: BigInt("-1001234567890"),
-        isActive: true,
-        summaryNotificationsEnabled: true,
-      },
-      createdAt: new Date("2026-02-12T00:00:00Z"),
-      id: SUMMARY_ID,
-      oneliner: "Daily recap",
-    };
+    summaryResult = createActiveSummaryRecord();
     summaryVoteTotalsResult = {
       dislikes: 2,
       likes: 5,
@@ -107,7 +111,14 @@ describe("summary delivery guards", () => {
 
     const result = await sendSummaryById(bot, SUMMARY_ID);
 
-    expect(result).toEqual({ sent: true });
+    expect(result).toEqual({
+      deliveredMessage: {
+        destinationChatId: BigInt("-1001234567890"),
+        messageId: 321,
+        sourceCommunityChatId: BigInt("-1001234567890"),
+      },
+      sent: true,
+    });
     expect(sendMessageCalls).toHaveLength(1);
     const [, , messageOptions] = sendMessageCalls[0] as [
       number,
@@ -146,6 +157,112 @@ describe("summary delivery guards", () => {
     expect(rows[1][0]?.url).toBe(
       buildSummaryFeedMiniAppUrl(summaryResult!.community.chatId, SUMMARY_ID)
     );
+  });
+
+  test("sendLatestSummary returns delivered message metadata on success", async () => {
+    const sendMessageCalls: unknown[] = [];
+    const bot = {
+      api: {
+        sendMessage: async (...args: unknown[]) => {
+          sendMessageCalls.push(args);
+          return { message_id: 654 } as never;
+        },
+      },
+    } as unknown as Bot;
+
+    communityResult = {
+      chatId: BigInt("-1001234567890"),
+      id: "community-1",
+      isActive: true,
+      summaryNotificationsEnabled: true,
+    };
+    summaryResult = createActiveSummaryRecord();
+
+    const result = await sendLatestSummary(bot, BigInt("-1001234567890"));
+
+    expect(result).toEqual({
+      deliveredMessage: {
+        destinationChatId: BigInt("-1001234567890"),
+        messageId: 654,
+        sourceCommunityChatId: BigInt("-1001234567890"),
+      },
+      sent: true,
+    });
+    expect(sendMessageCalls).toHaveLength(1);
+  });
+
+  test("sendSummaryById uses reply result message id when reply send succeeds", async () => {
+    const sendMessageCalls: unknown[] = [];
+    const bot = {
+      api: {
+        sendMessage: async (...args: unknown[]) => {
+          sendMessageCalls.push(args);
+          return { message_id: 901 } as never;
+        },
+      },
+    } as unknown as Bot;
+
+    summaryResult = createActiveSummaryRecord();
+
+    const result = await sendSummaryById(bot, SUMMARY_ID, {
+      replyToMessageId: 42,
+    });
+
+    expect(result).toEqual({
+      deliveredMessage: {
+        destinationChatId: BigInt("-1001234567890"),
+        messageId: 901,
+        sourceCommunityChatId: BigInt("-1001234567890"),
+      },
+      sent: true,
+    });
+    expect(sendMessageCalls).toHaveLength(1);
+    const [, , options] = sendMessageCalls[0] as [
+      number,
+      string,
+      {
+        reply_parameters?: {
+          message_id: number;
+        };
+      },
+    ];
+    expect(options.reply_parameters?.message_id).toBe(42);
+  });
+
+  test("sendSummaryById falls back and returns fallback message id when reply send fails", async () => {
+    const sendMessageCalls: unknown[] = [];
+    const bot = {
+      api: {
+        sendMessage: async (...args: unknown[]) => {
+          sendMessageCalls.push(args);
+          const [, , options] = args as [
+            number,
+            string,
+            { reply_parameters?: { message_id: number } },
+          ];
+          if (options.reply_parameters) {
+            throw new Error("reply failed");
+          }
+          return { message_id: 902 } as never;
+        },
+      },
+    } as unknown as Bot;
+
+    summaryResult = createActiveSummaryRecord();
+
+    const result = await sendSummaryById(bot, SUMMARY_ID, {
+      replyToMessageId: 42,
+    });
+
+    expect(result).toEqual({
+      deliveredMessage: {
+        destinationChatId: BigInt("-1001234567890"),
+        messageId: 902,
+        sourceCommunityChatId: BigInt("-1001234567890"),
+      },
+      sent: true,
+    });
+    expect(sendMessageCalls).toHaveLength(2);
   });
 
   test("sendSummaryById returns no_summaries when summary does not exist", async () => {
