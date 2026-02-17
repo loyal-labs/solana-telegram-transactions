@@ -18,7 +18,14 @@ Reference: `app/.env.example`.
 
 ### Register Telegram bot commands
 
-Call the setup endpoint once after deployment (or when commands change):
+Run the setup script once after deployment (or when commands change):
+
+```bash
+cd app
+bun run telegram:setup-commands
+```
+
+Optional fallback (if you prefer endpoint-based setup):
 
 - Endpoint: `POST /api/telegram/setup-commands`
 - Auth header: `Authorization: Bearer <TELEGRAM_SETUP_SECRET>`
