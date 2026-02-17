@@ -21,6 +21,12 @@ type InsertedVoteValues = {
 
 const SUMMARY_ID = "123e4567-e89b-12d3-a456-426614174000";
 const GROUP_CHAT_ID = "-1001234567890";
+const SUMMARY_VOTE_LIKE_CUSTOM_EMOJI_ID = "5447485069386090205";
+const SUMMARY_VOTE_DISLIKE_CUSTOM_EMOJI_ID = "5445146433923616423";
+const SUMMARY_OPEN_BUTTON_CUSTOM_EMOJI_ID = "5375302886936842644";
+const SUMMARY_SCORE_ZERO_CUSTOM_EMOJI_ID = "5447522585925426434";
+const SUMMARY_SCORE_NEGATIVE_CUSTOM_EMOJI_ID = "5447484068658714886";
+const SUMMARY_SCORE_POSITIVE_CUSTOM_EMOJI_ID = "5445293605272984280";
 
 let currentVoteTotals = { likes: 0, dislikes: 0 };
 let insertBehavior: "inserted" | "duplicate" | "throw" = "inserted";
@@ -169,21 +175,63 @@ describe("summary vote keyboard", () => {
     expect(rows[0]).toHaveLength(3);
     expect(rows[1]).toHaveLength(1);
 
-    expect(rows[0][0]?.text).toBe("👍👍👍");
-    expect(rows[0][0]?.style).toBe("success");
+    expect(rows[0][0]?.text).toBe("Like");
+    expect(rows[0][0]?.style).toBeUndefined();
+    expect(rows[0][0]?.icon_custom_emoji_id).toBe(
+      SUMMARY_VOTE_LIKE_CUSTOM_EMOJI_ID
+    );
     expect(rows[0][0]?.callback_data).toBe(`sv:u:${SUMMARY_ID}:${GROUP_CHAT_ID}`);
 
     expect(rows[0][1]?.text).toBe("Score: 3");
+    expect(rows[0][1]?.icon_custom_emoji_id).toBe(
+      SUMMARY_SCORE_POSITIVE_CUSTOM_EMOJI_ID
+    );
     expect(rows[0][1]?.callback_data).toBe(`sv:s:${SUMMARY_ID}:${GROUP_CHAT_ID}`);
 
-    expect(rows[0][2]?.text).toBe("👎👎👎");
-    expect(rows[0][2]?.style).toBe("danger");
+    expect(rows[0][2]?.text).toBe("Dislike");
+    expect(rows[0][2]?.style).toBeUndefined();
+    expect(rows[0][2]?.icon_custom_emoji_id).toBe(
+      SUMMARY_VOTE_DISLIKE_CUSTOM_EMOJI_ID
+    );
     expect(rows[0][2]?.callback_data).toBe(`sv:d:${SUMMARY_ID}:${GROUP_CHAT_ID}`);
 
     expect(rows[1][0]?.text).toBe("Open");
     expect(rows[1][0]?.style).toBe("primary");
+    expect(rows[1][0]?.icon_custom_emoji_id).toBe(
+      SUMMARY_OPEN_BUTTON_CUSTOM_EMOJI_ID
+    );
     expect(rows[1][0]?.url).toBe(
       buildSummaryFeedMiniAppUrl(GROUP_CHAT_ID, SUMMARY_ID)
+    );
+  });
+
+  test("uses neutral score icon when score is zero", () => {
+    const keyboard = buildSummaryVoteKeyboard(
+      BigInt(GROUP_CHAT_ID),
+      SUMMARY_ID,
+      4,
+      4
+    );
+    const rows = keyboard.inline_keyboard;
+
+    expect(rows[0][1]?.text).toBe("Score: 0");
+    expect(rows[0][1]?.icon_custom_emoji_id).toBe(
+      SUMMARY_SCORE_ZERO_CUSTOM_EMOJI_ID
+    );
+  });
+
+  test("uses negative score icon when score is below zero", () => {
+    const keyboard = buildSummaryVoteKeyboard(
+      BigInt(GROUP_CHAT_ID),
+      SUMMARY_ID,
+      1,
+      3
+    );
+    const rows = keyboard.inline_keyboard;
+
+    expect(rows[0][1]?.text).toBe("Score: -2");
+    expect(rows[0][1]?.icon_custom_emoji_id).toBe(
+      SUMMARY_SCORE_NEGATIVE_CUSTOM_EMOJI_ID
     );
   });
 });
@@ -268,7 +316,12 @@ describe("handleSummaryVoteCallback", () => {
       {
         reply_markup: {
           inline_keyboard: Array<
-            Array<{ callback_data?: string; style?: string; text?: string }>
+            Array<{
+              callback_data?: string;
+              icon_custom_emoji_id?: string;
+              style?: string;
+              text?: string;
+            }>
           >;
         };
       },
@@ -277,12 +330,21 @@ describe("handleSummaryVoteCallback", () => {
     expect(payload.reply_markup.inline_keyboard[0]?.[0]?.callback_data).toBe(
       `sv:u:${SUMMARY_ID}:${GROUP_CHAT_ID}`
     );
-    expect(payload.reply_markup.inline_keyboard[0]?.[0]?.style).toBe("success");
+    expect(payload.reply_markup.inline_keyboard[0]?.[0]?.style).toBeUndefined();
+    expect(payload.reply_markup.inline_keyboard[0]?.[0]?.icon_custom_emoji_id).toBe(
+      SUMMARY_VOTE_LIKE_CUSTOM_EMOJI_ID
+    );
     expect(payload.reply_markup.inline_keyboard[0]?.[1]?.text).toBe("Score: 1");
+    expect(payload.reply_markup.inline_keyboard[0]?.[1]?.icon_custom_emoji_id).toBe(
+      SUMMARY_SCORE_POSITIVE_CUSTOM_EMOJI_ID
+    );
     expect(payload.reply_markup.inline_keyboard[0]?.[1]?.callback_data).toBe(
       `sv:s:${SUMMARY_ID}:${GROUP_CHAT_ID}`
     );
-    expect(payload.reply_markup.inline_keyboard[0]?.[2]?.style).toBe("danger");
+    expect(payload.reply_markup.inline_keyboard[0]?.[2]?.style).toBeUndefined();
+    expect(payload.reply_markup.inline_keyboard[0]?.[2]?.icon_custom_emoji_id).toBe(
+      SUMMARY_VOTE_DISLIKE_CUSTOM_EMOJI_ID
+    );
 
     expect(answerCalls).toEqual([undefined]);
     expect(mixpanelTrackCalls).toEqual([
