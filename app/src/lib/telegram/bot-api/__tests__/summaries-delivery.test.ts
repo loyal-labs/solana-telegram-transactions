@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Bot } from "grammy";
 
-import { MINI_APP_FEED_LINK } from "../constants";
+import { buildSummaryFeedMiniAppUrl } from "@/lib/telegram/mini-app/start-param";
 
 mock.module("server-only", () => ({}));
 
@@ -129,15 +129,23 @@ describe("summary delivery guards", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveLength(3);
     expect(rows[1]).toHaveLength(1);
-    expect(rows[0][0]?.callback_data).toBe(`sv:u:${SUMMARY_ID}`);
+    expect(rows[0][0]?.callback_data).toBe(
+      `sv:u:${SUMMARY_ID}:${summaryResult!.community.chatId}`
+    );
     expect(rows[0][0]?.style).toBe("success");
     expect(rows[0][1]?.text).toBe("Score: 3");
-    expect(rows[0][1]?.callback_data).toBe(`sv:s:${SUMMARY_ID}`);
-    expect(rows[0][2]?.callback_data).toBe(`sv:d:${SUMMARY_ID}`);
+    expect(rows[0][1]?.callback_data).toBe(
+      `sv:s:${SUMMARY_ID}:${summaryResult!.community.chatId}`
+    );
+    expect(rows[0][2]?.callback_data).toBe(
+      `sv:d:${SUMMARY_ID}:${summaryResult!.community.chatId}`
+    );
     expect(rows[0][2]?.style).toBe("danger");
     expect(rows[1][0]?.text).toBe("Open");
     expect(rows[1][0]?.style).toBe("primary");
-    expect(rows[1][0]?.url).toBe(MINI_APP_FEED_LINK);
+    expect(rows[1][0]?.url).toBe(
+      buildSummaryFeedMiniAppUrl(summaryResult!.community.chatId, SUMMARY_ID)
+    );
   });
 
   test("sendSummaryById returns no_summaries when summary does not exist", async () => {

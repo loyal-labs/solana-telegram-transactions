@@ -1,8 +1,9 @@
 import { InlineKeyboard, InlineQueryResultBuilder } from "grammy";
 import { PreparedInlineMessage } from "grammy/types";
 
+import { MINI_APP_LINK } from "@/lib/telegram/constants";
+
 import { getBot } from "./bot";
-import { MINI_APP_LINK } from "./constants";
 
 export const prepareInlineMessage = async (
   userId: number,

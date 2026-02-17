@@ -7,8 +7,7 @@ import {
 } from "grammy";
 
 import { resolveEndpoint } from "@/lib/core/api";
-
-import { MINI_APP_LINK } from "./constants";
+import { MINI_APP_LINK } from "@/lib/telegram/constants";
 
 type StartCarouselAction = "prev" | "next";
 

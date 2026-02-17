@@ -1,9 +1,9 @@
 import { InlineKeyboard } from "grammy";
 
 import { resolveEndpoint } from "@/lib/core/api";
+import { MINI_APP_LINK } from "@/lib/telegram/constants";
 
 import { getBot } from "./bot";
-import { MINI_APP_LINK } from "./constants";
 
 const buildOgImageUrl = (
   sender: string,

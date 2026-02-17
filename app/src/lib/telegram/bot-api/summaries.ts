@@ -226,6 +226,7 @@ export async function sendLatestSummary(
     },
     {
       destinationChatId,
+      sourceCommunityChatId: sourceChatId,
       replyToMessageId,
     }
   );
@@ -260,6 +261,7 @@ export async function sendSummaryById(
     },
     {
       destinationChatId: options?.destinationChatId ?? summary.community.chatId,
+      sourceCommunityChatId: summary.community.chatId,
       replyToMessageId: options?.replyToMessageId,
     }
   );
@@ -351,6 +353,7 @@ async function sendSummaryToChat(
   summary: Pick<Summary, "createdAt" | "id" | "oneliner">,
   options: {
     destinationChatId: bigint;
+    sourceCommunityChatId: bigint;
     replyToMessageId?: number;
   }
 ): Promise<void> {
@@ -365,6 +368,7 @@ async function sendSummaryToChat(
 
   const voteTotals = await getSummaryVoteTotals(summary.id);
   const keyboard = buildSummaryVoteKeyboard(
+    options.sourceCommunityChatId,
     summary.id,
     voteTotals.likes,
     voteTotals.dislikes
