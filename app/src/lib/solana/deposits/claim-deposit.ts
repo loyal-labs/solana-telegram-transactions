@@ -6,10 +6,10 @@ import {
   NATIVE_MINT,
 } from "@solana/spl-token";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { LoyalPrivateTransactionsClient } from "@vladarbatov/private-transactions-test";
 
 import type { TelegramVerification } from "../../../../../target/types/telegram_verification";
 import { getSessionPda } from "../solana-helpers";
+import { getPrivateClient } from "./private-client";
 
 const ensureRecipientTokenAccount = async (
   provider: AnchorProvider,
@@ -45,11 +45,13 @@ export const claimDeposit = async (
   amount: number,
   username: string
 ): Promise<boolean> => {
+  throw Error("claimDeposit not fixed");
+
   if (amount <= 0) {
     throw new Error("Amount must be greater than 0");
   }
 
-  const privateClient = LoyalPrivateTransactionsClient.fromProvider(provider);
+  const privateClient = await getPrivateClient();
   const sessionPda = getSessionPda(recipient, verificationProgram);
   const { recipientTokenAccount, createdAta } =
     await ensureRecipientTokenAccount(provider, recipient);

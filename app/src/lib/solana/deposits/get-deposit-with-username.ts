@@ -1,18 +1,18 @@
-import { AnchorProvider } from "@coral-xyz/anchor";
 import { NATIVE_MINT } from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
 import {
   findUsernameDepositPda,
-  LoyalPrivateTransactionsClient,
   type UsernameDepositData,
 } from "@vladarbatov/private-transactions-test";
 
 import type { TelegramDeposit } from "../../../types/deposits";
+import { getPrivateClient } from "./private-client";
 
 const mapUsernameDepositToTelegramDeposit = (
-  provider: AnchorProvider,
+  user: PublicKey,
   deposit: UsernameDepositData
 ): TelegramDeposit => ({
-  user: provider.publicKey,
+  user,
   username: deposit.username,
   amount: Number(deposit.amount),
   lastNonce: 0,
@@ -21,32 +21,35 @@ const mapUsernameDepositToTelegramDeposit = (
 });
 
 export const getDepositWithUsername = async (
-  provider: AnchorProvider,
+  user: PublicKey,
   username: string
 ): Promise<TelegramDeposit[]> => {
-  const privateClient = LoyalPrivateTransactionsClient.fromProvider(provider);
-  const deposit = await privateClient.getUsernameDeposit(username, NATIVE_MINT);
+  const privateClient = await getPrivateClient();
+  const deposit = await privateClient.getEphemeralUsernameDeposit(
+    username,
+    NATIVE_MINT
+  );
   if (!deposit) {
     return [];
   }
 
-  return [mapUsernameDepositToTelegramDeposit(provider, deposit)];
+  return [mapUsernameDepositToTelegramDeposit(user, deposit)];
 };
 
 export const subscribeToDepositsWithUsername = async (
-  provider: AnchorProvider,
+  user: PublicKey,
   username: string,
   onChange: (deposit: TelegramDeposit) => void
 ): Promise<() => Promise<void>> => {
-  const privateClient = LoyalPrivateTransactionsClient.fromProvider(provider);
+  const privateClient = await getPrivateClient();
   const [depositPda] = findUsernameDepositPda(username, NATIVE_MINT);
-  const connection = provider.connection;
 
-  const subscriptionId = await connection.onAccountChange(
+  const connection = privateClient.ephemeralProgram.provider.connection;
+  const subscriptionId = connection.onAccountChange(
     depositPda,
     async () => {
       try {
-        const deposit = await privateClient.getUsernameDeposit(
+        const deposit = await privateClient.getEphemeralUsernameDeposit(
           username,
           NATIVE_MINT
         );
@@ -54,7 +57,7 @@ export const subscribeToDepositsWithUsername = async (
           return;
         }
 
-        onChange(mapUsernameDepositToTelegramDeposit(provider, deposit));
+        onChange(mapUsernameDepositToTelegramDeposit(user, deposit));
       } catch (error) {
         console.error("Failed to fetch username deposit account change", error);
       }
