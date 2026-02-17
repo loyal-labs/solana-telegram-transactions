@@ -673,7 +673,8 @@ export default function Home() {
   );
   const ensuredWalletRef = useRef(false);
   const claimInFlightRef = useRef(false);
-  const attemptedAutoClaimIdsRef = useRef<Set<string>>(new Set());
+  const autoClaimAttemptsRef = useRef<Map<string, number>>(new Map());
+  const [autoClaimPaused, setAutoClaimPaused] = useState(false);
 
   // Track seen transaction IDs to detect new ones for animation
   const seenTransactionIdsRef = useRef<Set<string>>(new Set());
@@ -1431,6 +1432,7 @@ export default function Home() {
         setIncomingTransactions((prev) =>
           prev.filter((tx) => tx.id !== transactionId)
         );
+        autoClaimAttemptsRef.current.delete(transactionId);
 
         await refreshWalletBalance(true);
         void loadWalletTransactions({ force: true });
@@ -1469,6 +1471,14 @@ export default function Home() {
             ? error.message
             : "Something went wrong. Please try again.";
         setClaimError(errorMessage);
+
+        // Track failure count and pause auto-claim for retry after delay
+        const attempts =
+          (autoClaimAttemptsRef.current.get(transactionId) ?? 0) + 1;
+        autoClaimAttemptsRef.current.set(transactionId, attempts);
+        if (attempts < 3) {
+          setAutoClaimPaused(true);
+        }
       } finally {
         claimInFlightRef.current = false;
         setIsClaimingTransaction(false);
@@ -1644,30 +1654,48 @@ export default function Home() {
     };
   }, [rawInitData]);
 
+  // Auto-clear pause after delay to allow claim retry
+  useEffect(() => {
+    if (!autoClaimPaused) return;
+    const timer = setTimeout(() => {
+      setAutoClaimPaused(false);
+      setClaimError(null);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [autoClaimPaused]);
+
   // Auto-claim incoming transactions
   useEffect(() => {
-    // Don't auto-claim if already claiming or no transactions
-    if (isClaimingTransaction || incomingTransactions.length === 0) {
+    // Don't auto-claim if already claiming, paused for retry, or no transactions
+    if (
+      autoClaimPaused ||
+      isClaimingTransaction ||
+      incomingTransactions.length === 0
+    ) {
       return;
     }
 
     // Keep only tx ids that still exist to avoid unbounded growth.
     const currentIds = new Set(incomingTransactions.map((tx) => tx.id));
-    attemptedAutoClaimIdsRef.current.forEach((attemptedId) => {
-      if (!currentIds.has(attemptedId)) {
-        attemptedAutoClaimIdsRef.current.delete(attemptedId);
+    for (const [id] of autoClaimAttemptsRef.current) {
+      if (!currentIds.has(id)) {
+        autoClaimAttemptsRef.current.delete(id);
       }
-    });
+    }
 
-    // Auto-claim each transaction id at most once to prevent retry loops.
+    // Find the next transaction that hasn't exceeded max retries (3 attempts).
     const nextAutoClaim = incomingTransactions.find(
-      (tx) => !attemptedAutoClaimIdsRef.current.has(tx.id)
+      (tx) => (autoClaimAttemptsRef.current.get(tx.id) ?? 0) < 3
     );
     if (nextAutoClaim) {
-      attemptedAutoClaimIdsRef.current.add(nextAutoClaim.id);
       void handleApproveTransaction(nextAutoClaim.id);
     }
-  }, [incomingTransactions, isClaimingTransaction, handleApproveTransaction]);
+  }, [
+    autoClaimPaused,
+    incomingTransactions,
+    isClaimingTransaction,
+    handleApproveTransaction,
+  ]);
 
   useEffect(() => {
     initTelegram();
