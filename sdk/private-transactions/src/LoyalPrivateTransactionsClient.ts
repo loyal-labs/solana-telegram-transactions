@@ -1,7 +1,6 @@
 import {
   Connection,
   PublicKey,
-  Keypair,
   SystemProgram,
   Transaction,
   VersionedTransaction,
@@ -28,8 +27,7 @@ import {
   PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
-  MAGIC_PROGRAM_ID,
-  MAGIC_CONTEXT_ID,
+  ER_VALIDATOR,
 } from "./constants";
 import {
   findDepositPda,
@@ -63,6 +61,7 @@ import type {
   TransferToUsernameDepositParams,
   InitializeUsernameDepositParams,
   ClaimUsernameDepositToDepositParams,
+  DelegationStatusResponse,
 } from "./types";
 
 function prettyStringify(obj: unknown): string {
@@ -339,9 +338,18 @@ export class LoyalPrivateTransactionsClient {
       let token: string;
       let expiresAt: number;
       if (!authToken) {
-        const isVerified = await verifyTeeRpcIntegrity(ephemeralRpcEndpoint);
-        if (!isVerified) {
-          throw new Error("TEE RPC integrity verification failed");
+        try {
+          const isVerified = await verifyTeeRpcIntegrity(ephemeralRpcEndpoint);
+          if (!isVerified) {
+            console.error(
+              "[LoyalClient] TEE RPC integrity verification returned false"
+            );
+          }
+        } catch (e) {
+          console.error(
+            "[LoyalClient] TEE RPC integrity verification error:",
+            e
+          );
         }
 
         const signMessage = deriveMessageSigner(signer);
@@ -620,13 +628,80 @@ export class LoyalPrivateTransactionsClient {
       session,
       tokenProgram: TOKEN_PROGRAM_ID,
     };
-    console.log("claimUsernameDepositToDeposit", prettyStringify(accounts));
+    console.log(
+      "claimUsernameDepositToDeposit accounts:",
+      prettyStringify(accounts)
+    );
 
-    const sim = await this.ephemeralProgram.methods
-      .claimUsernameDepositToDeposit(new BN(amount.toString()))
-      .accountsPartial(accounts)
-      .simulate();
-    console.log("Simulation logs:", sim.raw); // contains logs array
+    // Fetch and log account info for debugging
+    const connection = this.baseProgram.provider.connection;
+    const [srcInfo, dstInfo, sessionInfo] = await Promise.all([
+      connection.getAccountInfo(sourceUsernameDeposit),
+      connection.getAccountInfo(destinationDeposit),
+      connection.getAccountInfo(session),
+    ]);
+    console.log(
+      "claimUsernameDepositToDeposit sourceUsernameDeposit accountInfo:",
+      prettyStringify({
+        address: sourceUsernameDeposit.toBase58(),
+        exists: !!srcInfo,
+        owner: srcInfo?.owner?.toBase58(),
+        lamports: srcInfo?.lamports,
+        dataLen: srcInfo?.data?.length,
+        executable: srcInfo?.executable,
+      })
+    );
+    console.log(
+      "claimUsernameDepositToDeposit destinationDeposit accountInfo:",
+      prettyStringify({
+        address: destinationDeposit.toBase58(),
+        exists: !!dstInfo,
+        owner: dstInfo?.owner?.toBase58(),
+        lamports: dstInfo?.lamports,
+        dataLen: dstInfo?.data?.length,
+        executable: dstInfo?.executable,
+      })
+    );
+    console.log(
+      "claimUsernameDepositToDeposit session accountInfo:",
+      prettyStringify({
+        address: session.toBase58(),
+        exists: !!sessionInfo,
+        owner: sessionInfo?.owner?.toBase58(),
+        lamports: sessionInfo?.lamports,
+        dataLen: sessionInfo?.data?.length,
+        executable: sessionInfo?.executable,
+      })
+    );
+
+    try {
+      const sim = await this.ephemeralProgram.methods
+        .claimUsernameDepositToDeposit(new BN(amount.toString()))
+        .accountsPartial(accounts)
+        .simulate();
+      console.log("claimUsernameDepositToDeposit simulation logs:", sim.raw);
+    } catch (simErr: unknown) {
+      const simResponse = (
+        simErr as {
+          simulationResponse?: {
+            logs?: string[];
+            err?: unknown;
+            unitsConsumed?: number;
+          };
+        }
+      ).simulationResponse;
+      console.error("claimUsernameDepositToDeposit simulate FAILED");
+      console.error(
+        "  error message:",
+        simErr instanceof Error ? simErr.message : String(simErr)
+      );
+      if (simResponse) {
+        console.error("  simulation err:", prettyStringify(simResponse.err));
+        console.error("  simulation logs:", prettyStringify(simResponse.logs));
+        console.error("  unitsConsumed:", simResponse.unitsConsumed);
+      }
+      throw simErr;
+    }
 
     const signature = await this.ephemeralProgram.methods
       .claimUsernameDepositToDeposit(new BN(amount.toString()))
@@ -748,12 +823,11 @@ export class LoyalPrivateTransactionsClient {
       delegationRecordDeposit: delegationRecordPda,
       delegationMetadataDeposit: delegationMetadataPda,
       deposit: depositPda,
+      validator,
       ownerProgram: PROGRAM_ID,
       delegationProgram: DELEGATION_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     };
-
-    accounts.validator = validator ?? null;
 
     const signature = await this.baseProgram.methods
       .delegate(user, tokenMint)
@@ -849,7 +923,11 @@ export class LoyalPrivateTransactionsClient {
       baseDepositAccountInfo?.owner?.toString() ?? "account not found"
     );
 
-    await this.ensureDelegated(depositPda, "undelegateDeposit-depositPda");
+    await this.ensureDelegated(
+      depositPda,
+      "undelegateDeposit-depositPda",
+      true
+    );
 
     // Subscribe to depositPda owner changes on both connections,
     // resolving when owner matches PROGRAM_ID
@@ -1267,9 +1345,8 @@ export class LoyalPrivateTransactionsClient {
       await this.baseProgram.provider.connection.getAccountInfo(account);
     const ephemeralAccountInfo =
       await this.ephemeralProgram.provider.connection.getAccountInfo(account);
-    const accountInfo = baseAccountInfo;
 
-    if (!accountInfo) {
+    if (!baseAccountInfo) {
       if (passNotExist) {
         return;
       }
@@ -1278,34 +1355,33 @@ export class LoyalPrivateTransactionsClient {
         `Account is not exists: ${displayName}${account.toString()}`
       );
     }
-    const isDelegated = accountInfo!.owner.equals(DELEGATION_PROGRAM_ID);
+    const isDelegated = baseAccountInfo!.owner.equals(DELEGATION_PROGRAM_ID);
     const displayName = name ? `${name} - ` : "";
     if (isDelegated) {
-      const options = {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getDelegationStatus",
-          params: [account.toString()],
-        }),
-      };
-      const res = await fetch(
-        "https://devnet-router.magicblock.app/getDelegationStatus",
-        options
-      );
-      const resJson = await res.json();
-
       console.error(
         `Account is delegated to ER: ${displayName}${account.toString()}`
       );
-      console.error("/getDelegationStatus", JSON.stringify(resJson, null, 2));
+      const delegationStatus = await this.getDelegationStatus(account);
+      console.error(
+        "/getDelegationStatus",
+        JSON.stringify(delegationStatus, null, 2)
+      );
       console.error("baseAccountInfo", prettyStringify(baseAccountInfo));
       console.error(
         "ephemeralAccountInfo",
         prettyStringify(ephemeralAccountInfo)
       );
+
+      if (
+        delegationStatus.result?.delegationRecord.authority !==
+        ER_VALIDATOR.toString()
+      ) {
+        console.error(
+          `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${
+            delegationStatus.result?.delegationRecord.authority
+          }`
+        );
+      }
 
       throw new Error(
         `Account is delegated to ER: ${displayName}${account.toString()}`
@@ -1315,43 +1391,33 @@ export class LoyalPrivateTransactionsClient {
 
   private async ensureDelegated(
     account: PublicKey,
-    name?: string
+    name?: string,
+    skipValidatorCheck?: boolean
   ): Promise<void> {
     const baseAccountInfo =
       await this.baseProgram.provider.connection.getAccountInfo(account);
     const ephemeralAccountInfo =
       await this.ephemeralProgram.provider.connection.getAccountInfo(account);
-    const accountInfo = baseAccountInfo;
 
-    if (!accountInfo) {
+    if (!baseAccountInfo) {
       const displayName = name ? `${name} - ` : "";
       throw new Error(
         `Account is not exists: ${displayName}${account.toString()}`
       );
     }
-    const isDelegated = accountInfo!.owner.equals(DELEGATION_PROGRAM_ID);
+    const isDelegated = baseAccountInfo!.owner.equals(DELEGATION_PROGRAM_ID);
     const displayName = name ? `${name} - ` : "";
-    if (!isDelegated) {
-      const options = {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getDelegationStatus",
-          params: [account.toString()],
-        }),
-      };
-      const res = await fetch(
-        "https://devnet-router.magicblock.app/getDelegationStatus",
-        options
-      );
-      const resJson = await res.json();
 
+    const delegationStatus = await this.getDelegationStatus(account);
+
+    if (!isDelegated) {
       console.error(
         `Account is not delegated to ER: ${displayName}${account.toString()}`
       );
-      console.error("/getDelegationStatus:", JSON.stringify(resJson, null, 2));
+      console.error(
+        "/getDelegationStatus:",
+        JSON.stringify(delegationStatus, null, 2)
+      );
       console.error("baseAccountInfo", prettyStringify(baseAccountInfo));
       console.error(
         "ephemeralAccountInfo",
@@ -1361,6 +1427,51 @@ export class LoyalPrivateTransactionsClient {
       throw new Error(
         `Account is not delegated to ER: ${displayName}${account.toString()}`
       );
+    } else if (
+      !skipValidatorCheck &&
+      delegationStatus.result?.delegationRecord.authority !==
+        ER_VALIDATOR.toString()
+    ) {
+      console.error(
+        `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${
+          delegationStatus.result?.delegationRecord.authority
+        }`
+      );
+      console.error(
+        "/getDelegationStatus:",
+        JSON.stringify(delegationStatus, null, 2)
+      );
+      console.error("baseAccountInfo", prettyStringify(baseAccountInfo));
+      console.error(
+        "ephemeralAccountInfo",
+        prettyStringify(ephemeralAccountInfo)
+      );
+
+      throw new Error(
+        `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${
+          delegationStatus.result?.delegationRecord.authority
+        }`
+      );
     }
+  }
+
+  private async getDelegationStatus(
+    account: PublicKey
+  ): Promise<DelegationStatusResponse> {
+    const options = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getDelegationStatus",
+        params: [account.toString()],
+      }),
+    };
+    const res = await fetch(
+      "https://devnet-router.magicblock.app/getDelegationStatus",
+      options
+    );
+    return (await res.json()) as DelegationStatusResponse;
   }
 }
