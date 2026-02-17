@@ -6,6 +6,10 @@ import { buildSummaryFeedMiniAppUrl } from "@/lib/telegram/mini-app/start-param"
 mock.module("server-only", () => ({}));
 
 const SUMMARY_ID = "123e4567-e89b-12d3-a456-426614174000";
+const SUMMARY_VOTE_LIKE_CUSTOM_EMOJI_ID = "5447485069386090205";
+const SUMMARY_VOTE_DISLIKE_CUSTOM_EMOJI_ID = "5445146433923616423";
+const SUMMARY_OPEN_BUTTON_CUSTOM_EMOJI_ID = "5375302886936842644";
+const SUMMARY_SCORE_POSITIVE_CUSTOM_EMOJI_ID = "5445293605272984280";
 
 type CommunityRecord = {
   chatId: bigint;
@@ -120,7 +124,7 @@ describe("summary delivery guards", () => {
       sent: true,
     });
     expect(sendMessageCalls).toHaveLength(1);
-    const [, , messageOptions] = sendMessageCalls[0] as [
+    const [, messageText, messageOptions] = sendMessageCalls[0] as [
       number,
       string,
       {
@@ -128,6 +132,7 @@ describe("summary delivery guards", () => {
           inline_keyboard: Array<
             Array<{
               callback_data?: string;
+              icon_custom_emoji_id?: string;
               style?: string;
               text?: string;
               url?: string;
@@ -136,6 +141,9 @@ describe("summary delivery guards", () => {
         };
       },
     ];
+    expect(messageText).toContain("Daily recap");
+    expect(messageText).not.toContain("Summary:");
+    expect(messageText).not.toContain("<tg-emoji");
     const rows = messageOptions.reply_markup.inline_keyboard;
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveLength(3);
@@ -143,17 +151,31 @@ describe("summary delivery guards", () => {
     expect(rows[0][0]?.callback_data).toBe(
       `sv:u:${SUMMARY_ID}:${summaryResult!.community.chatId}`
     );
-    expect(rows[0][0]?.style).toBe("success");
+    expect(rows[0][0]?.text).toBe("Like");
+    expect(rows[0][0]?.style).toBeUndefined();
+    expect(rows[0][0]?.icon_custom_emoji_id).toBe(
+      SUMMARY_VOTE_LIKE_CUSTOM_EMOJI_ID
+    );
     expect(rows[0][1]?.text).toBe("Score: 3");
+    expect(rows[0][1]?.icon_custom_emoji_id).toBe(
+      SUMMARY_SCORE_POSITIVE_CUSTOM_EMOJI_ID
+    );
     expect(rows[0][1]?.callback_data).toBe(
       `sv:s:${SUMMARY_ID}:${summaryResult!.community.chatId}`
     );
     expect(rows[0][2]?.callback_data).toBe(
       `sv:d:${SUMMARY_ID}:${summaryResult!.community.chatId}`
     );
-    expect(rows[0][2]?.style).toBe("danger");
+    expect(rows[0][2]?.text).toBe("Dislike");
+    expect(rows[0][2]?.style).toBeUndefined();
+    expect(rows[0][2]?.icon_custom_emoji_id).toBe(
+      SUMMARY_VOTE_DISLIKE_CUSTOM_EMOJI_ID
+    );
     expect(rows[1][0]?.text).toBe("Open");
     expect(rows[1][0]?.style).toBe("primary");
+    expect(rows[1][0]?.icon_custom_emoji_id).toBe(
+      SUMMARY_OPEN_BUTTON_CUSTOM_EMOJI_ID
+    );
     expect(rows[1][0]?.url).toBe(
       buildSummaryFeedMiniAppUrl(summaryResult!.community.chatId, SUMMARY_ID)
     );

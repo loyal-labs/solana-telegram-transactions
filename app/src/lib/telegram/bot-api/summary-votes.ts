@@ -37,6 +37,12 @@ const GROUP_CHAT_ID_REGEX_PART = "-?\\d+";
 const DUPLICATE_VOTE_ALERT_CACHE_TIME_SECONDS = 300;
 const BOT_SUMMARY_LIKE_EVENT = "Bot Summary Like";
 const BOT_SUMMARY_DISLIKE_EVENT = "Bot Summary Dislike";
+const SUMMARY_VOTE_LIKE_CUSTOM_EMOJI_ID = "5447485069386090205";
+const SUMMARY_VOTE_DISLIKE_CUSTOM_EMOJI_ID = "5445146433923616423";
+const SUMMARY_OPEN_BUTTON_CUSTOM_EMOJI_ID = "5375302886936842644";
+const SUMMARY_SCORE_ZERO_CUSTOM_EMOJI_ID = "5447522585925426434";
+const SUMMARY_SCORE_NEGATIVE_CUSTOM_EMOJI_ID = "5447484068658714886";
+const SUMMARY_SCORE_POSITIVE_CUSTOM_EMOJI_ID = "5445293605272984280";
 
 function getVoteEventName(
   voteAction: PersistedSummaryVoteAction
@@ -121,12 +127,13 @@ export function buildSummaryVoteKeyboard(
   dislikes: number
 ): InlineKeyboard {
   const score = likes - dislikes;
+  const scoreCustomEmojiId = resolveScoreCustomEmojiId(score);
 
   return new InlineKeyboard()
     .text(
       {
-        style: "success",
-        text: "👍👍👍",
+        text: "Like",
+        icon_custom_emoji_id: SUMMARY_VOTE_LIKE_CUSTOM_EMOJI_ID,
       },
       encodeSummaryVoteCallbackData({
         action: "u",
@@ -135,7 +142,10 @@ export function buildSummaryVoteKeyboard(
       })
     )
     .text(
-      `Score: ${score}`,
+      {
+        text: `Score: ${score}`,
+        icon_custom_emoji_id: scoreCustomEmojiId,
+      },
       encodeSummaryVoteCallbackData({
         action: "s",
         groupChatId: groupChatId.toString(),
@@ -144,8 +154,8 @@ export function buildSummaryVoteKeyboard(
     )
     .text(
       {
-        style: "danger",
-        text: "👎👎👎",
+        text: "Dislike",
+        icon_custom_emoji_id: SUMMARY_VOTE_DISLIKE_CUSTOM_EMOJI_ID,
       },
       encodeSummaryVoteCallbackData({
         action: "d",
@@ -158,9 +168,22 @@ export function buildSummaryVoteKeyboard(
       {
         style: "primary",
         text: "Open",
+        icon_custom_emoji_id: SUMMARY_OPEN_BUTTON_CUSTOM_EMOJI_ID,
       },
       buildSummaryFeedMiniAppUrl(groupChatId, summaryId)
     );
+}
+
+function resolveScoreCustomEmojiId(score: number): string {
+  if (score > 0) {
+    return SUMMARY_SCORE_POSITIVE_CUSTOM_EMOJI_ID;
+  }
+
+  if (score < 0) {
+    return SUMMARY_SCORE_NEGATIVE_CUSTOM_EMOJI_ID;
+  }
+
+  return SUMMARY_SCORE_ZERO_CUSTOM_EMOJI_ID;
 }
 
 export async function getSummaryVoteTotals(

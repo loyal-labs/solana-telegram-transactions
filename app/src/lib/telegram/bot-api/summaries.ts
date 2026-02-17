@@ -361,8 +361,7 @@ async function sendSummaryToChat(
     replyToMessageId?: number;
   }
 ): Promise<SummaryDeliveredMessage> {
-  const safeOneliner = escapeTelegramHtml(summary.oneliner);
-  const messageBody = `Summary: ${safeOneliner}`;
+  const messageBody = buildSummaryMessageBody(summary.oneliner);
 
   const messageWithPreview = buildSummaryMessageWithPreview(
     messageBody,
@@ -384,37 +383,57 @@ async function sendSummaryToChat(
     reply_markup: keyboard,
   };
 
-  if (options.replyToMessageId) {
-    try {
-      const sentMessage = await bot.api.sendMessage(
-        Number(options.destinationChatId),
-        messageWithPreview,
-        {
-          ...messageOptions,
-          reply_parameters: { message_id: options.replyToMessageId },
-        }
-      );
-      return {
-        destinationChatId: options.destinationChatId,
-        messageId: sentMessage.message_id,
-        sourceCommunityChatId: options.sourceCommunityChatId,
-      };
-    } catch (error) {
-      console.log("Failed to send summary as reply, sending without reply", error);
-    }
-  }
-
-  const sentMessage = await bot.api.sendMessage(
-    Number(options.destinationChatId),
-    messageWithPreview,
-    messageOptions
-  );
+  const sentMessage = await sendSummaryMessage(bot, {
+    destinationChatId: options.destinationChatId,
+    messageOptions,
+    messageText: messageWithPreview,
+    replyToMessageId: options.replyToMessageId,
+  });
 
   return {
     destinationChatId: options.destinationChatId,
     messageId: sentMessage.message_id,
     sourceCommunityChatId: options.sourceCommunityChatId,
   };
+}
+
+function buildSummaryMessageBody(oneliner: string): string {
+  return escapeTelegramHtml(oneliner);
+}
+
+async function sendSummaryMessage(
+  bot: Bot,
+  params: {
+    destinationChatId: bigint;
+    messageOptions: {
+      parse_mode: "HTML";
+      link_preview_options: { prefer_large_media: boolean };
+      reply_markup: ReturnType<typeof buildSummaryVoteKeyboard>;
+    };
+    messageText: string;
+    replyToMessageId?: number;
+  }
+) {
+  if (params.replyToMessageId) {
+    try {
+      return await bot.api.sendMessage(
+        Number(params.destinationChatId),
+        params.messageText,
+        {
+          ...params.messageOptions,
+          reply_parameters: { message_id: params.replyToMessageId },
+        }
+      );
+    } catch (error) {
+      console.log("Failed to send summary as reply, sending without reply", error);
+    }
+  }
+
+  return bot.api.sendMessage(
+    Number(params.destinationChatId),
+    params.messageText,
+    params.messageOptions
+  );
 }
 
 function escapeTelegramHtml(text: string): string {
