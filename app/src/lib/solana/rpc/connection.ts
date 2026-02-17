@@ -17,18 +17,28 @@ const DEFAULT_SOLANA_ENV: SolanaEnv = "devnet";
 export const getSolanaEnv = (): SolanaEnv => {
   if (typeof window !== "undefined") {
     const override = localStorage.getItem("solana-env-override");
-    if (override === "mainnet" || override === "testnet" || override === "devnet" || override === "localnet") {
+    if (
+      override === "mainnet" ||
+      override === "testnet" ||
+      override === "devnet" ||
+      override === "localnet"
+    ) {
       return override;
     }
   }
   const env = process.env.NEXT_PUBLIC_SOLANA_ENV;
-  if (env === "mainnet" || env === "testnet" || env === "devnet" || env === "localnet") {
+  if (
+    env === "mainnet" ||
+    env === "testnet" ||
+    env === "devnet" ||
+    env === "localnet"
+  ) {
     return env;
   }
   return DEFAULT_SOLANA_ENV;
 };
 
-const getEndpoints = (
+export const getEndpoints = (
   env: SolanaEnv
 ): { rpcEndpoint: string; websocketEndpoint: string } => {
   switch (env) {
@@ -57,7 +67,8 @@ const getEndpoints = (
 };
 
 const selectedSolanaEnv = getSolanaEnv();
-const { rpcEndpoint, websocketEndpoint } = getEndpoints(selectedSolanaEnv);
+export const { rpcEndpoint, websocketEndpoint } =
+  getEndpoints(selectedSolanaEnv);
 
 let cachedConnection: Connection | null = null;
 let cachedWebsocketConnection: Connection | null = null;

@@ -1,9 +1,14 @@
+import {
+  SOLANA_USDC_MINT_MAINNET,
+  SOLANA_USDT_MINT_MAINNET,
+} from "../constants";
+
 export const DFLOW_API_BASE_URL = "https://b.quote-api.dflow.net";
 
 export const COMMON_MINTS = {
   SOL: "So11111111111111111111111111111111111111112",
-  USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+  USDC: SOLANA_USDC_MINT_MAINNET,
+  USDT: SOLANA_USDT_MINT_MAINNET,
 } as const;
 
 export const SWAP_ERRORS = {
