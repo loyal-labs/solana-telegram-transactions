@@ -642,7 +642,7 @@ pub struct ClaimUsernameDepositToDeposit<'info> {
     pub destination_deposit: Account<'info, Deposit>,
     pub token_mint: Account<'info, Mint>,
     #[account(
-        // constraint = session.user_wallet == recipient_token_account.owner @ ErrorCode::InvalidRecipient,
+        constraint = session.user_wallet == destination_deposit.user @ ErrorCode::InvalidRecipient,
         constraint = session.verified @ ErrorCode::NotVerified,
         constraint = session.username == source_username_deposit.username @ ErrorCode::InvalidUsername,
     )]
