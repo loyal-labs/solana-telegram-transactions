@@ -8,6 +8,8 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
+    "telegram:setup-commands": "bun run --conditions react-server scripts/telegram/setup-commands.ts",
+    "telegram:setup-chat-commands": "bun run --conditions react-server scripts/telegram/setup-chat-commands.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
