@@ -5,7 +5,7 @@ import Mixpanel from "mixpanel";
 
 import { serverEnv } from "@/lib/core/config/server";
 import { getDatabase } from "@/lib/core/database";
-import { admins, communities } from "@/lib/core/schema";
+import { admins, communities, userSettings } from "@/lib/core/schema";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
 
@@ -16,6 +16,7 @@ import { sendNotificationSettingsMessage } from "./notification-settings";
 import { sendStartCarousel } from "./start-carousel";
 import { sendLatestSummary } from "./summaries";
 import type { HandleSummaryCommandOptions } from "./types";
+import { sendUserSettingsMessage } from "./user-settings";
 
 interface CommunityPhoto {
   base64: string;
@@ -24,6 +25,8 @@ interface CommunityPhoto {
 
 const COMMUNITY_NOT_ACTIVATED_YET_REPLY_TEXT =
   "This community is not activated yet. Use /activate_community to enable it.";
+const SETTINGS_LOAD_ERROR_REPLY_TEXT =
+  "Unable to load your settings right now. Please try again.";
 const UNAUTHORIZED_VISIBILITY_REPLY_TEXT =
   "You are not authorized to manage community visibility. Contact an administrator to be added to the whitelist.";
 const VISIBILITY_UPDATE_ERROR_REPLY_TEXT =
@@ -427,6 +430,38 @@ export async function handleNotificationsCommand(
     await ctx.reply(
       "An error occurred while loading notification settings. Please try again."
     );
+  }
+}
+
+export async function handleSettingsCommand(
+  ctx: CommandContext<Context>
+): Promise<void> {
+  if (!ctx.from || !ctx.chat) return;
+  if (ctx.chat.type !== "private") return;
+
+  try {
+    const db = getDatabase();
+    const telegramUserId = BigInt(ctx.from.id);
+    const userId = await getOrCreateUser(telegramUserId, {
+      username: ctx.from.username || null,
+      displayName: getTelegramDisplayName(ctx.from),
+    });
+
+    await db.insert(userSettings).values({ userId }).onConflictDoNothing();
+
+    const settings = await db.query.userSettings.findFirst({
+      where: eq(userSettings.userId, userId),
+    });
+
+    if (!settings) {
+      await ctx.reply(SETTINGS_LOAD_ERROR_REPLY_TEXT);
+      return;
+    }
+
+    await sendUserSettingsMessage(ctx, settings);
+  } catch (error) {
+    console.error("Failed to send user settings", error);
+    await ctx.reply(SETTINGS_LOAD_ERROR_REPLY_TEXT);
   }
 }
 

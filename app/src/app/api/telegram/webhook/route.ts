@@ -8,6 +8,7 @@ import {
   handleDeactivateCommunityCommand,
   handleHideCommunityCommand,
   handleNotificationsCommand,
+  handleSettingsCommand,
   handleStartCommand,
   handleSummaryCommand,
   handleUnhideCommunityCommand,
@@ -32,6 +33,10 @@ import {
   SUMMARY_VOTE_CALLBACK_DATA_REGEX,
 } from "@/lib/telegram/bot-api/summary-votes";
 import {
+  handleUserSettingsCallback,
+  USER_SETTINGS_CALLBACK_DATA_REGEX,
+} from "@/lib/telegram/bot-api/user-settings";
+import {
   handleDirectMessage,
   handleDirectTopicCreatedMessage,
 } from "@/lib/telegram/conversation-service";
@@ -41,6 +46,10 @@ const bot = await getBot();
 
 bot.command("start", async (ctx: CommandContext<Context>) => {
   await handleStartCommand(ctx, bot);
+});
+
+bot.chatType("private").command("settings", async (ctx) => {
+  await handleSettingsCommand(ctx);
 });
 
 bot.command("ca", async (ctx: CommandContext<Context>) => {
@@ -87,6 +96,10 @@ bot.callbackQuery(START_CAROUSEL_CALLBACK_DATA_REGEX, async (ctx) => {
 
 bot.callbackQuery(NOTIFICATION_SETTINGS_CALLBACK_DATA_REGEX, async (ctx) => {
   await handleNotificationSettingsCallback(ctx);
+});
+
+bot.callbackQuery(USER_SETTINGS_CALLBACK_DATA_REGEX, async (ctx) => {
+  await handleUserSettingsCallback(ctx);
 });
 
 bot.callbackQuery(SUMMARY_VOTE_CALLBACK_DATA_REGEX, async (ctx) => {

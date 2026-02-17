@@ -123,6 +123,29 @@ export const users = pgTable(
 );
 
 /**
+ * Per-user bot settings for private chat behavior.
+ * Linked one-to-one with users.
+ */
+export const userSettings = pgTable(
+  "user_settings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    model: text("model").default("phala/gpt-oss-120b").notNull(),
+    notifications: boolean("notifications").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [uniqueIndex("user_settings_user_id_idx").on(table.userId)]
+);
+
+/**
  * Telegram group chats activated for message tracking.
  * Privileged management actions are controlled by the admins whitelist.
  */
@@ -418,6 +441,14 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   businessConnection: one(businessConnections),
   botThreads: many(botThreads),
   summaryVotes: many(summaryVotes),
+  userSettings: one(userSettings),
+}));
+
+export const userSettingsRelations = relations(userSettings, ({ one }) => ({
+  user: one(users, {
+    fields: [userSettings.userId],
+    references: [users.id],
+  }),
 }));
 
 export const communitiesRelations = relations(communities, ({ many }) => ({
@@ -504,6 +535,9 @@ export type InsertAdmin = typeof admins.$inferInsert;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+export type UserSettings = typeof userSettings.$inferSelect;
+export type InsertUserSettings = typeof userSettings.$inferInsert;
 
 export type Community = typeof communities.$inferSelect;
 export type InsertCommunity = typeof communities.$inferInsert;
