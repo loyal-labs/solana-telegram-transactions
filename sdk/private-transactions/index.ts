@@ -59,6 +59,9 @@ export type {
   UndelegateUsernameDepositParams,
   TransferDepositParams,
   TransferToUsernameDepositParams,
+  DelegationRecord,
+  DelegationStatusResult,
+  DelegationStatusResponse,
 } from "./src/types";
 
 // Type guards

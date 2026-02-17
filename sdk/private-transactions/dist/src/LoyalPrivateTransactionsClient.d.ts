@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { Program } from "@coral-xyz/anchor";
-import { type TelegramPrivateTransfer } from "./idl";
-import type { WalletLike, ClientConfig, DepositData, UsernameDepositData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, DepositForUsernameParams, ClaimUsernameDepositParams, CreatePermissionParams, CreateUsernamePermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams, TransferDepositParams, TransferToUsernameDepositParams } from "./types";
+import type { TelegramPrivateTransfer } from "./idl/telegram_private_transfer.ts";
+import type { WalletLike, ClientConfig, DepositData, UsernameDepositData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, DepositForUsernameParams, ClaimUsernameDepositParams, CreatePermissionParams, CreateUsernamePermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams, TransferDepositParams, TransferToUsernameDepositParams, InitializeUsernameDepositParams, ClaimUsernameDepositToDepositParams } from "./types";
 /**
  * LoyalPrivateTransactionsClient - SDK for interacting with the Telegram Private Transfer program
  * with MagicBlock PER (Private Ephemeral Rollups) support
@@ -43,6 +43,7 @@ export declare class LoyalPrivateTransactionsClient {
      * Initialize a deposit account for a user and token mint
      */
     initializeDeposit(params: InitializeDepositParams): Promise<string>;
+    initializeUsernameDeposit(params: InitializeUsernameDepositParams): Promise<string>;
     /**
      * Modify the balance of a user's deposit account
      */
@@ -55,6 +56,7 @@ export declare class LoyalPrivateTransactionsClient {
      * Claim tokens from a username-based deposit
      */
     claimUsernameDeposit(params: ClaimUsernameDepositParams): Promise<string>;
+    claimUsernameDepositToDeposit(params: ClaimUsernameDepositToDepositParams): Promise<string>;
     /**
      * Create a permission for a deposit account (required for PER)
      */
@@ -72,7 +74,9 @@ export declare class LoyalPrivateTransactionsClient {
      */
     delegateUsernameDeposit(params: DelegateUsernameDepositParams): Promise<string>;
     /**
-     * Undelegate a deposit account from the ephemeral rollup
+     * Undelegate a deposit account from the ephemeral rollup.
+     * Waits for both base and ephemeral connections to confirm the deposit
+     * is owned by PROGRAM_ID before returning.
      */
     undelegateDeposit(params: UndelegateDepositParams): Promise<string>;
     /**
@@ -127,4 +131,5 @@ export declare class LoyalPrivateTransactionsClient {
     private isAccountAlreadyInUse;
     private ensureNotDelegated;
     private ensureDelegated;
+    private getDelegationStatus;
 }

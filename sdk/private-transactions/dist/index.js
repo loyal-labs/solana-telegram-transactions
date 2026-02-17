@@ -18133,7 +18133,7 @@ https://github.com/browserify/crypto-browserify`);
   crypto_default = crypto;
 });
 
-// ../../node_modules/tweetnacl/nacl-fast.js
+// node_modules/tweetnacl/nacl-fast.js
 var require_nacl_fast = __commonJS((exports, module) => {
   (function(nacl) {
     var gf = function(init) {
@@ -20435,6 +20435,7 @@ var require_nacl_fast = __commonJS((exports, module) => {
 var import_tweetnacl = __toESM(require_nacl_fast(), 1);
 import {
   Connection,
+  PublicKey as PublicKey4,
   SystemProgram,
   VersionedTransaction as VersionedTransaction2,
   sendAndConfirmRawTransaction
@@ -20449,26 +20450,34 @@ import {
   verifyTeeRpcIntegrity,
   getAuthToken
 } from "@magicblock-labs/ephemeral-rollups-sdk";
-
-// src/idl.ts
-var IDL = {
+// src/idl/telegram_private_transfer.json
+var telegram_private_transfer_default = {
   address: "97FzQdWi26mFNR21AbQNg4KqofiCLqQydQfAvRQMcXhV",
   metadata: {
-    name: "telegramPrivateTransfer",
+    name: "telegram_private_transfer",
     version: "0.1.0",
     spec: "0.1.0",
     description: "Created with Anchor"
   },
   instructions: [
     {
-      name: "claimUsernameDeposit",
+      name: "claim_username_deposit",
       docs: [
         "Claims tokens from a username-based deposit using a verified Telegram session."
       ],
-      discriminator: [73, 62, 148, 70, 186, 247, 37, 80],
+      discriminator: [
+        73,
+        62,
+        148,
+        70,
+        186,
+        247,
+        37,
+        80
+      ],
       accounts: [
         {
-          name: "recipientTokenAccount",
+          name: "recipient_token_account",
           writable: true
         },
         {
@@ -20478,17 +20487,23 @@ var IDL = {
             seeds: [
               {
                 kind: "const",
-                value: [118, 97, 117, 108, 116]
+                value: [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
               },
               {
                 kind: "account",
-                path: "tokenMint"
+                path: "token_mint"
               }
             ]
           }
         },
         {
-          name: "vaultTokenAccount",
+          name: "vault_token_account",
           writable: true,
           pda: {
             seeds: [
@@ -20535,7 +20550,7 @@ var IDL = {
               },
               {
                 kind: "account",
-                path: "tokenMint"
+                path: "token_mint"
               }
             ],
             program: {
@@ -20606,25 +20621,27 @@ var IDL = {
               {
                 kind: "account",
                 path: "deposit.username",
-                account: "usernameDeposit"
+                account: "UsernameDeposit"
               },
               {
                 kind: "account",
-                path: "deposit.tokenMint",
-                account: "usernameDeposit"
+                path: "deposit.token_mint",
+                account: "UsernameDeposit"
               }
             ]
           }
         },
         {
-          name: "tokenMint",
-          relations: ["deposit"]
+          name: "token_mint",
+          relations: [
+            "deposit"
+          ]
         },
         {
           name: "session"
         },
         {
-          name: "tokenProgram",
+          name: "token_program",
           address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
@@ -20636,13 +20653,132 @@ var IDL = {
       ]
     },
     {
-      name: "createPermission",
+      name: "claim_username_deposit_to_deposit",
+      discriminator: [
+        147,
+        77,
+        235,
+        126,
+        72,
+        182,
+        30,
+        12
+      ],
+      accounts: [
+        {
+          name: "user",
+          relations: [
+            "destination_deposit"
+          ]
+        },
+        {
+          name: "source_username_deposit",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  117,
+                  115,
+                  101,
+                  114,
+                  110,
+                  97,
+                  109,
+                  101,
+                  95,
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
+              },
+              {
+                kind: "account",
+                path: "source_username_deposit.username",
+                account: "UsernameDeposit"
+              },
+              {
+                kind: "account",
+                path: "source_username_deposit.token_mint",
+                account: "UsernameDeposit"
+              }
+            ]
+          }
+        },
+        {
+          name: "destination_deposit",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
+              },
+              {
+                kind: "account",
+                path: "destination_deposit.user",
+                account: "Deposit"
+              },
+              {
+                kind: "account",
+                path: "destination_deposit.token_mint",
+                account: "Deposit"
+              }
+            ]
+          }
+        },
+        {
+          name: "token_mint",
+          relations: [
+            "source_username_deposit",
+            "destination_deposit"
+          ]
+        },
+        {
+          name: "session"
+        },
+        {
+          name: "token_program",
+          address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      args: [
+        {
+          name: "amount",
+          type: "u64"
+        }
+      ]
+    },
+    {
+      name: "create_permission",
       docs: [
         "Creates a permission for a deposit account using the external permission program.",
         "",
         "Calls out to the permission program to create a permission for the deposit account."
       ],
-      discriminator: [190, 182, 26, 164, 156, 221, 8, 0],
+      discriminator: [
+        190,
+        182,
+        26,
+        164,
+        156,
+        221,
+        8,
+        0
+      ],
       accounts: [
         {
           name: "payer",
@@ -20659,7 +20795,15 @@ var IDL = {
             seeds: [
               {
                 kind: "const",
-                value: [100, 101, 112, 111, 115, 105, 116]
+                value: [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
               },
               {
                 kind: "account",
@@ -20667,8 +20811,8 @@ var IDL = {
               },
               {
                 kind: "account",
-                path: "deposit.tokenMint",
-                account: "deposit"
+                path: "deposit.token_mint",
+                account: "Deposit"
               }
             ]
           }
@@ -20678,19 +20822,30 @@ var IDL = {
           writable: true
         },
         {
-          name: "permissionProgram"
+          name: "permission_program"
         },
         {
-          name: "systemProgram",
+          name: "system_program",
           address: "11111111111111111111111111111111"
         }
       ],
       args: []
     },
     {
-      name: "createUsernamePermission",
-      docs: ["Creates a permission for a username-based deposit account."],
-      discriminator: [130, 137, 147, 121, 57, 217, 102, 40],
+      name: "create_username_permission",
+      docs: [
+        "Creates a permission for a username-based deposit account."
+      ],
+      discriminator: [
+        130,
+        137,
+        147,
+        121,
+        57,
+        217,
+        102,
+        40
+      ],
       accounts: [
         {
           name: "payer",
@@ -20729,12 +20884,12 @@ var IDL = {
               {
                 kind: "account",
                 path: "deposit.username",
-                account: "usernameDeposit"
+                account: "UsernameDeposit"
               },
               {
                 kind: "account",
-                path: "deposit.tokenMint",
-                account: "usernameDeposit"
+                path: "deposit.token_mint",
+                account: "UsernameDeposit"
               }
             ]
           }
@@ -20747,10 +20902,10 @@ var IDL = {
           writable: true
         },
         {
-          name: "permissionProgram"
+          name: "permission_program"
         },
         {
-          name: "systemProgram",
+          name: "system_program",
           address: "11111111111111111111111111111111"
         }
       ],
@@ -20763,7 +20918,16 @@ var IDL = {
         "",
         "Uses the ephemeral rollups delegate CPI to delegate the deposit account."
       ],
-      discriminator: [90, 147, 75, 178, 85, 88, 4, 137],
+      discriminator: [
+        90,
+        147,
+        75,
+        178,
+        85,
+        88,
+        4,
+        137
+      ],
       accounts: [
         {
           name: "payer",
@@ -20775,13 +20939,20 @@ var IDL = {
           optional: true
         },
         {
-          name: "bufferDeposit",
+          name: "buffer_deposit",
           writable: true,
           pda: {
             seeds: [
               {
                 kind: "const",
-                value: [98, 117, 102, 102, 101, 114]
+                value: [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
               },
               {
                 kind: "account",
@@ -20828,13 +20999,24 @@ var IDL = {
           }
         },
         {
-          name: "delegationRecordDeposit",
+          name: "delegation_record_deposit",
           writable: true,
           pda: {
             seeds: [
               {
                 kind: "const",
-                value: [100, 101, 108, 101, 103, 97, 116, 105, 111, 110]
+                value: [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
               },
               {
                 kind: "account",
@@ -20843,12 +21025,12 @@ var IDL = {
             ],
             program: {
               kind: "account",
-              path: "delegationProgram"
+              path: "delegation_program"
             }
           }
         },
         {
-          name: "delegationMetadataDeposit",
+          name: "delegation_metadata_deposit",
           writable: true,
           pda: {
             seeds: [
@@ -20883,7 +21065,7 @@ var IDL = {
             ],
             program: {
               kind: "account",
-              path: "delegationProgram"
+              path: "delegation_program"
             }
           }
         },
@@ -20894,7 +21076,15 @@ var IDL = {
             seeds: [
               {
                 kind: "const",
-                value: [100, 101, 112, 111, 115, 105, 116]
+                value: [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
               },
               {
                 kind: "arg",
@@ -20902,21 +21092,21 @@ var IDL = {
               },
               {
                 kind: "arg",
-                path: "tokenMint"
+                path: "token_mint"
               }
             ]
           }
         },
         {
-          name: "ownerProgram",
+          name: "owner_program",
           address: "97FzQdWi26mFNR21AbQNg4KqofiCLqQydQfAvRQMcXhV"
         },
         {
-          name: "delegationProgram",
+          name: "delegation_program",
           address: "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
         },
         {
-          name: "systemProgram",
+          name: "system_program",
           address: "11111111111111111111111111111111"
         }
       ],
@@ -20926,17 +21116,26 @@ var IDL = {
           type: "pubkey"
         },
         {
-          name: "tokenMint",
+          name: "token_mint",
           type: "pubkey"
         }
       ]
     },
     {
-      name: "delegateUsernameDeposit",
+      name: "delegate_username_deposit",
       docs: [
         "Delegates the username-based deposit account to the ephemeral rollups delegate program."
       ],
-      discriminator: [26, 82, 4, 176, 221, 64, 84, 178],
+      discriminator: [
+        26,
+        82,
+        4,
+        176,
+        221,
+        64,
+        84,
+        178
+      ],
       accounts: [
         {
           name: "payer",
@@ -20948,16 +21147,20 @@ var IDL = {
           optional: true
         },
         {
-          name: "session"
-        },
-        {
-          name: "bufferDeposit",
+          name: "buffer_deposit",
           writable: true,
           pda: {
             seeds: [
               {
                 kind: "const",
-                value: [98, 117, 102, 102, 101, 114]
+                value: [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
               },
               {
                 kind: "account",
@@ -21004,13 +21207,24 @@ var IDL = {
           }
         },
         {
-          name: "delegationRecordDeposit",
+          name: "delegation_record_deposit",
           writable: true,
           pda: {
             seeds: [
               {
                 kind: "const",
-                value: [100, 101, 108, 101, 103, 97, 116, 105, 111, 110]
+                value: [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
               },
               {
                 kind: "account",
@@ -21019,12 +21233,12 @@ var IDL = {
             ],
             program: {
               kind: "account",
-              path: "delegationProgram"
+              path: "delegation_program"
             }
           }
         },
         {
-          name: "delegationMetadataDeposit",
+          name: "delegation_metadata_deposit",
           writable: true,
           pda: {
             seeds: [
@@ -21059,7 +21273,7 @@ var IDL = {
             ],
             program: {
               kind: "account",
-              path: "delegationProgram"
+              path: "delegation_program"
             }
           }
         },
@@ -21095,21 +21309,21 @@ var IDL = {
               },
               {
                 kind: "arg",
-                path: "tokenMint"
+                path: "token_mint"
               }
             ]
           }
         },
         {
-          name: "ownerProgram",
+          name: "owner_program",
           address: "97FzQdWi26mFNR21AbQNg4KqofiCLqQydQfAvRQMcXhV"
         },
         {
-          name: "delegationProgram",
+          name: "delegation_program",
           address: "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
         },
         {
-          name: "systemProgram",
+          name: "system_program",
           address: "11111111111111111111111111111111"
         }
       ],
@@ -21119,19 +21333,28 @@ var IDL = {
           type: "string"
         },
         {
-          name: "tokenMint",
+          name: "token_mint",
           type: "pubkey"
         }
       ]
     },
     {
-      name: "depositForUsername",
+      name: "deposit_for_username",
       docs: [
         "Deposits tokens into a username-based deposit.",
         "",
         "Anyone can deposit tokens for a Telegram username."
       ],
-      discriminator: [85, 11, 120, 21, 51, 229, 125, 220],
+      discriminator: [
+        85,
+        11,
+        120,
+        21,
+        51,
+        229,
+        125,
+        220
+      ],
       accounts: [
         {
           name: "payer",
@@ -21175,7 +21398,7 @@ var IDL = {
               },
               {
                 kind: "account",
-                path: "tokenMint"
+                path: "token_mint"
               }
             ]
           }
@@ -21187,17 +21410,23 @@ var IDL = {
             seeds: [
               {
                 kind: "const",
-                value: [118, 97, 117, 108, 116]
+                value: [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
               },
               {
                 kind: "account",
-                path: "tokenMint"
+                path: "token_mint"
               }
             ]
           }
         },
         {
-          name: "vaultTokenAccount",
+          name: "vault_token_account",
           writable: true,
           pda: {
             seeds: [
@@ -21244,7 +21473,7 @@ var IDL = {
               },
               {
                 kind: "account",
-                path: "tokenMint"
+                path: "token_mint"
               }
             ],
             program: {
@@ -21287,22 +21516,22 @@ var IDL = {
           }
         },
         {
-          name: "depositorTokenAccount",
+          name: "depositor_token_account",
           writable: true
         },
         {
-          name: "tokenMint"
+          name: "token_mint"
         },
         {
-          name: "tokenProgram",
+          name: "token_program",
           address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          name: "associatedTokenProgram",
+          name: "associated_token_program",
           address: "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          name: "systemProgram",
+          name: "system_program",
           address: "11111111111111111111111111111111"
         }
       ],
@@ -21318,14 +21547,23 @@ var IDL = {
       ]
     },
     {
-      name: "initializeDeposit",
+      name: "initialize_deposit",
       docs: [
         "Initializes a deposit account for a user and token mint if it does not exist.",
         "",
         "Sets up a new deposit account with zero balance for the user and token mint.",
         "If the account is already initialized, this instruction is a no-op."
       ],
-      discriminator: [171, 65, 93, 225, 61, 109, 31, 227],
+      discriminator: [
+        171,
+        65,
+        93,
+        225,
+        61,
+        109,
+        31,
+        227
+      ],
       accounts: [
         {
           name: "payer",
@@ -21342,7 +21580,15 @@ var IDL = {
             seeds: [
               {
                 kind: "const",
-                value: [100, 101, 112, 111, 115, 105, 116]
+                value: [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
               },
               {
                 kind: "account",
@@ -21350,34 +21596,117 @@ var IDL = {
               },
               {
                 kind: "account",
-                path: "tokenMint"
+                path: "token_mint"
               }
             ]
           }
         },
         {
-          name: "tokenMint"
+          name: "token_mint"
         },
         {
-          name: "tokenProgram",
+          name: "token_program",
           address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          name: "systemProgram",
+          name: "system_program",
           address: "11111111111111111111111111111111"
         }
       ],
       args: []
     },
     {
-      name: "modifyBalance",
+      name: "initialize_username_deposit",
+      discriminator: [
+        125,
+        255,
+        77,
+        198,
+        75,
+        226,
+        85,
+        91
+      ],
+      accounts: [
+        {
+          name: "payer",
+          writable: true,
+          signer: true
+        },
+        {
+          name: "deposit",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  117,
+                  115,
+                  101,
+                  114,
+                  110,
+                  97,
+                  109,
+                  101,
+                  95,
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
+              },
+              {
+                kind: "arg",
+                path: "username"
+              },
+              {
+                kind: "account",
+                path: "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          name: "token_mint"
+        },
+        {
+          name: "token_program",
+          address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111"
+        }
+      ],
+      args: [
+        {
+          name: "username",
+          type: "string"
+        }
+      ]
+    },
+    {
+      name: "modify_balance",
       docs: [
         "Modifies the balance of a user's deposit account by transferring tokens in or out.",
         "",
         "If `args.increase` is true, tokens are transferred from the user's token account to the deposit account.",
         "If false, tokens are transferred from the deposit account back to the user's token account."
       ],
-      discriminator: [148, 232, 7, 240, 55, 51, 121, 115],
+      discriminator: [
+        148,
+        232,
+        7,
+        240,
+        55,
+        51,
+        121,
+        115
+      ],
       accounts: [
         {
           name: "payer",
@@ -21387,7 +21716,9 @@ var IDL = {
         {
           name: "user",
           signer: true,
-          relations: ["deposit"]
+          relations: [
+            "deposit"
+          ]
         },
         {
           name: "vault",
@@ -21396,12 +21727,18 @@ var IDL = {
             seeds: [
               {
                 kind: "const",
-                value: [118, 97, 117, 108, 116]
+                value: [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
               },
               {
                 kind: "account",
-                path: "deposit.tokenMint",
-                account: "deposit"
+                path: "deposit.token_mint",
+                account: "Deposit"
               }
             ]
           }
@@ -21413,23 +21750,31 @@ var IDL = {
             seeds: [
               {
                 kind: "const",
-                value: [100, 101, 112, 111, 115, 105, 116]
+                value: [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
               },
               {
                 kind: "account",
                 path: "deposit.user",
-                account: "deposit"
+                account: "Deposit"
               },
               {
                 kind: "account",
-                path: "deposit.tokenMint",
-                account: "deposit"
+                path: "deposit.token_mint",
+                account: "Deposit"
               }
             ]
           }
         },
         {
-          name: "userTokenAccount",
+          name: "user_token_account",
           writable: true,
           pda: {
             seeds: [
@@ -21476,7 +21821,7 @@ var IDL = {
               },
               {
                 kind: "account",
-                path: "tokenMint"
+                path: "token_mint"
               }
             ],
             program: {
@@ -21519,7 +21864,7 @@ var IDL = {
           }
         },
         {
-          name: "vaultTokenAccount",
+          name: "vault_token_account",
           writable: true,
           pda: {
             seeds: [
@@ -21566,7 +21911,7 @@ var IDL = {
               },
               {
                 kind: "account",
-                path: "tokenMint"
+                path: "token_mint"
               }
             ],
             program: {
@@ -21609,19 +21954,21 @@ var IDL = {
           }
         },
         {
-          name: "tokenMint",
-          relations: ["deposit"]
+          name: "token_mint",
+          relations: [
+            "deposit"
+          ]
         },
         {
-          name: "tokenProgram",
+          name: "token_program",
           address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          name: "associatedTokenProgram",
+          name: "associated_token_program",
           address: "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          name: "systemProgram",
+          name: "system_program",
           address: "11111111111111111111111111111111"
         }
       ],
@@ -21630,18 +21977,27 @@ var IDL = {
           name: "args",
           type: {
             defined: {
-              name: "modifyDepositArgs"
+              name: "ModifyDepositArgs"
             }
           }
         }
       ]
     },
     {
-      name: "processUndelegation",
-      discriminator: [196, 28, 41, 206, 48, 37, 51, 167],
+      name: "process_undelegation",
+      discriminator: [
+        196,
+        28,
+        41,
+        206,
+        48,
+        37,
+        51,
+        167
+      ],
       accounts: [
         {
-          name: "baseAccount",
+          name: "base_account",
           writable: true
         },
         {
@@ -21652,12 +22008,12 @@ var IDL = {
           writable: true
         },
         {
-          name: "systemProgram"
+          name: "system_program"
         }
       ],
       args: [
         {
-          name: "accountSeeds",
+          name: "account_seeds",
           type: {
             vec: "bytes"
           }
@@ -21665,17 +22021,28 @@ var IDL = {
       ]
     },
     {
-      name: "transferDeposit",
+      name: "transfer_deposit",
       docs: [
         "Transfers a specified amount from one user's deposit account to another's for the same token mint.",
         "",
         "Only updates the internal accounting; does not move actual tokens."
       ],
-      discriminator: [20, 20, 147, 223, 41, 63, 204, 111],
+      discriminator: [
+        20,
+        20,
+        147,
+        223,
+        41,
+        63,
+        204,
+        111
+      ],
       accounts: [
         {
           name: "user",
-          relations: ["sourceDeposit"]
+          relations: [
+            "source_deposit"
+          ]
         },
         {
           name: "payer",
@@ -21683,59 +22050,78 @@ var IDL = {
           signer: true
         },
         {
-          name: "sessionToken",
+          name: "session_token",
           optional: true
         },
         {
-          name: "sourceDeposit",
+          name: "source_deposit",
           writable: true,
           pda: {
             seeds: [
               {
                 kind: "const",
-                value: [100, 101, 112, 111, 115, 105, 116]
+                value: [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
               },
               {
                 kind: "account",
-                path: "sourceDeposit.user",
-                account: "deposit"
+                path: "source_deposit.user",
+                account: "Deposit"
               },
               {
                 kind: "account",
-                path: "sourceDeposit.tokenMint",
-                account: "deposit"
+                path: "source_deposit.token_mint",
+                account: "Deposit"
               }
             ]
           }
         },
         {
-          name: "destinationDeposit",
+          name: "destination_deposit",
           writable: true,
           pda: {
             seeds: [
               {
                 kind: "const",
-                value: [100, 101, 112, 111, 115, 105, 116]
+                value: [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
               },
               {
                 kind: "account",
-                path: "destinationDeposit.user",
-                account: "deposit"
+                path: "destination_deposit.user",
+                account: "Deposit"
               },
               {
                 kind: "account",
-                path: "destinationDeposit.tokenMint",
-                account: "deposit"
+                path: "destination_deposit.token_mint",
+                account: "Deposit"
               }
             ]
           }
         },
         {
-          name: "tokenMint",
-          relations: ["sourceDeposit", "destinationDeposit"]
+          name: "token_mint",
+          relations: [
+            "source_deposit",
+            "destination_deposit"
+          ]
         },
         {
-          name: "systemProgram",
+          name: "system_program",
           address: "11111111111111111111111111111111"
         }
       ],
@@ -21747,17 +22133,28 @@ var IDL = {
       ]
     },
     {
-      name: "transferToUsernameDeposit",
+      name: "transfer_to_username_deposit",
       docs: [
         "Transfers a specified amount from a user's deposit account to a username-based deposit.",
         "",
         "Only updates the internal accounting; does not move actual tokens."
       ],
-      discriminator: [224, 228, 188, 234, 232, 153, 75, 96],
+      discriminator: [
+        224,
+        228,
+        188,
+        234,
+        232,
+        153,
+        75,
+        96
+      ],
       accounts: [
         {
           name: "user",
-          relations: ["sourceDeposit"]
+          relations: [
+            "source_deposit"
+          ]
         },
         {
           name: "payer",
@@ -21765,33 +22162,41 @@ var IDL = {
           signer: true
         },
         {
-          name: "sessionToken",
+          name: "session_token",
           optional: true
         },
         {
-          name: "sourceDeposit",
+          name: "source_deposit",
           writable: true,
           pda: {
             seeds: [
               {
                 kind: "const",
-                value: [100, 101, 112, 111, 115, 105, 116]
+                value: [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
               },
               {
                 kind: "account",
-                path: "sourceDeposit.user",
-                account: "deposit"
+                path: "source_deposit.user",
+                account: "Deposit"
               },
               {
                 kind: "account",
-                path: "sourceDeposit.tokenMint",
-                account: "deposit"
+                path: "source_deposit.token_mint",
+                account: "Deposit"
               }
             ]
           }
         },
         {
-          name: "destinationDeposit",
+          name: "destination_deposit",
           writable: true,
           pda: {
             seeds: [
@@ -21818,23 +22223,26 @@ var IDL = {
               },
               {
                 kind: "account",
-                path: "destinationDeposit.username",
-                account: "usernameDeposit"
+                path: "destination_deposit.username",
+                account: "UsernameDeposit"
               },
               {
                 kind: "account",
-                path: "destinationDeposit.tokenMint",
-                account: "usernameDeposit"
+                path: "destination_deposit.token_mint",
+                account: "UsernameDeposit"
               }
             ]
           }
         },
         {
-          name: "tokenMint",
-          relations: ["sourceDeposit", "destinationDeposit"]
+          name: "token_mint",
+          relations: [
+            "source_deposit",
+            "destination_deposit"
+          ]
         },
         {
-          name: "systemProgram",
+          name: "system_program",
           address: "11111111111111111111111111111111"
         }
       ],
@@ -21852,7 +22260,16 @@ var IDL = {
         "",
         "Uses the ephemeral rollups SDK to commit and undelegate the deposit account."
       ],
-      discriminator: [131, 148, 180, 198, 91, 104, 42, 238],
+      discriminator: [
+        131,
+        148,
+        180,
+        198,
+        91,
+        104,
+        42,
+        238
+      ],
       accounts: [
         {
           name: "user"
@@ -21863,7 +22280,7 @@ var IDL = {
           signer: true
         },
         {
-          name: "sessionToken",
+          name: "session_token",
           optional: true
         },
         {
@@ -21873,7 +22290,15 @@ var IDL = {
             seeds: [
               {
                 kind: "const",
-                value: [100, 101, 112, 111, 115, 105, 116]
+                value: [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116
+                ]
               },
               {
                 kind: "account",
@@ -21881,18 +22306,18 @@ var IDL = {
               },
               {
                 kind: "account",
-                path: "deposit.tokenMint",
-                account: "deposit"
+                path: "deposit.token_mint",
+                account: "Deposit"
               }
             ]
           }
         },
         {
-          name: "magicProgram",
+          name: "magic_program",
           address: "Magic11111111111111111111111111111111111111"
         },
         {
-          name: "magicContext",
+          name: "magic_context",
           writable: true,
           address: "MagicContext1111111111111111111111111111111"
         }
@@ -21900,11 +22325,20 @@ var IDL = {
       args: []
     },
     {
-      name: "undelegateUsernameDeposit",
+      name: "undelegate_username_deposit",
       docs: [
         "Commits and undelegates the username-based deposit account from the ephemeral rollups program."
       ],
-      discriminator: [169, 131, 184, 97, 218, 190, 134, 4],
+      discriminator: [
+        169,
+        131,
+        184,
+        97,
+        218,
+        190,
+        134,
+        4
+      ],
       accounts: [
         {
           name: "payer",
@@ -21946,17 +22380,17 @@ var IDL = {
               },
               {
                 kind: "arg",
-                path: "tokenMint"
+                path: "token_mint"
               }
             ]
           }
         },
         {
-          name: "magicProgram",
+          name: "magic_program",
           address: "Magic11111111111111111111111111111111111111"
         },
         {
-          name: "magicContext",
+          name: "magic_context",
           writable: true,
           address: "MagicContext1111111111111111111111111111111"
         }
@@ -21967,7 +22401,7 @@ var IDL = {
           type: "string"
         },
         {
-          name: "tokenMint",
+          name: "token_mint",
           type: "pubkey"
         }
       ]
@@ -21975,92 +22409,139 @@ var IDL = {
   ],
   accounts: [
     {
-      name: "deposit",
-      discriminator: [148, 146, 121, 66, 207, 173, 21, 227]
+      name: "Deposit",
+      discriminator: [
+        148,
+        146,
+        121,
+        66,
+        207,
+        173,
+        21,
+        227
+      ]
     },
     {
-      name: "sessionToken",
-      discriminator: [233, 4, 115, 14, 46, 21, 1, 15]
+      name: "SessionToken",
+      discriminator: [
+        233,
+        4,
+        115,
+        14,
+        46,
+        21,
+        1,
+        15
+      ]
     },
     {
-      name: "telegramSession",
-      discriminator: [166, 166, 101, 241, 97, 253, 72, 138]
+      name: "TelegramSession",
+      discriminator: [
+        166,
+        166,
+        101,
+        241,
+        97,
+        253,
+        72,
+        138
+      ]
     },
     {
-      name: "usernameDeposit",
-      discriminator: [242, 23, 53, 35, 55, 192, 177, 246]
+      name: "UsernameDeposit",
+      discriminator: [
+        242,
+        23,
+        53,
+        35,
+        55,
+        192,
+        177,
+        246
+      ]
     },
     {
-      name: "vault",
-      discriminator: [211, 8, 232, 43, 2, 152, 117, 119]
+      name: "Vault",
+      discriminator: [
+        211,
+        8,
+        232,
+        43,
+        2,
+        152,
+        117,
+        119
+      ]
     }
   ],
   errors: [
     {
       code: 6000,
-      name: "unauthorized",
+      name: "Unauthorized",
       msg: "Unauthorized"
     },
     {
       code: 6001,
-      name: "overflow",
+      name: "Overflow",
       msg: "Overflow"
     },
     {
       code: 6002,
-      name: "invalidMint",
+      name: "InvalidMint",
       msg: "Invalid Mint"
     },
     {
       code: 6003,
-      name: "insufficientVault",
+      name: "InsufficientVault",
       msg: "Insufficient Vault"
     },
     {
       code: 6004,
-      name: "insufficientDeposit",
+      name: "InsufficientDeposit",
       msg: "Insufficient Deposit"
     },
     {
       code: 6005,
-      name: "notVerified",
+      name: "NotVerified",
       msg: "Not Verified"
     },
     {
       code: 6006,
-      name: "expiredSignature",
+      name: "ExpiredSignature",
       msg: "Expired Signature"
     },
     {
       code: 6007,
-      name: "replay",
+      name: "Replay",
       msg: "Replay"
     },
     {
       code: 6008,
-      name: "invalidEd25519",
+      name: "InvalidEd25519",
       msg: "Invalid Ed25519"
     },
     {
       code: 6009,
-      name: "invalidUsername",
+      name: "InvalidUsername",
       msg: "Invalid Username"
     },
     {
       code: 6010,
-      name: "invalidRecipient",
+      name: "InvalidRecipient",
       msg: "Invalid Recipient"
     },
     {
       code: 6011,
-      name: "invalidDepositor",
+      name: "InvalidDepositor",
       msg: "Invalid Depositor"
     }
   ],
   types: [
     {
-      name: "deposit",
-      docs: ["A deposit account for a user and token mint."],
+      name: "Deposit",
+      docs: [
+        "A deposit account for a user and token mint."
+      ],
       type: {
         kind: "struct",
         fields: [
@@ -22069,7 +22550,7 @@ var IDL = {
             type: "pubkey"
           },
           {
-            name: "tokenMint",
+            name: "token_mint",
             type: "pubkey"
           },
           {
@@ -22080,7 +22561,7 @@ var IDL = {
       }
     },
     {
-      name: "modifyDepositArgs",
+      name: "ModifyDepositArgs",
       type: {
         kind: "struct",
         fields: [
@@ -22096,7 +22577,7 @@ var IDL = {
       }
     },
     {
-      name: "sessionToken",
+      name: "SessionToken",
       type: {
         kind: "struct",
         fields: [
@@ -22105,27 +22586,27 @@ var IDL = {
             type: "pubkey"
           },
           {
-            name: "targetProgram",
+            name: "target_program",
             type: "pubkey"
           },
           {
-            name: "sessionSigner",
+            name: "session_signer",
             type: "pubkey"
           },
           {
-            name: "validUntil",
+            name: "valid_until",
             type: "i64"
           }
         ]
       }
     },
     {
-      name: "telegramSession",
+      name: "TelegramSession",
       type: {
         kind: "struct",
         fields: [
           {
-            name: "userWallet",
+            name: "user_wallet",
             type: "pubkey"
           },
           {
@@ -22133,7 +22614,7 @@ var IDL = {
             type: "string"
           },
           {
-            name: "validationBytes",
+            name: "validation_bytes",
             type: "bytes"
           },
           {
@@ -22141,11 +22622,11 @@ var IDL = {
             type: "bool"
           },
           {
-            name: "authAt",
+            name: "auth_at",
             type: "u64"
           },
           {
-            name: "verifiedAt",
+            name: "verified_at",
             type: {
               option: "u64"
             }
@@ -22154,8 +22635,10 @@ var IDL = {
       }
     },
     {
-      name: "usernameDeposit",
-      docs: ["A deposit account for a telegram username and token mint."],
+      name: "UsernameDeposit",
+      docs: [
+        "A deposit account for a telegram username and token mint."
+      ],
       type: {
         kind: "struct",
         fields: [
@@ -22164,7 +22647,7 @@ var IDL = {
             type: "string"
           },
           {
-            name: "tokenMint",
+            name: "token_mint",
             type: "pubkey"
           },
           {
@@ -22175,7 +22658,7 @@ var IDL = {
       }
     },
     {
-      name: "vault",
+      name: "Vault",
       docs: [
         "A vault storing deposited tokens.",
         "Has a dummy field because Anchor requires it."
@@ -22184,7 +22667,7 @@ var IDL = {
         kind: "struct",
         fields: [
           {
-            name: "dummy",
+            name: "_dummy",
             type: "u8"
           }
         ]
@@ -22306,8 +22789,21 @@ class InternalWalletAdapter {
 }
 
 // src/LoyalPrivateTransactionsClient.ts
+function prettyStringify(obj) {
+  const json = JSON.stringify(obj, (_key, value) => {
+    if (value instanceof PublicKey4)
+      return value.toBase58();
+    if (typeof value === "bigint")
+      return value.toString();
+    return value;
+  }, 2);
+  return json.replace(/\[\s+(\d[\d,\s]*\d)\s+\]/g, (_match, inner) => {
+    const items = inner.split(/,\s*/).map((s) => s.trim());
+    return `[${items.join(", ")}]`;
+  });
+}
 function createProgram(provider) {
-  return new Program(IDL, provider);
+  return new Program(telegram_private_transfer_default, provider);
 }
 function programFromRpc(signer, commitment, rpcEndpoint, wsEndpoint) {
   const adapter = InternalWalletAdapter.from(signer);
@@ -22354,28 +22850,32 @@ class LoyalPrivateTransactionsClient {
       baseWsEndpoint,
       ephemeralRpcEndpoint,
       ephemeralWsEndpoint,
-      commitment = "confirmed"
+      commitment = "confirmed",
+      authToken
     } = config;
     const adapter = InternalWalletAdapter.from(signer);
     const baseProgram = programFromRpc(signer, commitment, baseRpcEndpoint, baseWsEndpoint);
     let finalEphemeralRpcEndpoint = ephemeralRpcEndpoint;
     let finalEphemeralWsEndpoint = ephemeralWsEndpoint;
-    let token;
-    let expiresAt;
     if (ephemeralRpcEndpoint.includes("tee")) {
-      const isVerified = await verifyTeeRpcIntegrity(ephemeralRpcEndpoint);
-      if (!isVerified) {
-        throw new Error("TEE RPC integrity verification failed");
+      let token;
+      let expiresAt;
+      if (!authToken) {
+        try {
+          const isVerified = await verifyTeeRpcIntegrity(ephemeralRpcEndpoint);
+          if (!isVerified) {
+            console.error("[LoyalClient] TEE RPC integrity verification returned false");
+          }
+        } catch (e) {
+          console.error("[LoyalClient] TEE RPC integrity verification error:", e);
+        }
+        const signMessage = deriveMessageSigner(signer);
+        ({ token, expiresAt } = await getAuthToken(ephemeralRpcEndpoint, adapter.publicKey, signMessage));
+      } else {
+        token = authToken.token;
       }
-      const signMessage = deriveMessageSigner(signer);
-      console.log("getAuthToken");
-      ({ token, expiresAt } = await getAuthToken(ephemeralRpcEndpoint, adapter.publicKey, signMessage));
-      console.log("getAuthToken token", token);
-      console.log("getAuthToken expiresAt", expiresAt);
       finalEphemeralRpcEndpoint = `${ephemeralRpcEndpoint}?token=${token}`;
       finalEphemeralWsEndpoint = ephemeralWsEndpoint ? `${ephemeralWsEndpoint}?token=${token}` : undefined;
-      console.log("authedEphemeralRpcEndpoint", finalEphemeralRpcEndpoint);
-      console.log("authedEphemeralWsEndpoint", finalEphemeralWsEndpoint);
     }
     const ephemeralProgram = programFromRpc(signer, commitment, finalEphemeralRpcEndpoint, finalEphemeralWsEndpoint);
     return new LoyalPrivateTransactionsClient(baseProgram, ephemeralProgram, adapter);
@@ -22387,6 +22887,18 @@ class LoyalPrivateTransactionsClient {
     const signature = await this.baseProgram.methods.initializeDeposit().accountsPartial({
       payer,
       user,
+      tokenMint,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId
+    }).rpc(rpcOptions);
+    return signature;
+  }
+  async initializeUsernameDeposit(params) {
+    const { username, tokenMint, payer, rpcOptions } = params;
+    const [usernameDepositPda] = findUsernameDepositPda(username, tokenMint);
+    await this.ensureNotDelegated(usernameDepositPda, "modifyBalance-depositPda", true);
+    const signature = await this.baseProgram.methods.initializeUsernameDeposit(username).accountsPartial({
+      payer,
       tokenMint,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId
@@ -22488,6 +23000,69 @@ class LoyalPrivateTransactionsClient {
     }).rpc(rpcOptions);
     return signature;
   }
+  async claimUsernameDepositToDeposit(params) {
+    const { username, tokenMint, amount, recipient, session, rpcOptions } = params;
+    this.validateUsername(username);
+    const [sourceUsernameDeposit] = findUsernameDepositPda(username, tokenMint);
+    const [destinationDeposit] = findDepositPda(recipient, tokenMint);
+    await this.ensureDelegated(sourceUsernameDeposit, "claimUsernameDepositToDeposit-sourceUsernameDeposit");
+    await this.ensureDelegated(destinationDeposit, "claimUsernameDepositToDeposit-destinationDeposit");
+    const accounts = {
+      user: recipient,
+      sourceUsernameDeposit,
+      destinationDeposit,
+      tokenMint,
+      session,
+      tokenProgram: TOKEN_PROGRAM_ID
+    };
+    console.log("claimUsernameDepositToDeposit accounts:", prettyStringify(accounts));
+    const connection = this.baseProgram.provider.connection;
+    const [srcInfo, dstInfo, sessionInfo] = await Promise.all([
+      connection.getAccountInfo(sourceUsernameDeposit),
+      connection.getAccountInfo(destinationDeposit),
+      connection.getAccountInfo(session)
+    ]);
+    console.log("claimUsernameDepositToDeposit sourceUsernameDeposit accountInfo:", prettyStringify({
+      address: sourceUsernameDeposit.toBase58(),
+      exists: !!srcInfo,
+      owner: srcInfo?.owner?.toBase58(),
+      lamports: srcInfo?.lamports,
+      dataLen: srcInfo?.data?.length,
+      executable: srcInfo?.executable
+    }));
+    console.log("claimUsernameDepositToDeposit destinationDeposit accountInfo:", prettyStringify({
+      address: destinationDeposit.toBase58(),
+      exists: !!dstInfo,
+      owner: dstInfo?.owner?.toBase58(),
+      lamports: dstInfo?.lamports,
+      dataLen: dstInfo?.data?.length,
+      executable: dstInfo?.executable
+    }));
+    console.log("claimUsernameDepositToDeposit session accountInfo:", prettyStringify({
+      address: session.toBase58(),
+      exists: !!sessionInfo,
+      owner: sessionInfo?.owner?.toBase58(),
+      lamports: sessionInfo?.lamports,
+      dataLen: sessionInfo?.data?.length,
+      executable: sessionInfo?.executable
+    }));
+    try {
+      const sim = await this.ephemeralProgram.methods.claimUsernameDepositToDeposit(new BN(amount.toString())).accountsPartial(accounts).simulate();
+      console.log("claimUsernameDepositToDeposit simulation logs:", sim.raw);
+    } catch (simErr) {
+      const simResponse = simErr.simulationResponse;
+      console.error("claimUsernameDepositToDeposit simulate FAILED");
+      console.error("  error message:", simErr instanceof Error ? simErr.message : String(simErr));
+      if (simResponse) {
+        console.error("  simulation err:", prettyStringify(simResponse.err));
+        console.error("  simulation logs:", prettyStringify(simResponse.logs));
+        console.error("  unitsConsumed:", simResponse.unitsConsumed);
+      }
+      throw simErr;
+    }
+    const signature = await this.ephemeralProgram.methods.claimUsernameDepositToDeposit(new BN(amount.toString())).accountsPartial(accounts).rpc({ skipPreflight: true, commitment: "confirmed" });
+    return signature;
+  }
   async createPermission(params) {
     const { user, tokenMint, payer, rpcOptions } = params;
     const [depositPda] = findDepositPda(user, tokenMint);
@@ -22553,16 +23128,22 @@ class LoyalPrivateTransactionsClient {
       delegationRecordDeposit: delegationRecordPda,
       delegationMetadataDeposit: delegationMetadataPda,
       deposit: depositPda,
+      validator,
       ownerProgram: PROGRAM_ID,
       delegationProgram: DELEGATION_PROGRAM_ID,
       systemProgram: SystemProgram.programId
     };
-    accounts.validator = validator ?? null;
     const signature = await this.baseProgram.methods.delegate(user, tokenMint).accountsPartial(accounts).rpc(rpcOptions);
     return signature;
   }
   async delegateUsernameDeposit(params) {
-    const { username, tokenMint, session, payer, validator, rpcOptions } = params;
+    const {
+      username,
+      tokenMint,
+      payer,
+      validator,
+      rpcOptions
+    } = params;
     this.validateUsername(username);
     const [depositPda] = findUsernameDepositPda(username, tokenMint);
     const [bufferPda] = findBufferPda(depositPda);
@@ -22571,7 +23152,6 @@ class LoyalPrivateTransactionsClient {
     await this.ensureNotDelegated(depositPda, "delegateUsernameDeposit-depositPda");
     const accounts = {
       payer,
-      session,
       bufferDeposit: bufferPda,
       delegationRecordDeposit: delegationRecordPda,
       delegationMetadataDeposit: delegationMetadataPda,
@@ -22598,9 +23178,33 @@ class LoyalPrivateTransactionsClient {
     console.log("undelegateDeposit user", user.toString());
     console.log("undelegateDeposit tokenMint", tokenMint.toString());
     console.log("undelegateDeposit depositPda", depositPda.toString());
-    const depositAccountInfo = await this.ephemeralProgram.provider.connection.getAccountInfo(depositPda);
-    console.log("undelegateDeposit depositPda owner", depositAccountInfo?.owner?.toString() ?? "account not found");
-    await this.ensureDelegated(depositPda, "undelegateDeposit-depositPda");
+    const perDepositAccountInfo = await this.ephemeralProgram.provider.connection.getAccountInfo(depositPda);
+    console.log("undelegateDeposit perClient depositPda owner", perDepositAccountInfo?.owner?.toString() ?? "account not found");
+    const baseDepositAccountInfo = await this.baseProgram.provider.connection.getAccountInfo(depositPda);
+    console.log("undelegateDeposit baseClient depositPda owner", baseDepositAccountInfo?.owner?.toString() ?? "account not found");
+    await this.ensureDelegated(depositPda, "undelegateDeposit-depositPda", true);
+    let perResolve;
+    let baseResolve;
+    const perOwnerReady = new Promise((r) => {
+      perResolve = r;
+    });
+    const baseOwnerReady = new Promise((r) => {
+      baseResolve = r;
+    });
+    const perSubId = this.ephemeralProgram.provider.connection.onAccountChange(depositPda, (accountInfo) => {
+      console.log("undelegateDeposit perClient: depositPda owner changed ->", accountInfo.owner.toString());
+      if (accountInfo.owner.equals(PROGRAM_ID))
+        perResolve();
+    }, { commitment: "confirmed" });
+    const baseSubId = this.baseProgram.provider.connection.onAccountChange(depositPda, (accountInfo) => {
+      console.log("undelegateDeposit baseClient: depositPda owner changed ->", accountInfo.owner.toString());
+      if (accountInfo.owner.equals(PROGRAM_ID))
+        baseResolve();
+    }, { commitment: "confirmed" });
+    if (perDepositAccountInfo?.owner.equals(PROGRAM_ID))
+      perResolve();
+    if (baseDepositAccountInfo?.owner.equals(PROGRAM_ID))
+      baseResolve();
     const accounts = {
       user,
       payer,
@@ -22615,6 +23219,11 @@ class LoyalPrivateTransactionsClient {
     });
     console.log("-----");
     const signature = await this.ephemeralProgram.methods.undelegate().accountsPartial(accounts).rpc(rpcOptions);
+    console.log("undelegateDeposit: waiting for depositPda owner to be PROGRAM_ID on both connections...");
+    await Promise.all([perOwnerReady, baseOwnerReady]);
+    console.log("undelegateDeposit: depositPda owner is PROGRAM_ID on both connections");
+    await this.ephemeralProgram.provider.connection.removeAccountChangeListener(perSubId);
+    await this.baseProgram.provider.connection.removeAccountChangeListener(baseSubId);
     return signature;
   }
   async undelegateUsernameDeposit(params) {
@@ -22800,67 +23409,68 @@ class LoyalPrivateTransactionsClient {
   async ensureNotDelegated(account, name, passNotExist) {
     const baseAccountInfo = await this.baseProgram.provider.connection.getAccountInfo(account);
     const ephemeralAccountInfo = await this.ephemeralProgram.provider.connection.getAccountInfo(account);
-    const accountInfo = baseAccountInfo;
-    if (!accountInfo) {
+    if (!baseAccountInfo) {
       if (passNotExist) {
         return;
       }
       const displayName2 = name ? `${name} - ` : "";
       throw new Error(`Account is not exists: ${displayName2}${account.toString()}`);
     }
-    const isDelegated = accountInfo.owner.equals(DELEGATION_PROGRAM_ID);
+    const isDelegated = baseAccountInfo.owner.equals(DELEGATION_PROGRAM_ID);
     const displayName = name ? `${name} - ` : "";
     if (isDelegated) {
-      const options = {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getDelegationStatus",
-          params: [account.toString()]
-        })
-      };
-      const res = await fetch("https://devnet-router.magicblock.app/getDelegationStatus", options);
-      const resJson = await res.json();
-      console.error(`Account is not delegated to ER: ${displayName}${account.toString()}`);
-      console.error("/getDelegationStatus", JSON.stringify(resJson, null, 2));
-      console.error("baseAccountInfo", JSON.stringify(baseAccountInfo, null, 2));
-      console.error("ephemeralAccountInfo", JSON.stringify(ephemeralAccountInfo, null, 2));
+      console.error(`Account is delegated to ER: ${displayName}${account.toString()}`);
+      const delegationStatus = await this.getDelegationStatus(account);
+      console.error("/getDelegationStatus", JSON.stringify(delegationStatus, null, 2));
+      console.error("baseAccountInfo", prettyStringify(baseAccountInfo));
+      console.error("ephemeralAccountInfo", prettyStringify(ephemeralAccountInfo));
+      if (delegationStatus.result?.delegationRecord.authority !== ER_VALIDATOR.toString()) {
+        console.error(`Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${delegationStatus.result?.delegationRecord.authority}`);
+      }
       throw new Error(`Account is delegated to ER: ${displayName}${account.toString()}`);
     }
   }
-  async ensureDelegated(account, name) {
+  async ensureDelegated(account, name, skipValidatorCheck) {
     const baseAccountInfo = await this.baseProgram.provider.connection.getAccountInfo(account);
     const ephemeralAccountInfo = await this.ephemeralProgram.provider.connection.getAccountInfo(account);
-    const accountInfo = baseAccountInfo;
-    if (!accountInfo) {
+    if (!baseAccountInfo) {
       const displayName2 = name ? `${name} - ` : "";
       throw new Error(`Account is not exists: ${displayName2}${account.toString()}`);
     }
-    const isDelegated = accountInfo.owner.equals(DELEGATION_PROGRAM_ID);
+    const isDelegated = baseAccountInfo.owner.equals(DELEGATION_PROGRAM_ID);
     const displayName = name ? `${name} - ` : "";
+    const delegationStatus = await this.getDelegationStatus(account);
     if (!isDelegated) {
-      const options = {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getDelegationStatus",
-          params: [account.toString()]
-        })
-      };
-      const res = await fetch("https://devnet-router.magicblock.app/getDelegationStatus", options);
-      const resJson = await res.json();
       console.error(`Account is not delegated to ER: ${displayName}${account.toString()}`);
-      console.error("/getDelegationStatus:", JSON.stringify(resJson, null, 2));
-      console.error("baseAccountInfo", JSON.stringify(baseAccountInfo, null, 2));
-      console.error("ephemeralAccountInfo", JSON.stringify(ephemeralAccountInfo, null, 2));
+      console.error("/getDelegationStatus:", JSON.stringify(delegationStatus, null, 2));
+      console.error("baseAccountInfo", prettyStringify(baseAccountInfo));
+      console.error("ephemeralAccountInfo", prettyStringify(ephemeralAccountInfo));
       throw new Error(`Account is not delegated to ER: ${displayName}${account.toString()}`);
+    } else if (!skipValidatorCheck && delegationStatus.result?.delegationRecord.authority !== ER_VALIDATOR.toString()) {
+      console.error(`Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${delegationStatus.result?.delegationRecord.authority}`);
+      console.error("/getDelegationStatus:", JSON.stringify(delegationStatus, null, 2));
+      console.error("baseAccountInfo", prettyStringify(baseAccountInfo));
+      console.error("ephemeralAccountInfo", prettyStringify(ephemeralAccountInfo));
+      throw new Error(`Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${delegationStatus.result?.delegationRecord.authority}`);
     }
   }
+  async getDelegationStatus(account) {
+    const options = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getDelegationStatus",
+        params: [account.toString()]
+      })
+    };
+    const res = await fetch("https://devnet-router.magicblock.app/getDelegationStatus", options);
+    return await res.json();
+  }
 }
+// index.ts
+var IDL = telegram_private_transfer_default;
 export {
   solToLamports,
   lamportsToSol,

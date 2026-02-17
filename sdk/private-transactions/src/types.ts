@@ -177,7 +177,7 @@ export interface DelegateDepositParams {
   user: PublicKey;
   tokenMint: PublicKey;
   payer: PublicKey;
-  validator?: PublicKey;
+  validator: PublicKey;
   rpcOptions?: RpcOptions;
 }
 
@@ -189,7 +189,7 @@ export interface DelegateUsernameDepositParams {
   tokenMint: PublicKey;
   // session: PublicKey;
   payer: PublicKey;
-  validator?: PublicKey;
+  validator: PublicKey;
   rpcOptions?: RpcOptions;
 }
 
@@ -243,6 +243,35 @@ export interface TransferToUsernameDepositParams {
   payer: PublicKey;
   sessionToken?: PublicKey | null;
   rpcOptions?: RpcOptions;
+}
+
+/**
+ * Delegation record from MagicBlock router
+ */
+export interface DelegationRecord {
+  authority: string;
+  owner: string;
+  delegationSlot: number;
+  lamports: number;
+}
+
+/**
+ * Response from MagicBlock getDelegationStatus RPC call
+ */
+export interface DelegationStatusResult {
+  isDelegated: boolean;
+  fqdn?: string;
+  delegationRecord: DelegationRecord;
+}
+
+/**
+ * Full JSON-RPC response for getDelegationStatus
+ */
+export interface DelegationStatusResponse {
+  jsonrpc: "2.0";
+  id: number | string;
+  result?: DelegationStatusResult;
+  error?: { code: number; message: string } | null;
 }
 
 // Type guards for runtime wallet type discrimination
