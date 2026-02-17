@@ -138,7 +138,7 @@ export const subscribeToWalletBalance = async (
 
   let lastLamports = balanceCache?.lamports;
 
-  const subscriptionId = await connection.onAccountChange(
+  const subscriptionId = connection.onAccountChange(
     keypair.publicKey,
     (accountInfo) => {
       const lamports = accountInfo.lamports;
