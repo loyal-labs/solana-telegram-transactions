@@ -2,6 +2,7 @@
 
 import { biometry } from "@telegram-apps/sdk";
 import { hapticFeedback, retrieveLaunchParams } from "@telegram-apps/sdk-react";
+import Lottie from "lottie-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import QRCodeLib from "qrcode";
@@ -10,6 +11,9 @@ import { sileo } from "sileo";
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import { buildBioMiniAppUrl } from "@/lib/telegram/mini-app/start-param";
+
+import dogAnimation from "../../../../public/biometrics/dog.json";
+import shieldAnimation from "../../../../public/biometrics/shield.json";
 
 type VerifyStep =
   | "checking"
@@ -328,20 +332,12 @@ export default function VerifyPage() {
 
   const bottomPadding = Math.max(safeBottom, 16) + 16;
 
-  // Hidden preload of verified.png through Next.js Image pipeline so it's
-  // already cached when transitioning from ready → verified step.
-  const preload = (
-    <div aria-hidden className="absolute h-0 w-0 overflow-hidden">
-      <Image src="/biometrics/verified.png" alt="" width={1} height={1} priority />
-    </div>
-  );
 
   // ---- Checking state ----
 
   if (step === "checking") {
     return (
       <main className="flex flex-1 items-center justify-center bg-white">
-        {preload}
         <div className="animate-pulse text-[17px] text-[rgba(60,60,67,0.6)]">
           Checking...
         </div>
@@ -417,13 +413,8 @@ export default function VerifyPage() {
           style={{ paddingBottom: bottomPadding }}
         >
           <div className="flex flex-1 flex-col items-center justify-center">
-            <div className="relative mb-8 h-[120px] w-[120px]">
-              <Image
-                src="/Shield.svg"
-                alt="Shield"
-                fill
-                className="object-contain"
-              />
+            <div className="mb-8 h-[200px] w-[200px]">
+              <Lottie animationData={shieldAnimation} loop />
             </div>
             <h1 className="mb-3 text-center text-[22px] font-semibold leading-[28px] text-black">
               Allow Telegram to Use Biometrics
@@ -459,19 +450,13 @@ export default function VerifyPage() {
   if (step === "ready") {
     return (
       <main className="flex flex-1 flex-col bg-white font-sans">
-        {preload}
         <div
           className="flex flex-1 flex-col items-center justify-between px-8"
           style={{ paddingBottom: bottomPadding }}
         >
           <div className="flex flex-1 flex-col items-center justify-center">
-            <div className="relative mb-8 h-[120px] w-[120px]">
-              <Image
-                src="/Shield.svg"
-                alt="Shield"
-                fill
-                className="object-contain"
-              />
+            <div className="mb-8 h-[200px] w-[200px]">
+              <Lottie animationData={shieldAnimation} loop />
             </div>
             <h1 className="mb-3 text-center text-[22px] font-semibold leading-[28px] text-black">
               Confirm You&apos;re Human
@@ -502,13 +487,8 @@ export default function VerifyPage() {
         style={{ paddingBottom: bottomPadding }}
       >
         <div className="flex flex-1 flex-col items-center justify-center">
-          <div className="relative mb-8 h-[200px] w-[200px]">
-            <Image
-              src="/biometrics/verified.png"
-              alt="Verified"
-              fill
-              className="object-contain"
-            />
+          <div className="mb-8 h-[200px] w-[200px]">
+            <Lottie animationData={dogAnimation} loop />
           </div>
           <h1 className="mb-3 text-center text-[22px] font-semibold leading-[28px] text-black">
             You&apos;re Verified
