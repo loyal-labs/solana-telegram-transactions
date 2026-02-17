@@ -9,13 +9,54 @@ const EXPECTED_ROUTE = `/telegram/summaries/feed?groupChatId=${encodeURIComponen
   GROUP_CHAT_ID
 )}&summaryId=${SUMMARY_ID}`;
 
+const stubWindow = (overrides: Record<string, unknown> = {}) => {
+  (globalThis as { window?: unknown }).window = {
+    location: { hash: "", search: "", href: "" },
+    ...overrides,
+  };
+};
+
 afterEach(() => {
   delete (globalThis as { window?: unknown }).window;
   mock.restore();
 });
 
 describe("getStartParamRoute", () => {
-  describe("SDK extraction (primary)", () => {
+  describe("native Telegram bridge (primary)", () => {
+    test("reads start_param from Telegram.WebApp.initDataUnsafe", () => {
+      mock.module("@telegram-apps/sdk-react", () => ({
+        retrieveLaunchParams: () => {
+          throw new Error("unused");
+        },
+      }));
+
+      stubWindow({
+        Telegram: {
+          WebApp: {
+            initDataUnsafe: { start_param: START_PARAM },
+          },
+        },
+      });
+
+      expect(getStartParamRoute()).toBe(EXPECTED_ROUTE);
+    });
+
+    test("skips when initDataUnsafe has no start_param", () => {
+      mock.module("@telegram-apps/sdk-react", () => ({
+        retrieveLaunchParams: () => ({
+          tgWebAppStartParam: undefined,
+        }),
+      }));
+
+      stubWindow({
+        Telegram: { WebApp: { initDataUnsafe: {} } },
+      });
+
+      expect(getStartParamRoute()).toBeUndefined();
+    });
+  });
+
+  describe("SDK extraction (secondary)", () => {
     test("parses start param via retrieveLaunchParams", () => {
       mock.module("@telegram-apps/sdk-react", () => ({
         retrieveLaunchParams: () => ({
@@ -23,25 +64,9 @@ describe("getStartParamRoute", () => {
         }),
       }));
 
-      (globalThis as { window?: unknown }).window = {
-        location: { hash: "", search: "" },
-      };
+      stubWindow();
 
       expect(getStartParamRoute()).toBe(EXPECTED_ROUTE);
-    });
-
-    test("returns undefined when SDK has no start param", () => {
-      mock.module("@telegram-apps/sdk-react", () => ({
-        retrieveLaunchParams: () => ({
-          tgWebAppStartParam: undefined,
-        }),
-      }));
-
-      (globalThis as { window?: unknown }).window = {
-        location: { hash: "", search: "" },
-      };
-
-      expect(getStartParamRoute()).toBeUndefined();
     });
   });
 
@@ -53,12 +78,13 @@ describe("getStartParamRoute", () => {
         },
       }));
 
-      (globalThis as { window?: unknown }).window = {
+      stubWindow({
         location: {
           hash: `#tgWebAppStartParam=${START_PARAM}`,
           search: "",
+          href: "",
         },
-      };
+      });
 
       expect(getStartParamRoute()).toBe(EXPECTED_ROUTE);
     });
@@ -70,12 +96,13 @@ describe("getStartParamRoute", () => {
         },
       }));
 
-      (globalThis as { window?: unknown }).window = {
+      stubWindow({
         location: {
           hash: "",
           search: `?tgWebAppStartParam=${START_PARAM}`,
+          href: "",
         },
-      };
+      });
 
       expect(getStartParamRoute()).toBe(EXPECTED_ROUTE);
     });
@@ -87,12 +114,13 @@ describe("getStartParamRoute", () => {
         },
       }));
 
-      (globalThis as { window?: unknown }).window = {
+      stubWindow({
         location: {
           hash: "#tgWebAppStartParam=invalid",
           search: "",
+          href: "",
         },
-      };
+      });
 
       expect(getStartParamRoute()).toBeUndefined();
     });
