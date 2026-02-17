@@ -108,3 +108,29 @@ export function getStartParamRoute(): string | undefined {
 
   return undefined;
 }
+
+const CONSUMED_KEY = "deeplink_consumed_route";
+
+/**
+ * Returns the deeplink route only if it hasn't been consumed yet.
+ * Use this in UI consumers to avoid re-triggering redirects on page refresh.
+ */
+export function getUnconsumedStartParamRoute(): string | undefined {
+  const route = getStartParamRoute();
+  if (!route) return undefined;
+  try {
+    if (sessionStorage.getItem(CONSUMED_KEY) === route) return undefined;
+  } catch {
+    // sessionStorage not available
+  }
+  return route;
+}
+
+/** Mark the deeplink route as consumed so page refreshes don't re-trigger it. */
+export function markStartParamConsumed(route: string): void {
+  try {
+    sessionStorage.setItem(CONSUMED_KEY, route);
+  } catch {
+    // sessionStorage not available
+  }
+}
