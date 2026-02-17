@@ -114,67 +114,6 @@ type MagicRouterConnection = Connection & {
   ) => Promise<BlockhashWithExpiryBlockHeight>;
 };
 
-function isMagicRouterConnection(
-  connection: Connection
-): connection is MagicRouterConnection {
-  return (
-    typeof (connection as MagicRouterConnection)
-      .getLatestBlockhashForTransaction === "function"
-  );
-}
-
-function patchProviderForMagicRouter(
-  provider: AnchorProvider,
-  wallet: InternalWalletAdapter
-): AnchorProvider {
-  if (!isMagicRouterConnection(provider.connection)) {
-    return provider;
-  }
-
-  provider.sendAndConfirm = async (
-    tx: Transaction | VersionedTransaction,
-    signers?: Signer[],
-    opts?: ConfirmOptions & { blockhash?: BlockhashWithExpiryBlockHeight }
-  ): Promise<string> => {
-    const options = opts ?? provider.opts;
-
-    if (tx instanceof VersionedTransaction) {
-      if (signers) {
-        tx.sign(signers);
-      }
-      const signedTx = await wallet.signTransaction(tx);
-      return sendAndConfirmRawTransaction(
-        provider.connection,
-        Buffer.from(signedTx.serialize()),
-        options
-      );
-    }
-
-    tx.feePayer = tx.feePayer ?? wallet.publicKey;
-    if (signers) {
-      for (const signer of signers) {
-        tx.partialSign(signer);
-      }
-    }
-
-    const blockhash =
-      (opts as { blockhash?: BlockhashWithExpiryBlockHeight } | undefined)
-        ?.blockhash ??
-      (await provider.connection.getLatestBlockhash(options?.commitment));
-    tx.recentBlockhash = blockhash.blockhash;
-    tx.lastValidBlockHeight = blockhash.lastValidBlockHeight;
-
-    const signedTx = await wallet.signTransaction(tx);
-    return sendAndConfirmRawTransaction(
-      provider.connection,
-      Buffer.from(signedTx.serialize()),
-      options
-    );
-  };
-
-  return provider;
-}
-
 /**
  * Derive a message signing function from any supported signer type.
  * Required for PER auth token acquisition.
@@ -207,6 +146,68 @@ function deriveMessageSigner(
     return (message: Uint8Array) => walletLike.signMessage!(message);
   }
   throw new Error("Wallet does not support signMessage, required for PER auth");
+}
+
+// Subscribe for changes (before transaction) and start polling (should be awaited after transaction).
+// Returns an object with `wait()` to start polling and `cancel()` to clean up the subscription
+// if the transaction fails before `wait()` is called.
+export function waitForAccountOwnerChange(
+  connection: Connection,
+  account: PublicKey,
+  expectedOwner: PublicKey,
+  timeoutMs = 15_000,
+  intervalMs = 1_000
+): { wait: () => Promise<void>; cancel: () => Promise<void> } {
+  let skipWait: () => void;
+  const subId = connection.onAccountChange(
+    account,
+    (accountInfo) => {
+      if (accountInfo.owner.equals(expectedOwner) && skipWait) {
+        console.log(
+          `waitForAccountOwnerChange: ${account.toString()} – short-circuit polling wait`
+        );
+        skipWait();
+      }
+    },
+    { commitment: "confirmed" }
+  );
+
+  const cleanup = async () => {
+    await connection.removeAccountChangeListener(subId);
+  };
+
+  const wait = async () => {
+    try {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        const info = await connection.getAccountInfo(account, "confirmed");
+        if (info && info.owner.equals(expectedOwner)) {
+          console.log(
+            `waitForAccountOwnerChange: ${account.toString()} appeared with owner ${expectedOwner.toString()} after ${
+              Date.now() - start
+            }ms`
+          );
+          return;
+        }
+        if (info) {
+          console.log(
+            `waitForAccountOwnerChange: ${account.toString()} exists but owner is ${info.owner.toString()}, expected ${expectedOwner.toString()}`
+          );
+        }
+        await new Promise<void>((r) => {
+          skipWait = r;
+          setTimeout(r, intervalMs);
+        });
+      }
+      throw new Error(
+        `waitForAccountOwnerChange: ${account.toString()} did not appear with owner ${expectedOwner.toString()} after ${timeoutMs}ms`
+      );
+    } finally {
+      await cleanup();
+    }
+  };
+
+  return { wait, cancel: cleanup };
 }
 
 /**
@@ -254,56 +255,6 @@ export class LoyalPrivateTransactionsClient {
   // ============================================================
   // Factory Methods
   // ============================================================
-
-  // /**
-  //  * Create client from an AnchorProvider (for existing Anchor projects)
-  //  */
-  // static fromProvider(
-  //   provider: AnchorProvider
-  // ): LoyalPrivateTransactionsClient {
-  //   const wallet = InternalWalletAdapter.from(provider);
-  //   const patchedProvider = patchProviderForMagicRouter(provider, wallet);
-  //   const program = createProgram(patchedProvider);
-  //   return new LoyalPrivateTransactionsClient(program, wallet);
-  // }
-
-  // /**
-  //  * Create client from any supported signer type
-  //  */
-  // static from(
-  //   connection: Connection,
-  //   signer: WalletSigner
-  // ): LoyalPrivateTransactionsClient {
-  //   const adapter = InternalWalletAdapter.from(signer);
-  //   const provider = patchProviderForMagicRouter(
-  //     new AnchorProvider(connection, adapter, {
-  //       commitment: "confirmed",
-  //     }),
-  //     adapter
-  //   );
-  //   const program = createProgram(provider);
-  //   return new LoyalPrivateTransactionsClient(program, adapter);
-  // }
-
-  // /**
-  //  * Create client from a Connection and wallet adapter (for browser dApps)
-  //  */
-  // static fromWallet(
-  //   connection: Connection,
-  //   wallet: WalletLike
-  // ): LoyalPrivateTransactionsClient {
-  //   return LoyalPrivateTransactionsClient.from(connection, wallet);
-  // }
-
-  // /**
-  //  * Create client from a Connection and Keypair (for server-side scripts)
-  //  */
-  // static fromKeypair(
-  //   connection: Connection,
-  //   keypair: Keypair
-  // ): LoyalPrivateTransactionsClient {
-  //   return LoyalPrivateTransactionsClient.from(connection, keypair);
-  // }
 
   /**
    * Create client connected to an ephemeral rollup endpoint with PER auth token.
@@ -903,69 +854,12 @@ export class LoyalPrivateTransactionsClient {
     } = params;
 
     const [depositPda] = findDepositPda(user, tokenMint);
-    console.log("undelegateDeposit user", user.toString());
-    console.log("undelegateDeposit tokenMint", tokenMint.toString());
-    console.log("undelegateDeposit depositPda", depositPda.toString());
-
-    const perDepositAccountInfo =
-      await this.ephemeralProgram.provider.connection.getAccountInfo(
-        depositPda
-      );
-    console.log(
-      "undelegateDeposit perClient depositPda owner",
-      perDepositAccountInfo?.owner?.toString() ?? "account not found"
-    );
-
-    const baseDepositAccountInfo =
-      await this.baseProgram.provider.connection.getAccountInfo(depositPda);
-    console.log(
-      "undelegateDeposit baseClient depositPda owner",
-      baseDepositAccountInfo?.owner?.toString() ?? "account not found"
-    );
 
     await this.ensureDelegated(
       depositPda,
       "undelegateDeposit-depositPda",
       true
     );
-
-    // Subscribe to depositPda owner changes on both connections,
-    // resolving when owner matches PROGRAM_ID
-    let perResolve: () => void;
-    let baseResolve: () => void;
-    const perOwnerReady = new Promise<void>((r) => {
-      perResolve = r;
-    });
-    const baseOwnerReady = new Promise<void>((r) => {
-      baseResolve = r;
-    });
-
-    const perSubId = this.ephemeralProgram.provider.connection.onAccountChange(
-      depositPda,
-      (accountInfo) => {
-        console.log(
-          "undelegateDeposit perClient: depositPda owner changed ->",
-          accountInfo.owner.toString()
-        );
-        if (accountInfo.owner.equals(PROGRAM_ID)) perResolve();
-      },
-      { commitment: "confirmed" }
-    );
-    const baseSubId = this.baseProgram.provider.connection.onAccountChange(
-      depositPda,
-      (accountInfo) => {
-        console.log(
-          "undelegateDeposit baseClient: depositPda owner changed ->",
-          accountInfo.owner.toString()
-        );
-        if (accountInfo.owner.equals(PROGRAM_ID)) baseResolve();
-      },
-      { commitment: "confirmed" }
-    );
-
-    // If already owned by PROGRAM_ID, resolve immediately
-    if (perDepositAccountInfo?.owner.equals(PROGRAM_ID)) perResolve!();
-    if (baseDepositAccountInfo?.owner.equals(PROGRAM_ID)) baseResolve!();
 
     const accounts: Record<string, PublicKey | null> = {
       user,
@@ -976,33 +870,27 @@ export class LoyalPrivateTransactionsClient {
     };
     accounts.sessionToken = sessionToken ?? null;
 
-    console.log("undelegateDeposit Accounts:");
-    Object.entries(accounts).forEach(([key, value]) => {
-      console.log(key, value && value.toString());
-    });
-    console.log("-----");
-
-    const signature = await this.ephemeralProgram.methods
-      .undelegate()
-      .accountsPartial(accounts)
-      .rpc(rpcOptions);
-
-    // Wait for both connections to see depositPda owned by PROGRAM_ID
-    console.log(
-      "undelegateDeposit: waiting for depositPda owner to be PROGRAM_ID on both connections..."
-    );
-    await Promise.all([perOwnerReady, baseOwnerReady]);
-    console.log(
-      "undelegateDeposit: depositPda owner is PROGRAM_ID on both connections"
+    const delegationWatcher = waitForAccountOwnerChange(
+      this.baseProgram.provider.connection,
+      depositPda,
+      PROGRAM_ID
     );
 
-    // Clean up account change subscriptions
-    await this.ephemeralProgram.provider.connection.removeAccountChangeListener(
-      perSubId
-    );
-    await this.baseProgram.provider.connection.removeAccountChangeListener(
-      baseSubId
-    );
+    let signature;
+    try {
+      console.log("undelegateDeposit Accounts:", prettyStringify(accounts));
+      signature = await this.ephemeralProgram.methods
+        .undelegate()
+        .accountsPartial(accounts)
+        .rpc(rpcOptions);
+      console.log(
+        "undelegateDeposit: waiting for depositPda owner to be PROGRAM_ID on base connection..."
+      );
+      await delegationWatcher.wait();
+    } catch (e) {
+      await delegationWatcher.cancel();
+      throw e;
+    }
 
     return signature;
   }
