@@ -10,6 +10,9 @@ let mockDb: {
     admins: { findFirst: () => Promise<{ id: string } | null> };
     communities: { findFirst: () => Promise<Community | null> };
   };
+  insert: () => {
+    values: (values: Record<string, unknown>) => Promise<void>;
+  };
   update: () => {
     set: (values: Record<string, unknown>) => {
       where: () => Promise<void>;
@@ -54,6 +57,7 @@ let handleUnhideCommunityCommand: (
 
 let adminResult: { id: string } | null;
 let communityResult: Community | null;
+let insertValuesCaptured: Array<Record<string, unknown>>;
 let updateValuesCaptured: Array<Record<string, unknown>>;
 
 function createCommunity(overrides?: Partial<Community>): Community {
@@ -111,6 +115,7 @@ describe("commands admin authorization", () => {
     adminResult = null;
     communityResult = null;
     getChatCalls = 0;
+    insertValuesCaptured = [];
     updateValuesCaptured = [];
 
     mockDb = {
@@ -122,6 +127,11 @@ describe("commands admin authorization", () => {
           findFirst: async () => communityResult,
         },
       },
+      insert: () => ({
+        values: async (values: Record<string, unknown>) => {
+          insertValuesCaptured.push(values);
+        },
+      }),
       update: () => ({
         set: (values: Record<string, unknown>) => {
           updateValuesCaptured.push(values);
@@ -156,6 +166,20 @@ describe("commands admin authorization", () => {
     expect(replyCalls).toEqual([
       "You are not authorized to activate communities. Contact an administrator to be added to the whitelist.",
     ]);
+  });
+
+  test("activate creates new community as hidden by default", async () => {
+    adminResult = { id: "admin-1" };
+    communityResult = null;
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleActivateCommunityCommand(ctx);
+
+    expect(getChatCalls).toBe(1);
+    expect(updateValuesCaptured).toHaveLength(0);
+    expect(insertValuesCaptured).toHaveLength(1);
+    expect(insertValuesCaptured[0]?.isPublic).toBe(false);
+    expect(replyCalls).toContain("Community activated for message tracking!");
   });
 
   test("deactivate succeeds for whitelisted user without requiring Telegram chat-admin check", async () => {

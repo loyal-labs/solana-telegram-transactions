@@ -333,6 +333,7 @@ export async function handleActivateCommunityCommand(
       chatId,
       chatTitle: ctx.chat.title || "Untitled",
       activatedBy: telegramUserId,
+      isPublic: false,
       settings,
     });
 
