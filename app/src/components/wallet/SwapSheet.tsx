@@ -7,12 +7,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
-import { SOL_PRICE_USD } from "@/lib/constants";
+import {
+  NATIVE_SOL_MINT,
+  SOL_PRICE_USD,
+  SOLANA_USDC_MINT_DEVNET,
+  SOLANA_USDC_MINT_MAINNET,
+  SOLANA_USDT_MINT_MAINNET,
+} from "@/lib/constants";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
+import { getSolanaEnv } from "@/lib/solana/rpc/connection";
 import {
   DEFAULT_TOKEN_ICON,
   KNOWN_TOKEN_ICONS,
-  NATIVE_SOL_MINT,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
 
@@ -113,7 +119,19 @@ const FALLBACK_TOKENS: Token[] = [
     decimals: 6,
     balance: 0,
     priceUsd: 1,
-    mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    mint: SOLANA_USDT_MINT_MAINNET,
+  },
+  {
+    symbol: "USDC",
+    name: "USDC",
+    icon: "/tokens/usd-coin-usdc-logo.png",
+    decimals: 6,
+    balance: 0,
+    priceUsd: 1,
+    mint:
+      getSolanaEnv() == "devnet"
+        ? SOLANA_USDC_MINT_DEVNET
+        : SOLANA_USDC_MINT_MAINNET,
   },
 ];
 

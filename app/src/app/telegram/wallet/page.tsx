@@ -15,7 +15,6 @@ import {
   useSignal,
   viewport,
 } from "@telegram-apps/sdk-react";
-import { ER_VALIDATOR, findDepositPda, PROGRAM_ID } from "@vladarbatov/private-transactions-test";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Brush, Copy, RefreshCcw } from "lucide-react";
 import Image from "next/image";
@@ -44,6 +43,7 @@ import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
   BALANCE_BG_KEY,
   DISPLAY_CURRENCY_KEY,
+  NATIVE_SOL_MINT,
   SOL_PRICE_USD,
   TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
@@ -52,14 +52,16 @@ import { fetchInvoiceState } from "@/lib/irys/fetch-invoice-state";
 import {
   refundDeposit,
   subscribeToDepositsWithUsername,
-  topUpDeposit,
+  transferTokens,
+  transferTokensToUsername,
 } from "@/lib/solana/deposits";
 import {
   fetchLoyalDeposits,
   shieldTokens,
+  subscribeToSecureBalance,
   unshieldTokens,
 } from "@/lib/solana/deposits/loyal-deposits";
-import { getBaseClient, getPerClient } from "@/lib/solana/deposits/private-client";
+import { getPrivateClient } from "@/lib/solana/deposits/private-client";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import {
@@ -407,6 +409,44 @@ const ensureWalletBalanceSubscription = async (walletAddress: string) => {
   return walletBalanceSubscriptionPromise;
 };
 
+// Secure SOL balance (Loyal deposit) – mirrors wallet balance subscription
+const secureBalanceCache = new Map<string, number>();
+const secureBalanceListeners = new Set<(lamports: number) => void>();
+let secureBalanceSubscriptionPromise: Promise<() => Promise<void>> | null =
+  null;
+
+const getCachedSecureBalance = (
+  walletAddress: string | null
+): number | null => {
+  if (!walletAddress) return null;
+  const cached = secureBalanceCache.get(walletAddress);
+  return typeof cached === "number" ? cached : null;
+};
+
+const setCachedSecureBalance = (
+  walletAddress: string | null,
+  lamports: number
+): void => {
+  if (!walletAddress) return;
+  secureBalanceCache.set(walletAddress, lamports);
+};
+
+const ensureSecureBalanceSubscription = async (walletAddress: string) => {
+  if (secureBalanceSubscriptionPromise) {
+    return secureBalanceSubscriptionPromise;
+  }
+
+  secureBalanceSubscriptionPromise = subscribeToSecureBalance((lamports) => {
+    setCachedSecureBalance(walletAddress, lamports);
+    secureBalanceListeners.forEach((listener) => listener(lamports));
+  }).catch((error) => {
+    secureBalanceSubscriptionPromise = null;
+    throw error;
+  });
+
+  return secureBalanceSubscriptionPromise;
+};
+
 // SOL price cache (shared across page visits)
 let cachedSolPriceUsd: number | null = null;
 let solPriceFetchedAt: number | null = null;
@@ -652,7 +692,11 @@ export default function Home() {
     setSendStep(1); // Reset step
     if (recipientName) {
       setSelectedRecipient(recipientName);
-      setSendFormValues({ amount: "", recipient: recipientName, isSecured: false });
+      setSendFormValues({
+        amount: "",
+        recipient: recipientName,
+        isSecured: false,
+      });
     } else {
       setSelectedRecipient("");
       setSendFormValues({ amount: "", recipient: "", isSecured: false });
@@ -1013,7 +1057,7 @@ export default function Home() {
 
         if (username) {
           const provider = await getWalletProvider();
-          const deposits = await fetchDeposits(provider, username);
+          const deposits = await fetchDeposits(provider.publicKey, username);
           const mappedTransactions: IncomingTransaction[] = deposits.map(
             mapDepositToIncomingTransaction
           );
@@ -1059,86 +1103,24 @@ export default function Home() {
 
       if (isValidSolanaAddress(trimmedRecipient)) {
         if (sendFormValues.isSecured) {
-          const keypair = await getWalletKeypair();
           const destinationUser = new PublicKey(trimmedRecipient);
-          const baseClient = await getBaseClient();
-          const perClient = await getPerClient();
-          const connection = baseClient.program.provider.connection;
 
-          // Ensure a deposit is delegated to PER, initializing if needed
-          const ensureDelegated = async (user: PublicKey, label: string) => {
-            const existing = await baseClient.getDeposit(user, NATIVE_MINT);
-            if (!existing) {
-              console.log(`[send-shielded] initializeDeposit for ${label}`);
-              await baseClient.initializeDeposit({
-                user,
-                tokenMint: NATIVE_MINT,
-                payer: keypair.publicKey,
-              });
-              console.log(`[send-shielded] initializeDeposit done for ${label}`);
-            }
-
-            const [depositPda] = findDepositPda(user, NATIVE_MINT);
-            const accountInfo = await connection.getAccountInfo(depositPda);
-            const delegated = accountInfo && !accountInfo.owner.equals(PROGRAM_ID);
-            console.log(`[send-shielded] ${label} delegated:`, delegated);
-
-            if (!delegated) {
-              try {
-                console.log(`[send-shielded] createPermission for ${label}`);
-                await baseClient.createPermission({
-                  tokenMint: NATIVE_MINT,
-                  user,
-                  payer: keypair.publicKey,
-                });
-                console.log(`[send-shielded] createPermission done for ${label}`);
-              } catch {
-                // Permission may already exist
-              }
-
-              console.log(`[send-shielded] delegateDeposit for ${label}`);
-              await baseClient.delegateDeposit({
-                tokenMint: NATIVE_MINT,
-                user,
-                payer: keypair.publicKey,
-                validator: ER_VALIDATOR,
-              });
-              console.log(`[send-shielded] delegateDeposit done for ${label}`);
-
-              // Wait for PER to pick up the delegated account
-              console.log(`[send-shielded] waiting for PER to see ${label}...`);
-              for (let i = 0; i < 30; i++) {
-                const perAccountInfo = await perClient.program.provider.connection.getAccountInfo(depositPda);
-                if (perAccountInfo) {
-                  console.log(`[send-shielded] PER sees ${label}, attempt: ${i + 1}`);
-                  break;
-                }
-                await new Promise((r) => setTimeout(r, 1000));
-              }
-            }
-          };
-
-          await ensureDelegated(keypair.publicKey, "source");
-          await ensureDelegated(destinationUser, trimmedRecipient);
-
-          // Transfer via PER
-          console.log("[send-shielded] transferDeposit to", trimmedRecipient, "amount:", lamports);
-          signature = await perClient.transferDeposit({
-            user: keypair.publicKey,
+          // Transfer via privateClient
+          signature = await transferTokens({
             tokenMint: NATIVE_MINT,
-            destinationUser,
             amount: lamports,
-            payer: keypair.publicKey,
+            destination: destinationUser,
           });
-          console.log("[send-shielded] transferDeposit sig", signature);
         } else {
           signature = await sendSolTransaction(trimmedRecipient, lamports);
         }
       } else if (isValidTelegramUsername(trimmedRecipient)) {
         const username = trimmedRecipient.replace(/^@/, "");
-        const provider = await getWalletProvider();
-        const topUpResult = await topUpDeposit(provider, username, lamports);
-        signature = topUpResult.signature;
+        signature = await transferTokensToUsername({
+          tokenMint: NATIVE_MINT,
+          amount: lamports,
+          destinationUsername: username,
+        });
       } else {
         throw new Error("Invalid recipient");
       }
@@ -1418,6 +1400,13 @@ export default function Home() {
           wallet
         );
 
+        const privateClient = await getPrivateClient();
+        const ephemeralUrl = new URL(
+          privateClient.ephemeralProgram.provider.connection.rpcEndpoint
+        );
+        // Auth token can be used to access PER username deposit data
+        const perAuthToken = ephemeralUrl.searchParams.get("token");
+
         const claimResponse = await sendStoreInitDataTxn(
           storeTx,
           recipientPublicKey,
@@ -1426,7 +1415,8 @@ export default function Home() {
           validationBytes,
           signatureBytes,
           TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
-          closeTx ?? undefined
+          closeTx ?? undefined,
+          perAuthToken ?? undefined
         );
 
         const claimed = Boolean(
@@ -1593,7 +1583,7 @@ export default function Home() {
         }
 
         const provider = await getWalletProvider();
-        const deposits = await fetchDeposits(provider, username);
+        const deposits = await fetchDeposits(provider.publicKey, username);
         if (isCancelled) {
           return;
         }
@@ -1606,7 +1596,7 @@ export default function Home() {
         setIncomingTransactions(mappedTransactions);
 
         unsubscribe = await subscribeToDepositsWithUsername(
-          provider,
+          provider.publicKey,
           username,
           (deposit) => {
             if (isCancelled) {
@@ -1908,6 +1898,80 @@ export default function Home() {
     };
   }, [walletAddress]);
 
+  // Subscribe to secure (Loyal deposit) balance updates via ephemeral websocket
+  useEffect(() => {
+    if (USE_MOCK_DATA) return;
+    if (!walletAddress) return;
+
+    let isCancelled = false;
+
+    const handleSecureBalanceUpdate = (lamports: number) => {
+      if (isCancelled) return;
+      setTokenHoldings((prev) => {
+        const securedIndex = prev.findIndex(
+          (h) => h.mint === NATIVE_SOL_MINT && h.isSecured
+        );
+        const solHolding = prev.find(
+          (h) => h.mint === NATIVE_SOL_MINT && !h.isSecured
+        );
+        const balance = lamports / 1e9;
+        const valueUsd = solHolding?.priceUsd
+          ? balance * solHolding.priceUsd
+          : null;
+
+        if (lamports <= 0) {
+          // Remove the secured entry if balance is zero
+          if (securedIndex >= 0) {
+            const next = [...prev];
+            next.splice(securedIndex, 1);
+            return next;
+          }
+          return prev;
+        }
+
+        const securedEntry: TokenHolding = {
+          mint: NATIVE_SOL_MINT,
+          symbol: "SOL",
+          name: "Solana",
+          balance,
+          decimals: 9,
+          priceUsd: solHolding?.priceUsd ?? null,
+          valueUsd,
+          imageUrl: solHolding?.imageUrl ?? null,
+          isSecured: true,
+        };
+
+        if (securedIndex >= 0) {
+          const existing = prev[securedIndex];
+          if (existing.balance === balance && existing.valueUsd === valueUsd) {
+            return prev;
+          }
+          const next = [...prev];
+          next[securedIndex] = securedEntry;
+          return next;
+        }
+
+        return [...prev, securedEntry];
+      });
+    };
+
+    const cachedSecure = getCachedSecureBalance(walletAddress);
+    if (cachedSecure !== null) {
+      handleSecureBalanceUpdate(cachedSecure);
+    }
+
+    secureBalanceListeners.add(handleSecureBalanceUpdate);
+
+    void ensureSecureBalanceSubscription(walletAddress).catch((error) => {
+      console.error("Failed to subscribe to secure balance", error);
+    });
+
+    return () => {
+      isCancelled = true;
+      secureBalanceListeners.delete(handleSecureBalanceUpdate);
+    };
+  }, [walletAddress]);
+
   // Fetch token holdings
   useEffect(() => {
     if (USE_MOCK_DATA) return;
@@ -1973,11 +2037,13 @@ export default function Home() {
           for (const [mint, amount] of loyalDeposits) {
             const original = holdings.find((h) => h.mint === mint);
             if (original) {
+              const securedBalance =
+                Number(amount) / Math.pow(10, original.decimals);
               securedHoldings.push({
                 ...original,
-                balance: Number(amount) / Math.pow(10, original.decimals),
+                balance: securedBalance,
                 valueUsd: original.priceUsd
-                  ? (Number(amount) / Math.pow(10, original.decimals)) * original.priceUsd
+                  ? securedBalance * original.priceUsd
                   : null,
                 isSecured: true,
               });
@@ -2759,7 +2825,9 @@ export default function Home() {
                         : token.symbol;
                     return (
                       <div
-                        key={`${token.mint} (${token.name})${token.isSecured ? " secured" : ""}`}
+                        key={`${token.mint} (${token.name})${
+                          token.isSecured ? " secured" : ""
+                        }`}
                         className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
                         style={{ border: "2px solid #f2f2f7" }}
                       >

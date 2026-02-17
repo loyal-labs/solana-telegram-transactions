@@ -1,22 +1,31 @@
 import { LoyalPrivateTransactionsClient } from "@vladarbatov/private-transactions-test";
 
-import { getConnection } from "../rpc/connection";
+import { getEndpoints, getSolanaEnv } from "../rpc/connection";
+import { PER_RPC_ENDPOINT, PER_WS_ENDPOINT } from "../rpc/constants";
 import { getWalletKeypair } from "../wallet/wallet-details";
 
-const PER_RPC_ENDPOINT = "https://tee.magicblock.app";
-const PER_WS_ENDPOINT = "wss://tee.magicblock.app";
+let cachedPrivateClient: LoyalPrivateTransactionsClient | null = null;
+let cachedPrivateClientPromise: Promise<LoyalPrivateTransactionsClient> | null =
+  null;
 
-export async function getBaseClient(): Promise<LoyalPrivateTransactionsClient> {
-  const connection = getConnection();
-  const keypair = await getWalletKeypair();
-  return LoyalPrivateTransactionsClient.from(connection, keypair);
-}
-
-export async function getPerClient(): Promise<LoyalPrivateTransactionsClient> {
-  const keypair = await getWalletKeypair();
-  return await LoyalPrivateTransactionsClient.fromEphemeral({
-    signer: keypair,
-    rpcEndpoint: PER_RPC_ENDPOINT,
-    wsEndpoint: PER_WS_ENDPOINT,
-  });
-}
+export const getPrivateClient =
+  async (): Promise<LoyalPrivateTransactionsClient> => {
+    const keypair = await getWalletKeypair();
+    if (cachedPrivateClient) return cachedPrivateClient;
+    if (!cachedPrivateClientPromise) {
+      const selectedSolanaEnv = getSolanaEnv();
+      const { rpcEndpoint, websocketEndpoint } =
+        getEndpoints(selectedSolanaEnv);
+      cachedPrivateClientPromise = LoyalPrivateTransactionsClient.fromConfig({
+        signer: keypair,
+        baseRpcEndpoint: rpcEndpoint,
+        baseWsEndpoint: websocketEndpoint,
+        ephemeralRpcEndpoint: PER_RPC_ENDPOINT,
+        ephemeralWsEndpoint: PER_WS_ENDPOINT,
+      }).then((client) => {
+        cachedPrivateClient = client;
+        return client;
+      });
+    }
+    return cachedPrivateClientPromise;
+  };

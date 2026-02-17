@@ -1,10 +1,9 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { NATIVE_MINT } from "@solana/spl-token";
-import { LoyalPrivateTransactionsClient } from "@vladarbatov/private-transactions-test";
 
 import type { TelegramDeposit } from "../../../types/deposits";
 import { getDeposit } from "./get-deposit";
-import { getBaseClient, getPerClient } from "./private-client";
+import { getPrivateClient } from "./private-client";
 import { closeWsolAta, wrapSolToWSol } from "./wsol-utils";
 
 export type TopUpDepositResult = {
@@ -21,8 +20,7 @@ export const topUpDeposit = async (
     throw new Error("Amount must be greater than 0");
   }
 
-  const baseClient = await getBaseClient();
-  // const privateClient = await getPerClient();
+  const privateClient = await getPrivateClient();
 
   const payer = provider.wallet.payer!;
   const { wsolAta, createdAta } = await wrapSolToWSol({
@@ -32,13 +30,16 @@ export const topUpDeposit = async (
   });
 
   try {
+    // todo: fix topup
+    throw Error("top up is not enabled");
+
     // await privateClient.initializeDeposit({
     //   tokenMint: NATIVE_MINT,
     //   user: provider.publicKey,
     //   payer: provider.publicKey,
     // });
 
-    const signature = await baseClient.depositForUsername({
+    const signature = await privateClient.depositForUsername({
       username,
       tokenMint: NATIVE_MINT,
       amount,

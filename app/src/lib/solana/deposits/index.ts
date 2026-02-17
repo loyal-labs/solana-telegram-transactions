@@ -6,6 +6,8 @@ import {
 } from "./get-deposit-with-username";
 import { refundDeposit } from "./refund-deposit";
 import { topUpDeposit } from "./top-up-deposit";
+import { transferTokens } from "./transfer-deposit";
+import { transferTokensToUsername } from "./transfer-deposit-to-username";
 
 export {
   claimDeposit,
@@ -14,4 +16,6 @@ export {
   refundDeposit,
   subscribeToDepositsWithUsername,
   topUpDeposit,
+  transferTokens,
+  transferTokensToUsername,
 };
