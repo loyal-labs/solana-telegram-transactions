@@ -20436,9 +20436,7 @@ var import_tweetnacl = __toESM(require_nacl_fast(), 1);
 import {
   Connection,
   PublicKey as PublicKey4,
-  SystemProgram,
-  VersionedTransaction as VersionedTransaction2,
-  sendAndConfirmRawTransaction
+  SystemProgram
 } from "@solana/web3.js";
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
 import {
@@ -22833,6 +22831,41 @@ function deriveMessageSigner(signer) {
   }
   throw new Error("Wallet does not support signMessage, required for PER auth");
 }
+function waitForAccountOwnerChange(connection, account, expectedOwner, timeoutMs = 15000, intervalMs = 1000) {
+  let skipWait;
+  const subId = connection.onAccountChange(account, (accountInfo) => {
+    if (accountInfo.owner.equals(expectedOwner) && skipWait) {
+      console.log(`waitForAccountOwnerChange: ${account.toString()} – short-circuit polling wait`);
+      skipWait();
+    }
+  }, { commitment: "confirmed" });
+  const cleanup = async () => {
+    await connection.removeAccountChangeListener(subId);
+  };
+  const wait = async () => {
+    try {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        const info = await connection.getAccountInfo(account, "confirmed");
+        if (info && info.owner.equals(expectedOwner)) {
+          console.log(`waitForAccountOwnerChange: ${account.toString()} appeared with owner ${expectedOwner.toString()} after ${Date.now() - start}ms`);
+          return;
+        }
+        if (info) {
+          console.log(`waitForAccountOwnerChange: ${account.toString()} exists but owner is ${info.owner.toString()}, expected ${expectedOwner.toString()}`);
+        }
+        await new Promise((r) => {
+          skipWait = r;
+          setTimeout(r, intervalMs);
+        });
+      }
+      throw new Error(`waitForAccountOwnerChange: ${account.toString()} did not appear with owner ${expectedOwner.toString()} after ${timeoutMs}ms`);
+    } finally {
+      await cleanup();
+    }
+  };
+  return { wait, cancel: cleanup };
+}
 
 class LoyalPrivateTransactionsClient {
   baseProgram;
@@ -23175,36 +23208,7 @@ class LoyalPrivateTransactionsClient {
       rpcOptions
     } = params;
     const [depositPda] = findDepositPda(user, tokenMint);
-    console.log("undelegateDeposit user", user.toString());
-    console.log("undelegateDeposit tokenMint", tokenMint.toString());
-    console.log("undelegateDeposit depositPda", depositPda.toString());
-    const perDepositAccountInfo = await this.ephemeralProgram.provider.connection.getAccountInfo(depositPda);
-    console.log("undelegateDeposit perClient depositPda owner", perDepositAccountInfo?.owner?.toString() ?? "account not found");
-    const baseDepositAccountInfo = await this.baseProgram.provider.connection.getAccountInfo(depositPda);
-    console.log("undelegateDeposit baseClient depositPda owner", baseDepositAccountInfo?.owner?.toString() ?? "account not found");
     await this.ensureDelegated(depositPda, "undelegateDeposit-depositPda", true);
-    let perResolve;
-    let baseResolve;
-    const perOwnerReady = new Promise((r) => {
-      perResolve = r;
-    });
-    const baseOwnerReady = new Promise((r) => {
-      baseResolve = r;
-    });
-    const perSubId = this.ephemeralProgram.provider.connection.onAccountChange(depositPda, (accountInfo) => {
-      console.log("undelegateDeposit perClient: depositPda owner changed ->", accountInfo.owner.toString());
-      if (accountInfo.owner.equals(PROGRAM_ID))
-        perResolve();
-    }, { commitment: "confirmed" });
-    const baseSubId = this.baseProgram.provider.connection.onAccountChange(depositPda, (accountInfo) => {
-      console.log("undelegateDeposit baseClient: depositPda owner changed ->", accountInfo.owner.toString());
-      if (accountInfo.owner.equals(PROGRAM_ID))
-        baseResolve();
-    }, { commitment: "confirmed" });
-    if (perDepositAccountInfo?.owner.equals(PROGRAM_ID))
-      perResolve();
-    if (baseDepositAccountInfo?.owner.equals(PROGRAM_ID))
-      baseResolve();
     const accounts = {
       user,
       payer,
@@ -23213,17 +23217,17 @@ class LoyalPrivateTransactionsClient {
       magicContext
     };
     accounts.sessionToken = sessionToken ?? null;
-    console.log("undelegateDeposit Accounts:");
-    Object.entries(accounts).forEach(([key, value]) => {
-      console.log(key, value && value.toString());
-    });
-    console.log("-----");
-    const signature = await this.ephemeralProgram.methods.undelegate().accountsPartial(accounts).rpc(rpcOptions);
-    console.log("undelegateDeposit: waiting for depositPda owner to be PROGRAM_ID on both connections...");
-    await Promise.all([perOwnerReady, baseOwnerReady]);
-    console.log("undelegateDeposit: depositPda owner is PROGRAM_ID on both connections");
-    await this.ephemeralProgram.provider.connection.removeAccountChangeListener(perSubId);
-    await this.baseProgram.provider.connection.removeAccountChangeListener(baseSubId);
+    const delegationWatcher = waitForAccountOwnerChange(this.baseProgram.provider.connection, depositPda, PROGRAM_ID);
+    let signature;
+    try {
+      console.log("undelegateDeposit Accounts:", prettyStringify(accounts));
+      signature = await this.ephemeralProgram.methods.undelegate().accountsPartial(accounts).rpc(rpcOptions);
+      console.log("undelegateDeposit: waiting for depositPda owner to be PROGRAM_ID on base connection...");
+      await delegationWatcher.wait();
+    } catch (e) {
+      await delegationWatcher.cancel();
+      throw e;
+    }
     return signature;
   }
   async undelegateUsernameDeposit(params) {
@@ -23472,6 +23476,7 @@ class LoyalPrivateTransactionsClient {
 // index.ts
 var IDL = telegram_private_transfer_default;
 export {
+  waitForAccountOwnerChange,
   solToLamports,
   lamportsToSol,
   isWalletLike,

@@ -36,7 +36,10 @@
  */
 
 // Main SDK class
-export { LoyalPrivateTransactionsClient } from "./src/LoyalPrivateTransactionsClient";
+export {
+  LoyalPrivateTransactionsClient,
+  waitForAccountOwnerChange,
+} from "./src/LoyalPrivateTransactionsClient";
 
 // Types
 export type {

@@ -1,4 +1,4 @@
-import { describe } from "bun:test";
+import { describe, expect } from "bun:test";
 import * as anchor from "@coral-xyz/anchor";
 import {
   findDepositPda,
@@ -350,6 +350,45 @@ export async function claimTokens(params: {
   const client = await getOtherLoyalClient();
   const { tokenMint, amount, username, destination, session } = params;
 
+  const [usernameDepositPda] = findUsernameDepositPda(username, tokenMint);
+  const baseUsernameDepositAccountInfo =
+    await client.baseProgram.provider.connection.getAccountInfo(
+      usernameDepositPda
+    );
+  const isUsernameDelegated = baseUsernameDepositAccountInfo?.owner.equals(
+    DELEGATION_PROGRAM_ID
+  );
+
+  if (!isUsernameDelegated) {
+    const keypair = await getWalletKeypair();
+    console.log("delegateUsernameDeposit");
+    const delegateUsernameDepositSig = await client.delegateUsernameDeposit({
+      tokenMint,
+      username,
+      payer: keypair.publicKey,
+      validator: ER_VALIDATOR,
+    });
+    console.log("delegateUsernameDeposit sig", delegateUsernameDepositSig);
+  }
+
+  const [depositPda] = findDepositPda(destination, tokenMint);
+  const baseDepositAccountInfo =
+    await client.baseProgram.provider.connection.getAccountInfo(depositPda);
+  const isDelegated = baseDepositAccountInfo?.owner.equals(
+    DELEGATION_PROGRAM_ID
+  );
+
+  if (!isDelegated) {
+    console.log("delegateUsernameDeposit");
+    const delegateDepositSig = await client.delegateDeposit({
+      user: destination,
+      tokenMint,
+      payer: destination,
+      validator: ER_VALIDATOR,
+    });
+    console.log("delegateDepositSig sig", delegateDepositSig);
+  }
+
   console.log("claimUsernameDepositToDeposit");
   const claimUsernameDepositToDepositSig =
     await client.claimUsernameDepositToDeposit({
@@ -386,14 +425,7 @@ export async function transferTokensToUsername(params: {
   );
   const existingEphemeralUsernameDeposit =
     await client.getEphemeralUsernameDeposit(destinationUsername, tokenMint);
-  console.log(
-    "existingBaseUsernameDeposit",
-    prettyStringify(existingBaseUsernameDeposit)
-  );
-  console.log(
-    "existingEphemeralUsernameDeposit",
-    prettyStringify(existingEphemeralUsernameDeposit)
-  );
+
   if (!existingBaseUsernameDeposit && !existingEphemeralUsernameDeposit) {
     console.log("initializeUsernameDeposit");
     const initializeUsernameDepositSig = await client.initializeUsernameDeposit(
@@ -411,19 +443,6 @@ export async function transferTokensToUsername(params: {
   const [depositPda] = findUsernameDepositPda(destinationUsername, tokenMint);
   const baseAccountInfo =
     await client.baseProgram.provider.connection.getAccountInfo(depositPda);
-  const ephemeralAccountInfo =
-    await client.ephemeralProgram.provider.connection.getAccountInfo(
-      depositPda
-    );
-  console.log(
-    "delegateUsernameDeposit baseAccountInfo",
-    prettyStringify(baseAccountInfo)
-  );
-  console.log(
-    "delegateUsernameDeposit ephemeralAccountInfo",
-    prettyStringify(ephemeralAccountInfo)
-  );
-
   const isDelegated = baseAccountInfo?.owner.equals(DELEGATION_PROGRAM_ID);
 
   if (!isDelegated) {
@@ -471,13 +490,8 @@ export async function transferTokens(params: {
     destination,
     tokenMint
   );
-  console.log("existingBaseDeposit", prettyStringify(existingBaseDeposit));
-  console.log(
-    "existingEphemeralDeposit",
-    prettyStringify(existingEphemeralDeposit)
-  );
   if (!existingBaseDeposit && !existingEphemeralDeposit) {
-    console.log("initializeDeposit");
+    console.log("initializeDeposit for destination user");
     const initializeDepositSig = await client.initializeDeposit({
       tokenMint,
       user: destination,
@@ -497,7 +511,7 @@ export async function transferTokens(params: {
   );
 
   if (!isDelegated) {
-    console.log("delegateDeposit");
+    console.log("delegateDeposit for destination user");
     const delegateDepositSig = await client.delegateDeposit({
       tokenMint,
       user: destination,
@@ -649,7 +663,7 @@ export async function shieldTokens(params: {
 
 /**
  * Unshield tokens: move from Loyal private deposit back to regular wallet.
- * Flow: undelegateDeposit (via PER) → modifyBalance(decrease) on base layer
+ * Flow: undelegateDeposit (from PER to base layer) → modifyBalance(decrease) → unwrap wSOL if native → re-delegate remaining
  */
 export async function unshieldTokens(params: {
   tokenMint: PublicKey;
@@ -757,7 +771,7 @@ describe("private-transactions shield SDK (PER)", async () => {
     NativeMint = "native_mint",
   }
 
-  const MINT_MODE = MintMode.CreateNew as MintMode;
+  const MINT_MODE = MintMode.NativeMint as MintMode;
 
   let mint: PublicKey;
 
@@ -924,16 +938,64 @@ describe("private-transactions shield SDK (PER)", async () => {
 
   let amount;
   if (MINT_MODE === MintMode.NativeMint) {
-    amount = 100000000; // LAMPORTS_PER_SOL / 10
+    amount = LAMPORTS_PER_SOL / 10;
   } else {
     amount = 1 * 10 ** 2;
   }
   const doubleAmount = 2 * amount;
 
   const username = VALIDATION_USERNAME;
+  const isNativeSol = mint.equals(NATIVE_MINT);
 
-  await shieldTokens({ tokenMint: mint, amount: amount });
-  await shieldTokens({ tokenMint: mint, amount: doubleAmount });
+  const otherUserUsernameDepositBefore =
+    await loyalClient.getEphemeralUsernameDeposit(username, mint);
+  console.log(
+    "otherUserUsernameDeposit amount before",
+    otherUserUsernameDepositBefore?.amount?.toString()
+  );
+  if (otherUserUsernameDepositBefore?.amount) {
+    await claimTokens({
+      tokenMint: mint,
+      amount: Number(otherUserUsernameDepositBefore?.amount),
+      username,
+      destination: OTHER_USER,
+      session: sessionPda,
+    });
+  }
+
+  const userDepositBefore = await loyalClient.getBaseDeposit(USER, mint);
+  const otherUserDepositBefore = await otherLoyalClient.getBaseDeposit(
+    OTHER_USER,
+    mint
+  );
+  console.log(
+    "userDeposit amount before",
+    userDepositBefore?.amount?.toString()
+  );
+  console.log(
+    "otherUserDeposit amount before",
+    otherUserDepositBefore?.amount?.toString()
+  );
+  if (userDepositBefore?.amount) {
+    await unshieldTokens({
+      tokenMint: mint,
+      amount: Number(userDepositBefore!.amount),
+    });
+  }
+  if (otherUserDepositBefore?.amount) {
+    await unshieldTokens({
+      tokenMint: mint,
+      amount: Number(otherUserDepositBefore!.amount),
+      otherClient: otherLoyalClient,
+      otherKeypair: OTHER_USER_KP,
+    });
+  }
+
+  const shieldSig1 = await shieldTokens({ tokenMint: mint, amount: amount });
+  const shieldSig2 = await shieldTokens({
+    tokenMint: mint,
+    amount: doubleAmount,
+  });
 
   await transferTokensToUsername({
     tokenMint: mint,
@@ -972,16 +1034,171 @@ describe("private-transactions shield SDK (PER)", async () => {
     session: sessionPda,
   });
 
-  await unshieldTokens({ tokenMint: mint, amount });
-  await unshieldTokens({
+  const unshieldSig1 = await unshieldTokens({ tokenMint: mint, amount });
+  const unshieldSig2 = await unshieldTokens({
     tokenMint: mint,
     amount: doubleAmount,
     otherClient: otherLoyalClient,
     otherKeypair: OTHER_USER_KP,
   });
 
+  // --- Verification checks after all shield/transfer/claim/unshield operations ---
+  console.log("=== Verification checks ===");
+
+  // 1. Check each modifyBalance transaction transferred the expected token amount.
+  //    This avoids overall SOL balance comparison which is noisy from tx fees, rent, and wSOL wrapping.
+  async function getModifyBalanceTokenDelta(
+    sig: string,
+    ownerPubkey: PublicKey
+  ): Promise<number> {
+    const tx = await solanaConnection.getTransaction(sig, {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
+    if (!tx || !tx.meta) throw new Error(`Transaction ${sig} not found`);
+
+    const ownerStr = ownerPubkey.toBase58();
+    const mintStr = mint.toBase58();
+
+    const preBal = tx.meta.preTokenBalances?.find(
+      (b) => b.owner === ownerStr && b.mint === mintStr
+    );
+    const postBal = tx.meta.postTokenBalances?.find(
+      (b) => b.owner === ownerStr && b.mint === mintStr
+    );
+
+    const pre = Number(preBal?.uiTokenAmount?.amount ?? "0");
+    const post = Number(postBal?.uiTokenAmount?.amount ?? "0");
+    return post - pre;
+  }
+
+  // Shield: user's token account should decrease by the shielded amount
+  const shieldDelta1 = await getModifyBalanceTokenDelta(shieldSig1, USER);
+  const shieldDelta2 = await getModifyBalanceTokenDelta(shieldSig2, USER);
+  console.log("shieldDelta1", shieldDelta1, "expected", -amount);
+  console.log("shieldDelta2", shieldDelta2, "expected", -doubleAmount);
+  expect(shieldDelta1).toBe(-amount);
+  expect(shieldDelta2).toBe(-doubleAmount);
+  console.log("Shield modifyBalance checks passed");
+
+  // Unshield: user's token account should increase by the unshielded amount
+  const unshieldDelta1 = await getModifyBalanceTokenDelta(unshieldSig1, USER);
+  const unshieldDelta2 = await getModifyBalanceTokenDelta(
+    unshieldSig2,
+    OTHER_USER
+  );
+  console.log("unshieldDelta1", unshieldDelta1, "expected", amount);
+  console.log("unshieldDelta2", unshieldDelta2, "expected", doubleAmount);
+  expect(unshieldDelta1).toBe(amount);
+  expect(unshieldDelta2).toBe(doubleAmount);
+  console.log("Unshield modifyBalance checks passed");
+
+  // 2. Check deposit accounts have zero balances and correct owners (undelegated = owned by PROGRAM_ID)
+  const [userDepositPda] = findDepositPda(USER, mint);
+  const [otherUserDepositPda] = findDepositPda(OTHER_USER, mint);
+
+  const userDeposit = await loyalClient.getBaseDeposit(USER, mint);
+  const otherUserDeposit = await otherLoyalClient.getBaseDeposit(
+    OTHER_USER,
+    mint
+  );
+  console.log("userDeposit amount", userDeposit?.amount?.toString());
+  console.log("otherUserDeposit amount", otherUserDeposit?.amount?.toString());
+
+  expect(userDeposit).not.toBeNull();
+  expect(userDeposit!.amount).toBe(0n);
+  expect(otherUserDeposit).not.toBeNull();
+  expect(otherUserDeposit!.amount).toBe(0n);
+  console.log("Deposit amounts are zero — passed");
+
+  // 3. Check deposit account owners — after unshield, deposits with 0 balance get re-delegated
+  //    only if remaining balance > 0 (see unshieldTokens). With 0 balance, they stay on base layer.
+  const userDepositAccountInfo = await solanaConnection.getAccountInfo(
+    userDepositPda
+  );
+  const otherUserDepositAccountInfo = await solanaConnection.getAccountInfo(
+    otherUserDepositPda
+  );
+
+  expect(userDepositAccountInfo).not.toBeNull();
+  expect(otherUserDepositAccountInfo).not.toBeNull();
+  // Zero-balance deposits should NOT be re-delegated — owner should be PROGRAM_ID
+  expect(userDepositAccountInfo!.owner.equals(PROGRAM_ID)).toBe(true);
+  expect(otherUserDepositAccountInfo!.owner.equals(PROGRAM_ID)).toBe(true);
+  console.log("Deposit accounts owned by PROGRAM_ID (not delegated) — passed");
+
+  // 4. Check username deposit account
+  const [usernameDepositPda] = findUsernameDepositPda(username, mint);
+  const usernameDepositAccountInfo = await solanaConnection.getAccountInfo(
+    usernameDepositPda
+  );
+  if (usernameDepositAccountInfo) {
+    console.log(
+      "usernameDeposit owner",
+      usernameDepositAccountInfo.owner.toBase58(),
+      "isDelegated",
+      usernameDepositAccountInfo.owner.equals(DELEGATION_PROGRAM_ID)
+    );
+  }
+
+  const usernameDeposit = await loyalClient.getBaseUsernameDeposit(
+    username,
+    mint
+  );
+  const usernameDepositEphemeral =
+    await loyalClient.getEphemeralUsernameDeposit(username, mint);
+  console.log("usernameDeposit amount", usernameDeposit?.amount?.toString());
+  console.log(
+    "usernameDepositEphemeral amount",
+    usernameDepositEphemeral?.amount?.toString()
+  );
+
+  // All username deposit funds were claimed — amount should be 0 on at least one layer
+  const usernameDepositAmount =
+    usernameDepositEphemeral?.amount ?? usernameDeposit?.amount ?? 0n;
+  expect(usernameDepositAmount).toBe(0n);
+  console.log("Username deposit amount is zero — passed");
+
+  // Username deposit should still be delegated (claims happen on ephemeral layer)
+
+  if (usernameDepositAccountInfo) {
+    expect(usernameDepositAccountInfo.owner.equals(DELEGATION_PROGRAM_ID)).toBe(
+      true
+    );
+  }
+  console.log("Username deposit delegation check — passed");
+
+  // 5. Check no wSOL ATAs left for either user (unshield closes them for native SOL)
+  if (isNativeSol) {
+    const userWsolAta = getAssociatedTokenAddressSync(
+      NATIVE_MINT,
+      USER,
+      false,
+      TOKEN_PROGRAM_ID
+    );
+    const otherUserWsolAta = getAssociatedTokenAddressSync(
+      NATIVE_MINT,
+      OTHER_USER,
+      false,
+      TOKEN_PROGRAM_ID
+    );
+
+    const userWsolInfo = await solanaConnection.getAccountInfo(userWsolAta);
+    const otherUserWsolInfo = await solanaConnection.getAccountInfo(
+      otherUserWsolAta
+    );
+
+    console.log("userWsolAta exists", !!userWsolInfo);
+    console.log("otherUserWsolAta exists", !!otherUserWsolInfo);
+
+    expect(userWsolInfo).toBeNull();
+    expect(otherUserWsolInfo).toBeNull();
+    console.log("No wSOL ATAs left — passed");
+  }
+
+  console.log("=== All verification checks passed ===");
+
   // Transfer back — re-wrap SOL into wSOL if native mint since unshieldTokens closed the ATA
-  const isNativeSol = mint.equals(NATIVE_MINT);
   if (isNativeSol) {
     await wrapSolToWSol({
       connection: solanaConnection,
