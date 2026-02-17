@@ -125,4 +125,44 @@ describe("getStartParamRoute", () => {
       expect(getStartParamRoute()).toBeUndefined();
     });
   });
+
+  describe("tgWebAppData blob extraction (when start_param is only inside init data)", () => {
+    const TG_WEB_APP_DATA = `user=%7B%22id%22%3A123%7D&start_param=${START_PARAM}&auth_date=1234`;
+
+    test("extracts start_param from tgWebAppData in hash", () => {
+      mock.module("@telegram-apps/sdk-react", () => ({
+        retrieveLaunchParams: () => {
+          throw new Error("Not in Telegram context");
+        },
+      }));
+
+      stubWindow({
+        location: {
+          hash: `#tgWebAppData=${encodeURIComponent(TG_WEB_APP_DATA)}&tgWebAppVersion=8.0`,
+          search: "",
+          href: `https://example.com/#tgWebAppData=${encodeURIComponent(TG_WEB_APP_DATA)}&tgWebAppVersion=8.0`,
+        },
+      });
+
+      expect(getStartParamRoute()).toBe(EXPECTED_ROUTE);
+    });
+
+    test("extracts start_param from tgWebAppData in query string", () => {
+      mock.module("@telegram-apps/sdk-react", () => ({
+        retrieveLaunchParams: () => {
+          throw new Error("Not in Telegram context");
+        },
+      }));
+
+      stubWindow({
+        location: {
+          hash: "",
+          search: "",
+          href: `https://example.com/?tgWebAppData=${encodeURIComponent(TG_WEB_APP_DATA)}`,
+        },
+      });
+
+      expect(getStartParamRoute()).toBe(EXPECTED_ROUTE);
+    });
+  });
 });

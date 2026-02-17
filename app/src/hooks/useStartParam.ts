@@ -65,7 +65,7 @@ export function getStartParamRoute(): string | undefined {
     // SDK extraction failed (e.g. not in Telegram context) — fall through
   }
 
-  // 3. Manual hash / search-param parsing
+  // 3. Manual hash / search-param parsing for tgWebAppStartParam
   try {
     const hash = window.location.hash;
     if (hash) {
@@ -85,6 +85,25 @@ export function getStartParamRoute(): string | undefined {
     }
   } catch (error) {
     console.debug("Failed to parse startParam from URL:", error);
+  }
+
+  // 4. Extract start_param from tgWebAppData blob in the URL
+  // Some Telegram clients embed start_param only inside tgWebAppData
+  // and don't expose it as a separate tgWebAppStartParam parameter.
+  try {
+    const allParams = window.location.href.replace(/^[^?#]*[?#]/, "").replace(/[?#]/g, "&");
+    const urlParams = new URLSearchParams(allParams);
+    const tgWebAppData = urlParams.get("tgWebAppData");
+    if (tgWebAppData) {
+      const dataParams = new URLSearchParams(tgWebAppData);
+      const startParam = dataParams.get("start_param");
+      const routeFromData = mapStartParamToRoute(startParam);
+      if (routeFromData) {
+        return routeFromData;
+      }
+    }
+  } catch (error) {
+    console.debug("Failed to parse start_param from tgWebAppData:", error);
   }
 
   return undefined;
