@@ -17,6 +17,11 @@ export async function runSetupCommandsCli(): Promise<number> {
   }
 }
 
-if (import.meta.main) {
+function isDirectExecution(scriptName: string): boolean {
+  const entrypoint = process.argv[1];
+  return typeof entrypoint === "string" && entrypoint.endsWith(scriptName);
+}
+
+if (isDirectExecution("setup-commands.ts")) {
   process.exit(await runSetupCommandsCli());
 }

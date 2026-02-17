@@ -69,7 +69,12 @@ export async function runSetupChatCommandsCli(
   }
 }
 
-if (import.meta.main) {
+function isDirectExecution(scriptName: string): boolean {
+  const entrypoint = process.argv[1];
+  return typeof entrypoint === "string" && entrypoint.endsWith(scriptName);
+}
+
+if (isDirectExecution("setup-chat-commands.ts")) {
   const chatId = process.argv[2] ?? DEFAULT_CHAT_ID;
   process.exit(await runSetupChatCommandsCli(chatId));
 }
