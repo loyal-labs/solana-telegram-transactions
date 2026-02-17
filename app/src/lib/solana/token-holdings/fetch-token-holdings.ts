@@ -1,9 +1,15 @@
 import { PublicKey } from "@solana/web3.js";
 
+import { NATIVE_SOL_DECIMALS, NATIVE_SOL_MINT } from "@/lib/constants";
+
 import { fetchJson } from "../../core/http";
 import { getSolanaEnv } from "../rpc/connection";
-import { SECURE_DEVNET_RPC_URL, SECURE_MAINNET_RPC_URL, TESTNET_RPC_URL } from "../rpc/constants";
-import { CACHE_TTL_MS, NATIVE_SOL_DECIMALS, NATIVE_SOL_MINT } from "./constants";
+import {
+  SECURE_DEVNET_RPC_URL,
+  SECURE_MAINNET_RPC_URL,
+  TESTNET_RPC_URL,
+} from "../rpc/constants";
+import { CACHE_TTL_MS } from "./constants";
 import type {
   CachedHoldings,
   HeliusAsset,
@@ -28,25 +34,55 @@ function getRpcUrl(): string | null {
   return null;
 }
 
+function getSafeString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function resolveSymbol(asset: HeliusAsset): string {
+  const tokenSymbol = getSafeString(asset.token_info?.symbol);
+  if (tokenSymbol.length > 0) return tokenSymbol;
+
+  const metadataSymbol = getSafeString(asset.content?.metadata?.symbol);
+  if (metadataSymbol.length > 0) return metadataSymbol;
+
+  if (asset.id === NATIVE_SOL_MINT) return "SOL";
+  return "TOKEN";
+}
+
+function resolveName(asset: HeliusAsset, symbol: string): string {
+  const metadataName = getSafeString(asset.content?.metadata?.name);
+  if (metadataName.length > 0) return metadataName;
+  return symbol;
+}
+
+function resolveImageUrl(asset: HeliusAsset): string | null {
+  const imageUrl = getSafeString(asset.content?.links?.image);
+  return imageUrl.length > 0 ? imageUrl : null;
+}
+
 function mapAssetToHolding(asset: HeliusAsset): TokenHolding | null {
   const tokenInfo = asset.token_info;
   if (!tokenInfo) return null;
 
-  const { symbol, balance, decimals, price_info } = tokenInfo;
+  const { balance, decimals, price_info } = tokenInfo;
+  const symbol = resolveSymbol(asset);
+  const name = resolveName(asset, symbol);
 
   return {
     mint: asset.id,
     symbol,
-    name: asset.content?.metadata?.name ?? symbol,
+    name,
     balance: balance / Math.pow(10, decimals),
     decimals,
     priceUsd: price_info?.price_per_token ?? null,
     valueUsd: price_info?.total_price ?? null,
-    imageUrl: asset.content?.links?.image ?? null,
+    imageUrl: resolveImageUrl(asset),
   };
 }
 
-function mapNativeBalance(nativeBalance: HeliusNativeBalance | undefined): TokenHolding | null {
+function mapNativeBalance(
+  nativeBalance: HeliusNativeBalance | undefined
+): TokenHolding | null {
   if (!nativeBalance) return null;
 
   const { lamports, price_per_sol, total_price } = nativeBalance;
@@ -94,6 +130,8 @@ async function fetchHoldingsFromHelius(
   }
 
   for (const asset of response.result.items) {
+    // Skip wSOL — native SOL is already included via nativeBalance
+    if (asset.id === NATIVE_SOL_MINT) continue;
     const holding = mapAssetToHolding(asset);
     if (holding) {
       holdings.push(holding);

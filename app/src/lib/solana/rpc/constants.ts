@@ -13,3 +13,6 @@ export const TESTNET_RPC_WS = "wss://api.testnet.solana.com";
 
 export const LOCALNET_RPC_URL = "http://127.0.0.1:8899";
 export const LOCALNET_RPC_WS = "ws://127.0.0.1:8900";
+
+export const PER_RPC_ENDPOINT = "https://tee.magicblock.app";
+export const PER_WS_ENDPOINT = "wss://tee.magicblock.app";
