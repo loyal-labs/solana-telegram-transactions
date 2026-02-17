@@ -3,6 +3,7 @@
 import mixpanel from "mixpanel-browser";
 
 import { publicEnv } from "@/lib/core/config/public";
+import { parseSummaryFeedStartParam } from "@/lib/telegram/mini-app/start-param";
 import type {
   TelegramIdentity,
   TelegramLaunchContext,
@@ -79,30 +80,20 @@ function setUserProfileOnce(properties: AnalyticsProperties): void {
 function mapLaunchContextToEventProperties(
   context: TelegramLaunchContext
 ): AnalyticsProperties {
-  const properties: AnalyticsProperties = {};
+  const startParamRaw = normalizeOptionalString(context.startParamRaw) ?? "none";
+  const parsedStartParam = parseSummaryFeedStartParam(context.startParamRaw);
 
-  if (context.startParamRaw) {
-    properties.launch_start_param_raw = context.startParamRaw;
-  }
-  if (context.chatType) {
-    properties.launch_chat_type = context.chatType;
-  }
-  if (context.chatInstance) {
-    properties.launch_chat_instance = context.chatInstance;
-  }
-
-  return properties;
+  return {
+    start_param_raw: startParamRaw,
+    group_chat_id: parsedStartParam?.groupChatId ?? "none",
+    summary_id: parsedStartParam?.summaryId ?? "none",
+  };
 }
 
 export function setTelegramLaunchContext(
   context: TelegramLaunchContext | null
 ): void {
-  if (!context) {
-    currentLaunchContext = {};
-    return;
-  }
-
-  currentLaunchContext = mapLaunchContextToEventProperties(context);
+  currentLaunchContext = mapLaunchContextToEventProperties(context ?? {});
 }
 
 export function clearTelegramLaunchContext(): void {

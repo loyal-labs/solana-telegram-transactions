@@ -12,11 +12,11 @@ type CommunityPhotoSettings = {
 export async function GET(req: Request): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(req.url);
-    const chatId = searchParams.get("chatId");
+    const groupChatId = searchParams.get("groupChatId");
     const db = getDatabase();
 
-    const result = chatId
-      ? await fetchSummariesByChatId(db, chatId)
+    const result = groupChatId
+      ? await fetchSummariesByGroupChatId(db, groupChatId)
       : (
           await db
             .select({
@@ -63,13 +63,13 @@ type SummaryWithCommunity = Summary & {
   community: { chatId: bigint; settings: unknown };
 };
 
-async function fetchSummariesByChatId(
+async function fetchSummariesByGroupChatId(
   db: ReturnType<typeof getDatabase>,
-  chatId: string
+  groupChatId: string
 ): Promise<SummaryWithCommunity[]> {
   const community = await db.query.communities.findFirst({
     where: and(
-      eq(communities.chatId, BigInt(chatId)),
+      eq(communities.chatId, BigInt(groupChatId)),
       eq(communities.isPublic, true)
     ),
   });

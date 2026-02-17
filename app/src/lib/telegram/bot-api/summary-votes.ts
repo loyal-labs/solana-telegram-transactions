@@ -8,16 +8,17 @@ import {
   type SummaryVoteAction as PersistedSummaryVoteAction,
   summaryVotes,
 } from "@/lib/core/schema";
+import { buildSummaryFeedMiniAppUrl } from "@/lib/telegram/mini-app/start-param";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName } from "@/lib/telegram/utils";
 
 import { isMessageNotModifiedError } from "./callback-query-utils";
-import { MINI_APP_FEED_LINK } from "./constants";
 
 type SummaryVoteAction = "u" | "d" | "s";
 
 type SummaryVoteCallbackData = {
   action: SummaryVoteAction;
+  groupChatId: string;
   summaryId: string;
 };
 
@@ -29,16 +30,17 @@ export type SummaryVoteTotals = {
 
 const SUMMARY_ID_REGEX_PART =
   "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+const GROUP_CHAT_ID_REGEX_PART = "-?\\d+";
 const DUPLICATE_VOTE_ALERT_CACHE_TIME_SECONDS = 300;
 
 export const SUMMARY_VOTE_CALLBACK_DATA_REGEX = new RegExp(
-  `^sv:(u|d|s):(${SUMMARY_ID_REGEX_PART})$`
+  `^sv:(u|d|s):(${SUMMARY_ID_REGEX_PART}):(${GROUP_CHAT_ID_REGEX_PART})$`
 );
 
 export function encodeSummaryVoteCallbackData(
   callbackData: SummaryVoteCallbackData
 ): string {
-  return `sv:${callbackData.action}:${callbackData.summaryId}`;
+  return `sv:${callbackData.action}:${callbackData.summaryId}:${callbackData.groupChatId}`;
 }
 
 export function parseSummaryVoteCallbackData(
@@ -51,6 +53,7 @@ export function parseSummaryVoteCallbackData(
 
   const action = matches[1];
   const summaryId = matches[2];
+  const groupChatId = matches[3];
 
   if (action !== "u" && action !== "d" && action !== "s") {
     return null;
@@ -58,11 +61,13 @@ export function parseSummaryVoteCallbackData(
 
   return {
     action,
+    groupChatId,
     summaryId,
   };
 }
 
 export function buildSummaryVoteKeyboard(
+  groupChatId: bigint,
   summaryId: string,
   likes: number,
   dislikes: number
@@ -77,6 +82,7 @@ export function buildSummaryVoteKeyboard(
       },
       encodeSummaryVoteCallbackData({
         action: "u",
+        groupChatId: groupChatId.toString(),
         summaryId,
       })
     )
@@ -84,6 +90,7 @@ export function buildSummaryVoteKeyboard(
       `Score: ${score}`,
       encodeSummaryVoteCallbackData({
         action: "s",
+        groupChatId: groupChatId.toString(),
         summaryId,
       })
     )
@@ -94,6 +101,7 @@ export function buildSummaryVoteKeyboard(
       },
       encodeSummaryVoteCallbackData({
         action: "d",
+        groupChatId: groupChatId.toString(),
         summaryId,
       })
     )
@@ -103,7 +111,7 @@ export function buildSummaryVoteKeyboard(
         style: "primary",
         text: "Open",
       },
-      MINI_APP_FEED_LINK
+      buildSummaryFeedMiniAppUrl(groupChatId, summaryId)
     );
 }
 
@@ -232,6 +240,7 @@ export async function handleSummaryVoteCallback(
       callbackMessage.message_id,
       {
         reply_markup: buildSummaryVoteKeyboard(
+          BigInt(callbackData.groupChatId),
           callbackData.summaryId,
           voteTotals.likes,
           voteTotals.dislikes

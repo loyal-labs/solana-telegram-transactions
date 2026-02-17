@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { CallbackQueryContext, Context } from "grammy";
 
-import { MINI_APP_FEED_LINK } from "../constants";
+import { buildSummaryFeedMiniAppUrl } from "@/lib/telegram/mini-app/start-param";
 
 mock.module("server-only", () => ({}));
 
@@ -12,6 +12,7 @@ type InsertedVoteValues = {
 };
 
 const SUMMARY_ID = "123e4567-e89b-12d3-a456-426614174000";
+const GROUP_CHAT_ID = "-1001234567890";
 
 let currentVoteTotals = { likes: 0, dislikes: 0 };
 let insertBehavior: "inserted" | "duplicate" | "throw" = "inserted";
@@ -88,35 +89,42 @@ describe("summary vote callback parser", () => {
   test("parses valid callback data", () => {
     const data = encodeSummaryVoteCallbackData({
       action: "u",
+      groupChatId: GROUP_CHAT_ID,
       summaryId: SUMMARY_ID,
     });
 
     expect(parseSummaryVoteCallbackData(data)).toEqual({
       action: "u",
+      groupChatId: GROUP_CHAT_ID,
       summaryId: SUMMARY_ID,
     });
   });
 
   test("rejects invalid callback data", () => {
     expect(parseSummaryVoteCallbackData("sv:u:bad-id")).toBeNull();
-    expect(parseSummaryVoteCallbackData("sv:u:123")).toBeNull();
-    expect(parseSummaryVoteCallbackData("sv:u:123:0:0")).toBeNull();
+    expect(parseSummaryVoteCallbackData("sv:u:123:-100123")).toBeNull();
+    expect(parseSummaryVoteCallbackData(`sv:u:${SUMMARY_ID}`)).toBeNull();
     expect(parseSummaryVoteCallbackData("unknown")).toBeNull();
   });
 
   test("regex trigger only matches simplified callback format", () => {
-    expect(SUMMARY_VOTE_CALLBACK_DATA_REGEX.test(`sv:s:${SUMMARY_ID}`)).toBe(
-      true
-    );
     expect(
-      SUMMARY_VOTE_CALLBACK_DATA_REGEX.test(`sv:s:${SUMMARY_ID}:12:3`)
+      SUMMARY_VOTE_CALLBACK_DATA_REGEX.test(`sv:s:${SUMMARY_ID}:${GROUP_CHAT_ID}`)
+    ).toBe(true);
+    expect(
+      SUMMARY_VOTE_CALLBACK_DATA_REGEX.test(`sv:s:${SUMMARY_ID}`)
     ).toBe(false);
   });
 });
 
 describe("summary vote keyboard", () => {
   test("builds two rows with vote callbacks and mini app URL button", () => {
-    const keyboard = buildSummaryVoteKeyboard(SUMMARY_ID, 5, 2);
+    const keyboard = buildSummaryVoteKeyboard(
+      BigInt(GROUP_CHAT_ID),
+      SUMMARY_ID,
+      5,
+      2
+    );
     const rows = keyboard.inline_keyboard;
 
     expect(rows).toHaveLength(2);
@@ -125,18 +133,20 @@ describe("summary vote keyboard", () => {
 
     expect(rows[0][0]?.text).toBe("👍👍👍");
     expect(rows[0][0]?.style).toBe("success");
-    expect(rows[0][0]?.callback_data).toBe(`sv:u:${SUMMARY_ID}`);
+    expect(rows[0][0]?.callback_data).toBe(`sv:u:${SUMMARY_ID}:${GROUP_CHAT_ID}`);
 
     expect(rows[0][1]?.text).toBe("Score: 3");
-    expect(rows[0][1]?.callback_data).toBe(`sv:s:${SUMMARY_ID}`);
+    expect(rows[0][1]?.callback_data).toBe(`sv:s:${SUMMARY_ID}:${GROUP_CHAT_ID}`);
 
     expect(rows[0][2]?.text).toBe("👎👎👎");
     expect(rows[0][2]?.style).toBe("danger");
-    expect(rows[0][2]?.callback_data).toBe(`sv:d:${SUMMARY_ID}`);
+    expect(rows[0][2]?.callback_data).toBe(`sv:d:${SUMMARY_ID}:${GROUP_CHAT_ID}`);
 
     expect(rows[1][0]?.text).toBe("Open");
     expect(rows[1][0]?.style).toBe("primary");
-    expect(rows[1][0]?.url).toBe(MINI_APP_FEED_LINK);
+    expect(rows[1][0]?.url).toBe(
+      buildSummaryFeedMiniAppUrl(GROUP_CHAT_ID, SUMMARY_ID)
+    );
   });
 });
 
@@ -157,7 +167,7 @@ describe("handleSummaryVoteCallback", () => {
         },
       },
       callbackQuery: {
-        data: `sv:s:${SUMMARY_ID}`,
+        data: `sv:s:${SUMMARY_ID}:${GROUP_CHAT_ID}`,
       },
     } as unknown as CallbackQueryContext<Context>;
 
@@ -188,7 +198,7 @@ describe("handleSummaryVoteCallback", () => {
         },
       },
       callbackQuery: {
-        data: `sv:u:${SUMMARY_ID}`,
+        data: `sv:u:${SUMMARY_ID}:${GROUP_CHAT_ID}`,
         message: {
           chat: { id: -1001234 },
           message_id: 99,
@@ -226,12 +236,12 @@ describe("handleSummaryVoteCallback", () => {
     ];
 
     expect(payload.reply_markup.inline_keyboard[0]?.[0]?.callback_data).toBe(
-      `sv:u:${SUMMARY_ID}`
+      `sv:u:${SUMMARY_ID}:${GROUP_CHAT_ID}`
     );
     expect(payload.reply_markup.inline_keyboard[0]?.[0]?.style).toBe("success");
     expect(payload.reply_markup.inline_keyboard[0]?.[1]?.text).toBe("Score: 1");
     expect(payload.reply_markup.inline_keyboard[0]?.[1]?.callback_data).toBe(
-      `sv:s:${SUMMARY_ID}`
+      `sv:s:${SUMMARY_ID}:${GROUP_CHAT_ID}`
     );
     expect(payload.reply_markup.inline_keyboard[0]?.[2]?.style).toBe("danger");
 
@@ -254,7 +264,7 @@ describe("handleSummaryVoteCallback", () => {
         },
       },
       callbackQuery: {
-        data: `sv:d:${SUMMARY_ID}`,
+        data: `sv:d:${SUMMARY_ID}:${GROUP_CHAT_ID}`,
         message: {
           chat: { id: -1001234 },
           message_id: 99,
@@ -289,7 +299,7 @@ describe("handleSummaryVoteCallback", () => {
         editMessageReplyMarkup: async () => ({}) as never,
       },
       callbackQuery: {
-        data: `sv:u:${SUMMARY_ID}`,
+        data: `sv:u:${SUMMARY_ID}:${GROUP_CHAT_ID}`,
       },
       from: {
         first_name: "Test",
@@ -320,7 +330,7 @@ describe("handleSummaryVoteCallback", () => {
         },
       },
       callbackQuery: {
-        data: `sv:u:${SUMMARY_ID}`,
+        data: `sv:u:${SUMMARY_ID}:${GROUP_CHAT_ID}`,
         message: {
           chat: { id: -1001234 },
           message_id: 99,

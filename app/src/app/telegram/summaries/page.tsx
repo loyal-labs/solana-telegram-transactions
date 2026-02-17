@@ -241,15 +241,17 @@ export default function SummariesPage() {
   const [isGroupsLoading, setIsGroupsLoading] = useState(true);
   const { summaries: cachedSummaries, setSummaries, hasCachedData } = useSummaries();
 
-  // Transform summaries to unique group chats format (deduplicate by title)
-  const transformToGroupChats = (summaries: Array<{ id: string; title: string; photoBase64?: string; photoMimeType?: string; topics?: Array<{ content: string }> }>) => {
+  // Transform summaries to unique group chats format (deduplicate by group chat id)
+  const transformToGroupChats = (summaries: Array<{ chatId?: string; title: string; photoBase64?: string; photoMimeType?: string; topics?: Array<{ content: string }> }>) => {
     const groupMap = new Map<string, GroupChat>();
 
     for (const summary of summaries) {
+      const groupKey = summary.chatId ?? summary.title;
+
       // Only keep the first (most recent) summary for each group
-      if (!groupMap.has(summary.title)) {
-        groupMap.set(summary.title, {
-          id: summary.id,
+      if (!groupMap.has(groupKey)) {
+        groupMap.set(groupKey, {
+          id: groupKey,
           title: summary.title,
           subtitle: summary.topics?.[0]?.content || "",
           photoBase64: summary.photoBase64,
@@ -375,7 +377,9 @@ export default function SummariesPage() {
 
     // Groups tab: navigate to SummaryFeed page (vertical swipe)
     if (activeTab === "groups") {
-      router.push(`/telegram/summaries/feed?chatId=${chat.id}`);
+      router.push(
+        `/telegram/summaries/feed?groupChatId=${encodeURIComponent(chat.id)}`
+      );
       return;
     }
 

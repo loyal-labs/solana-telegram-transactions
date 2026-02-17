@@ -60,6 +60,9 @@ mock.module("@/lib/core/config/public", () => ({
 }));
 
 let analytics: typeof import("../analytics");
+const SUMMARY_ID = "123e4567-e89b-12d3-a456-426614174000";
+const GROUP_CHAT_ID = "-1001234567890";
+const VALID_START_PARAM = `sf1_${GROUP_CHAT_ID}_${SUMMARY_ID}`;
 
 describe("analytics identifyTelegramUser", () => {
   beforeAll(async () => {
@@ -129,7 +132,7 @@ describe("analytics identifyTelegramUser", () => {
 
   test("adds launch context to tracked events while context is set", () => {
     analytics.setTelegramLaunchContext({
-      startParamRaw: "post_42",
+      startParamRaw: VALID_START_PARAM,
       chatType: "channel",
       chatInstance: "99887766",
     });
@@ -140,9 +143,29 @@ describe("analytics identifyTelegramUser", () => {
     expect(trackCalls[0]).toEqual({
       event: "Page View",
       properties: {
-        launch_start_param_raw: "post_42",
-        launch_chat_type: "channel",
-        launch_chat_instance: "99887766",
+        start_param_raw: VALID_START_PARAM,
+        group_chat_id: GROUP_CHAT_ID,
+        summary_id: SUMMARY_ID,
+        path: "/telegram/wallet",
+      },
+    });
+  });
+
+  test("uses none placeholders when launch start param is missing", () => {
+    analytics.setTelegramLaunchContext({
+      chatType: "channel",
+      chatInstance: "99887766",
+    });
+
+    analytics.track("Page View", { path: "/telegram/wallet" });
+
+    expect(trackCalls).toHaveLength(1);
+    expect(trackCalls[0]).toEqual({
+      event: "Page View",
+      properties: {
+        start_param_raw: "none",
+        group_chat_id: "none",
+        summary_id: "none",
         path: "/telegram/wallet",
       },
     });
@@ -150,7 +173,7 @@ describe("analytics identifyTelegramUser", () => {
 
   test("stops attaching launch context after clear", () => {
     analytics.setTelegramLaunchContext({
-      startParamRaw: "post_42",
+      startParamRaw: VALID_START_PARAM,
       chatType: "channel",
       chatInstance: "99887766",
     });

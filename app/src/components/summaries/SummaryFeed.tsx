@@ -151,8 +151,8 @@ function getTopicsForDate(
 }
 
 export type SummaryFeedProps = {
-  /** Initial chat/summary ID to display */
-  initialChatId?: string;
+  /** Initial summary ID to focus (deeplink entry) */
+  initialSummaryId?: string;
   /** All summaries for the group (pre-fetched) */
   summaries?: ChatSummary[];
   /** Telegram community chat ID for tracking */
@@ -162,7 +162,7 @@ export type SummaryFeedProps = {
 };
 
 export default function SummaryFeed({
-  initialChatId,
+  initialSummaryId,
   summaries: initialSummaries,
   groupChatId,
   groupTitle: initialGroupTitle,
@@ -179,6 +179,13 @@ export default function SummaryFeed({
   );
   const [isLoading, setIsLoading] = useState(!initialSummaries);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!initialSummaries) return;
+    setSummaries(initialSummaries);
+    setIsLoading(false);
+    setError(null);
+  }, [initialSummaries]);
 
   // Fetch summaries from API if not provided
   useEffect(() => {
@@ -236,10 +243,27 @@ export default function SummaryFeed({
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return availableDates[0] || toDateKey(new Date().toISOString());
   });
+  const initialSummaryDate = useMemo(() => {
+    if (!initialSummaryId) {
+      return undefined;
+    }
+
+    const summary = summaries.find((item) => item.id === initialSummaryId);
+    if (!summary?.createdAt) {
+      return undefined;
+    }
+
+    return toDateKey(summary.createdAt);
+  }, [initialSummaryId, summaries]);
   const pendingSelectionSourceRef = useRef<SummarySelectionSource>(
     SUMMARY_SELECTION_SOURCES.initial
   );
   const hasTrackedInitialViewRef = useRef(false);
+  const hasAppliedInitialSummarySelectionRef = useRef(false);
+
+  useEffect(() => {
+    hasAppliedInitialSummarySelectionRef.current = false;
+  }, [initialSummaryId]);
 
   // Only reset selectedDate when the data itself changes (not on every selectedDate change)
   useEffect(() => {
@@ -253,6 +277,28 @@ export default function SummaryFeed({
       });
     }
   }, [availableDates]);
+
+  useEffect(() => {
+    if (hasAppliedInitialSummarySelectionRef.current) {
+      return;
+    }
+
+    if (!initialSummaryId) {
+      hasAppliedInitialSummarySelectionRef.current = true;
+      return;
+    }
+
+    if (initialSummaryDate) {
+      setSelectedDate(initialSummaryDate);
+      hasAppliedInitialSummarySelectionRef.current = true;
+      return;
+    }
+
+    // If the data has loaded and we still cannot resolve summaryId, fallback to default date.
+    if (!isLoading) {
+      hasAppliedInitialSummarySelectionRef.current = true;
+    }
+  }, [initialSummaryId, initialSummaryDate, isLoading]);
 
   useEffect(() => {
     if (!groupChatId || !groupTitle || !selectedDate) {
