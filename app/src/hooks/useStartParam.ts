@@ -5,13 +5,28 @@ import { retrieveLaunchParams } from "@telegram-apps/sdk-react";
 import { parseSummaryFeedStartParam } from "@/lib/telegram/mini-app/start-param";
 
 /**
- * Parse startParam from URL and return the mapped route.
- * Works before React/SDK initialization - can be called in splash screen.
+ * Extract start_param from the native Telegram WebApp bridge object.
+ * This is set by Telegram before the web app loads and is the most
+ * reliable source — it doesn't depend on URL hash format or SDK init.
+ */
+function getNativeStartParam(): string | undefined {
+  try {
+    const startParam = (
+      window as { Telegram?: { WebApp?: { initDataUnsafe?: { start_param?: string } } } }
+    ).Telegram?.WebApp?.initDataUnsafe?.start_param;
+    return startParam || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Parse startParam and return the mapped route.
  *
- * Uses the Telegram SDK's retrieveLaunchParams() which handles multiple
- * sources (location.href, performance navigation entries, localStorage)
- * and various Telegram client hash formats. Falls back to manual URL
- * parsing if the SDK extraction fails.
+ * Tries three sources in order:
+ * 1. Native Telegram WebApp bridge (most reliable, always set by Telegram)
+ * 2. SDK retrieveLaunchParams (multi-source: href, perf entries, localStorage)
+ * 3. Manual URL hash / search-param parsing (legacy fallback)
  *
  * @returns The mapped route path if startParam is valid, undefined otherwise.
  */
@@ -32,31 +47,30 @@ export function getStartParamRoute(): string | undefined {
     return `/telegram/summaries/feed?${params.toString()}`;
   };
 
-  // TODO: remove diagnostic logs after deeplink debugging
-  console.warn("[deeplink] href:", window.location.href);
-  console.warn("[deeplink] hash:", window.location.hash);
-  console.warn("[deeplink] search:", window.location.search);
-
-  // 1. Try SDK extraction (handles all Telegram client variations)
-  try {
-    const launchParams = retrieveLaunchParams();
-    console.warn("[deeplink] SDK tgWebAppStartParam:", launchParams.tgWebAppStartParam);
-    const routeFromSdk = mapStartParamToRoute(launchParams.tgWebAppStartParam);
-    if (routeFromSdk) {
-      console.warn("[deeplink] route from SDK:", routeFromSdk);
-      return routeFromSdk;
-    }
-  } catch (e) {
-    console.warn("[deeplink] SDK extraction failed:", e);
+  // 1. Native Telegram WebApp bridge (most reliable)
+  const nativeParam = getNativeStartParam();
+  const routeFromNative = mapStartParamToRoute(nativeParam);
+  if (routeFromNative) {
+    return routeFromNative;
   }
 
-  // 2. Fallback: manual hash / search-param parsing
+  // 2. SDK extraction (handles various client hash formats)
+  try {
+    const launchParams = retrieveLaunchParams();
+    const routeFromSdk = mapStartParamToRoute(launchParams.tgWebAppStartParam);
+    if (routeFromSdk) {
+      return routeFromSdk;
+    }
+  } catch {
+    // SDK extraction failed (e.g. not in Telegram context) — fall through
+  }
+
+  // 3. Manual hash / search-param parsing
   try {
     const hash = window.location.hash;
     if (hash) {
       const params = new URLSearchParams(hash.slice(1));
       const startParam = params.get("tgWebAppStartParam");
-      console.warn("[deeplink] hash startParam:", startParam);
       const routeFromHash = mapStartParamToRoute(startParam);
       if (routeFromHash) {
         return routeFromHash;
@@ -65,7 +79,6 @@ export function getStartParamRoute(): string | undefined {
 
     const searchParams = new URLSearchParams(window.location.search);
     const startParam = searchParams.get("tgWebAppStartParam");
-    console.warn("[deeplink] search startParam:", startParam);
     const routeFromSearch = mapStartParamToRoute(startParam);
     if (routeFromSearch) {
       return routeFromSearch;
@@ -74,6 +87,5 @@ export function getStartParamRoute(): string | undefined {
     console.debug("Failed to parse startParam from URL:", error);
   }
 
-  console.warn("[deeplink] no route found, falling back");
   return undefined;
 }
