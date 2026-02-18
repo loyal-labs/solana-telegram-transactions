@@ -100,6 +100,7 @@ function ChatItem({ chat, onClick }: ChatItemProps) {
         {/* Avatar */}
         <div className="pr-3 py-1.5">
           {photoSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={photoSrc}
               alt={chat.title}

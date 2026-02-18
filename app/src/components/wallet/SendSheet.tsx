@@ -141,13 +141,6 @@ const truncateDecimals = (num: number, decimals: number): string => {
   return truncated.toFixed(decimals);
 };
 
-// Format number for display: truncate to max decimals, remove trailing zeros
-const formatForDisplay = (num: number, maxDecimals: number): string => {
-  const factor = Math.pow(10, maxDecimals);
-  const truncated = Math.floor(num * factor) / factor;
-  return String(Number(truncated.toFixed(maxDecimals)));
-};
-
 type LastAmount = {
   sol: number;
   usd: number;
@@ -308,7 +301,7 @@ export default function SendSheet({
   const [amountStr, setAmountStr] = useState("");
   const [recipient, setRecipient] = useState("");
   const [currency, setCurrency] = useState<'SOL' | 'USD'>('SOL');
-  const [lastAmount, setLastAmount] = useState<LastAmount | null>(null);
+  const [, setLastAmount] = useState<LastAmount | null>(null);
   const [recentRecipients, setRecentRecipients] = useState<RecentRecipient[]>([]);
   const [solPriceUsdState, setSolPriceUsdState] = useState<number | null>(null);
   const [isSolPriceLoadingState, setIsSolPriceLoadingState] = useState(true);
@@ -585,22 +578,6 @@ export default function SendSheet({
   };
 
   const tokenSymbol = selectedToken?.symbol || 'SOL';
-
-  // Computed display values
-  const secondaryDisplay = useMemo(() => {
-    const val = parseFloat(amountStr);
-    if (isNaN(val)) return currency === 'SOL' ? '≈ $0.00' : `≈ 0.00 ${tokenSymbol}`;
-
-    if (!solPriceUsd) {
-      return currency === 'SOL' ? '≈ $—' : `≈ — ${tokenSymbol}`;
-    }
-
-    if (currency === 'SOL') {
-      return `≈ $${(val * solPriceUsd).toFixed(2)}`;
-    } else {
-      return `≈ ${(val / solPriceUsd).toFixed(4)} ${tokenSymbol}`;
-    }
-  }, [amountStr, currency, solPriceUsd, tokenSymbol]);
 
   // Insufficient balance check
   const insufficientBalance = useMemo(() => {

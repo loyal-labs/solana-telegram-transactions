@@ -192,11 +192,6 @@ const ChatSummarySheet = forwardRef<ChatSummarySheetRef, ChatSummarySheetProps>(
   // Swipe direction: 'left' for keep unread, 'right' for mark read
   const swipeDirection = swipeX > 0 ? "right" : swipeX < 0 ? "left" : null;
 
-  // Back card visibility - show when swiping
-  const backCardOpacity = useMemo(() => {
-    return Math.min(Math.abs(swipeX) / 50, 0.5);
-  }, [swipeX]);
-
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };

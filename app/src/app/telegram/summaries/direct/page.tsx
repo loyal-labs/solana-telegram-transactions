@@ -637,6 +637,7 @@ function DirectFeedContent() {
               {/* Avatar */}
               <div className="pr-3 py-1.5">
                 {nextChat.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={nextChat.avatarUrl}
                     alt={nextChat.title}
@@ -717,6 +718,7 @@ function DirectFeedContent() {
             {/* Avatar */}
             <div className="pr-3 py-1.5">
               {currentChat.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={currentChat.avatarUrl}
                   alt={currentChat.title}
