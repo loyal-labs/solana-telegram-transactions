@@ -4,10 +4,7 @@ import {
   backButton,
   hapticFeedback,
   swipeBehavior,
-  useSignal,
-  viewport,
 } from "@telegram-apps/sdk-react";
-import type { Signal } from "@telegram-apps/signals";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -17,6 +14,7 @@ import {
   SUMMARY_SELECTION_SOURCES,
   type SummarySelectionSource,
 } from "@/app/telegram/summaries/summaries-analytics";
+import { useDeviceSafeAreaTop } from "@/hooks/useTelegramSafeArea";
 import { track } from "@/lib/core/analytics";
 
 import { getAvatarColor, getFirstLetter } from "./avatar-utils";
@@ -169,9 +167,7 @@ export default function SummaryFeed({
   groupTitle: initialGroupTitle,
 }: SummaryFeedProps) {
   const router = useRouter();
-  const safeAreaInsetTop = useSignal(
-    viewport.safeAreaInsetTop as Signal<number>
-  );
+  const safeAreaInsetTop = useDeviceSafeAreaTop();
   const topOffset = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);

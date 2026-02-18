@@ -1,7 +1,5 @@
 "use client";
 
-import { useSignal, viewport } from "@telegram-apps/sdk-react";
-import type { Signal } from "@telegram-apps/signals";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -21,7 +19,9 @@ import {
   getUnconsumedStartParamRoute,
   markStartParamConsumed,
 } from "@/hooks/useStartParam";
+import { useDeviceSafeAreaTop } from "@/hooks/useTelegramSafeArea";
 import { track } from "@/lib/core/analytics";
+import { initTelegram } from "@/lib/telegram/mini-app";
 import {
   getCloudValue,
   setCloudValue,
@@ -38,12 +38,12 @@ export default function TelegramLayoutClient({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const safeAreaInsetTop = useSignal(
-    viewport.safeAreaInsetTop as Signal<number>
-  );
+  const safeAreaInsetTop = useDeviceSafeAreaTop();
   const pathname = usePathname();
   // null = loading, true = show, false = don't show
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+  // Gate layout visibility until safe area value is known (prevents content jump)
+  const [safeAreaReady, setSafeAreaReady] = useState(false);
 
   // Detect deeplink synchronously on first render to prevent
   // flash of cached page content (black screen / flicker).
@@ -72,6 +72,24 @@ export default function TelegramLayoutClient({
       setDeeplinkRoute(undefined);
     }
   }, [deeplinkRoute, pathname]);
+
+  // Initialize Telegram SDK + viewport at layout level so safe area
+  // values are available for all pages, not just the wallet page.
+  useEffect(() => {
+    initTelegram();
+  }, []);
+
+  // Mark safe area as ready once the SDK provides a non-zero value.
+  // Timeout fallback for devices without a notch (safeAreaInsetTop is genuinely 0).
+  useEffect(() => {
+    if (safeAreaInsetTop > 0) setSafeAreaReady(true);
+  }, [safeAreaInsetTop]);
+
+  useEffect(() => {
+    if (safeAreaReady) return;
+    const timer = setTimeout(() => setSafeAreaReady(true), 150);
+    return () => clearTimeout(timer);
+  }, [safeAreaReady]);
 
   // Check cloud storage for onboarding completion
   useEffect(() => {
@@ -124,7 +142,11 @@ export default function TelegramLayoutClient({
       <TelegramProvider>
         <div
           className="flex flex-col"
-          style={{ background: "#fff", minHeight: "100vh" }}
+          style={{
+            background: "#fff",
+            minHeight: "100vh",
+            visibility: safeAreaReady ? "visible" : "hidden",
+          }}
         >
           <Header />
           {showOnboarding ? (

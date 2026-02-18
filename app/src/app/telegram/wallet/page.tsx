@@ -37,7 +37,7 @@ import SwapSheet, {
 import TokensSheet from "@/components/wallet/TokensSheet";
 import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
 import { useSwap } from "@/hooks/useSwap";
-import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+import { useDeviceSafeAreaTop, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
   BALANCE_BG_KEY,
   DISPLAY_CURRENCY_KEY,
@@ -507,7 +507,7 @@ export default function Home() {
   const rawInitData = useRawInitData();
   const { bottom: _safeBottom } = useTelegramSafeArea();
   // Get device safe area only (not content safe area) to align with native header buttons
-  const safeAreaInsetTop = useSignal(viewport.safeAreaInsetTop);
+  const safeAreaInsetTop = useDeviceSafeAreaTop();
   const [isSendSheetOpen, setSendSheetOpen] = useState(false);
   const [isSwapSheetOpen, setSwapSheetOpen] = useState(false);
   const [swapActiveTab, setSwapActiveTab] = useState<"swap" | "secure">("swap");
