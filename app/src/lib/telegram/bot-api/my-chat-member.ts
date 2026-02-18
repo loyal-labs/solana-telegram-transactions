@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import type { Context } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
@@ -13,6 +14,16 @@ function isFreshJoinTransition(oldStatus: string, newStatus: string): boolean {
   const joinedFrom = oldStatus === "left" || oldStatus === "kicked";
   const joinedTo = newStatus === "member" || newStatus === "administrator";
   return joinedFrom && joinedTo;
+}
+
+function isRemovalTransition(oldStatus: string, newStatus: string): boolean {
+  const removedTo = newStatus === "left" || newStatus === "kicked";
+  const removedFrom =
+    oldStatus === "member" ||
+    oldStatus === "administrator" ||
+    oldStatus === "creator" ||
+    oldStatus === "restricted";
+  return removedFrom && removedTo;
 }
 
 function isSupportedCommunityChat(chatType: string): boolean {
@@ -31,7 +42,10 @@ export async function handleMyChatMemberUpdate(ctx: Context): Promise<void> {
 
   const oldStatus = myChatMemberUpdate.old_chat_member.status;
   const newStatus = myChatMemberUpdate.new_chat_member.status;
-  if (!isFreshJoinTransition(oldStatus, newStatus)) {
+  const isJoinTransition = isFreshJoinTransition(oldStatus, newStatus);
+  const isRemovedTransition = isRemovalTransition(oldStatus, newStatus);
+
+  if (!isJoinTransition && !isRemovedTransition) {
     return;
   }
 
@@ -39,37 +53,46 @@ export async function handleMyChatMemberUpdate(ctx: Context): Promise<void> {
   const chatTitle = myChatMemberUpdate.chat.title || "Untitled";
   const activatedBy = BigInt(myChatMemberUpdate.from.id);
   const upsertTimestamp = new Date();
-  let isCommunityUpserted = false;
+  const deactivatedCommunityState = {
+    chatTitle,
+    isActive: false,
+    isPublic: false,
+    updatedAt: upsertTimestamp,
+  };
+  let isDatabaseOperationSuccessful = false;
 
   try {
     const db = getDatabase();
-    await db
-      .insert(communities)
-      .values({
-        activatedBy,
-        chatId,
-        chatTitle,
-        isActive: false,
-        isPublic: false,
-        updatedAt: upsertTimestamp,
-      })
-      .onConflictDoUpdate({
-        target: communities.chatId,
-        set: {
-          chatTitle,
-          isActive: false,
-          isPublic: false,
-          updatedAt: upsertTimestamp,
-        },
-      });
-    isCommunityUpserted = true;
+    if (isJoinTransition) {
+      await db
+        .insert(communities)
+        .values({
+          activatedBy,
+          chatId,
+          ...deactivatedCommunityState,
+        })
+        .onConflictDoUpdate({
+          target: communities.chatId,
+          set: deactivatedCommunityState,
+        });
+      isDatabaseOperationSuccessful = true;
+    } else if (isRemovedTransition) {
+      await db
+        .update(communities)
+        .set(deactivatedCommunityState)
+        .where(eq(communities.chatId, chatId));
+      isDatabaseOperationSuccessful = true;
+    }
   } catch (error) {
-    console.error("Failed to upsert community from my_chat_member update", error);
+    console.error(
+      "Failed to update community state from my_chat_member update",
+      error
+    );
   } finally {
     evictActiveCommunityCache(chatId);
   }
 
-  if (!isCommunityUpserted) {
+  if (!isJoinTransition || !isDatabaseOperationSuccessful) {
     return;
   }
 

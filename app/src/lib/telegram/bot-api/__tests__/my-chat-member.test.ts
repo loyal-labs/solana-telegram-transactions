@@ -10,14 +10,22 @@ let mockDb: {
       }) => Promise<void>;
     };
   };
+  update: () => {
+    set: (values: Record<string, unknown>) => {
+      where: () => Promise<void>;
+    };
+  };
 };
 
 let evictCalls: Array<bigint | number | string> = [];
 
 let upsertShouldThrow = false;
+let removalUpdateShouldThrow = false;
 let insertValuesCaptured: Array<Record<string, unknown>>;
 let conflictSetCaptured: Array<Record<string, unknown>>;
 let conflictTargetCaptured: unknown[] = [];
+let removalUpdateValuesCaptured: Array<Record<string, unknown>>;
+let removalWhereCalls = 0;
 
 mock.module("@/lib/core/database", () => ({
   getDatabase: () => mockDb,
@@ -96,10 +104,13 @@ describe("my chat member onboarding", () => {
 
   beforeEach(() => {
     upsertShouldThrow = false;
+    removalUpdateShouldThrow = false;
     evictCalls = [];
     insertValuesCaptured = [];
     conflictSetCaptured = [];
     conflictTargetCaptured = [];
+    removalUpdateValuesCaptured = [];
+    removalWhereCalls = 0;
 
     mockDb = {
       insert: () => ({
@@ -111,6 +122,19 @@ describe("my chat member onboarding", () => {
               conflictTargetCaptured.push(config.target);
               if (upsertShouldThrow) {
                 throw new Error("upsert failed");
+              }
+            },
+          };
+        },
+      }),
+      update: () => ({
+        set: (values: Record<string, unknown>) => {
+          removalUpdateValuesCaptured.push(values);
+          return {
+            where: async () => {
+              removalWhereCalls += 1;
+              if (removalUpdateShouldThrow) {
+                throw new Error("removal update failed");
               }
             },
           };
@@ -129,6 +153,7 @@ describe("my chat member onboarding", () => {
     await handleMyChatMemberUpdate(ctx);
 
     expect(insertValuesCaptured).toHaveLength(1);
+    expect(removalUpdateValuesCaptured).toHaveLength(0);
     expect(insertValuesCaptured[0]?.chatId).toBe(BigInt(COMMUNITY_CHAT_ID));
     expect(insertValuesCaptured[0]?.chatTitle).toBe("New Community Title");
     expect(insertValuesCaptured[0]?.activatedBy).toBe(BigInt(777));
@@ -157,6 +182,7 @@ describe("my chat member onboarding", () => {
     await handleMyChatMemberUpdate(ctx);
 
     expect(insertValuesCaptured).toHaveLength(1);
+    expect(removalUpdateValuesCaptured).toHaveLength(0);
     expect(conflictSetCaptured).toHaveLength(1);
     expect(evictCalls).toEqual([BigInt(COMMUNITY_CHAT_ID)]);
     expect(sendMessageCalls).toHaveLength(1);
@@ -172,6 +198,7 @@ describe("my chat member onboarding", () => {
     await handleMyChatMemberUpdate(ctx);
 
     expect(insertValuesCaptured).toHaveLength(0);
+    expect(removalUpdateValuesCaptured).toHaveLength(0);
     expect(conflictSetCaptured).toHaveLength(0);
     expect(evictCalls).toHaveLength(0);
     expect(sendMessageCalls).toHaveLength(0);
@@ -187,6 +214,7 @@ describe("my chat member onboarding", () => {
     await handleMyChatMemberUpdate(ctx);
 
     expect(insertValuesCaptured).toHaveLength(0);
+    expect(removalUpdateValuesCaptured).toHaveLength(0);
     expect(conflictSetCaptured).toHaveLength(0);
     expect(evictCalls).toHaveLength(0);
     expect(sendMessageCalls).toHaveLength(0);
@@ -210,6 +238,7 @@ describe("my chat member onboarding", () => {
     }
 
     expect(insertValuesCaptured).toHaveLength(1);
+    expect(removalUpdateValuesCaptured).toHaveLength(0);
     expect(evictCalls).toEqual([BigInt(COMMUNITY_CHAT_ID)]);
     expect(sendMessageCalls).toHaveLength(0);
     expect(consoleErrorMock).toHaveBeenCalledTimes(1);
@@ -233,6 +262,7 @@ describe("my chat member onboarding", () => {
     }
 
     expect(insertValuesCaptured).toHaveLength(1);
+    expect(removalUpdateValuesCaptured).toHaveLength(0);
     expect(conflictSetCaptured).toHaveLength(1);
     expect(evictCalls).toEqual([BigInt(COMMUNITY_CHAT_ID)]);
     expect(consoleErrorMock).toHaveBeenCalledTimes(1);
@@ -252,5 +282,84 @@ describe("my chat member onboarding", () => {
     expect(sentMessage).toContain("/notifications");
     expect(sentMessage).toContain("/hide");
     expect(sentMessage).toContain("/unhide");
+  });
+
+  test("handles removal member -> left by deactivating and hiding without onboarding message", async () => {
+    const { ctx, sendMessageCalls } = createContext({
+      chatType: "supergroup",
+      oldStatus: "member",
+      newStatus: "left",
+    });
+
+    await handleMyChatMemberUpdate(ctx);
+
+    expect(insertValuesCaptured).toHaveLength(0);
+    expect(conflictSetCaptured).toHaveLength(0);
+    expect(removalUpdateValuesCaptured).toHaveLength(1);
+    expect(removalUpdateValuesCaptured[0]?.chatTitle).toBe("New Community Title");
+    expect(removalUpdateValuesCaptured[0]?.isActive).toBe(false);
+    expect(removalUpdateValuesCaptured[0]?.isPublic).toBe(false);
+    expect(removalUpdateValuesCaptured[0]?.updatedAt).toBeInstanceOf(Date);
+    expect(removalWhereCalls).toBe(1);
+    expect(evictCalls).toEqual([BigInt(COMMUNITY_CHAT_ID)]);
+    expect(sendMessageCalls).toHaveLength(0);
+  });
+
+  test("handles removal administrator -> kicked in channel by deactivating and hiding", async () => {
+    const { ctx, sendMessageCalls } = createContext({
+      chatType: "channel",
+      oldStatus: "administrator",
+      newStatus: "kicked",
+    });
+
+    await handleMyChatMemberUpdate(ctx);
+
+    expect(insertValuesCaptured).toHaveLength(0);
+    expect(conflictSetCaptured).toHaveLength(0);
+    expect(removalUpdateValuesCaptured).toHaveLength(1);
+    expect(removalWhereCalls).toBe(1);
+    expect(evictCalls).toEqual([BigInt(COMMUNITY_CHAT_ID)]);
+    expect(sendMessageCalls).toHaveLength(0);
+  });
+
+  test("handles removal restricted -> left by deactivating and hiding", async () => {
+    const { ctx, sendMessageCalls } = createContext({
+      chatType: "supergroup",
+      oldStatus: "restricted",
+      newStatus: "left",
+    });
+
+    await handleMyChatMemberUpdate(ctx);
+
+    expect(insertValuesCaptured).toHaveLength(0);
+    expect(conflictSetCaptured).toHaveLength(0);
+    expect(removalUpdateValuesCaptured).toHaveLength(1);
+    expect(removalWhereCalls).toBe(1);
+    expect(evictCalls).toEqual([BigInt(COMMUNITY_CHAT_ID)]);
+    expect(sendMessageCalls).toHaveLength(0);
+  });
+
+  test("evicts cache and does not crash when removal update fails", async () => {
+    removalUpdateShouldThrow = true;
+    const { ctx, sendMessageCalls } = createContext({
+      chatType: "group",
+      oldStatus: "member",
+      newStatus: "left",
+    });
+    const consoleErrorMock = mock(() => undefined);
+    const previousConsoleError = console.error;
+    console.error = consoleErrorMock;
+
+    try {
+      await handleMyChatMemberUpdate(ctx);
+    } finally {
+      console.error = previousConsoleError;
+    }
+
+    expect(insertValuesCaptured).toHaveLength(0);
+    expect(removalUpdateValuesCaptured).toHaveLength(1);
+    expect(evictCalls).toEqual([BigInt(COMMUNITY_CHAT_ID)]);
+    expect(sendMessageCalls).toHaveLength(0);
+    expect(consoleErrorMock).toHaveBeenCalledTimes(1);
   });
 });
