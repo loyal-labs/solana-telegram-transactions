@@ -79,7 +79,7 @@ function VerifyQRCode({ value, size }: { value: string; size: number }) {
   const renderFinderPattern = (
     startRow: number,
     startCol: number,
-    id: string,
+    id: string
   ) => {
     const x = startCol * cellSize;
     const y = startRow * cellSize;
@@ -154,7 +154,7 @@ function VerifyQRCode({ value, size }: { value: string; size: number }) {
               fill="black"
             />
           );
-        }),
+        })
       )}
 
       {renderFinderPattern(0, 0, "v-tl")}
@@ -265,7 +265,10 @@ export default function VerifyPage() {
       }
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      sileo.error({ title: "Failed to copy link", description: "Please copy it manually." });
+      sileo.error({
+        title: "Failed to copy link",
+        description: "Please copy it manually."
+      });
     }
   }, [bioUrl]);
 
@@ -276,17 +279,23 @@ export default function VerifyPage() {
     try {
       if (biometry.requestAccess.isAvailable()) {
         const granted = await biometry.requestAccess({
-          reason: "Verify your identity with biometrics",
+          reason: "Verify your identity with biometrics"
         });
         if (granted) {
           setStep("ready");
         } else {
-          sileo.error({ title: "Access denied", description: "Biometric access was not granted." });
+          sileo.error({
+            title: "Access denied",
+            description: "Biometric access was not granted."
+          });
         }
       }
     } catch (err) {
       console.error("Failed to request biometry access", err);
-      sileo.error({ title: "Something went wrong", description: "Could not request biometric access." });
+      sileo.error({
+        title: "Something went wrong",
+        description: "Could not request biometric access."
+      });
     }
   }, []);
 
@@ -306,7 +315,7 @@ export default function VerifyPage() {
     try {
       if (biometry.authenticate.isAvailable()) {
         const { status } = await biometry.authenticate({
-          reason: "Confirm you're human",
+          reason: "Confirm you're human"
         });
         if (status === "authorized") {
           if (hapticFeedback.notificationOccurred.isAvailable()) {
@@ -314,12 +323,18 @@ export default function VerifyPage() {
           }
           setStep("verified");
         } else {
-          sileo.error({ title: "Verification failed", description: "Biometric check was not successful. Please try again." });
+          sileo.error({
+            title: "Verification failed",
+            description: "Biometric check was not successful. Please try again."
+          });
         }
       }
     } catch (err) {
       console.error("Biometry authentication failed", err);
-      sileo.error({ title: "Something went wrong", description: "Biometric authentication failed unexpectedly." });
+      sileo.error({
+        title: "Something went wrong",
+        description: "Biometric authentication failed unexpectedly."
+      });
     }
   }, []);
 
@@ -331,7 +346,6 @@ export default function VerifyPage() {
   }, [router]);
 
   const bottomPadding = Math.max(safeBottom, 16) + 16;
-
 
   // ---- Checking state ----
 
@@ -417,11 +431,11 @@ export default function VerifyPage() {
               <Lottie animationData={shieldAnimation} loop />
             </div>
             <h1 className="mb-3 text-center text-[22px] font-semibold leading-[28px] text-black">
-              Allow Telegram to Use Biometrics
+              Allow Loyal to Use Biometrics
             </h1>
             <p className="max-w-[300px] text-center text-[17px] font-normal leading-[22px] text-[rgba(60,60,67,0.6)]">
-              To continue, enable Face ID or fingerprint for Telegram in your
-              phone settings.
+              To continue, enable Face ID or fingerprint for Loyal in your phone
+              settings.
             </p>
           </div>
 
@@ -510,7 +524,7 @@ export default function VerifyPage() {
             onClick={() => {
               sileo.error({
                 title: "Something went wrong",
-                description: "Please try again later.",
+                description: "Please try again later."
               });
             }}
             className="py-2 px-4 text-[13px] text-[rgba(60,60,67,0.4)] underline active:opacity-60"
