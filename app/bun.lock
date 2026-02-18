@@ -17,7 +17,7 @@
         "@telegram-apps/sdk": "^3.11.8",
         "@telegram-apps/sdk-react": "^3.3.9",
         "@telegram-apps/telegram-ui": "^2.1.13",
-        "@vladarbatov/private-transactions-test": "^0.1.1",
+        "@vladarbatov/private-transactions-test": "^0.1.2",
         "@xelene/vaul-with-scroll-fix": "^0.1.4",
         "bs58": "^6.0.0",
         "class-variance-authority": "^0.7.1",
@@ -716,7 +716,7 @@
 
     "@urql/core": ["@urql/core@6.0.1", "", { "dependencies": { "@0no-co/graphql.web": "^1.0.13", "wonka": "^6.3.2" } }, "sha512-FZDiQk6jxbj5hixf2rEPv0jI+IZz0EqqGW8mJBEug68/zHTtT+f34guZDmyjJZyiWbj0vL165LoMr/TkeDHaug=="],
 
-    "@vladarbatov/private-transactions-test": ["@vladarbatov/private-transactions-test@0.1.1", "", { "dependencies": { "tweetnacl": "^1.0.3" }, "peerDependencies": { "@coral-xyz/anchor": "^0.32.0", "@magicblock-labs/ephemeral-rollups-sdk": "^0.8.5", "@solana/spl-token": "^0.4.14", "@solana/web3.js": "^1.95.0" } }, "sha512-NGewL32ZP/mZzTMjL4RbhhvuwUSr2rfSpWxCpv6p03jjjtE/Vl1ne0niohLnpy87UvdxlGdXi6THon+6McBh5g=="],
+    "@vladarbatov/private-transactions-test": ["@vladarbatov/private-transactions-test@0.1.2", "", { "dependencies": { "tweetnacl": "^1.0.3" }, "peerDependencies": { "@coral-xyz/anchor": "^0.32.0", "@magicblock-labs/ephemeral-rollups-sdk": "^0.8.5", "@solana/spl-token": "^0.4.14", "@solana/web3.js": "^1.95.0" } }, "sha512-Zv3tyjTVUfWTk3gehjrmh7lfWMDf9rIN4x8sNVBiay2oMoF6Sy79tER/MVukTlip3jOE4XqrAd1oGMoolTsjaQ=="],
 
     "@wallet-standard/app": ["@wallet-standard/app@1.1.0", "", { "dependencies": { "@wallet-standard/base": "^1.1.0" } }, "sha512-3CijvrO9utx598kjr45hTbbeeykQrQfKmSnxeWOgU25TOEpvcipD/bYDQWIqUv1Oc6KK4YStokSMu/FBNecGUQ=="],
 
