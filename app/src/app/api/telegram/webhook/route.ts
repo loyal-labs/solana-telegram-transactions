@@ -19,6 +19,7 @@ import {
   handleCommunityMessage,
   handleGLoyalReaction,
 } from "@/lib/telegram/bot-api/message-handlers";
+import { handleMyChatMemberUpdate } from "@/lib/telegram/bot-api/my-chat-member";
 import {
   handleNotificationSettingsCallback,
   NOTIFICATION_SETTINGS_CALLBACK_DATA_REGEX,
@@ -118,6 +119,10 @@ bot.on("business_connection", async (ctx) => {
   } catch (error) {
     console.error("Failed to handle business connection", error);
   }
+});
+
+bot.on("my_chat_member", async (ctx) => {
+  await handleMyChatMemberUpdate(ctx);
 });
 
 bot.on("message:forum_topic_created", async (ctx) => {

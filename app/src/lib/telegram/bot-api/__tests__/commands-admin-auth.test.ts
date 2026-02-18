@@ -21,6 +21,7 @@ let mockDb: {
 };
 
 let getChatCalls = 0;
+let evictCalls: Array<bigint | number | string> = [];
 
 mock.module("@/lib/core/database", () => ({
   getDatabase: () => mockDb,
@@ -42,6 +43,12 @@ mock.module("../get-file", () => ({
 
 mock.module("@/lib/telegram/user-service", () => ({
   getOrCreateUser: async () => "user-1",
+}));
+
+mock.module("../message-handlers", () => ({
+  evictActiveCommunityCache: (chatId: bigint | number | string) => {
+    evictCalls.push(chatId);
+  },
 }));
 
 let handleActivateCommunityCommand: (
@@ -115,6 +122,7 @@ describe("commands admin authorization", () => {
     adminResult = null;
     communityResult = null;
     getChatCalls = 0;
+    evictCalls = [];
     insertValuesCaptured = [];
     updateValuesCaptured = [];
 
@@ -192,6 +200,7 @@ describe("commands admin authorization", () => {
     expect(updateValuesCaptured).toHaveLength(1);
     expect(updateValuesCaptured[0]?.isActive).toBe(false);
     expect(updateValuesCaptured[0]?.updatedAt).toBeInstanceOf(Date);
+    expect(evictCalls).toEqual([BigInt(ctx.chat.id)]);
     expect(replyCalls).toContain(
       "Community deactivated. Message tracking has been disabled."
     );
@@ -204,6 +213,7 @@ describe("commands admin authorization", () => {
     await handleDeactivateCommunityCommand(ctx);
 
     expect(updateValuesCaptured).toHaveLength(0);
+    expect(evictCalls).toHaveLength(0);
     expect(replyCalls).toEqual([
       "You are not authorized to deactivate communities. Contact an administrator to be added to the whitelist.",
     ]);

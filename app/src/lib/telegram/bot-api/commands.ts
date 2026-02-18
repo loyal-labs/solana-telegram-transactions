@@ -12,6 +12,7 @@ import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
 import { CA_COMMAND_CHAT_ID } from "./constants";
 import { getChat } from "./get-chat";
 import { downloadTelegramFile } from "./get-file";
+import { evictActiveCommunityCache } from "./message-handlers";
 import { sendNotificationSettingsMessage } from "./notification-settings";
 import { sendStartCarousel } from "./start-carousel";
 import { sendLatestSummary } from "./summaries";
@@ -525,6 +526,7 @@ export async function handleDeactivateCommunityCommand(
       .set({ isActive: false, updatedAt: new Date() })
       .where(eq(communities.id, existingCommunity.id));
 
+    evictActiveCommunityCache(chatId);
     await ctx.reply("Community deactivated. Message tracking has been disabled.");
   } catch (error) {
     console.error("Failed to deactivate community", error);
