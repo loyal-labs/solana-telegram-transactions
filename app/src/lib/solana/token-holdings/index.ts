@@ -13,7 +13,6 @@ export {
   DEFAULT_TOKEN_ICON,
   fetchTokenHoldings,
   KNOWN_TOKEN_ICONS,
-  NATIVE_SOL_MINT,
   resolveTokenIcon,
   subscribeToTokenHoldings,
   type SubscribeToTokenHoldingsOptions,

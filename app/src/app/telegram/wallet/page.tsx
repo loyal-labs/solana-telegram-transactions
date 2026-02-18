@@ -1824,7 +1824,7 @@ export default function Home() {
       (tx) => (autoClaimAttemptsRef.current.get(tx.id) ?? 0) < 3
     );
     if (nextAutoClaim) {
-      void handleApproveTransaction(nextAutoClaim.id);
+      void handleApproveTransaction(nextAutoClaim.id, CLAIM_SOURCES.auto);
     }
   }, [
     autoClaimPaused,

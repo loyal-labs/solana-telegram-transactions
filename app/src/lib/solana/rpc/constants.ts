@@ -15,9 +15,6 @@ export const SECURE_DEVNET_RPC_WS = "wss://api.devnet.solana.com";
 export const TESTNET_RPC_URL = "https://api.testnet.solana.com";
 export const TESTNET_RPC_WS = "wss://api.testnet.solana.com";
 
-export const TESTNET_RPC_URL = "https://api.testnet.solana.com";
-export const TESTNET_RPC_WS = "wss://api.testnet.solana.com";
-
 export const LOCALNET_RPC_URL = "http://127.0.0.1:8899";
 export const LOCALNET_RPC_WS = "ws://127.0.0.1:8900";
 

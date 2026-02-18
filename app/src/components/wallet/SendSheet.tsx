@@ -1,12 +1,12 @@
 "use client";
 
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { hapticFeedback, openTelegramLink, retrieveLaunchParams } from "@telegram-apps/sdk-react";
 import {
-  ArrowLeft,
-  Search,
-  X,
-} from "lucide-react";
+  hapticFeedback,
+  openTelegramLink,
+  retrieveLaunchParams,
+} from "@telegram-apps/sdk-react";
+import { ArrowLeft, Search, X } from "lucide-react";
 import Image from "next/image";
 import {
   type ReactNode,
@@ -40,26 +40,51 @@ const SHEET_TRANSITION = "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)";
 const OVERLAY_TRANSITION = "opacity 0.3s ease";
 
 // Parse raw Solana error into a user-friendly message
-function getFriendlyError(raw: string): { message: string; details: string | null } {
+function getFriendlyError(raw: string): {
+  message: string;
+  details: string | null;
+} {
   const lower = raw.toLowerCase();
 
-  if (lower.includes("insufficient lamports") || lower.includes("not enough sol")) {
-    return { message: "You don't have enough SOL to complete this transaction.", details: null };
+  if (
+    lower.includes("insufficient lamports") ||
+    lower.includes("not enough sol")
+  ) {
+    return {
+      message: "You don't have enough SOL to complete this transaction.",
+      details: null,
+    };
   }
   if (lower.includes("insufficient funds")) {
-    return { message: "Insufficient funds for this transaction.", details: null };
+    return {
+      message: "Insufficient funds for this transaction.",
+      details: null,
+    };
   }
-  if (lower.includes("blockhash not found") || lower.includes("block height exceeded")) {
-    return { message: "The transaction expired. Please try again.", details: null };
+  if (
+    lower.includes("blockhash not found") ||
+    lower.includes("block height exceeded")
+  ) {
+    return {
+      message: "The transaction expired. Please try again.",
+      details: null,
+    };
   }
   if (lower.includes("timeout") || lower.includes("timed out")) {
-    return { message: "The transaction timed out. Please try again.", details: null };
+    return {
+      message: "The transaction timed out. Please try again.",
+      details: null,
+    };
   }
   if (lower.includes("user rejected") || lower.includes("user cancelled")) {
     return { message: "Transaction was cancelled.", details: null };
   }
   if (lower.includes("simulation failed") || lower.includes("program error")) {
-    return { message: "The transaction could not be processed. Please try again later.", details: raw };
+    return {
+      message:
+        "The transaction could not be processed. Please try again later.",
+      details: raw,
+    };
   }
   if (raw.length > 120) {
     return { message: "Something went wrong. Please try again.", details: raw };
@@ -73,7 +98,11 @@ export type SendSheetProps = {
   onOpenChange?: (open: boolean) => void;
   initialRecipient?: string;
   onValidationChange?: (isValid: boolean) => void;
-  onFormValuesChange?: (values: { amount: string; recipient: string; isSecured: boolean }) => void;
+  onFormValuesChange?: (values: {
+    amount: string;
+    recipient: string;
+    isSecured: boolean;
+  }) => void;
   step: 1 | 2 | 3 | 4 | 5;
   onStepChange: (step: 1 | 2 | 3 | 4 | 5) => void;
   balance?: number | null;
@@ -141,31 +170,21 @@ const truncateDecimals = (num: number, decimals: number): string => {
   return truncated.toFixed(decimals);
 };
 
-// Format number for display: truncate to max decimals, remove trailing zeros
-const formatForDisplay = (num: number, maxDecimals: number): string => {
-  const factor = Math.pow(10, maxDecimals);
-  const truncated = Math.floor(num * factor) / factor;
-  return String(Number(truncated.toFixed(maxDecimals)));
-};
-
 type LastAmount = {
   sol: number;
   usd: number;
 };
 
-const getLastAmount = async (): Promise<LastAmount | null> => {
-  try {
-    const stored = await getCloudValue(LAST_AMOUNT_KEY);
-    if (stored && typeof stored === "string") return JSON.parse(stored);
-  } catch {}
-  return null;
-};
-
-const saveLastAmount = async (solAmount: number, solPriceUsd: number | null): Promise<void> => {
+const saveLastAmount = async (
+  solAmount: number,
+  solPriceUsd: number | null
+): Promise<void> => {
   try {
     const lastAmount: LastAmount = {
       sol: solAmount,
-      usd: solPriceUsd ? parseFloat((solAmount * solPriceUsd).toFixed(2)) : solAmount,
+      usd: solPriceUsd
+        ? parseFloat((solAmount * solPriceUsd).toFixed(2))
+        : solAmount,
     };
     await setCloudValue(LAST_AMOUNT_KEY, JSON.stringify(lastAmount));
   } catch {}
@@ -187,16 +206,46 @@ const getAvatarColor = (name: string): string => {
 
 // Chevron icon (light theme)
 const ChevronIcon = () => (
-  <svg width="16" height="24" viewBox="0 0 16 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M5.5 6L11 12L5.5 18" stroke="rgba(60,60,67,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  <svg
+    width="16"
+    height="24"
+    viewBox="0 0 16 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M5.5 6L11 12L5.5 18"
+      stroke="rgba(60,60,67,0.3)"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
 // Arrow up/down icon for currency switch (light theme)
 const ArrowUpDownIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M9.33 5.25V22.75M9.33 22.75L5.25 18.67M9.33 22.75L13.42 18.67" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M18.67 22.75V5.25M18.67 5.25L14.58 9.33M18.67 5.25L22.75 9.33" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+  <svg
+    width="28"
+    height="28"
+    viewBox="0 0 28 28"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M9.33 5.25V22.75M9.33 22.75L5.25 18.67M9.33 22.75L13.42 18.67"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M18.67 22.75V5.25M18.67 5.25L14.58 9.33M18.67 5.25L22.75 9.33"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -207,12 +256,7 @@ function ErrorResult({ error }: { error: string }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
       <div className="relative mb-5">
-        <Image
-          src="/dogs/dog-cry.png"
-          alt="Error"
-          width={96}
-          height={96}
-        />
+        <Image src="/dogs/dog-cry.png" alt="Error" width={96} height={96} />
       </div>
       <div className="flex flex-col gap-2 items-center text-center max-w-[280px]">
         <h2 className="text-xl font-semibold text-black leading-6">
@@ -288,7 +332,7 @@ export default function SendSheet({
   // Abbreviate wallet address for display
   const abbreviatedAddress = walletAddress
     ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
-    : '';
+    : "";
 
   // Token selection state
   const [tokenSearchQuery, setTokenSearchQuery] = useState("");
@@ -299,17 +343,17 @@ export default function SendSheet({
     const q = tokenSearchQuery.toLowerCase();
     return tokenHoldings.filter(
       (t) =>
-        t.symbol.toLowerCase().includes(q) ||
-        t.name.toLowerCase().includes(q),
+        t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)
     );
   }, [tokenHoldings, tokenSearchQuery]);
 
   // Form state
   const [amountStr, setAmountStr] = useState("");
   const [recipient, setRecipient] = useState("");
-  const [currency, setCurrency] = useState<'SOL' | 'USD'>('SOL');
-  const [lastAmount, setLastAmount] = useState<LastAmount | null>(null);
-  const [recentRecipients, setRecentRecipients] = useState<RecentRecipient[]>([]);
+  const [currency, setCurrency] = useState<"SOL" | "USD">("SOL");
+  const [recentRecipients, setRecentRecipients] = useState<RecentRecipient[]>(
+    []
+  );
   const [solPriceUsdState, setSolPriceUsdState] = useState<number | null>(null);
   const [isSolPriceLoadingState, setIsSolPriceLoadingState] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -319,7 +363,9 @@ export default function SendSheet({
 
   // Use the selected token's balance if available, otherwise fall back to wallet SOL balance
   const walletBalanceInSol = balance ? balance / LAMPORTS_PER_SOL : 0;
-  const balanceInSol = selectedToken ? selectedToken.balance : walletBalanceInSol;
+  const balanceInSol = selectedToken
+    ? selectedToken.balance
+    : walletBalanceInSol;
   const isUsingExternalPrice =
     solPriceUsdProp !== undefined || isSolPriceLoadingProp !== undefined;
   const solPriceUsd = isUsingExternalPrice
@@ -396,10 +442,9 @@ export default function SendSheet({
     if (open) {
       setAmountStr("");
       setRecipient(initialRecipient || "");
-      setCurrency('SOL');
+      setCurrency("SOL");
       setTokenSearchQuery("");
       setSelectedToken(null);
-      void getLastAmount().then(setLastAmount);
       void getRecentRecipients().then(setRecentRecipients);
     }
   }, [open, initialRecipient]);
@@ -448,7 +493,7 @@ export default function SendSheet({
     if (!open || step !== 3) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Backspace') {
+      if (e.key === "Backspace") {
         if (!amountStrRef.current) {
           e.preventDefault();
           e.stopPropagation();
@@ -456,8 +501,8 @@ export default function SendSheet({
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [open, step]);
 
   // Save last amount when moving to step 4 (confirmation)
@@ -466,7 +511,7 @@ export default function SendSheet({
       const amount = parseFloat(amountStr);
       if (!isNaN(amount) && amount > 0) {
         const solAmount =
-          currency === 'USD'
+          currency === "USD"
             ? solPriceUsd
               ? amount / solPriceUsd
               : NaN
@@ -482,17 +527,26 @@ export default function SendSheet({
   useEffect(() => {
     if (onFormValuesChange) {
       let finalAmount = amountStr;
-      if (currency === 'USD' && amountStr) {
+      if (currency === "USD" && amountStr) {
         const usdVal = parseFloat(amountStr);
         if (!isNaN(usdVal)) {
-          finalAmount = solPriceUsd
-            ? (usdVal / solPriceUsd).toFixed(6)
-            : "";
+          finalAmount = solPriceUsd ? (usdVal / solPriceUsd).toFixed(6) : "";
         }
       }
-      onFormValuesChange({ amount: finalAmount, recipient, isSecured: !!selectedToken?.isSecured });
+      onFormValuesChange({
+        amount: finalAmount,
+        recipient,
+        isSecured: !!selectedToken?.isSecured,
+      });
     }
-  }, [amountStr, recipient, currency, onFormValuesChange, solPriceUsd, selectedToken]);
+  }, [
+    amountStr,
+    recipient,
+    currency,
+    onFormValuesChange,
+    solPriceUsd,
+    selectedToken,
+  ]);
 
   // Validation Logic
   useEffect(() => {
@@ -502,7 +556,9 @@ export default function SendSheet({
     }
 
     const recipientTrimmed = recipient.trim();
-    const isRecipientValid = isValidSolanaAddress(recipientTrimmed) || isValidTelegramUsername(recipientTrimmed);
+    const isRecipientValid =
+      isValidSolanaAddress(recipientTrimmed) ||
+      isValidTelegramUsername(recipientTrimmed);
 
     if (step === 1) {
       // Token selection step — always valid (user picks from list)
@@ -519,20 +575,15 @@ export default function SendSheet({
     const isAmountValid = !isNaN(amount) && amount > 0 && isFinite(amount);
 
     const amountInSol =
-      currency === 'SOL'
-        ? amount
-        : solPriceUsd
-          ? amount / solPriceUsd
-          : NaN;
-    const hasEnoughBalance =
-      !isNaN(amountInSol) && amountInSol <= balanceInSol;
+      currency === "SOL" ? amount : solPriceUsd ? amount / solPriceUsd : NaN;
+    const hasEnoughBalance = !isNaN(amountInSol) && amountInSol <= balanceInSol;
 
     if (step === 3) {
       const isValid =
         isAmountValid &&
         isRecipientValid &&
         hasEnoughBalance &&
-        (currency === 'SOL' || !!solPriceUsd);
+        (currency === "SOL" || !!solPriceUsd);
       onValidationChange?.(isValid);
       return;
     }
@@ -550,14 +601,24 @@ export default function SendSheet({
         isRecipientValid &&
         hasEnoughBalance &&
         hasEnoughSolForFee &&
-        (currency === 'SOL' || !!solPriceUsd);
+        (currency === "SOL" || !!solPriceUsd);
       onValidationChange?.(isValid);
       return;
     }
 
     onValidationChange?.(false);
-  }, [step, amountStr, recipient, open, onValidationChange, currency, balanceInSol, walletBalanceInSol, selectedToken, solPriceUsd]);
-
+  }, [
+    step,
+    amountStr,
+    recipient,
+    open,
+    onValidationChange,
+    currency,
+    balanceInSol,
+    walletBalanceInSol,
+    selectedToken,
+    solPriceUsd,
+  ]);
 
   const handleRecipientSelect = (selected: string) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -577,7 +638,7 @@ export default function SendSheet({
     if (document.activeElement !== amountInputRef.current) {
       amountInputRef.current?.focus({ preventScroll: true });
     }
-    const strVal = typeof val === 'string' ? val : val.toString();
+    const strVal = typeof val === "string" ? val : val.toString();
     setAmountStr(strVal);
   };
 
@@ -590,34 +651,14 @@ export default function SendSheet({
     onStepChange(2);
   };
 
-  const tokenSymbol = selectedToken?.symbol || 'SOL';
-
-  // Computed display values
-  const secondaryDisplay = useMemo(() => {
-    const val = parseFloat(amountStr);
-    if (isNaN(val)) return currency === 'SOL' ? '≈ $0.00' : `≈ 0.00 ${tokenSymbol}`;
-
-    if (!solPriceUsd) {
-      return currency === 'SOL' ? '≈ $—' : `≈ — ${tokenSymbol}`;
-    }
-
-    if (currency === 'SOL') {
-      return `≈ $${(val * solPriceUsd).toFixed(2)}`;
-    } else {
-      return `≈ ${(val / solPriceUsd).toFixed(4)} ${tokenSymbol}`;
-    }
-  }, [amountStr, currency, solPriceUsd, tokenSymbol]);
+  const tokenSymbol = selectedToken?.symbol || "SOL";
 
   // Insufficient balance check
   const insufficientBalance = useMemo(() => {
     const val = parseFloat(amountStr);
     if (isNaN(val) || val <= 0) return false;
     const amountInSol =
-      currency === 'SOL'
-        ? val
-        : solPriceUsd
-          ? val / solPriceUsd
-          : NaN;
+      currency === "SOL" ? val : solPriceUsd ? val / solPriceUsd : NaN;
     return amountInSol > balanceInSol;
   }, [amountStr, currency, solPriceUsd, balanceInSol]);
 
@@ -652,7 +693,7 @@ export default function SendSheet({
         unmount();
       }
     },
-    [unmount],
+    [unmount]
   );
 
   // Close when parent sets open=false while sheet is still showing
@@ -707,7 +748,9 @@ export default function SendSheet({
   useEffect(() => {
     if (rendered) {
       document.body.style.overflow = "hidden";
-      return () => { document.body.style.overflow = ""; };
+      return () => {
+        document.body.style.overflow = "";
+      };
     }
   }, [rendered]);
 
@@ -716,11 +759,11 @@ export default function SendSheet({
   const sheetTopOffset = headerHeight || 56;
 
   // Pill display for steps 3-5
-  const pillAddress = recipient.startsWith('@')
+  const pillAddress = recipient.startsWith("@")
     ? recipient
     : recipient
-      ? `${recipient.slice(0, 4)}…${recipient.slice(-4)}`
-      : '';
+    ? `${recipient.slice(0, 4)}…${recipient.slice(-4)}`
+    : "";
 
   const content = (
     <>
@@ -805,10 +848,17 @@ export default function SendSheet({
           {/* Steps 3-5: Recipient Pill */}
           {step >= 3 && (
             <div
-              className={`flex items-center px-3 py-1.5 rounded-[54px] ${recipient.startsWith('@') ? 'cursor-pointer active:scale-95 active:opacity-80 transition-all duration-150' : ''}`}
+              className={`flex items-center px-3 py-1.5 rounded-[54px] ${
+                recipient.startsWith("@")
+                  ? "cursor-pointer active:scale-95 active:opacity-80 transition-all duration-150"
+                  : ""
+              }`}
               style={{ background: "#f2f2f7" }}
               onClick={() => {
-                if (recipient.startsWith('@') && openTelegramLink.isAvailable()) {
+                if (
+                  recipient.startsWith("@") &&
+                  openTelegramLink.isAvailable()
+                ) {
                   if (hapticFeedback.impactOccurred.isAvailable()) {
                     hapticFeedback.impactOccurred("light");
                   }
@@ -851,7 +901,7 @@ export default function SendSheet({
             style={{
               transform: `translateX(${(1 - step) * 100}%)`,
               opacity: step === 1 ? 1 : 0,
-              pointerEvents: step === 1 ? 'auto' : 'none',
+              pointerEvents: step === 1 ? "auto" : "none",
             }}
           >
             {/* Search Input */}
@@ -887,7 +937,9 @@ export default function SendSheet({
 
               return (
                 <button
-                  key={`${token.mint}-${token.name}-${token.isSecured ? "secured" : "standard"}`}
+                  key={`${token.mint}-${token.name}-${
+                    token.isSecured ? "secured" : "standard"
+                  }`}
                   onClick={() => handleTokenSelect(token)}
                   className="flex items-center px-4 active:bg-black/[0.03] transition-colors"
                 >
@@ -903,7 +955,12 @@ export default function SendSheet({
                       </div>
                       {token.isSecured && (
                         <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
-                          <Image src="/Shield.svg" alt="Secured" width={20} height={20} />
+                          <Image
+                            src="/Shield.svg"
+                            alt="Secured"
+                            width={20}
+                            height={20}
+                          />
                         </div>
                       )}
                     </div>
@@ -964,7 +1021,7 @@ export default function SendSheet({
             style={{
               transform: `translateX(${(2 - step) * 100}%)`,
               opacity: step === 2 ? 1 : 0,
-              pointerEvents: step === 2 ? 'auto' : 'none',
+              pointerEvents: step === 2 ? "auto" : "none",
             }}
           >
             {/* Search Input */}
@@ -995,16 +1052,25 @@ export default function SendSheet({
                   />
                 </div>
                 {/* Validation Error */}
-                {recipient.trim().length > 0 && !isValidSolanaAddress(recipient) && !isValidTelegramUsername(recipient) && (
-                  <p className="text-[13px] leading-4 px-1" style={{ color: "#f9363c" }}>Invalid address</p>
-                )}
+                {recipient.trim().length > 0 &&
+                  !isValidSolanaAddress(recipient) &&
+                  !isValidTelegramUsername(recipient) && (
+                    <p
+                      className="text-[13px] leading-4 px-1"
+                      style={{ color: "#f9363c" }}
+                    >
+                      Invalid address
+                    </p>
+                  )}
               </div>
             </div>
 
             {/* Recent Section Header */}
             {recentRecipients.length > 0 && (
               <div className="px-4 pt-3 pb-2">
-                <p className="text-base font-medium text-black tracking-[-0.176px]">Recent</p>
+                <p className="text-base font-medium text-black tracking-[-0.176px]">
+                  Recent
+                </p>
               </div>
             )}
 
@@ -1014,7 +1080,10 @@ export default function SendSheet({
                 const isUsername = recentItem.address.startsWith("@");
                 const displayName = isUsername
                   ? recentItem.address
-                  : `${recentItem.address.slice(0, 4)}...${recentItem.address.slice(-4)}`;
+                  : `${recentItem.address.slice(
+                      0,
+                      4
+                    )}...${recentItem.address.slice(-4)}`;
                 const avatarChar = isUsername
                   ? recentItem.address.slice(1, 2).toUpperCase()
                   : recentItem.address.slice(0, 1).toUpperCase();
@@ -1037,7 +1106,9 @@ export default function SendSheet({
                       </div>
                     </div>
                     <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                      <p className="text-base text-black text-left leading-5">{displayName}</p>
+                      <p className="text-base text-black text-left leading-5">
+                        {displayName}
+                      </p>
                       <p
                         className="text-[13px] text-left leading-4"
                         style={{ color: "rgba(60, 60, 67, 0.6)" }}
@@ -1053,36 +1124,58 @@ export default function SendSheet({
               })}
 
               {/* Manual Entry */}
-              {recipient.trim().length > 0 && (isValidSolanaAddress(recipient) || isValidTelegramUsername(recipient)) && (
-                <button
-                  onClick={() => handleRecipientSelect(recipient)}
-                  className="w-full flex items-center px-3 py-1 rounded-2xl active:bg-black/[0.03] transition-colors"
-                >
-                  <div className="py-1.5 pr-3">
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center"
-                      style={{ background: "rgba(99, 102, 241, 0.1)" }}
-                    >
-                      <svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M15.8333 5.83333V3.33333C15.8333 3.11232 15.7455 2.90036 15.5893 2.74408C15.433 2.5878 15.221 2.5 15 2.5H4.16667C3.72464 2.5 3.30072 2.67559 2.98816 2.98816C2.67559 3.30072 2.5 3.72464 2.5 4.16667C2.5 4.60869 2.67559 5.03262 2.98816 5.34518C3.30072 5.65774 3.72464 5.83333 4.16667 5.83333H16.6667C16.8877 5.83333 17.0996 5.92113 17.2559 6.07741C17.4122 6.23369 17.5 6.44565 17.5 6.66667V10M17.5 10H15C14.558 10 14.1341 10.1756 13.8215 10.4882C13.5089 10.8007 13.3333 11.2246 13.3333 11.6667C13.3333 12.1087 13.5089 12.5326 13.8215 12.8452C14.1341 13.1577 14.558 13.3333 15 13.3333H17.5C17.721 13.3333 17.933 13.2455 18.0893 13.0893C18.2455 12.933 18.3333 12.721 18.3333 12.5V10.8333C18.3333 10.6123 18.2455 10.4004 18.0893 10.2441C17.933 10.0878 17.721 10 17.5 10Z" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M2.5 4.16656V15.8332C2.5 16.2753 2.67559 16.6992 2.98816 17.0117C3.30072 17.3243 3.72464 17.4999 4.16667 17.4999H16.6667C16.8877 17.4999 17.0996 17.4121 17.2559 17.2558C17.4122 17.0995 17.5 16.8876 17.5 16.6666V13.3332" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
+              {recipient.trim().length > 0 &&
+                (isValidSolanaAddress(recipient) ||
+                  isValidTelegramUsername(recipient)) && (
+                  <button
+                    onClick={() => handleRecipientSelect(recipient)}
+                    className="w-full flex items-center px-3 py-1 rounded-2xl active:bg-black/[0.03] transition-colors"
+                  >
+                    <div className="py-1.5 pr-3">
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center"
+                        style={{ background: "rgba(99, 102, 241, 0.1)" }}
+                      >
+                        <svg
+                          width="24"
+                          height="24"
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M15.8333 5.83333V3.33333C15.8333 3.11232 15.7455 2.90036 15.5893 2.74408C15.433 2.5878 15.221 2.5 15 2.5H4.16667C3.72464 2.5 3.30072 2.67559 2.98816 2.98816C2.67559 3.30072 2.5 3.72464 2.5 4.16667C2.5 4.60869 2.67559 5.03262 2.98816 5.34518C3.30072 5.65774 3.72464 5.83333 4.16667 5.83333H16.6667C16.8877 5.83333 17.0996 5.92113 17.2559 6.07741C17.4122 6.23369 17.5 6.44565 17.5 6.66667V10M17.5 10H15C14.558 10 14.1341 10.1756 13.8215 10.4882C13.5089 10.8007 13.3333 11.2246 13.3333 11.6667C13.3333 12.1087 13.5089 12.5326 13.8215 12.8452C14.1341 13.1577 14.558 13.3333 15 13.3333H17.5C17.721 13.3333 17.933 13.2455 18.0893 13.0893C18.2455 12.933 18.3333 12.721 18.3333 12.5V10.8333C18.3333 10.6123 18.2455 10.4004 18.0893 10.2441C17.933 10.0878 17.721 10 17.5 10Z"
+                            stroke="#6366f1"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M2.5 4.16656V15.8332C2.5 16.2753 2.67559 16.6992 2.98816 17.0117C3.30072 17.3243 3.72464 17.4999 4.16667 17.4999H16.6667C16.8877 17.4999 17.0996 17.4121 17.2559 17.2558C17.4122 17.0995 17.5 16.8876 17.5 16.6666V13.3332"
+                            stroke="#6366f1"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-1 flex flex-col gap-0.5 py-2.5">
-                    <p className="text-base text-black text-left leading-5">Send to address</p>
-                    <p
-                      className="text-[13px] text-left leading-4 truncate max-w-[200px]"
-                      style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                    >
-                      {recipient}
-                    </p>
-                  </div>
-                  <div className="pl-3 py-2 flex items-center justify-center h-10">
-                    <ChevronIcon />
-                  </div>
-                </button>
-              )}
+                    <div className="flex-1 flex flex-col gap-0.5 py-2.5">
+                      <p className="text-base text-black text-left leading-5">
+                        Send to address
+                      </p>
+                      <p
+                        className="text-[13px] text-left leading-4 truncate max-w-[200px]"
+                        style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                      >
+                        {recipient}
+                      </p>
+                    </div>
+                    <div className="pl-3 py-2 flex items-center justify-center h-10">
+                      <ChevronIcon />
+                    </div>
+                  </button>
+                )}
             </div>
           </div>
 
@@ -1092,10 +1185,10 @@ export default function SendSheet({
             style={{
               transform: `translateX(${(3 - step) * 100}%)`,
               opacity: step === 3 ? 1 : 0,
-              pointerEvents: step === 3 ? 'auto' : 'none',
+              pointerEvents: step === 3 ? "auto" : "none",
             }}
             onKeyDownCapture={(e) => {
-              if (e.key === 'Backspace') {
+              if (e.key === "Backspace") {
                 e.stopPropagation();
                 if (!amountStr) {
                   e.preventDefault();
@@ -1129,11 +1222,14 @@ export default function SendSheet({
                     }, 50);
                   }}
                   onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
+                    const val = e.target.value.replace(",", ".");
                     if (/^[0-9]*\.?[0-9]*$/.test(val)) {
-                      if (val.includes('.')) {
-                        const [, decimals] = val.split('.');
-                        if (decimals && decimals.length > (currency === 'SOL' ? 4 : 2)) {
+                      if (val.includes(".")) {
+                        const [, decimals] = val.split(".");
+                        if (
+                          decimals &&
+                          decimals.length > (currency === "SOL" ? 4 : 2)
+                        ) {
                           return;
                         }
                       }
@@ -1141,7 +1237,7 @@ export default function SendSheet({
                     }
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Backspace') {
+                    if (e.key === "Backspace") {
                       e.stopPropagation();
                       e.nativeEvent.stopImmediatePropagation();
                       if (!amountStr) {
@@ -1158,15 +1254,21 @@ export default function SendSheet({
                     <p
                       ref={amountTextRef}
                       className="text-[40px] font-semibold leading-[48px]"
-                      style={{ color: insufficientBalance ? "#f9363c" : "#000" }}
+                      style={{
+                        color: insufficientBalance ? "#f9363c" : "#000",
+                      }}
                     >
-                      {amountStr || '\u200B'}
+                      {amountStr || "\u200B"}
                     </p>
                     <p
                       className="text-[28px] font-semibold leading-8 tracking-[0.4px]"
-                      style={{ color: insufficientBalance ? "#f9363c" : "rgba(60, 60, 67, 0.6)" }}
+                      style={{
+                        color: insufficientBalance
+                          ? "#f9363c"
+                          : "rgba(60, 60, 67, 0.6)",
+                      }}
                     >
-                      {currency === 'SOL' ? tokenSymbol : currency}
+                      {currency === "SOL" ? tokenSymbol : currency}
                     </p>
                     {/* Caret */}
                     <div
@@ -1174,7 +1276,7 @@ export default function SendSheet({
                       style={{
                         left: `${caretLeft}px`,
                         background: "#f9363c",
-                        animation: 'blink 1s step-end infinite',
+                        animation: "blink 1s step-end infinite",
                       }}
                     />
                   </div>
@@ -1191,14 +1293,14 @@ export default function SendSheet({
                       if (amountStr) {
                         const val = parseFloat(amountStr);
                         if (!isNaN(val)) {
-                          if (currency === 'SOL') {
+                          if (currency === "SOL") {
                             setAmountStr((val * solPriceUsd).toFixed(2));
                           } else {
                             setAmountStr((val / solPriceUsd).toFixed(4));
                           }
                         }
                       }
-                      setCurrency(currency === 'SOL' ? 'USD' : 'SOL');
+                      setCurrency(currency === "SOL" ? "USD" : "SOL");
                     }}
                     disabled={isSolPriceLoading || !solPriceUsd}
                     className="z-20 shrink-0 mb-1 disabled:opacity-20 disabled:pointer-events-none"
@@ -1210,23 +1312,38 @@ export default function SendSheet({
                 {/* Secondary display */}
                 <p
                   className="text-base leading-5 h-[22px]"
-                  style={{ color: insufficientBalance ? "#f9363c" : "rgba(60, 60, 67, 0.6)" }}
+                  style={{
+                    color: insufficientBalance
+                      ? "#f9363c"
+                      : "rgba(60, 60, 67, 0.6)",
+                  }}
                 >
                   {insufficientBalance
                     ? "Not enough coins"
-                    : `1 ${currency === 'SOL' ? tokenSymbol : currency} ≈ ${currency === 'SOL' ? (solPriceUsd ? `$${solPriceUsd.toFixed(2)}` : '$—') : (solPriceUsd ? `${(1 / solPriceUsd).toFixed(6)} ${tokenSymbol}` : `— ${tokenSymbol}`)}`}
+                    : `1 ${currency === "SOL" ? tokenSymbol : currency} ≈ ${
+                        currency === "SOL"
+                          ? solPriceUsd
+                            ? `$${solPriceUsd.toFixed(2)}`
+                            : "$—"
+                          : solPriceUsd
+                          ? `${(1 / solPriceUsd).toFixed(6)} ${tokenSymbol}`
+                          : `— ${tokenSymbol}`
+                      }`}
                 </p>
               </div>
 
               {/* Quick Amount Presets */}
               <div className="flex gap-2 w-full">
-                {[0.1, 0.2, 0.5, 1].map(val => (
+                {[0.1, 0.2, 0.5, 1].map((val) => (
                   <button
                     key={val}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handlePresetAmount(val)}
                     className="flex-1 min-w-[48px] px-3 py-2 rounded-[40px] text-sm font-normal leading-5 text-center transition-all active:opacity-70"
-                    style={{ background: "rgba(249, 54, 60, 0.14)", color: "#f9363c" }}
+                    style={{
+                      background: "rgba(249, 54, 60, 0.14)",
+                      color: "#f9363c",
+                    }}
                   >
                     {val}
                   </button>
@@ -1234,28 +1351,38 @@ export default function SendSheet({
                 <button
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
-                    if (currency === 'SOL') {
-                      const maxVal = truncateDecimals(Math.max(0, balanceInSol - SOLANA_FEE_SOL), 4).replace(/\.?0+$/, '');
-                      handlePresetAmount(maxVal || '0');
+                    if (currency === "SOL") {
+                      const maxVal = truncateDecimals(
+                        Math.max(0, balanceInSol - SOLANA_FEE_SOL),
+                        4
+                      ).replace(/\.?0+$/, "");
+                      handlePresetAmount(maxVal || "0");
                     } else {
-                      const feeUsd = solPriceUsd ? SOLANA_FEE_SOL * solPriceUsd : 0;
-                      const maxVal = balanceInUsd !== null
-                        ? truncateDecimals(Math.max(0, balanceInUsd - feeUsd), 2).replace(/\.?0+$/, '')
-                        : '0';
-                      handlePresetAmount(maxVal || '0');
+                      const feeUsd = solPriceUsd
+                        ? SOLANA_FEE_SOL * solPriceUsd
+                        : 0;
+                      const maxVal =
+                        balanceInUsd !== null
+                          ? truncateDecimals(
+                              Math.max(0, balanceInUsd - feeUsd),
+                              2
+                            ).replace(/\.?0+$/, "")
+                          : "0";
+                      handlePresetAmount(maxVal || "0");
                     }
                   }}
                   className="flex-1 min-w-[48px] px-3 py-2 rounded-[40px] text-sm font-normal leading-5 text-center transition-all active:opacity-70"
-                  style={{ background: "rgba(249, 54, 60, 0.14)", color: "#f9363c" }}
+                  style={{
+                    background: "rgba(249, 54, 60, 0.14)",
+                    color: "#f9363c",
+                  }}
                 >
                   Max
                 </button>
               </div>
 
               {/* Balance Card */}
-              <div
-                className="flex items-center pl-3 pr-4 py-1 overflow-hidden"
-              >
+              <div className="flex items-center pl-3 pr-4 py-1 overflow-hidden">
                 <div className="py-1.5 pr-3">
                   <div className="w-12 h-12 relative">
                     <div className="w-12 h-12 overflow-hidden flex items-center justify-center">
@@ -1295,7 +1422,10 @@ export default function SendSheet({
                     className="text-[13px] leading-4 text-right"
                     style={{ color: "rgba(60, 60, 67, 0.6)" }}
                   >
-                    ~{balanceInUsd !== null ? `$${truncateDecimals(balanceInUsd, 2)}` : "—"}
+                    ~
+                    {balanceInUsd !== null
+                      ? `$${truncateDecimals(balanceInUsd, 2)}`
+                      : "—"}
                   </p>
                 </div>
               </div>
@@ -1308,7 +1438,7 @@ export default function SendSheet({
             style={{
               transform: `translateX(${(4 - step) * 100}%)`,
               opacity: step === 4 ? 1 : 0,
-              pointerEvents: step === 4 ? 'auto' : 'none',
+              pointerEvents: step === 4 ? "auto" : "none",
             }}
           >
             {/* Amount Display */}
@@ -1318,12 +1448,16 @@ export default function SendSheet({
                   <p className="text-[40px] font-semibold leading-[48px] text-black">
                     {(() => {
                       const val = parseFloat(amountStr);
-                      if (isNaN(val)) return '0';
-                      if (currency === 'USD') {
-                        if (!solPriceUsd) return '0';
-                        return (val / solPriceUsd).toFixed(4).replace(/\.?0+$/, '') || '0';
+                      if (isNaN(val)) return "0";
+                      if (currency === "USD") {
+                        if (!solPriceUsd) return "0";
+                        return (
+                          (val / solPriceUsd)
+                            .toFixed(4)
+                            .replace(/\.?0+$/, "") || "0"
+                        );
                       }
-                      return amountStr || '0';
+                      return amountStr || "0";
                     })()}
                   </p>
                   <p
@@ -1339,19 +1473,25 @@ export default function SendSheet({
                 >
                   {(() => {
                     const val = parseFloat(amountStr);
-                    if (isNaN(val)) return '≈$0.00';
+                    if (isNaN(val)) return "≈$0.00";
                     const usdVal =
-                      currency === 'SOL'
+                      currency === "SOL"
                         ? solPriceUsd
                           ? val * solPriceUsd
                           : null
                         : val;
-                    if (usdVal === null) return '≈$—';
-                    return `≈$${usdVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    if (usdVal === null) return "≈$—";
+                    return `≈$${usdVal.toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`;
                   })()}
                 </p>
-                {recipient.startsWith('@') && (
-                  <p className="text-[11px] leading-[14px] mt-1" style={{ color: "#eab308" }}>
+                {recipient.startsWith("@") && (
+                  <p
+                    className="text-[11px] leading-[14px] mt-1"
+                    style={{ color: "#eab308" }}
+                  >
                     ⚠️ Usernames are case-sensitive. Double-check spelling.
                   </p>
                 )}
@@ -1373,9 +1513,14 @@ export default function SendSheet({
                     Transfer fee
                   </p>
                   <div className="flex items-baseline text-base leading-5">
-                    <span className="text-black">{SOLANA_FEE_SOL.toFixed(6).replace(/\.?0+$/, '')} {tokenSymbol}</span>
+                    <span className="text-black">
+                      {SOLANA_FEE_SOL.toFixed(6).replace(/\.?0+$/, "")}{" "}
+                      {tokenSymbol}
+                    </span>
                     <span style={{ color: "rgba(60, 60, 67, 0.6)" }}>
-                      {solanaFeeUsd !== null ? ` ≈ $${solanaFeeUsd.toFixed(2)}` : " ≈ $—"}
+                      {solanaFeeUsd !== null
+                        ? ` ≈ $${solanaFeeUsd.toFixed(2)}`
+                        : " ≈ $—"}
                     </span>
                   </div>
                 </div>
@@ -1397,38 +1542,51 @@ export default function SendSheet({
                     <span className="text-black">
                       {(() => {
                         const val = parseFloat(amountStr);
-                        const feeStr = SOLANA_FEE_SOL.toFixed(6).replace(/\.?0+$/, '');
+                        const feeStr = SOLANA_FEE_SOL.toFixed(6).replace(
+                          /\.?0+$/,
+                          ""
+                        );
                         if (isNaN(val)) {
                           return `${feeStr} ${tokenSymbol}`;
                         }
                         const solVal =
-                          currency === 'SOL'
+                          currency === "SOL"
                             ? val
                             : solPriceUsd
-                              ? val / solPriceUsd
-                              : NaN;
+                            ? val / solPriceUsd
+                            : NaN;
                         const total = solVal + SOLANA_FEE_SOL;
                         if (isNaN(total)) return `${feeStr} ${tokenSymbol}`;
-                        return `${total.toFixed(6).replace(/\.?0+$/, '')} ${tokenSymbol}`;
+                        return `${total
+                          .toFixed(6)
+                          .replace(/\.?0+$/, "")} ${tokenSymbol}`;
                       })()}
                     </span>
                     <span style={{ color: "rgba(60, 60, 67, 0.6)" }}>
                       {(() => {
                         const val = parseFloat(amountStr);
                         if (isNaN(val)) {
-                          return solanaFeeUsd !== null ? ` ≈ $${solanaFeeUsd.toFixed(2)}` : " ≈ $—";
+                          return solanaFeeUsd !== null
+                            ? ` ≈ $${solanaFeeUsd.toFixed(2)}`
+                            : " ≈ $—";
                         }
                         const usdVal =
-                          currency === 'SOL'
+                          currency === "SOL"
                             ? solPriceUsd
                               ? val * solPriceUsd
                               : null
                             : val;
                         if (usdVal === null) {
-                          return ' ≈ $—';
+                          return " ≈ $—";
                         }
-                        const totalUsd = solanaFeeUsd !== null ? usdVal + solanaFeeUsd : usdVal;
-                        return ` ≈ $${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                        const totalUsd =
+                          solanaFeeUsd !== null
+                            ? usdVal + solanaFeeUsd
+                            : usdVal;
+                        return ` ≈ $${totalUsd.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`;
                       })()}
                     </span>
                   </div>
@@ -1443,7 +1601,7 @@ export default function SendSheet({
             style={{
               transform: `translateX(${(5 - step) * 100}%)`,
               opacity: step === 5 ? 1 : 0,
-              pointerEvents: step === 5 ? 'auto' : 'none',
+              pointerEvents: step === 5 ? "auto" : "none",
             }}
           >
             {isSending ? (
@@ -1466,7 +1624,8 @@ export default function SendSheet({
                     className="text-base leading-5"
                     style={{ color: "rgba(60, 60, 67, 0.6)" }}
                   >
-                    Your transaction is being processed and will be completed shortly
+                    Your transaction is being processed and will be completed
+                    shortly
                   </p>
                 </div>
               </div>
@@ -1493,9 +1652,10 @@ export default function SendSheet({
                     style={{ color: "rgba(60, 60, 67, 0.6)" }}
                   >
                     <span className="text-black">
-                      {sentAmountSol?.toFixed(4).replace(/\.?0+$/, '') || '0'} {tokenSymbol}
-                    </span>
-                    {" "}successfully sent to{" "}
+                      {sentAmountSol?.toFixed(4).replace(/\.?0+$/, "") || "0"}{" "}
+                      {tokenSymbol}
+                    </span>{" "}
+                    successfully sent to{" "}
                     <span className="text-black">{pillAddress}</span>
                   </p>
                 </div>

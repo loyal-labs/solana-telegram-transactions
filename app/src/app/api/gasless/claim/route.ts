@@ -22,9 +22,9 @@ import {
   getSessionPda,
   getTelegramVerificationProgram,
 } from "@/lib/solana/solana-helpers";
+import { getGaslessKeypair } from "@/lib/solana/wallet/gasless-keypair.server";
 import {
   getCustomWalletProvider,
-  getGaslessKeypair,
   getGaslessPublicKey,
 } from "@/lib/solana/wallet/wallet-details";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";

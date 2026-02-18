@@ -1,16 +1,15 @@
 import { PublicKey } from "@solana/web3.js";
 
+import { NATIVE_SOL_DECIMALS, NATIVE_SOL_MINT } from "@/lib/constants";
+
 import { fetchJson } from "../../core/http";
 import { getSolanaEnv } from "../rpc/connection";
 import {
   SECURE_DEVNET_RPC_URL,
   SECURE_MAINNET_RPC_URL,
+  TESTNET_RPC_URL,
 } from "../rpc/constants";
-import {
-  CACHE_TTL_MS,
-  NATIVE_SOL_DECIMALS,
-  NATIVE_SOL_MINT,
-} from "./constants";
+import { CACHE_TTL_MS } from "./constants";
 import { resolveTokenIcon } from "./resolve-token-info";
 import type {
   CachedHoldings,

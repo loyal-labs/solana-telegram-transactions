@@ -10,6 +10,7 @@ import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
   NATIVE_SOL_MINT,
   SOL_PRICE_USD,
+  SOLANA_FEE_SOL,
   SOLANA_USDC_MINT_DEVNET,
   SOLANA_USDC_MINT_MAINNET,
   SOLANA_USDT_MINT_MAINNET,
@@ -683,7 +684,10 @@ export default function SwapSheet({
       if (percentage === 100 && fromToken.symbol === "SOL") {
         amount = Math.max(0, amount - SOLANA_FEE_SOL);
       }
-      const formatted = amount.toFixed(getMaxDecimals(fromToken.symbol)).replace(/\.?0+$/, "") || "0";
+      const formatted =
+        amount
+          .toFixed(getMaxDecimals(fromToken.symbol))
+          .replace(/\.?0+$/, "") || "0";
       setAmountStr(formatted);
       amountInputRef.current?.focus({ preventScroll: true });
     },
@@ -719,10 +723,17 @@ export default function SwapSheet({
     (percentage: number) => {
       hapticFeedback.impactOccurred("light");
       let amount = secureToken.balance * (percentage / 100);
-      if (percentage === 100 && secureToken.symbol === "SOL" && secureDirection === "shield") {
+      if (
+        percentage === 100 &&
+        secureToken.symbol === "SOL" &&
+        secureDirection === "shield"
+      ) {
         amount = Math.max(0, amount - SOLANA_FEE_SOL);
       }
-      const formatted = amount.toFixed(getMaxDecimals(secureToken.symbol)).replace(/\.?0+$/, "") || "0";
+      const formatted =
+        amount
+          .toFixed(getMaxDecimals(secureToken.symbol))
+          .replace(/\.?0+$/, "") || "0";
       setSecureAmountStr(formatted);
       secureAmountInputRef.current?.focus({ preventScroll: true });
     },

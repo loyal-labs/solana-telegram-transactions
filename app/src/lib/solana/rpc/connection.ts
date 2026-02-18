@@ -1,5 +1,7 @@
 import { Connection } from "@solana/web3.js";
 
+import { publicEnv } from "@/lib/core/config/public";
+
 import {
   LOCALNET_RPC_URL,
   LOCALNET_RPC_WS,
@@ -11,8 +13,6 @@ import {
   TESTNET_RPC_WS,
 } from "./constants";
 import type { SolanaEnv } from "./types";
-
-const DEFAULT_SOLANA_ENV: SolanaEnv = "devnet";
 
 export const getSolanaEnv = (): SolanaEnv => {
   if (typeof window !== "undefined") {
@@ -26,16 +26,8 @@ export const getSolanaEnv = (): SolanaEnv => {
       return override;
     }
   }
-  const env = process.env.NEXT_PUBLIC_SOLANA_ENV;
-  if (
-    env === "mainnet" ||
-    env === "testnet" ||
-    env === "devnet" ||
-    env === "localnet"
-  ) {
-    return env;
-  }
-  return DEFAULT_SOLANA_ENV;
+
+  return publicEnv.solanaEnv;
 };
 
 export const getEndpoints = (

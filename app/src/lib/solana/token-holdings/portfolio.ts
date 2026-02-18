@@ -1,6 +1,5 @@
-import { SOL_PRICE_USD } from "@/lib/constants";
+import { NATIVE_SOL_MINT, SOL_PRICE_USD } from "@/lib/constants";
 
-import { NATIVE_SOL_MINT } from "./constants";
 import type { TokenHolding } from "./types";
 
 export type PortfolioTotals = {
@@ -27,7 +26,8 @@ function getEffectiveSolPriceUsd(
     (typeof fromHoldings === "number" && Number.isFinite(fromHoldings)
       ? fromHoldings
       : null) ??
-    (typeof fallbackSolPriceUsd === "number" && Number.isFinite(fallbackSolPriceUsd)
+    (typeof fallbackSolPriceUsd === "number" &&
+    Number.isFinite(fallbackSolPriceUsd)
       ? fallbackSolPriceUsd
       : null) ??
     (typeof SOL_PRICE_USD === "number" && Number.isFinite(SOL_PRICE_USD)
@@ -38,10 +38,16 @@ function getEffectiveSolPriceUsd(
 }
 
 function holdingUsdValue(holding: TokenHolding): number | null {
-  if (typeof holding.valueUsd === "number" && Number.isFinite(holding.valueUsd)) {
+  if (
+    typeof holding.valueUsd === "number" &&
+    Number.isFinite(holding.valueUsd)
+  ) {
     return holding.valueUsd;
   }
-  if (typeof holding.priceUsd === "number" && Number.isFinite(holding.priceUsd)) {
+  if (
+    typeof holding.priceUsd === "number" &&
+    Number.isFinite(holding.priceUsd)
+  ) {
     const value = holding.balance * holding.priceUsd;
     return Number.isFinite(value) ? value : null;
   }
@@ -85,4 +91,3 @@ export function computePortfolioTotals(
     effectiveSolPriceUsd,
   };
 }
-
