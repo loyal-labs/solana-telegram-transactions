@@ -28,6 +28,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTelegramUser } from "@/components/telegram/TelegramProvider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resolveEndpoint } from "@/lib/core/api";
+import { publicEnv } from "@/lib/core/config/public";
 import { getSolanaEnv } from "@/lib/solana/rpc/connection";
 import type { SolanaEnv } from "@/lib/solana/rpc/types";
 import { setLoyalEmojiStatus } from "@/lib/telegram/mini-app/emoji-status";
@@ -633,6 +634,11 @@ export default function ProfilePage() {
               onClick={handleSupport}
             />
           </SettingsSection>
+
+          {/* Build Info */}
+          <p className="text-center text-xs text-black/20 pt-2">
+            {publicEnv.gitBranch} @ {publicEnv.gitCommitHash}
+          </p>
         </div>
       </div>
     </main>
