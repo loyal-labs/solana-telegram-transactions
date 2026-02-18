@@ -112,7 +112,7 @@ export type InsertUser = typeof users.$inferInsert;
 | --------------------- | -------------------------------------------------------------------------------------- |
 | `admins`              | Global admin whitelist for privileged community actions (activate/deactivate/settings) |
 | `users`               | Telegram users who interact with the bot                                               |
-| `communities`         | Activated Telegram group chats for message tracking                                    |
+| `communities`         | Telegram communities tracked by the bot lifecycle; may be pre-activation/inactive      |
 | `communityMembers`    | Many-to-many: users ↔ communities                                                      |
 | `messages`            | Chat messages from tracked communities                                                 |
 | `summaries`           | AI-generated daily chat summaries with topics                                          |
