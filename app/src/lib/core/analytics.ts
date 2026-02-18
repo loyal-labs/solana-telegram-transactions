@@ -13,6 +13,7 @@ type AnalyticsProperties = Record<string, unknown>;
 
 let mixpanel: typeof MixpanelType | null = null;
 let isInitialized = false;
+let initPromise: Promise<void> | null = null;
 let lastIdentifiedDistinctId: string | null = null;
 let lastProfiledDistinctId: string | null = null;
 let lastRegisteredDistinctId: string | null = null;
@@ -54,35 +55,42 @@ async function loadMixpanel(): Promise<typeof MixpanelType | null> {
   }
 }
 
-export async function initAnalytics(): Promise<void> {
+export function initAnalytics(): Promise<void> {
   if (!canTrack() || isInitialized) {
-    return;
+    return Promise.resolve();
   }
 
-  const mp = await loadMixpanel();
-  if (!mp) return;
+  if (initPromise) return initPromise;
 
-  const isDevnetDemoMode = publicEnv.solanaEnv === "devnet";
+  initPromise = (async () => {
+    const mp = await loadMixpanel();
+    if (!mp) return;
 
-  try {
-    mp.init(publicEnv.mixpanelToken!, {
-      api_host: getApiHost(),
-      debug: isDevnetDemoMode,
-      track_pageview: false,
-      persistence: "localStorage",
-    });
+    const isDevnetDemoMode = publicEnv.solanaEnv === "devnet";
 
-    if (isDevnetDemoMode) {
-      mp.register({
-        app_mode: "demo",
-        app_solana_env: "devnet",
+    try {
+      mp.init(publicEnv.mixpanelToken!, {
+        api_host: getApiHost(),
+        debug: isDevnetDemoMode,
+        track_pageview: false,
+        persistence: "localStorage",
       });
-    }
 
-    isInitialized = true;
-  } catch (error) {
-    console.error("Failed to initialize Mixpanel", error);
-  }
+      if (isDevnetDemoMode) {
+        mp.register({
+          app_mode: "demo",
+          app_solana_env: "devnet",
+        });
+      }
+
+      isInitialized = true;
+    } catch (error) {
+      console.error("Failed to initialize Mixpanel", error);
+      initPromise = null;
+    }
+  })();
+
+  return initPromise;
 }
 
 function setUserProfileOnce(properties: AnalyticsProperties): void {
@@ -267,6 +275,7 @@ export function setUserProfile(properties: AnalyticsProperties): void {
 
 export function __resetAnalyticsStateForTests(): void {
   isInitialized = false;
+  initPromise = null;
   mixpanel = null;
   lastIdentifiedDistinctId = null;
   lastProfiledDistinctId = null;

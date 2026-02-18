@@ -145,6 +145,13 @@ export async function PATCH(req: Request) {
       })
       .returning();
 
+    if (!updated) {
+      return NextResponse.json(
+        { error: "Failed to update settings" },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json({
       notifications: updated.notifications,
       model: updated.model,
