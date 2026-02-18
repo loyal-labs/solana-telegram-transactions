@@ -2,10 +2,7 @@
 
 import {
   hapticFeedback,
-  useSignal,
-  viewport,
 } from "@telegram-apps/sdk-react";
-import type { Signal } from "@telegram-apps/signals";
 import { motion, type PanInfo } from "framer-motion";
 import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -15,6 +12,7 @@ import { getAvatarColor, getFirstLetter } from "@/components/summaries/avatar-ut
 import { MOCK_SUMMARIES } from "@/components/summaries/mock-data";
 import { useSummaries } from "@/components/summaries/SummariesContext";
 import ConnectBotModal from "@/components/telegram/ConnectBotModal";
+import { useDeviceSafeAreaTop } from "@/hooks/useTelegramSafeArea";
 import { publicEnv } from "@/lib/core/config/public";
 
 type GroupChat = {
@@ -218,9 +216,7 @@ const ACTIVE_TAB_STORAGE_KEY = "summaries_active_tab";
 
 export default function SummariesPage() {
   const router = useRouter();
-  const safeAreaInsetTop = useSignal(
-    viewport.safeAreaInsetTop as Signal<number>
-  );
+  const safeAreaInsetTop = useDeviceSafeAreaTop();
   const headerHeight = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
 
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
