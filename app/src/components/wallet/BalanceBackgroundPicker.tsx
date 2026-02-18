@@ -89,6 +89,7 @@ export default function BalanceBackgroundPicker({
   const isClosing = useRef(false);
 
   const [previewBg, setPreviewBg] = useState<string | null>(selectedBg);
+  const previewBgRef = useRef<string | null>(previewBg);
   const confirmedBgRef = useRef<string | null | undefined>(undefined);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -125,14 +126,21 @@ export default function BalanceBackgroundPicker({
     }
   }, [open]);
 
-  // Telegram Main Button
+  // Keep preview ref in sync so button onClick always reads the latest value
+  useEffect(() => {
+    previewBgRef.current = previewBg;
+  }, [previewBg]);
+
+  // Telegram Main Button — shown/hidden only by open+show, not by previewBg.
+  // Using previewBgRef avoids teardown+recreate on every scroll, which caused
+  // the "Done" button to flicker/disappear on slower Android devices.
   useEffect(() => {
     if (!open || !show) return;
     hideSecondaryButton();
     showMainButton({
       text: "Done",
       onClick: () => {
-        confirmedBgRef.current = previewBg;
+        confirmedBgRef.current = previewBgRef.current;
         closeSheet();
       },
     });
@@ -140,7 +148,7 @@ export default function BalanceBackgroundPicker({
       hideMainButton();
       hideSecondaryButton();
     };
-  }, [open, show, previewBg]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, show]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll to initial selection on open
   useEffect(() => {
