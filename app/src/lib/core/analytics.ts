@@ -1,6 +1,6 @@
 "use client";
 
-import mixpanel from "mixpanel-browser";
+import type MixpanelType from "mixpanel-browser";
 
 import { publicEnv } from "@/lib/core/config/public";
 import type {
@@ -11,7 +11,9 @@ import { parseSummaryFeedStartParam } from "@/lib/telegram/mini-app/start-param"
 
 type AnalyticsProperties = Record<string, unknown>;
 
+let mixpanel: typeof MixpanelType | null = null;
 let isInitialized = false;
+let initPromise: Promise<void> | null = null;
 let lastIdentifiedDistinctId: string | null = null;
 let lastProfiledDistinctId: string | null = null;
 let lastRegisteredDistinctId: string | null = null;
@@ -41,35 +43,58 @@ function getApiHost(): string {
   return `${window.location.origin}${publicEnv.mixpanelProxyPath}`;
 }
 
-export function initAnalytics(): void {
-  if (!canTrack() || isInitialized) {
-    return;
-  }
-
-  const isDevnetDemoMode = publicEnv.solanaEnv === "devnet";
-
+async function loadMixpanel(): Promise<typeof MixpanelType | null> {
+  if (mixpanel) return mixpanel;
   try {
-    mixpanel.init(publicEnv.mixpanelToken!, {
-      api_host: getApiHost(),
-      debug: isDevnetDemoMode,
-      track_pageview: false,
-      persistence: "localStorage",
-    });
-
-    if (isDevnetDemoMode) {
-      mixpanel.register({
-        app_mode: "demo",
-        app_solana_env: "devnet",
-      });
-    }
-
-    isInitialized = true;
+    const mod = await import("mixpanel-browser");
+    mixpanel = mod.default;
+    return mixpanel;
   } catch (error) {
-    console.error("Failed to initialize Mixpanel", error);
+    console.error("Failed to load Mixpanel", error);
+    return null;
   }
 }
 
+export function initAnalytics(): Promise<void> {
+  if (!canTrack() || isInitialized) {
+    return Promise.resolve();
+  }
+
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    const mp = await loadMixpanel();
+    if (!mp) return;
+
+    const isDevnetDemoMode = publicEnv.solanaEnv === "devnet";
+
+    try {
+      mp.init(publicEnv.mixpanelToken!, {
+        api_host: getApiHost(),
+        debug: isDevnetDemoMode,
+        track_pageview: false,
+        persistence: "localStorage",
+      });
+
+      if (isDevnetDemoMode) {
+        mp.register({
+          app_mode: "demo",
+          app_solana_env: "devnet",
+        });
+      }
+
+      isInitialized = true;
+    } catch (error) {
+      console.error("Failed to initialize Mixpanel", error);
+      initPromise = null;
+    }
+  })();
+
+  return initPromise;
+}
+
 function setUserProfileOnce(properties: AnalyticsProperties): void {
+  if (!mixpanel) return;
   try {
     mixpanel.people.set_once(properties);
   } catch (error) {
@@ -105,19 +130,19 @@ export function track(event: string, properties?: AnalyticsProperties): void {
     return;
   }
 
-  initAnalytics();
-  if (!isInitialized) {
-    return;
-  }
+  // Fire-and-forget: ensure initialized then track
+  void initAnalytics().then(() => {
+    if (!isInitialized || !mixpanel) return;
 
-  try {
-    mixpanel.track(event, {
-      ...currentLaunchContext,
-      ...(properties ?? {}),
-    });
-  } catch (error) {
-    console.error("Failed to track Mixpanel event", error);
-  }
+    try {
+      mixpanel.track(event, {
+        ...currentLaunchContext,
+        ...(properties ?? {}),
+      });
+    } catch (error) {
+      console.error("Failed to track Mixpanel event", error);
+    }
+  });
 }
 
 export function identifyTelegramUser(identity: TelegramIdentity | null): void {
@@ -125,80 +150,79 @@ export function identifyTelegramUser(identity: TelegramIdentity | null): void {
     return;
   }
 
-  initAnalytics();
-  if (!isInitialized) {
-    return;
-  }
+  void initAnalytics().then(() => {
+    if (!isInitialized || !mixpanel) return;
 
-  const distinctId = `tg:${identity.telegramId}`;
-  const username = normalizeOptionalString(identity.username);
-  const canSkipCompletely =
-    lastIdentifiedDistinctId === distinctId &&
-    lastProfiledDistinctId === distinctId &&
-    lastRegisteredDistinctId === distinctId &&
-    lastRegisteredUsername === username;
+    const distinctId = `tg:${identity.telegramId}`;
+    const username = normalizeOptionalString(identity.username);
+    const canSkipCompletely =
+      lastIdentifiedDistinctId === distinctId &&
+      lastProfiledDistinctId === distinctId &&
+      lastRegisteredDistinctId === distinctId &&
+      lastRegisteredUsername === username;
 
-  if (canSkipCompletely) {
-    return;
-  }
-
-  try {
-    const currentDistinctId = mixpanel.get_distinct_id();
-    if (
-      lastIdentifiedDistinctId !== distinctId &&
-      currentDistinctId !== distinctId
-    ) {
-      mixpanel.identify(distinctId);
+    if (canSkipCompletely) {
+      return;
     }
 
-    mixpanel.register_once({
-      telegram_id: identity.telegramId,
-      identity_provider: TELEGRAM_IDENTITY_PROVIDER,
-    });
+    try {
+      const currentDistinctId = mixpanel.get_distinct_id();
+      if (
+        lastIdentifiedDistinctId !== distinctId &&
+        currentDistinctId !== distinctId
+      ) {
+        mixpanel.identify(distinctId);
+      }
 
-    if (username) {
-      mixpanel.register({
-        telegram_username: username,
-      });
-    }
-
-    if (lastProfiledDistinctId !== distinctId) {
-      const profileProperties: AnalyticsProperties = {
+      mixpanel.register_once({
         telegram_id: identity.telegramId,
         identity_provider: TELEGRAM_IDENTITY_PROVIDER,
-      };
+      });
 
       if (username) {
-        profileProperties.$username = username;
-        profileProperties.telegram_username = username;
-      }
-      if (identity.firstName) {
-        profileProperties.$first_name = identity.firstName;
-      }
-      if (identity.lastName) {
-        profileProperties.$last_name = identity.lastName;
-      }
-      if (identity.photoUrl) {
-        profileProperties.$avatar = identity.photoUrl;
-      }
-      if (identity.languageCode) {
-        profileProperties.$language = identity.languageCode;
-        profileProperties.telegram_language_code = identity.languageCode;
-      }
-      if (identity.isPremium !== undefined) {
-        profileProperties.telegram_is_premium = identity.isPremium;
+        mixpanel.register({
+          telegram_username: username,
+        });
       }
 
-      setUserProfileOnce(profileProperties);
-      lastProfiledDistinctId = distinctId;
+      if (lastProfiledDistinctId !== distinctId) {
+        const profileProperties: AnalyticsProperties = {
+          telegram_id: identity.telegramId,
+          identity_provider: TELEGRAM_IDENTITY_PROVIDER,
+        };
+
+        if (username) {
+          profileProperties.$username = username;
+          profileProperties.telegram_username = username;
+        }
+        if (identity.firstName) {
+          profileProperties.$first_name = identity.firstName;
+        }
+        if (identity.lastName) {
+          profileProperties.$last_name = identity.lastName;
+        }
+        if (identity.photoUrl) {
+          profileProperties.$avatar = identity.photoUrl;
+        }
+        if (identity.languageCode) {
+          profileProperties.$language = identity.languageCode;
+          profileProperties.telegram_language_code = identity.languageCode;
+        }
+        if (identity.isPremium !== undefined) {
+          profileProperties.telegram_is_premium = identity.isPremium;
+        }
+
+        setUserProfileOnce(profileProperties);
+        lastProfiledDistinctId = distinctId;
+      }
+
+      lastIdentifiedDistinctId = distinctId;
+      lastRegisteredDistinctId = distinctId;
+      lastRegisteredUsername = username;
+    } catch (error) {
+      console.error("Failed to identify Telegram Mixpanel user", error);
     }
-
-    lastIdentifiedDistinctId = distinctId;
-    lastRegisteredDistinctId = distinctId;
-    lastRegisteredUsername = username;
-  } catch (error) {
-    console.error("Failed to identify Telegram Mixpanel user", error);
-  }
+  });
 }
 
 export function identify(distinctId: string): void {
@@ -206,16 +230,15 @@ export function identify(distinctId: string): void {
     return;
   }
 
-  initAnalytics();
-  if (!isInitialized) {
-    return;
-  }
+  void initAnalytics().then(() => {
+    if (!isInitialized || !mixpanel) return;
 
-  try {
-    mixpanel.identify(distinctId);
-  } catch (error) {
-    console.error("Failed to identify Mixpanel user", error);
-  }
+    try {
+      mixpanel.identify(distinctId);
+    } catch (error) {
+      console.error("Failed to identify Mixpanel user", error);
+    }
+  });
 }
 
 export function resetAnalytics(): void {
@@ -223,16 +246,15 @@ export function resetAnalytics(): void {
     return;
   }
 
-  initAnalytics();
-  if (!isInitialized) {
-    return;
-  }
+  void initAnalytics().then(() => {
+    if (!isInitialized || !mixpanel) return;
 
-  try {
-    mixpanel.reset();
-  } catch (error) {
-    console.error("Failed to reset Mixpanel user", error);
-  }
+    try {
+      mixpanel.reset();
+    } catch (error) {
+      console.error("Failed to reset Mixpanel user", error);
+    }
+  });
 }
 
 export function setUserProfile(properties: AnalyticsProperties): void {
@@ -240,20 +262,21 @@ export function setUserProfile(properties: AnalyticsProperties): void {
     return;
   }
 
-  initAnalytics();
-  if (!isInitialized) {
-    return;
-  }
+  void initAnalytics().then(() => {
+    if (!isInitialized || !mixpanel) return;
 
-  try {
-    mixpanel.people.set(properties);
-  } catch (error) {
-    console.error("Failed to set Mixpanel profile", error);
-  }
+    try {
+      mixpanel.people.set(properties);
+    } catch (error) {
+      console.error("Failed to set Mixpanel profile", error);
+    }
+  });
 }
 
 export function __resetAnalyticsStateForTests(): void {
   isInitialized = false;
+  initPromise = null;
+  mixpanel = null;
   lastIdentifiedDistinctId = null;
   lastProfiledDistinctId = null;
   lastRegisteredDistinctId = null;

@@ -4,7 +4,8 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import { useCallback, useState } from "react";
 
 import { fetchJson } from "@/lib/core/http";
-import { SWAP_ERRORS, type SwapParams, type SwapResult } from "@/lib/jupiter";
+import { SWAP_ERRORS } from "@/lib/jupiter/constants";
+import type { SwapParams, SwapResult } from "@/lib/jupiter/types";
 
 type OrderApiResponse = {
   transaction: string;

@@ -39,7 +39,7 @@ export default function RootLayout({
           defer
           src="https://cloud.umami.is/script.js"
           data-website-id="f6491a00-a838-4c1d-aa01-4f61ff790967"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>

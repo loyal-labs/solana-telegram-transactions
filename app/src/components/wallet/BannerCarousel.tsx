@@ -133,7 +133,7 @@ export default function BannerCarousel({
     });
 
     return list;
-  }, [isMobilePlatform, router]);
+  }, [isMobilePlatform]); // eslint-disable-line react-hooks/exhaustive-deps -- router is intentionally omitted: it's unstable (new ref each render) and callbacks only use router.push on click, which works from stale closures
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [swipeX, setSwipeX] = useState(0);

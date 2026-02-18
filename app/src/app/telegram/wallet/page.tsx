@@ -16,9 +16,11 @@ import {
 } from "@telegram-apps/sdk-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Brush, Copy, RefreshCcw } from "lucide-react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Confetti from "react-confetti";
+
+const Confetti = dynamic(() => import("react-confetti"), { ssr: false });
 
 import { ScanIcon } from "@/components/ui/icons/ScanIcon";
 import { ActionButton } from "@/components/wallet/ActionButton";
