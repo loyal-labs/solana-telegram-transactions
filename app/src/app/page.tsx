@@ -1,35 +1,40 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { getStartParamRoute } from "@/hooks/useStartParam";
+import {
+  getUnconsumedStartParamRoute,
+  markStartParamConsumed,
+} from "@/hooks/useStartParam";
 import { getCloudValue } from "@/lib/telegram/mini-app/cloud-storage";
 
 const LAST_PAGE_CACHE_KEY = "last_visited_page";
 const SPLASH_DURATION = 2400; // ms - time before redirect
-const DEEPLINK_DELAY = 400; // ms - shorter delay for deeplinks
 
 export default function SplashPage() {
   const router = useRouter();
   const hasRedirected = useRef(false);
 
+  // Detect deeplink synchronously to choose background color before first paint
+  const [deeplinkRoute] = useState<string | undefined>(() => {
+    if (typeof window === "undefined") return undefined;
+    return getUnconsumedStartParamRoute();
+  });
+
   useEffect(() => {
     if (hasRedirected.current) return;
 
+    if (deeplinkRoute) {
+      // Deeplink detected — redirect immediately, no splash animation
+      hasRedirected.current = true;
+      markStartParamConsumed(deeplinkRoute);
+      router.replace(deeplinkRoute);
+      return;
+    }
+
     const redirect = async () => {
-      // 1. Check startParam first (highest priority - deeplinks)
-      const deeplinkRoute = getStartParamRoute();
-
-      if (deeplinkRoute) {
-        hasRedirected.current = true;
-        setTimeout(() => {
-          router.replace(deeplinkRoute);
-        }, DEEPLINK_DELAY);
-        return;
-      }
-
-      // 2. Fall back to saved page from cloud storage
+      // Fall back to saved page from cloud storage
       let targetPage = "/telegram/wallet";
 
       try {
@@ -53,7 +58,12 @@ export default function SplashPage() {
     };
 
     redirect();
-  }, [router]);
+  }, [deeplinkRoute, router]);
+
+  // Deeplink: white screen while redirecting (no splash animation)
+  if (deeplinkRoute) {
+    return <div style={{ background: "#fff", minHeight: "100vh" }} />;
+  }
 
   return (
     <div

@@ -1,22 +1,43 @@
 "use client";
 
-import { Keypair } from "@solana/web3.js";
+import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import { useCallback, useState } from "react";
 
 import { fetchJson } from "@/lib/core/http";
-import { executeSwapTransaction, SWAP_ERRORS, type SwapParams, type SwapResult } from "@/lib/dflow";
+import { SWAP_ERRORS, type SwapParams, type SwapResult } from "@/lib/jupiter";
 
-type QuoteApiResponse = {
+type OrderApiResponse = {
   transaction: string;
-  lastValidBlockHeight: number;
+  requestId: string;
   expectedOutAmount: number;
   priceImpactPct: number;
   inAmount: number;
   outAmount: number;
+  gasless: boolean;
+  swapType: string;
+  error?: string;
+};
+
+type ExecuteApiResponse = {
+  status: "Success" | "Failed";
+  signature: string;
+  code: number;
+  inputAmountResult?: string;
+  outputAmountResult?: string;
   error?: string;
 };
 
 type SwapState = "idle" | "quoting" | "signing" | "confirming";
+
+function signTransaction(
+  base64Transaction: string,
+  keypair: Keypair
+): string {
+  const buffer = Buffer.from(base64Transaction, "base64");
+  const transaction = VersionedTransaction.deserialize(buffer);
+  transaction.sign([keypair]);
+  return Buffer.from(transaction.serialize()).toString("base64");
+}
 
 export function useSwap(getKeypair: () => Promise<Keypair>) {
   const [state, setState] = useState<SwapState>("idle");
@@ -31,8 +52,9 @@ export function useSwap(getKeypair: () => Promise<Keypair>) {
         const keypair = await getKeypair();
         const userPublicKey = keypair.publicKey.toBase58();
 
-        const quoteResponse = await fetchJson<QuoteApiResponse>(
-          "/api/dflow/quote",
+        // Step 1: Get order (quote + unsigned transaction)
+        const orderResponse = await fetchJson<OrderApiResponse>(
+          "/api/jupiter/order",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -47,31 +69,50 @@ export function useSwap(getKeypair: () => Promise<Keypair>) {
           }
         );
 
-        if (quoteResponse.error) {
-          setError(quoteResponse.error);
+        if (orderResponse.error) {
+          setError(orderResponse.error);
           setState("idle");
-          return { success: false, error: quoteResponse.error };
+          return { success: false, error: orderResponse.error };
         }
 
+        // Step 2: Sign transaction client-side
         setState("signing");
+        const signedTransaction = signTransaction(
+          orderResponse.transaction,
+          keypair
+        );
 
-        const result = await executeSwapTransaction(
-          quoteResponse.transaction,
-          keypair,
-          quoteResponse.lastValidBlockHeight,
-          params.fromAmount,
-          params.fromSymbol,
-          quoteResponse.expectedOutAmount,
-          params.toSymbol
+        // Step 3: Execute via Jupiter (handles broadcasting + confirmation)
+        setState("confirming");
+        const executeResponse = await fetchJson<ExecuteApiResponse>(
+          "/api/jupiter/execute",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              signedTransaction,
+              requestId: orderResponse.requestId,
+            }),
+          }
         );
 
         setState("idle");
 
-        if (!result.success && result.error) {
-          setError(result.error);
+        if (executeResponse.status === "Success") {
+          return {
+            success: true,
+            signature: executeResponse.signature,
+            fromAmount: params.fromAmount,
+            fromSymbol: params.fromSymbol,
+            toAmount: orderResponse.expectedOutAmount,
+            toSymbol: params.toSymbol,
+          };
         }
 
-        return result;
+        const errorMsg =
+          executeResponse.error || SWAP_ERRORS.TRANSACTION_FAILED;
+        setError(errorMsg);
+        return { success: false, error: errorMsg };
       } catch (err) {
         console.error("[useSwap] Error:", err);
         const errorMessage =

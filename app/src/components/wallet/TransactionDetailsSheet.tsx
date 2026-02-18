@@ -16,10 +16,16 @@ import { createPortal } from "react-dom";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import { SOLANA_FEE_SOL } from "@/lib/constants";
 import { getDeposit } from "@/lib/solana/deposits/get-deposit";
-import { getExplorerTxUrl, getSolscanAccountUrl } from "@/lib/solana/rpc/explorer";
-import { formatTransactionDate, getStatusText } from "@/lib/solana/wallet/formatters";
+import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
+import type { TokenHolding } from "@/lib/solana/token-holdings";
+import { resolveTokenInfo } from "@/lib/solana/token-holdings/resolve-token-info";
+import {
+  formatTransactionDate,
+  getStatusText,
+} from "@/lib/solana/wallet/formatters";
 import { getWalletProvider } from "@/lib/solana/wallet/wallet-details";
 import {
+  hideAllButtons,
   hideMainButton,
   hideSecondaryButton,
   showMainButton,
@@ -40,6 +46,7 @@ export type TransactionDetailsSheetProps = {
   showSuccess?: boolean;
   showError?: string | null;
   solPriceUsd?: number | null;
+  tokenHoldings?: TokenHolding[];
   onShare?: () => void;
   onCancelDeposit?: (username: string, amount: number) => Promise<void>;
   // Swap transaction props
@@ -79,6 +86,7 @@ export default function TransactionDetailsSheet({
   showSuccess = false,
   showError = null,
   solPriceUsd = null,
+  tokenHoldings = [],
   onShare,
   onCancelDeposit,
   swapFromSymbol,
@@ -153,8 +161,9 @@ export default function TransactionDetailsSheet({
       setIsLoadingDeposit(true);
       try {
         const provider = await getWalletProvider();
+        const transferProgram = getTelegramTransferProgram(provider);
         const username = transaction.recipientUsername!.replace(/^@/, "");
-        const deposit = await getDeposit(provider, username);
+        const deposit = await getDeposit(provider, transferProgram, username);
         setDepositAmount(deposit.amount);
       } catch (error) {
         console.warn("Failed to fetch deposit info:", error);
@@ -240,6 +249,7 @@ export default function TransactionDetailsSheet({
   const closeSheet = useCallback(() => {
     if (isClosing.current) return;
     isClosing.current = true;
+    hideAllButtons();
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
@@ -319,15 +329,38 @@ export default function TransactionDetailsSheet({
   const isStoreTransaction = transaction.transferType === "store";
   const isVerifyTransaction = transaction.transferType === "verify_telegram_init_data";
   const isSpecialTransaction = isStoreTransaction || isVerifyTransaction;
+  const isTokenTransfer =
+    !!transaction.tokenMint && typeof transaction.tokenAmount === "string";
+
   const amountSol = transaction.amountLamports / LAMPORTS_PER_SOL;
-  const usdPrice = solPriceUsd ?? null;
-  const amountUsd = usdPrice === null ? null : amountSol * usdPrice;
+  const solUsdPrice = solPriceUsd ?? null;
+  const amountUsdSol = solUsdPrice === null ? null : amountSol * solUsdPrice;
+
+  const tokenInfo = isTokenTransfer
+    ? resolveTokenInfo(transaction.tokenMint!, tokenHoldings)
+    : null;
+  const tokenPriceUsd = isTokenTransfer
+    ? tokenHoldings.find((h) => h.mint === transaction.tokenMint)?.priceUsd ??
+      null
+    : null;
+  const amountUsdToken =
+    isTokenTransfer && tokenPriceUsd !== null
+      ? (() => {
+          const amt = Number.parseFloat(transaction.tokenAmount!);
+          return Number.isFinite(amt) ? amt * tokenPriceUsd : null;
+        })()
+      : null;
+
+  const mainSymbol = isTokenTransfer ? tokenInfo?.symbol ?? "?" : "SOL";
+  const formattedAmount = isTokenTransfer
+    ? transaction.tokenAmount!
+    : amountSol.toFixed(4).replace(/\.?0+$/, "");
+  const mainAmountUsd = isTokenTransfer ? amountUsdToken : amountUsdSol;
   const networkFeeSol = transaction.networkFeeLamports
     ? transaction.networkFeeLamports / LAMPORTS_PER_SOL
     : SOLANA_FEE_SOL;
-  const networkFeeUsd = usdPrice === null ? null : networkFeeSol * usdPrice;
-
-  const formattedAmount = amountSol.toFixed(4).replace(/\.?0+$/, '');
+  const networkFeeUsd =
+    solUsdPrice === null ? null : networkFeeSol * solUsdPrice;
 
   const displayAddress = isIncoming
     ? (transaction.senderUsername || transaction.sender || "Unknown")
@@ -348,7 +381,8 @@ export default function TransactionDetailsSheet({
       hapticFeedback.impactOccurred("light");
     }
     if (transaction.signature) {
-      window.open(getExplorerTxUrl(transaction.signature), "_blank");
+      const explorerUrl = `https://explorer.solana.com/tx/${transaction.signature}`;
+      window.open(explorerUrl, "_blank");
     }
   };
 
@@ -362,12 +396,12 @@ export default function TransactionDetailsSheet({
       return;
     }
 
-    const shareText = `Transaction: ${isIncoming ? "+" : "-"}${formattedAmount} SOL`;
+    const shareText = `Transaction: ${isIncoming ? "+" : "-"}${formattedAmount} ${mainSymbol}`;
 
     if (shareURL.isAvailable()) {
       const explorerUrl = transaction.signature
-        ? getExplorerTxUrl(transaction.signature)
-        : getSolscanAccountUrl(fullAddress);
+        ? `https://explorer.solana.com/tx/${transaction.signature}`
+        : `https://solscan.io/account/${fullAddress}`;
       shareURL(explorerUrl, shareText);
     } else if (navigator?.clipboard?.writeText) {
       void navigator.clipboard.writeText(shareText);
@@ -486,7 +520,7 @@ export default function TransactionDetailsSheet({
         {/* Content — scrollable */}
         <div
           className="flex-1 overflow-y-auto overscroll-contain"
-          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+          style={{ paddingBottom: Math.max(safeBottom, 24) + 80 }}
         >
           {showError ? (
             /* Error View */
@@ -942,7 +976,7 @@ export default function TransactionDetailsSheet({
                       className="text-[28px] font-semibold leading-8 tracking-[0.4px]"
                       style={{ color: "rgba(60, 60, 67, 0.6)" }}
                     >
-                      SOL
+                      {mainSymbol}
                     </p>
                   </div>
                   {/* USD Value */}
@@ -950,8 +984,8 @@ export default function TransactionDetailsSheet({
                     className="text-base leading-[22px] text-center"
                     style={{ color: "rgba(60, 60, 67, 0.6)" }}
                   >
-                    ≈{amountUsd !== null
-                      ? `$${amountUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    ≈{mainAmountUsd !== null
+                      ? `$${mainAmountUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : "—"}
                   </p>
                   {/* Date */}

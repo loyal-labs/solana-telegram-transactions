@@ -1,10 +1,11 @@
+import { serverEnv } from "../core/config/server";
 import { EncryptedData } from "./types";
 
 const ALGORITHM = "AES-GCM";
 const IV_LENGTH = 12;
 
 async function getKey(): Promise<CryptoKey | null> {
-  const keyBase64 = process.env.MESSAGE_ENCRYPTION_KEY;
+  const keyBase64 = serverEnv.messageEncryptionKey;
   if (!keyBase64) {
     console.error("MESSAGE_ENCRYPTION_KEY environment variable is not set");
     return null;

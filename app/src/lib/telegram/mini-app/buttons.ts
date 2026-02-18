@@ -1,13 +1,6 @@
-import type { SecondaryButtonPosition } from "@telegram-apps/bridge";
-import {
-  hapticFeedback,
-  mainButton,
-  secondaryButton,
-} from "@telegram-apps/sdk-react";
+import { hapticFeedback } from "@telegram-apps/sdk-react";
 
 import { BaseButtonOptions } from "@/types/telegram";
-
-import { isInMiniApp } from "./index";
 
 export type MainButtonOptions = BaseButtonOptions & {
   onClick?: () => void;
@@ -15,154 +8,135 @@ export type MainButtonOptions = BaseButtonOptions & {
 
 export type SecondaryButtonOptions = BaseButtonOptions & {
   onClick?: () => void;
-  position?: SecondaryButtonPosition;
+  position?: string;
 };
 
-let detachMainClick: VoidFunction | null = null;
-let detachSecondaryClick: VoidFunction | null = null;
+// --- Reactive button state store ---
 
-const ensureMainButton = () => {
-  if (!mainButton.mount.isAvailable()) return false;
-
-  if (!mainButton.isMounted()) {
-    mainButton.mount();
-  }
-
-  return true;
+export type SingleButtonState = {
+  text: string;
+  isEnabled: boolean;
+  onClick: (() => void) | null;
+  showLoader: boolean;
 };
 
-const ensureSecondaryButton = () => {
-  if (!secondaryButton.mount.isAvailable()) return false;
-
-  if (!secondaryButton.isMounted()) {
-    secondaryButton.mount();
-  }
-
-  return true;
+export type ButtonBarState = {
+  main: SingleButtonState | null;
+  secondary: SingleButtonState | null;
 };
 
-const buildMainButtonParams = (options: MainButtonOptions) => ({
-  text: options.text,
-  isVisible: true,
-  isEnabled: options.isEnabled ?? true,
-  hasShineEffect: options.hasShineEffect ?? false,
-  isLoaderVisible: Boolean(options.showLoader),
-  ...(options.backgroundColor
-    ? { backgroundColor: options.backgroundColor }
-    : {}),
-  ...(options.textColor ? { textColor: options.textColor } : {}),
-});
+let buttonBarState: ButtonBarState = { main: null, secondary: null };
+const listeners = new Set<() => void>();
 
-const buildSecondaryButtonParams = (options: SecondaryButtonOptions) => ({
-  text: options.text,
-  isVisible: true,
-  isEnabled: options.isEnabled ?? true,
-  hasShineEffect: options.hasShineEffect ?? false,
-  isLoaderVisible: Boolean(options.showLoader),
-  ...(options.backgroundColor
-    ? { backgroundColor: options.backgroundColor }
-    : {}),
-  ...(options.textColor ? { textColor: options.textColor } : {}),
-  ...(options.position ? { position: options.position } : {}),
-});
-
-const bindMainClick = (onClick?: () => void) => {
-  if (!mainButton.onClick.isAvailable()) return;
-
-  if (detachMainClick) {
-    detachMainClick();
-    detachMainClick = null;
+function emitChange() {
+  // Create new reference so useSyncExternalStore detects the change
+  buttonBarState = { ...buttonBarState };
+  for (const listener of listeners) {
+    listener();
   }
+}
 
-  if (onClick) {
-    const handler = () => {
+export function subscribeButtonState(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function getButtonStateSnapshot(): ButtonBarState {
+  return buttonBarState;
+}
+
+// --- Haptic-wrapped click handler ---
+
+function wrapWithHaptic(onClick?: () => void): (() => void) | null {
+  if (!onClick) return null;
+  return () => {
+    try {
       if (hapticFeedback.impactOccurred.isAvailable()) {
         hapticFeedback.impactOccurred("medium");
       }
-      onClick();
-    };
+    } catch {
+      // Haptic not available outside Telegram
+    }
+    onClick();
+  };
+}
 
-    detachMainClick = mainButton.onClick(handler);
-  }
-};
+// --- Immediate DOM sync ---
+// React re-renders are async (useEffect → store update → scheduled render).
+// To avoid the button bar lingering after a modal closes, we directly toggle
+// the DOM element's display before React catches up.
 
-const bindSecondaryClick = (onClick?: () => void) => {
-  if (!secondaryButton.onClick.isAvailable()) return;
+const BUTTON_BAR_ID = "bottom-button-bar";
 
-  if (detachSecondaryClick) {
-    detachSecondaryClick();
-    detachSecondaryClick = null;
-  }
+function syncDomVisibility() {
+  const el = document.getElementById(BUTTON_BAR_ID);
+  if (!el) return;
+  const hasButtons = !!(buttonBarState.main || buttonBarState.secondary);
+  el.style.display = hasButtons ? "flex" : "none";
+}
 
-  if (onClick) {
-    const handler = () => {
-      if (hapticFeedback.impactOccurred.isAvailable()) {
-        hapticFeedback.impactOccurred("medium");
-      }
-      onClick();
-    };
-
-    detachSecondaryClick = secondaryButton.onClick(handler);
-  }
-};
+// --- Public API (unchanged signatures) ---
 
 export const showMainButton = (options: MainButtonOptions): boolean => {
-  if (!isInMiniApp()) return false;
-  if (!ensureMainButton()) return false;
-  if (!mainButton.setParams.isAvailable()) return false;
-
-  mainButton.setParams(buildMainButtonParams(options));
-  bindMainClick(options.onClick);
-
+  buttonBarState = {
+    ...buttonBarState,
+    main: {
+      text: options.text,
+      isEnabled: options.isEnabled ?? true,
+      onClick: wrapWithHaptic(options.onClick),
+      showLoader: options.showLoader ?? false,
+    },
+  };
+  syncDomVisibility();
+  emitChange();
   return true;
 };
 
 export const hideMainButton = (): boolean => {
-  if (detachMainClick) {
-    detachMainClick();
-    detachMainClick = null;
-  }
-
-  if (!isInMiniApp()) return false;
-  if (!mainButton.setParams.isAvailable()) return false;
-
-  mainButton.setParams({
-    isVisible: false,
-    isLoaderVisible: false,
-  });
-
+  buttonBarState = {
+    ...buttonBarState,
+    main: null,
+  };
+  syncDomVisibility();
+  emitChange();
   return true;
 };
 
 export const showSecondaryButton = (
   options: SecondaryButtonOptions
 ): boolean => {
-  if (!isInMiniApp()) return false;
-  if (!ensureSecondaryButton()) return false;
-  if (!secondaryButton.setParams.isAvailable()) return false;
-
-  secondaryButton.setParams(buildSecondaryButtonParams(options));
-  bindSecondaryClick(options.onClick);
-
+  buttonBarState = {
+    ...buttonBarState,
+    secondary: {
+      text: options.text,
+      isEnabled: options.isEnabled ?? true,
+      onClick: wrapWithHaptic(options.onClick),
+      showLoader: options.showLoader ?? false,
+    },
+  };
+  syncDomVisibility();
+  emitChange();
   return true;
 };
 
 export const hideSecondaryButton = (): boolean => {
-  if (detachSecondaryClick) {
-    detachSecondaryClick();
-    detachSecondaryClick = null;
-  }
-
-  if (!isInMiniApp()) return false;
-  if (!secondaryButton.setParams.isAvailable()) return false;
-
-  secondaryButton.setParams({
-    isVisible: false,
-    isLoaderVisible: false,
-  });
-
+  buttonBarState = {
+    ...buttonBarState,
+    secondary: null,
+  };
+  syncDomVisibility();
+  emitChange();
   return true;
 };
+
+export const hideAllButtons = (): void => {
+  hideMainButton();
+  hideSecondaryButton();
+};
+
+// --- Preset button combinations ---
 
 type ButtonStyleOptions = Pick<
   BaseButtonOptions,

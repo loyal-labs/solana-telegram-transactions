@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+if [ $# -lt 1 ]; then
+  echo "Missing commit message file path." >&2
+  exit 1
+fi
+
+if [ ! -x "./node_modules/.bin/commitlint" ]; then
+  echo "commitlint is required. Install dependencies with: bun install" >&2
+  exit 1
+fi
+
+./node_modules/.bin/commitlint --edit "$1"

@@ -75,3 +75,7 @@ sdk/private-transactions/tests/.mint-cache.json
 CHANGELOG-*.md
 
 CLAUDE.md
+
+docs/plans
+
+.entire/

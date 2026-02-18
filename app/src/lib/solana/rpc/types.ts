@@ -20,6 +20,17 @@ export type WalletTransfer = {
   feeLamports: number;
   status: "success" | "failed";
   counterparty?: string;
+  // Optional SPL token transfer fields (used when type === "transfer" and tx is a pure token transfer)
+  tokenMint?: string;
+  tokenAmount?: string; // human-readable (decimal-adjusted, truncated for display)
+  tokenDecimals?: number;
+  // Optional swap fields (used when type === "swap")
+  swapFromMint?: string;
+  swapFromAmount?: string; // human-readable
+  swapFromDecimals?: number;
+  swapToMint?: string;
+  swapToAmount?: string; // human-readable
+  swapToDecimals?: number;
 };
 
 export type GetAccountTransactionHistoryOptions = {

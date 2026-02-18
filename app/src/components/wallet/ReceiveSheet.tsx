@@ -15,6 +15,7 @@ import { createPortal } from "react-dom";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import { getSolscanAccountUrl } from "@/lib/solana/rpc/explorer";
 import { getWalletPublicKey } from "@/lib/solana/wallet/wallet-details";
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 
 // iOS-style sheet timing (shared with TokensSheet)
 const SHEET_TRANSITION = "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)";
@@ -267,6 +268,7 @@ export default function ReceiveSheet({
   const closeSheet = useCallback(() => {
     if (isClosing.current) return;
     isClosing.current = true;
+    hideAllButtons();
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
@@ -442,7 +444,7 @@ export default function ReceiveSheet({
         {/* Content — scrollable */}
         <div
           className="flex-1 overflow-y-auto overscroll-contain"
-          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+          style={{ paddingBottom: Math.max(safeBottom, 24) + 80 }}
         >
           <div className="flex flex-col items-center pt-8">
             {/* Solana Icon */}

@@ -1,9 +1,10 @@
 import { InlineKeyboard } from "grammy";
 
 import { resolveEndpoint } from "@/lib/core/api";
+import { MINI_APP_LINK } from "@/lib/telegram/constants";
 
 import { getBot } from "./bot";
-import { MINI_APP_LINK } from "./constants";
+import { isNotificationsEnabledForTelegramUser } from "./user-settings";
 
 const buildOgImageUrl = (
   sender: string,
@@ -27,6 +28,13 @@ export const sendTransactionNotification = async (
   solAmount: number,
   usdAmount: number
 ): Promise<void> => {
+  const notificationsEnabled = await isNotificationsEnabledForTelegramUser(
+    BigInt(userId)
+  );
+  if (!notificationsEnabled) {
+    return;
+  }
+
   const bot = await getBot();
   const photoUrl = buildOgImageUrl(
     senderUsername,

@@ -1,7 +1,8 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -43,6 +44,21 @@ export type SenderType = "user" | "bot" | "system";
 export type ThreadStatus = "active" | "archived" | "closed";
 
 /**
+ * Allowed user actions for summary voting.
+ */
+export type SummaryVoteAction = "LIKE" | "DISLIKE";
+
+/**
+ * Allowed time-based summary notification frequency options.
+ */
+export type SummaryNotificationTimeHours = 24 | 48;
+
+/**
+ * Allowed message-count summary notification frequency options.
+ */
+export type SummaryNotificationMessageCount = 500 | 1000;
+
+/**
  * Encrypted message content stored as JSONB.
  * Supports text now, extensible for images/voice later.
  */
@@ -63,8 +79,9 @@ export type EncryptedMessageContent = {
 // ============================================================================
 
 /**
- * Global admins whitelist - Telegram users who can activate communities.
- * Must be both in this table AND a Telegram group admin to activate.
+ * Global admins whitelist for privileged community actions.
+ * Users in this table can activate/deactivate communities and manage
+ * notification settings.
  */
 export const admins = pgTable(
   "admins",
@@ -106,8 +123,31 @@ export const users = pgTable(
 );
 
 /**
+ * Per-user bot settings for private chat behavior.
+ * Linked one-to-one with users.
+ */
+export const userSettings = pgTable(
+  "user_settings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    model: text("model").default("phala/gpt-oss-120b").notNull(),
+    notifications: boolean("notifications").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [uniqueIndex("user_settings_user_id_idx").on(table.userId)]
+);
+
+/**
  * Telegram group chats activated for message tracking.
- * Only users in the admins whitelist can activate communities.
+ * Privileged management actions are controlled by the admins whitelist.
  */
 export const communities = pgTable(
   "communities",
@@ -117,6 +157,18 @@ export const communities = pgTable(
     chatTitle: text("chat_title").notNull(),
     activatedBy: bigint("activated_by", { mode: "bigint" }).notNull(),
     isActive: boolean("is_active").default(true).notNull(),
+    summaryNotificationsEnabled: boolean("summary_notifications_enabled")
+      .default(true)
+      .notNull(),
+    summaryNotificationTimeHours: integer("summary_notification_time_hours")
+      .$type<SummaryNotificationTimeHours | null>()
+      .default(24),
+    summaryNotificationMessageCount: integer(
+      "summary_notification_message_count"
+    )
+      .$type<SummaryNotificationMessageCount | null>()
+      .default(null),
+    isPublic: boolean("is_public").default(true).notNull(),
     settings: jsonb("settings").default({}).notNull(),
     activatedAt: timestamp("activated_at", { withTimezone: true })
       .defaultNow()
@@ -128,6 +180,14 @@ export const communities = pgTable(
   (table) => [
     uniqueIndex("communities_chat_id_idx").on(table.chatId),
     index("communities_is_active_idx").on(table.isActive),
+    check(
+      "communities_summary_notification_time_hours_check",
+      sql`${table.summaryNotificationTimeHours} IS NULL OR ${table.summaryNotificationTimeHours} IN (24, 48)`
+    ),
+    check(
+      "communities_summary_notification_message_count_check",
+      sql`${table.summaryNotificationMessageCount} IS NULL OR ${table.summaryNotificationMessageCount} IN (500, 1000)`
+    ),
   ]
 );
 
@@ -215,6 +275,12 @@ export const summaries = pgTable(
       .$type<{ title: string; content: string; sources: string[] }[]>()
       .notNull(),
     oneliner: text("oneliner").notNull(),
+    triggerType: text("trigger_type"),
+    triggerKey: text("trigger_key"),
+    notificationSentAt: timestamp("notification_sent_at", { withTimezone: true }),
+    notificationClaimedAt: timestamp("notification_claimed_at", {
+      withTimezone: true,
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -224,6 +290,49 @@ export const summaries = pgTable(
     index("summaries_community_created_idx").on(
       table.communityId,
       table.createdAt
+    ),
+    uniqueIndex("summaries_community_trigger_key_uidx")
+      .on(table.communityId, table.triggerKey)
+      .where(sql`${table.triggerKey} IS NOT NULL`),
+    index("summaries_trigger_key_idx").on(table.triggerKey),
+    index("summaries_notification_sent_idx").on(
+      table.triggerKey,
+      table.notificationSentAt
+    ),
+  ]
+);
+
+/**
+ * User votes for summaries.
+ * A user can vote only once per summary.
+ */
+export const summaryVotes = pgTable(
+  "summary_votes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    summaryId: uuid("summary_id")
+      .notNull()
+      .references(() => summaries.id, { onDelete: "cascade" }),
+    action: text("action").$type<SummaryVoteAction>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("summary_votes_summary_user_uidx").on(
+      table.summaryId,
+      table.userId
+    ),
+    index("summary_votes_summary_action_idx").on(table.summaryId, table.action),
+    check(
+      "summary_votes_action_check",
+      sql`${table.action} IN ('LIKE', 'DISLIKE')`
     ),
   ]
 );
@@ -331,6 +440,15 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   communityMemberships: many(communityMembers),
   businessConnection: one(businessConnections),
   botThreads: many(botThreads),
+  summaryVotes: many(summaryVotes),
+  userSettings: one(userSettings),
+}));
+
+export const userSettingsRelations = relations(userSettings, ({ one }) => ({
+  user: one(users, {
+    fields: [userSettings.userId],
+    references: [users.id],
+  }),
 }));
 
 export const communitiesRelations = relations(communities, ({ many }) => ({
@@ -364,10 +482,22 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
-export const summariesRelations = relations(summaries, ({ one }) => ({
+export const summariesRelations = relations(summaries, ({ one, many }) => ({
   community: one(communities, {
     fields: [summaries.communityId],
     references: [communities.id],
+  }),
+  summaryVotes: many(summaryVotes),
+}));
+
+export const summaryVotesRelations = relations(summaryVotes, ({ one }) => ({
+  summary: one(summaries, {
+    fields: [summaryVotes.summaryId],
+    references: [summaries.id],
+  }),
+  user: one(users, {
+    fields: [summaryVotes.userId],
+    references: [users.id],
   }),
 }));
 
@@ -406,6 +536,9 @@ export type InsertAdmin = typeof admins.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+export type UserSettings = typeof userSettings.$inferSelect;
+export type InsertUserSettings = typeof userSettings.$inferInsert;
+
 export type Community = typeof communities.$inferSelect;
 export type InsertCommunity = typeof communities.$inferInsert;
 
@@ -417,6 +550,9 @@ export type InsertMessage = typeof messages.$inferInsert;
 
 export type Summary = typeof summaries.$inferSelect;
 export type InsertSummary = typeof summaries.$inferInsert;
+
+export type SummaryVote = typeof summaryVotes.$inferSelect;
+export type InsertSummaryVote = typeof summaryVotes.$inferInsert;
 
 export type BusinessConnection = typeof businessConnections.$inferSelect;
 export type InsertBusinessConnection = typeof businessConnections.$inferInsert;

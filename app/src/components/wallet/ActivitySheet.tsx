@@ -13,10 +13,13 @@ import {
 import { createPortal } from "react-dom";
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+import type { TokenHolding } from "@/lib/solana/token-holdings";
+import { resolveTokenInfo } from "@/lib/solana/token-holdings/resolve-token-info";
 import {
   formatSenderAddress,
   formatTransactionAmount,
 } from "@/lib/solana/wallet/formatters";
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 import type { IncomingTransaction, Transaction } from "@/types/wallet";
 
 const ITEMS_PER_PAGE = 10;
@@ -28,6 +31,7 @@ export type ActivitySheetProps = {
   incomingTransactions: IncomingTransaction[];
   onTransactionClick: (transaction: Transaction) => void;
   isLoading?: boolean;
+  tokenHoldings?: TokenHolding[];
 };
 
 type GroupedTransactions = {
@@ -75,6 +79,7 @@ export default function ActivitySheet({
   incomingTransactions,
   onTransactionClick,
   isLoading = false,
+  tokenHoldings = [],
 }: ActivitySheetProps) {
   const { bottom: safeBottom } = useTelegramSafeArea();
   const [mounted, setMounted] = useState(false);
@@ -183,6 +188,7 @@ export default function ActivitySheet({
   const closeSheet = useCallback(() => {
     if (isClosing.current) return;
     isClosing.current = true;
+    hideAllButtons();
 
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
@@ -330,7 +336,7 @@ export default function ActivitySheet({
           ref={scrollContainerRef}
           onScroll={handleScroll}
           className="flex-1 overflow-y-auto overscroll-contain"
-          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+          style={{ paddingBottom: Math.max(safeBottom, 24) + 80 }}
         >
           {isLoading ? (
             <div className="flex flex-col px-4">
@@ -453,6 +459,14 @@ export default function ActivitySheet({
                         ? "#f9363c"
                         : "black";
                     const timestamp = new Date(transaction.timestamp);
+                    const isTokenTransfer =
+                      !!transaction.tokenMint &&
+                      typeof transaction.tokenAmount === "string";
+                    const tokenInfo = isTokenTransfer
+                      ? resolveTokenInfo(transaction.tokenMint!, tokenHoldings)
+                      : null;
+                    const tokenAmountText =
+                      isTokenTransfer ? transaction.tokenAmount : null;
 
                     // Compact view for store/verify transactions
                     if (transferTypeLabel !== null) {
@@ -490,6 +504,91 @@ export default function ActivitySheet({
                       );
                     }
 
+                    // Swap transaction view
+                    if (transaction.transferType === "swap") {
+                      const toInfo = transaction.swapToMint
+                        ? resolveTokenInfo(transaction.swapToMint, tokenHoldings)
+                        : null;
+                      const fromSymbol =
+                        transaction.swapFromSymbol ||
+                        (transaction.swapFromMint
+                          ? resolveTokenInfo(transaction.swapFromMint, tokenHoldings).symbol
+                          : "?");
+                      const toSymbol =
+                        transaction.swapToSymbol ||
+                        (toInfo ? toInfo.symbol : "?");
+                      const toIcon = toInfo?.icon || "/tokens/solana-sol-logo.png";
+                      const fromInfo = transaction.swapFromMint
+                        ? resolveTokenInfo(transaction.swapFromMint, tokenHoldings)
+                        : null;
+                      const fromIcon = fromInfo?.icon || "/tokens/solana-sol-logo.png";
+                      const toAmount = transaction.swapToAmount;
+
+                      return (
+                        <button
+                          key={transaction.id}
+                          onClick={() => onTransactionClick(transaction)}
+                          className="flex items-center px-4 w-full text-left active:opacity-70 transition-opacity"
+                        >
+                          {/* Swap token icons - from (back) + to (front) */}
+                          <div className="py-1.5 pr-3">
+                            <div className="w-12 h-12 relative">
+                              <div className="absolute left-0.5 top-0.5 w-7 h-7 rounded-full border-2 border-white overflow-hidden bg-[#f2f2f7]">
+                                <Image
+                                  src={fromIcon}
+                                  alt={fromSymbol}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div className="absolute right-0.5 bottom-0.5 w-7 h-7 rounded-full border-2 border-white overflow-hidden bg-[#f2f2f7]">
+                                <Image
+                                  src={toIcon}
+                                  alt={toSymbol}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Text */}
+                          <div className="flex-1 py-2.5 flex flex-col gap-0.5 min-w-0">
+                            <p className="text-base text-black leading-5">
+                              Swap
+                            </p>
+                            <p
+                              className="text-[13px] leading-4 truncate"
+                              style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                            >
+                              {fromSymbol} to {toSymbol}
+                            </p>
+                          </div>
+
+                          {/* Amount + Time */}
+                          <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3 shrink-0">
+                            <p
+                              className="text-base leading-5"
+                              style={{ color: "#32e55e" }}
+                            >
+                              {toAmount != null
+                                ? `+${toAmount.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${toSymbol}`
+                                : "Swap"}
+                            </p>
+                            <p
+                              className="text-[13px] leading-4"
+                              style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                            >
+                              {timestamp.toLocaleTimeString([], {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    }
+
                     // Secure/Unshield transaction view
                     if (isSecureOrUnshield) {
                       return (
@@ -501,7 +600,7 @@ export default function ActivitySheet({
                           {/* Icon */}
                           <div className="py-1.5 pr-3">
                             <div className="w-12 h-12 relative">
-                              <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                              <div className="absolute left-0 top-0 w-8 h-8 rounded-full overflow-hidden bg-[#f2f2f7]">
                                 <Image
                                   src={transaction.secureTokenIcon || "/tokens/solana-sol-logo.png"}
                                   alt={transaction.secureTokenSymbol || "Token"}
@@ -509,23 +608,21 @@ export default function ActivitySheet({
                                   className="object-cover"
                                 />
                               </div>
-                              {isSecureTransaction && (
-                                <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
-                                  <Image
-                                    src="/Shield.svg"
-                                    alt="Shield"
-                                    width={20}
-                                    height={20}
-                                  />
-                                </div>
-                              )}
+                              <div className="absolute bottom-0 right-0 w-8 h-8">
+                                <Image
+                                  src={isSecureTransaction ? "/icons/Shield_32.png" : "/icons/Unshield_32.png"}
+                                  alt={isSecureTransaction ? "Shielded" : "Unshielded"}
+                                  width={32}
+                                  height={32}
+                                />
+                              </div>
                             </div>
                           </div>
 
                           {/* Text */}
                           <div className="flex-1 py-2.5 flex flex-col gap-0.5 min-w-0">
                             <p className="text-base text-black leading-5">
-                              {isSecureTransaction ? "Secure" : "Unshield"}
+                              {isSecureTransaction ? "Shielded" : "Unshielded"}
                             </p>
                             <p
                               className="text-[13px] leading-4 truncate"
@@ -578,10 +675,10 @@ export default function ActivitySheet({
                           ) : (
                             <div className="w-12 h-12 rounded-full overflow-hidden relative">
                               <Image
-                                src="/tokens/solana-sol-logo.png"
-                                alt="SOL"
+                                src={tokenInfo?.icon || "/tokens/solana-sol-logo.png"}
+                                alt={tokenInfo?.symbol || "SOL"}
                                 fill
-                                className="object-cover"
+                                className="object-contain"
                               />
                             </div>
                           )}
@@ -612,10 +709,9 @@ export default function ActivitySheet({
                             style={{ color: amountColor }}
                           >
                             {amountPrefix}
-                            {formatTransactionAmount(
-                              transaction.amountLamports,
-                            )}{" "}
-                            SOL
+                            {isTokenTransfer
+                              ? `${tokenAmountText ?? "0"} ${tokenInfo?.symbol ?? ""}`.trim()
+                              : `${formatTransactionAmount(transaction.amountLamports)} SOL`}
                           </p>
                           <p
                             className="text-[13px] leading-4"

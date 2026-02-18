@@ -11,11 +11,20 @@ import type { Signal } from "@telegram-apps/signals";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  SUMMARIES_ANALYTICS_EVENTS,
+  SUMMARIES_ANALYTICS_PATH,
+  SUMMARY_SELECTION_SOURCES,
+  type SummarySelectionSource,
+} from "@/app/telegram/summaries/summaries-analytics";
+import { track } from "@/lib/core/analytics";
+
 import { getAvatarColor, getFirstLetter } from "./avatar-utils";
 import DatePicker from "./DatePicker";
 
 export type ChatSummary = {
   id: string;
+  chatId?: string;
   title: string;
   messageCount?: number;
   createdAt?: string;
@@ -32,15 +41,17 @@ export type ChatSummary = {
 // Source avatars component (overlapping circles)
 function SourceAvatars({ sources }: { sources: string[] }) {
   return (
-    <div className="flex items-center h-12">
+    <div className="flex items-end pt-3">
       <div className="flex items-center">
         {sources.slice(0, 3).map((source, index) => (
           <div
             key={source}
-            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium text-white border-2 border-[#242427]"
+            className="rounded-full flex items-center justify-center text-[10px] font-medium text-white"
             style={{
+              width: 28,
+              height: 28,
               backgroundColor: getAvatarColor(source),
-              marginLeft: index > 0 ? -4 : 0,
+              marginRight: -2,
               zIndex: sources.length - index,
             }}
           >
@@ -52,17 +63,32 @@ function SourceAvatars({ sources }: { sources: string[] }) {
   );
 }
 
+// Empty state for today when no summaries available
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center px-8 py-16">
+      <img
+        src="/dogs/dog-green.png"
+        alt=""
+        className="w-16 h-16 object-contain mb-4 opacity-60"
+      />
+      <p className="text-[15px] text-center" style={{ color: "rgba(60,60,67,0.6)" }}>
+        Summary for today is being created...
+      </p>
+    </div>
+  );
+}
+
 // Topic card component
 function TopicCard({ topic }: { topic: ChatSummary["topics"][0] }) {
   return (
-    <div className="bg-[#242427] rounded-2xl px-3 pt-4 pb-2 overflow-hidden">
-      {/* Topic Title */}
-      <h2 className="text-xl font-semibold text-white leading-7 pb-2">
+    <div className="bg-[#F2F2F7] overflow-hidden" style={{ borderRadius: 26, padding: 16 }}>
+      <h2 className="font-semibold text-black pb-3" style={{ fontSize: 20, lineHeight: "24px" }}>
         {topic.title}
       </h2>
-      {/* Content */}
-      <p className="text-base text-white leading-7">{topic.content}</p>
-      {/* Source Avatars */}
+      <p className="font-normal" style={{ fontSize: 15, lineHeight: "20px", color: "rgba(60,60,67,0.8)" }}>
+        {topic.content}
+      </p>
       <SourceAvatars sources={topic.sources} />
     </div>
   );
@@ -125,25 +151,27 @@ function getTopicsForDate(
 }
 
 export type SummaryFeedProps = {
-  /** Initial chat/summary ID to display */
-  initialChatId?: string;
+  /** Initial summary ID to focus (deeplink entry) */
+  initialSummaryId?: string;
   /** All summaries for the group (pre-fetched) */
   summaries?: ChatSummary[];
+  /** Telegram community chat ID for tracking */
+  groupChatId?: string;
   /** Group title (optional, derived from summaries if not provided) */
   groupTitle?: string;
 };
 
 export default function SummaryFeed({
-  initialChatId,
+  initialSummaryId,
   summaries: initialSummaries,
+  groupChatId,
   groupTitle: initialGroupTitle,
 }: SummaryFeedProps) {
   const router = useRouter();
   const safeAreaInsetTop = useSignal(
     viewport.safeAreaInsetTop as Signal<number>
   );
-  // Calculate header height to determine available space
-  const headerHeight = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
+  const topOffset = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [summaries, setSummaries] = useState<ChatSummary[]>(
@@ -151,6 +179,13 @@ export default function SummaryFeed({
   );
   const [isLoading, setIsLoading] = useState(!initialSummaries);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!initialSummaries) return;
+    setSummaries(initialSummaries);
+    setIsLoading(false);
+    setError(null);
+  }, [initialSummaries]);
 
   // Fetch summaries from API if not provided
   useEffect(() => {
@@ -177,14 +212,12 @@ export default function SummaryFeed({
     fetchSummaries();
   }, [initialSummaries]);
 
-  // Get group title from summaries
   const groupTitle = useMemo(() => {
     if (initialGroupTitle) return initialGroupTitle;
     if (summaries.length > 0) return summaries[0].title;
     return "Chat Summary";
   }, [initialGroupTitle, summaries]);
 
-  // Get group photo from summaries (all summaries share the same community photo)
   const groupPhoto = useMemo(() => {
     if (summaries.length === 0) return null;
     const first = summaries[0];
@@ -197,31 +230,97 @@ export default function SummaryFeed({
     return null;
   }, [summaries]);
 
-  // Group summaries by date
   const summariesByDate = useMemo(
     () => groupSummariesByDate(summaries),
     [summaries]
   );
 
-  // Get available dates
   const availableDates = useMemo(
     () => getAvailableDates(summaries),
     [summaries]
   );
 
-  // Selected date state - default to most recent date with summaries
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return availableDates[0] || toDateKey(new Date().toISOString());
   });
-
-  // Update selected date when available dates change
-  useEffect(() => {
-    if (availableDates.length > 0 && !availableDates.includes(selectedDate)) {
-      setSelectedDate(availableDates[0]);
+  const initialSummaryDate = useMemo(() => {
+    if (!initialSummaryId) {
+      return undefined;
     }
-  }, [availableDates, selectedDate]);
 
-  // Get data for selected date
+    const summary = summaries.find((item) => item.id === initialSummaryId);
+    if (!summary?.createdAt) {
+      return undefined;
+    }
+
+    return toDateKey(summary.createdAt);
+  }, [initialSummaryId, summaries]);
+  const pendingSelectionSourceRef = useRef<SummarySelectionSource>(
+    SUMMARY_SELECTION_SOURCES.initial
+  );
+  const hasTrackedInitialViewRef = useRef(false);
+  const hasAppliedInitialSummarySelectionRef = useRef(false);
+
+  useEffect(() => {
+    hasAppliedInitialSummarySelectionRef.current = false;
+  }, [initialSummaryId]);
+
+  // Only reset selectedDate when the data itself changes (not on every selectedDate change)
+  useEffect(() => {
+    if (availableDates.length > 0) {
+      setSelectedDate(prev => {
+        const todayKey = toDateKey(new Date().toISOString());
+        // Keep current selection if it has data or is today
+        if (availableDates.includes(prev) || prev === todayKey) return prev;
+        // Otherwise default to most recent
+        return availableDates[0];
+      });
+    }
+  }, [availableDates]);
+
+  useEffect(() => {
+    if (hasAppliedInitialSummarySelectionRef.current) {
+      return;
+    }
+
+    if (!initialSummaryId) {
+      hasAppliedInitialSummarySelectionRef.current = true;
+      return;
+    }
+
+    if (initialSummaryDate) {
+      setSelectedDate(initialSummaryDate);
+      hasAppliedInitialSummarySelectionRef.current = true;
+      return;
+    }
+
+    // If the data has loaded and we still cannot resolve summaryId, fallback to default date.
+    if (!isLoading) {
+      hasAppliedInitialSummarySelectionRef.current = true;
+    }
+  }, [initialSummaryId, initialSummaryDate, isLoading]);
+
+  useEffect(() => {
+    if (!groupChatId || !groupTitle || !selectedDate) {
+      return;
+    }
+
+    const selectionSource = hasTrackedInitialViewRef.current
+      ? pendingSelectionSourceRef.current
+      : SUMMARY_SELECTION_SOURCES.initial;
+
+    track(SUMMARIES_ANALYTICS_EVENTS.viewCommunitySummaryDay, {
+      path: SUMMARIES_ANALYTICS_PATH,
+      community_chat_id: groupChatId,
+      community_title: groupTitle,
+      summary_date: selectedDate,
+      selection_source: selectionSource,
+    });
+
+    hasTrackedInitialViewRef.current = true;
+    pendingSelectionSourceRef.current = SUMMARY_SELECTION_SOURCES.initial;
+  }, [groupChatId, groupTitle, selectedDate]);
+
   const messageCount = useMemo(
     () => getMessageCountForDate(summariesByDate, selectedDate),
     [summariesByDate, selectedDate]
@@ -232,7 +331,6 @@ export default function SummaryFeed({
     [summariesByDate, selectedDate]
   );
 
-  // Get adjacent dates' topics for peek effect during swipe
   const { prevTopics, nextTopics } = useMemo(() => {
     const currentIndex = availableDates.indexOf(selectedDate);
     const prevDate = currentIndex < availableDates.length - 1 ? availableDates[currentIndex + 1] : null;
@@ -245,12 +343,10 @@ export default function SummaryFeed({
 
   // Setup Telegram back button and disable vertical swipe to close
   useEffect(() => {
-    // Disable vertical swipe to close the app
     if (swipeBehavior.disableVertical.isAvailable()) {
       swipeBehavior.disableVertical();
     }
 
-    // Mount and show back button
     try {
       backButton.mount();
     } catch {
@@ -272,11 +368,9 @@ export default function SummaryFeed({
     }
 
     return () => {
-      // Re-enable vertical swipe when leaving
       if (swipeBehavior.enableVertical.isAvailable()) {
         swipeBehavior.enableVertical();
       }
-      // Hide and unmount back button
       if (backButton.hide.isAvailable()) {
         backButton.hide();
       }
@@ -291,6 +385,51 @@ export default function SummaryFeed({
     };
   }, [router]);
 
+  // Header hide/show on content scroll
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
+  const lastContentScrollTopRef = useRef(0);
+  const headerInnerRef = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  // Measure header height
+  useEffect(() => {
+    const el = headerInnerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      setHeaderHeight(entries[0].contentRect.height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const handleContentScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const currentScrollTop = container.scrollTop;
+    const maxScroll = container.scrollHeight - container.clientHeight;
+
+    // Ignore WebKit rubber-band overscroll (negative or beyond max)
+    if (currentScrollTop < 0 || currentScrollTop > maxScroll) {
+      return;
+    }
+
+    const delta = currentScrollTop - lastContentScrollTopRef.current;
+
+    // Only trigger after meaningful scroll (avoid micro-jitter)
+    if (Math.abs(delta) < 4) return;
+
+    if (delta > 0 && currentScrollTop > 20) {
+      // Scrolling down — hide timeline
+      setIsHeaderHidden(true);
+    } else if (delta < -2 && currentScrollTop < maxScroll) {
+      // Scrolling up (but not during bottom bounce) — show timeline
+      setIsHeaderHidden(false);
+    }
+
+    lastContentScrollTopRef.current = currentScrollTop;
+  }, []);
+
   // Slide animation state
   const [slideDirection, setSlideDirection] = useState<"left" | "right" | null>(
     null
@@ -302,13 +441,7 @@ export default function SummaryFeed({
   // Swipe detection for content area
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const isSwipingRef = useRef(false);
-  const [swipeX, setSwipeX] = useState(0); // Track horizontal drag offset
-
-  // Date picker collapse state based on scroll
-  const [isDatePickerCollapsed, setIsDatePickerCollapsed] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const lastScrollTopRef = useRef(0);
-  const scrollThresholdRef = useRef(0); // Accumulate scroll delta before triggering
+  const [swipeX, setSwipeX] = useState(0);
 
   // Navigate to adjacent date with data
   const navigateToAdjacentDate = useCallback(
@@ -318,10 +451,8 @@ export default function SummaryFeed({
 
       let targetDate: string | null = null;
       if (direction === "prev" && currentIndex < availableDates.length - 1) {
-        // Older date (availableDates is sorted newest first)
         targetDate = availableDates[currentIndex + 1];
       } else if (direction === "next" && currentIndex > 0) {
-        // Newer date
         targetDate = availableDates[currentIndex - 1];
       }
 
@@ -329,14 +460,13 @@ export default function SummaryFeed({
         if (hapticFeedback.impactOccurred.isAvailable()) {
           hapticFeedback.impactOccurred("light");
         }
-        // Trigger date selection with proper direction
+        pendingSelectionSourceRef.current = SUMMARY_SELECTION_SOURCES.swipe;
         const slideDir = direction === "next" ? "left" : "right";
         setOldTopics(topics);
         setSlideDirection(slideDir);
         setIsSliding(true);
         setSelectedDate(targetDate);
         prevDateRef.current = targetDate;
-        setIsScrolled(false);
 
         if (scrollContainerRef.current) {
           scrollContainerRef.current.scrollTop = 0;
@@ -351,10 +481,8 @@ export default function SummaryFeed({
     [availableDates, selectedDate, topics]
   );
 
-  // Swipe threshold to trigger date change
   const SWIPE_THRESHOLD = 50;
 
-  // Handle touch events for swipe detection with visual feedback
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartRef.current = {
       x: e.touches[0].clientX,
@@ -369,31 +497,24 @@ export default function SummaryFeed({
     const deltaX = e.touches[0].clientX - touchStartRef.current.x;
     const deltaY = e.touches[0].clientY - touchStartRef.current.y;
 
-    // Determine if this is a horizontal swipe (not vertical scroll)
     if (!isSwipingRef.current && Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
       isSwipingRef.current = true;
     }
 
-    // Apply visual feedback during horizontal swipe
     if (isSwipingRef.current) {
-      // Check if we can navigate in this direction
       const currentIndex = availableDates.indexOf(selectedDate);
-      const canGoNext = currentIndex > 0; // newer date
-      const canGoPrev = currentIndex < availableDates.length - 1; // older date
+      const canGoNext = currentIndex > 0;
+      const canGoPrev = currentIndex < availableDates.length - 1;
 
-      // Apply resistance if can't go in that direction
       let adjustedDelta = deltaX;
       if ((deltaX < 0 && !canGoNext) || (deltaX > 0 && !canGoPrev)) {
-        // Rubber band effect - stronger resistance when can't navigate
         adjustedDelta = deltaX * 0.15;
       } else {
-        // Subtle movement - enough to hint but not reveal too much
         adjustedDelta = deltaX * 0.35;
       }
 
       setSwipeX(adjustedDelta);
 
-      // Haptic feedback at threshold
       if (Math.abs(deltaX) >= SWIPE_THRESHOLD && Math.abs(deltaX - (deltaX > 0 ? 5 : -5)) < SWIPE_THRESHOLD) {
         if (hapticFeedback.selectionChanged.isAvailable()) {
           hapticFeedback.selectionChanged();
@@ -409,18 +530,14 @@ export default function SummaryFeed({
       const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
       const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
 
-      // Only trigger if it was a horizontal swipe past threshold
       if (Math.abs(deltaX) > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
         if (deltaX < 0) {
-          // Swipe left = go to newer date
           navigateToAdjacentDate("next");
         } else {
-          // Swipe right = go to older date
           navigateToAdjacentDate("prev");
         }
       }
 
-      // Reset swipe position (animate back if no navigation)
       setSwipeX(0);
       touchStartRef.current = null;
       isSwipingRef.current = false;
@@ -428,73 +545,29 @@ export default function SummaryFeed({
     [navigateToAdjacentDate]
   );
 
-  // Handle content scroll to collapse/expand date picker
-  const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.currentTarget;
-    const scrollTop = target.scrollTop;
-
-    // Track if content is scrolled (for top fade gradient)
-    setIsScrolled(scrollTop > 5);
-
-    // Only enable collapse behavior if content is actually scrollable
-    const isScrollable = target.scrollHeight > target.clientHeight + 50;
-    if (!isScrollable) {
-      // Reset collapsed state if content becomes non-scrollable
-      if (isDatePickerCollapsed) {
-        setIsDatePickerCollapsed(false);
-      }
-      return;
-    }
-
-    const delta = scrollTop - lastScrollTopRef.current;
-    lastScrollTopRef.current = scrollTop;
-
-    // Accumulate scroll delta
-    scrollThresholdRef.current += delta;
-
-    // Collapse when scrolling down past threshold
-    if (scrollThresholdRef.current > 30 && !isDatePickerCollapsed) {
-      setIsDatePickerCollapsed(true);
-      scrollThresholdRef.current = 0;
-    }
-    // Expand when scrolling up past threshold or at top
-    else if ((scrollThresholdRef.current < -20 || scrollTop < 10) && isDatePickerCollapsed) {
-      setIsDatePickerCollapsed(false);
-      scrollThresholdRef.current = 0;
-    }
-
-    // Reset threshold when direction changes
-    if ((delta > 0 && scrollThresholdRef.current < 0) || (delta < 0 && scrollThresholdRef.current > 0)) {
-      scrollThresholdRef.current = delta;
-    }
-  }, [isDatePickerCollapsed]);
-
   // Handle date selection with slide animation
   const handleDateSelect = useCallback(
-    (date: string) => {
+    (
+      date: string,
+      source: SummarySelectionSource = SUMMARY_SELECTION_SOURCES.datePicker
+    ) => {
       if (date === selectedDate) return;
 
-      // Save current topics before switching
+      setIsHeaderHidden(false);
       setOldTopics(topics);
+      pendingSelectionSourceRef.current = source;
 
-      // Determine slide direction based on date comparison
-      // Newer date (right in calendar) = content slides left
-      // Older date (left in calendar) = content slides right
       const direction = date > prevDateRef.current ? "left" : "right";
       setSlideDirection(direction);
       setIsSliding(true);
 
-      // Update selected date
       setSelectedDate(date);
       prevDateRef.current = date;
-      setIsScrolled(false);
 
-      // Reset scroll position
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = 0;
       }
 
-      // End animation after transition (faster: 180ms instead of 300ms)
       setTimeout(() => {
         setIsSliding(false);
         setSlideDirection(null);
@@ -502,6 +575,15 @@ export default function SummaryFeed({
     },
     [selectedDate, topics]
   );
+
+  // Handle "Today" button - always navigate to today
+  const handleTodayClick = useCallback(() => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    const today = toDateKey(new Date().toISOString());
+    handleDateSelect(today, SUMMARY_SELECTION_SOURCES.todayButton);
+  }, [handleDateSelect]);
 
   // Page entrance animation
   const [isPageMounted, setIsPageMounted] = useState(false);
@@ -517,9 +599,9 @@ export default function SummaryFeed({
     return (
       <div
         className="fixed inset-0 flex items-center justify-center"
-        style={{ background: "#000" }}
+        style={{ background: "#fff" }}
       >
-        <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-black/10 border-t-black/40 rounded-full animate-spin" />
       </div>
     );
   }
@@ -528,12 +610,12 @@ export default function SummaryFeed({
     return (
       <div
         className="fixed inset-0 flex flex-col items-center justify-center gap-4"
-        style={{ background: "#000" }}
+        style={{ background: "#fff" }}
       >
-        <p className="text-white/60">{error}</p>
+        <p className="text-black/50">{error}</p>
         <button
           onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-white/10 rounded-lg text-white text-sm"
+          className="px-4 py-2 bg-black/5 rounded-lg text-black text-sm"
         >
           Retry
         </button>
@@ -545,9 +627,9 @@ export default function SummaryFeed({
     return (
       <div
         className="fixed inset-0 flex items-center justify-center"
-        style={{ background: "#000" }}
+        style={{ background: "#fff" }}
       >
-        <p className="text-white/60">No summaries available</p>
+        <p className="text-black/50">No summaries available</p>
       </div>
     );
   }
@@ -557,25 +639,18 @@ export default function SummaryFeed({
 
   return (
     <main
-      className="text-white font-sans overflow-hidden relative flex flex-col"
+      className="text-black font-sans overflow-hidden relative flex flex-col"
       style={{
-        background: "#000",
-        height: `calc(100vh - ${headerHeight}px)`,
+        background: "#fff",
+        height: `calc(100vh - ${topOffset}px)`,
       }}
     >
-      {/* Header Section - Fixed */}
-      <div
-        className="shrink-0 flex flex-col items-center gap-2 px-4 pb-2"
-      >
-        {/* Group Pill */}
+      {/* Header Section - Always visible */}
+      <div className="shrink-0 px-4">
+        {/* Group info row */}
         <div
-          className="flex items-center backdrop-blur-xl rounded-full overflow-hidden"
+          className="flex items-center gap-3 py-2"
           style={{
-            backgroundColor: "rgba(128, 128, 128, 0.1)",
-            paddingLeft: 6,
-            paddingRight: isDatePickerCollapsed ? 12 : 24,
-            paddingTop: 6,
-            paddingBottom: 6,
             opacity: isPageMounted ? 1 : 0,
             transform: isPageMounted ? "translateY(0)" : "translateY(-10px)",
             transition: `all 300ms ${EASE_OUT}`,
@@ -587,71 +662,61 @@ export default function SummaryFeed({
               src={`data:${groupPhoto.mimeType};base64,${groupPhoto.base64}`}
               alt={groupTitle}
               className="rounded-full object-cover shrink-0"
-              style={{
-                width: isDatePickerCollapsed ? 24 : 32,
-                height: isDatePickerCollapsed ? 24 : 32,
-                marginRight: isDatePickerCollapsed ? 8 : 12,
-                transition: `all 300ms ${EASE_OUT}`,
-              }}
+              style={{ width: 44, height: 44 }}
             />
           ) : (
             <div
               className="rounded-full flex items-center justify-center font-medium text-white shrink-0"
-              style={{
-                backgroundColor: avatarColor,
-                width: isDatePickerCollapsed ? 24 : 32,
-                height: isDatePickerCollapsed ? 24 : 32,
-                fontSize: isDatePickerCollapsed ? 11 : 14,
-                marginRight: isDatePickerCollapsed ? 8 : 12,
-                transition: `all 300ms ${EASE_OUT}`,
-              }}
+              style={{ width: 44, height: 44, fontSize: 16, backgroundColor: avatarColor }}
             >
               {firstLetter}
             </div>
           )}
 
-          {/* Text */}
-          <div className="flex flex-col justify-center overflow-hidden">
-            <p
-              className="font-normal text-white whitespace-nowrap"
-              style={{
-                fontSize: isDatePickerCollapsed ? 14 : 16,
-                lineHeight: isDatePickerCollapsed ? "20px" : "20px",
-                transition: `all 300ms ${EASE_OUT}`,
-              }}
-            >
+          {/* Title and subtitle */}
+          <div className="flex-1 min-w-0 py-2.5">
+            <p className="font-medium text-black truncate" style={{ fontSize: 17, lineHeight: "22px" }}>
               {groupTitle}
             </p>
-            <p
-              className="text-[13px] text-white/60 whitespace-nowrap overflow-hidden"
-              style={{
-                lineHeight: "16px",
-                maxHeight: isDatePickerCollapsed ? 0 : 16,
-                opacity: isDatePickerCollapsed ? 0 : 1,
-                transition: `all 300ms ${EASE_OUT}`,
-              }}
-            >
+            <p className="font-normal mt-0.5" style={{ fontSize: 15, lineHeight: "20px", color: "rgba(60,60,67,0.6)" }}>
               {messageCount > 0
                 ? `Summary of ${messageCount.toLocaleString()} messages`
                 : "No messages"}
             </p>
           </div>
-        </div>
 
-        {/* Date Picker */}
+          {/* Today button */}
+          <button
+            onClick={handleTodayClick}
+            className="shrink-0 rounded-full font-medium text-black active:opacity-70 transition-opacity"
+            style={{ fontSize: 17, lineHeight: "22px", height: 44, paddingLeft: 16, paddingRight: 16, backgroundColor: "rgba(249,54,60,0.14)" }}
+          >
+            Today
+          </button>
+        </div>
+      </div>
+
+      {/* Date Picker - Slides up/down on content scroll */}
+      <div
+        className="shrink-0 overflow-hidden"
+        style={{
+          height: isHeaderHidden ? 0 : headerHeight || "auto",
+          transition: headerHeight ? "height 300ms cubic-bezier(0.25, 0.1, 0.25, 1)" : "none",
+        }}
+      >
         <div
-          className="w-full"
+          ref={headerInnerRef}
+          className="pb-2"
           style={{
+            transform: isHeaderHidden ? "translateY(-100%)" : "translateY(0)",
+            transition: "transform 300ms cubic-bezier(0.25, 0.1, 0.25, 1)",
             opacity: isPageMounted ? 1 : 0,
-            transform: isPageMounted ? "translateY(0)" : "translateY(10px)",
-            transition: isPageMounted ? `all 400ms ${EASE_OUT} 100ms` : "none",
           }}
         >
           <DatePicker
             availableDates={availableDates}
             selectedDate={selectedDate}
             onDateSelect={handleDateSelect}
-            collapsed={isDatePickerCollapsed}
           />
         </div>
       </div>
@@ -663,16 +728,6 @@ export default function SummaryFeed({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Fade gradient at top - only show when scrolled */}
-        <div
-          className="absolute top-0 left-0 right-0 h-2 z-10 pointer-events-none transition-opacity duration-150"
-          style={{
-            background:
-              "linear-gradient(to bottom, #000 0%, transparent 100%)",
-            opacity: isScrolled ? 1 : 0,
-          }}
-        />
-
         {/* Sliding container wrapper - carousel with peek */}
         <div
           className="h-full relative"
@@ -688,7 +743,7 @@ export default function SummaryFeed({
               style={{
                 width: "100%",
                 right: "100%",
-                marginRight: -20, // Peek amount
+                marginRight: -20,
               }}
             >
               <div className="flex flex-col gap-3 opacity-60">
@@ -706,7 +761,7 @@ export default function SummaryFeed({
               style={{
                 width: "100%",
                 left: "100%",
-                marginLeft: -20, // Peek amount
+                marginLeft: -20,
               }}
             >
               <div className="flex flex-col gap-3 opacity-60">
@@ -736,9 +791,7 @@ export default function SummaryFeed({
                   ))}
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-40">
-                  <p className="text-white/40 text-sm">No topics for this date</p>
-                </div>
+                <EmptyState />
               )}
               <div className="h-20 shrink-0" />
             </div>
@@ -762,7 +815,6 @@ export default function SummaryFeed({
                 : isPageMounted
                   ? `all 400ms ${EASE_OUT} 150ms`
                   : "none",
-              // Start position for slide-in
               ...(isSliding && {
                 animation:
                   slideDirection === "left"
@@ -778,9 +830,7 @@ export default function SummaryFeed({
                 ))}
               </div>
             ) : (
-              <div className="flex items-center justify-center h-40">
-                <p className="text-white/40 text-sm">No topics for this date</p>
-              </div>
+              <EmptyState />
             )}
 
             {/* Bottom safe area padding */}

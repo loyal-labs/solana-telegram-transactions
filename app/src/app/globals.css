@@ -119,8 +119,8 @@
   html {
     touch-action: manipulation;
     -webkit-text-size-adjust: 100%;
-    background: #000 !important;
-    background-color: #000 !important;
+    background: #fff !important;
+    background-color: #fff !important;
   }
   body {
     @apply bg-background text-foreground;
@@ -128,8 +128,8 @@
     -webkit-user-select: none;
     -webkit-touch-callout: none;
     overscroll-behavior: none;
-    background: #000 !important;
-    background-color: #000 !important;
+    background: #fff !important;
+    background-color: #fff !important;
   }
 }
 

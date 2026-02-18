@@ -12,7 +12,7 @@ Solana Telegram Transactions enables users to deposit SOL for any Telegram usern
 
 ```bash
 bun dev                    # Start dev server (turbopack)
-bun build                  # Production build
+bun run build              # Production build (Next.js)
 bun lint                   # ESLint
 bun db:generate            # Generate Drizzle migrations from schema
 bun db:migrate             # Apply migrations
@@ -52,9 +52,20 @@ anchor test --provider.cluster localnet --skip-local-validator --skip-build --sk
 ### Root Level
 
 ```bash
-npm run lint               # prettier --check
-npm run lint:fix           # prettier -w
+bun run lint               # prettier --check
+bun run lint:fix           # prettier -w
 ```
+
+### Git Hooks
+
+```bash
+./scripts/setup-git-hooks.sh
+```
+
+- Run once per clone/worktree to enable repo hooks.
+- Hooks enforce commit message format (`commit-msg`) and run lint before push (`pre-push`: `cd app && bun run lint`).
+- Temporary bypass (only when necessary): `SKIP_VERIFY=1 git push`
+- CI note: app builds are intentionally not run in GitHub Actions; Vercel is the build/deploy gate.
 
 ## Architecture
 
@@ -75,7 +86,45 @@ npm run lint:fix           # prettier -w
 | `telegram-transfer` | `4ewpzEPF5xrVAHeRkoe7XS1yKFGQBekD7PgFwEz9SaxY` |
 | `telegram-verification` | `9yiphKYd4b69tR1ZPP8rNwtMeUwWgjYXaXdEzyNziNhz` |
 
-### Frontend Library Structure (`/app/src/lib`)
+### Vertical Slice Architecture (Current Implementation + Required Direction)
+
+The current `/app/src` architecture is a hybrid vertical-slice implementation. Feature boundaries are primarily expressed by route segments and feature-scoped component folders:
+
+- Route slices: `/app/src/app/telegram/*` and `/app/src/app/api/*`
+- UI slices: `/app/src/components/wallet`, `/app/src/components/summaries`, `/app/src/components/telegram`
+- Shared cross-slice hooks/types: `/app/src/hooks`, `/app/src/types`
+- Shared integration/domain modules: `/app/src/lib/*`
+
+Current slice mapping:
+
+- **Wallet slice**: `/app/src/app/telegram/wallet/page.tsx` + `/app/src/components/wallet/*` + Solana/Telegram wallet integrations in `/app/src/lib/solana/*` and `/app/src/lib/telegram/mini-app/*`
+- **Summaries slice**: `/app/src/app/telegram/summaries/*` + `/app/src/components/summaries/*` + summaries APIs in `/app/src/app/api/summaries/route.ts`
+- **Telegram platform slice**: `/app/src/app/telegram/layout.tsx` + `/app/src/components/telegram/*` + bot/API modules in `/app/src/lib/telegram/*` and `/app/src/app/api/telegram/*`
+
+Rules for all new feature work:
+
+- Organize by feature first; do not introduce new horizontal folders by technical layer.
+- Extend an existing slice in-place when behavior belongs to wallet/summaries/telegram/profile flows.
+- Keep route handlers and page files as orchestration layers; move reusable business logic out of route/page files and into slice-owned modules.
+- Avoid deep imports across slices (for example, wallet internals imported from summaries).
+- Shared code must be stable and reused by multiple slices before promotion to `/app/src/lib`.
+
+For net-new, substantial features, prefer creating an explicit slice root:
+
+```text
+/app/src/features/<feature-name>/
+  index.ts                 # public entrypoints only
+  ui/
+  server/
+  domain/
+  data/
+  integrations/
+  types.ts
+```
+
+### Shared Platform Libraries (`/app/src/lib`)
+
+Use `/app/src/lib` for cross-slice infrastructure and integration primitives. Existing shared modules include:
 
 | Module | Purpose |
 |--------|---------|
@@ -89,6 +138,10 @@ npm run lint:fix           # prettier -w
 | `telegram/` | User service, bot thread service, bot API handlers |
 | `magicblock/` | SOL/USD price feed via Pyth oracle |
 | `redpill/` | AI chat summaries |
+
+- New feature-specific behavior should stay in its owning slice unless it is clearly shared.
+- Promote code into `/app/src/lib` only after it is proven reusable across multiple slices.
+- Refactor incrementally by slice (wallet, summaries, telegram, etc.), not by file type alone.
 
 ### Key Patterns
 
@@ -119,7 +172,8 @@ Service layer patterns:
   const result = await db.insert(table).values({...}).onConflictDoNothing().returning({ id: table.id });
   if (result.length === 0) { /* query existing record */ }
   ```
-- **Transactions**: Use `db.transaction()` when multiple operations must be atomic
+- **Driver Compatibility (Critical)**: Check `/app/src/lib/core/database.ts` before choosing advanced DB APIs. Do not assume all Drizzle drivers support the same capabilities.
+- **Atomic Multi-step Writes (Neon HTTP)**: This repo uses `drizzle-orm/neon-http`, which does **not** support `db.transaction()`. For atomic multi-statement writes, use `db.batch([...])`. Only use `db.transaction()` if the project is moved to a driver that supports it.
 - **Query Builder**: Prefer `db.query.table.findFirst()` with `with:` for relations over raw SQL
 
 ### Code Patterns
@@ -138,6 +192,130 @@ Service layer patterns:
   });
   ```
 - **Idempotent Operations**: Use `onConflictDoNothing` or `onConflictDoUpdate` to handle duplicate inserts gracefully
+- **Server/Client Boundaries (Critical)**:
+  - Never import `@/lib/core/config/server` from client code or shared barrels consumed by client code.
+  - Keep server-only entrypoints isolated in dedicated modules (e.g. `server.ts` or `*.server.ts`) and import them only from server contexts (`/app/api`, server actions, other server-only modules).
+  - For dual-use modules (client + server), keep `index.ts` client-safe and expose server-only helpers via a separate server entrypoint.
+  - Components imported by `app/src/app/layout.tsx` and other root wrappers must be verified as SSR-safe before merge.
+  - Browser-only SDKs (`@telegram-apps/*`, `window`/`document`/`localStorage` dependent modules, Mixpanel browser SDK, etc.) must be loaded behind `dynamic(..., { ssr: false })` in a Client Component, or via a dedicated client-only wrapper component imported from layout.
+  - If a component must stay client-only but is imported in layout/provider trees, use lazy client entrypoints and keep browser globals behind `useEffect` or client-guarded code paths.
+- **Root Layout Change Checklist**:
+  - After any change to `app/src/app/layout.tsx`, `/app/src/app/**/layout.tsx`, or global provider trees, run `cd app && bun run build`.
+  - Verify production build/`_not-found` prerender path succeeds without `ReferenceError: window is not defined`.
+  - Check changed modules for top-level browser API usage and ensure any browser-only dependencies are behind client-only boundaries.
+
+### Troubleshooting
+
+- **Runtime vs Code Mismatch**: If logs/stack traces reference code that no longer matches current file contents, restart the local dev server or worker process. Stale processes can keep executing old code after edits.
+
+### Telegram SDK + Cloud Storage Guardrails
+
+- Keep `app/src/app/layout.tsx` free of Telegram SDK/UI imports. Telegram wrappers/providers belong under `app/src/app/telegram/*` route scope only.
+- Do not top-level import `@telegram-apps/sdk` or `@telegram-apps/sdk-react` from modules that can be pulled into server/root graphs (`/`, `/_not-found`, metadata, shared root providers).
+- If Telegram SDK access is needed from shared utilities, load it lazily inside runtime functions (`await import("@telegram-apps/sdk")`) and guard with `typeof window !== "undefined"`.
+- `next/dynamic(..., { ssr: false })` is only valid in a Client Component. Do not use it directly in a Server Component.
+- Cloud storage policy is strict for wallet key material: no local/session fallback for keypair persistence. Use Telegram Cloud Storage only.
+- Cloud storage readiness can race during early app boot. Critical writes (wallet keypair persistence) must use bounded retry/backoff before throwing.
+- After changing any of these files, run `cd app && bun run build` and confirm no prerender failures on `/`, `/_not-found`, and `/telegram`:
+- `app/src/app/layout.tsx`
+- `app/src/app/telegram/layout.tsx`
+- `app/src/lib/telegram/mini-app/cloud-storage.ts`
+- `app/src/components/telegram/*`
+- `app/src/lib/solana/wallet/wallet-keypair-logic.ts`
+- Manual smoke check after SDK/cloud-storage changes: open wallet in Telegram mini-app and confirm keypair persistence succeeds without `Failed to persist generated wallet keypair`.
+
+## Git Worktree Workflow
+
+### Branch Naming Convention
+
+All branches MUST follow the Linear format: `<issue-number-title>`
+
+Example: `ask-328-fix-wrong-token-history-processing`
+
+To find the correct branch name for a Linear issue, use the issue identifier (e.g., ASK-123).
+
+### Creating a Worktree
+
+When asked to work on a new issue/branch:
+
+1. Create the worktree from the repo root:
+
+```bash
+git worktree add ../solana-telegram-transactions-ASK-123 -b ASK-123-short-description main
+```
+
+   - Worktrees live as sibling directories to the main repo
+   - Always branch from `main` (or ask if unclear)
+
+2. `cd` into the new worktree directory before doing any work
+
+### Listing Worktrees
+
+```bash
+git worktree list
+```
+
+### Removing a Worktree
+
+When done with a branch:
+
+```bash
+git worktree remove ../solana-telegram-transactions-ASK-123
+```
+
+Or if already deleted the directory:
+
+```bash
+git worktree prune
+```
+
+### Important Rules
+
+- NEVER switch branches in the main worktree to work on issues — always create a new worktree
+- Each tmux session / Claude Code instance should operate in its own worktree
+- Run `git worktree list` if unsure which worktrees exist
+- After merging a PR, clean up the worktree
+
+## Commit Conventions
+
+This project enforces [Conventional Commits](https://www.conventionalcommits.org/) via `commitlint` with `@commitlint/config-conventional`. A CI workflow (`.github/workflows/commit-style.yml`) validates all commit messages in a PR and the PR title itself.
+
+### Format
+
+```
+type(scope): description
+```
+
+**Allowed types**: `feat`, `fix`, `chore`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `revert`
+
+**Scope** is optional but encouraged — use the area of the codebase being changed (e.g., `wallet`, `ui`, `og`, `sdk`, `ci`, `telegram`).
+
+### Examples
+
+```
+feat(wallet): show SPL token transfers in activity
+fix(sdk): restore delegation PDA helpers
+chore(ci): enforce conventional commit style with commitlint
+docs(sdk): refresh README for PER + auth usage
+refactor(ui): extract pill button component
+```
+
+### Rules
+
+- NEVER add `Co-Authored-By` trailers or any co-author attribution to commits
+- Keep the subject line under 100 characters
+- Use imperative mood in the description ("add", not "added" or "adds")
+- Do not end the subject line with a period
+- Validate locally before pushing:
+  - `bun run commitlint:head`
+  - `cd app && bun run lint`
+
+## Pull Requests
+
+- PR titles MUST follow the same conventional commit format: `type(scope): description`
+- PR body should be a simple one-two sentence summary of the changes — no templates or checklists
+- Only merge a PR after its Vercel build/check is successful
+- Merge PRs using squash-and-merge
 
 ## Tooling
 
@@ -153,7 +331,8 @@ Required for frontend (in `/app/.env.local`):
 ```env
 NEXT_PUBLIC_TELEGRAM_BOT_ID=<bot_id>
 NEXT_PUBLIC_SOLANA_ENV=devnet  # mainnet, devnet, or localnet
-ASKLOYAL_TGBOT_KEY=<bot_token>
+ASKLOYAL_TGBOT_KEY=<bot_token>  # Telegram Bot API token only
+TELEGRAM_SETUP_SECRET=<route_secret>  # Bearer token for /api/telegram/setup-commands
 REDPILL_AI_API_KEY=<api_key>
 DATABASE_URL=postgresql://...
 MESSAGE_ENCRYPTION_KEY=<base64-32-bytes>  # For encrypted bot messages
@@ -163,3 +342,31 @@ Optional:
 - `NEXT_PUBLIC_SERVER_HOST` - API base URL
 - `DEPLOYMENT_PK` - Gasless transaction keypair (base58)
 - `NEXT_PUBLIC_GAS_PUBLIC_KEY` - Gasless payer public key
+
+### Cloudflare R2/CDN (feature-specific)
+
+Core clients live in `/app/src/lib/core`:
+- `r2-upload.ts` (server-only): `getCloudflareR2UploadClientFromEnv()`
+- `cdn-url.ts`: `getCloudflareCdnUrlClientFromEnv()`
+
+Required for R2 upload:
+- `CLOUDFLARE_R2_ACCOUNT_ID`
+- `CLOUDFLARE_R2_ACCESS_KEY_ID`
+- `CLOUDFLARE_R2_SECRET_ACCESS_KEY`
+- `CLOUDFLARE_R2_BUCKET_NAME`
+
+Set at least one CDN base URL:
+- `CLOUDFLARE_CDN_BASE_URL` (preferred)
+- `NEXT_PUBLIC_CLOUDFLARE_CDN_BASE_URL`
+- `CLOUDFLARE_R2_PUBLIC_DEV_URL` (dev fallback)
+
+Optional:
+- `CLOUDFLARE_R2_S3_ENDPOINT`
+- `CLOUDFLARE_R2_UPLOAD_PREFIX`
+
+Run targeted tests:
+
+```bash
+cd app
+bun test src/lib/core/__tests__/object-path.test.ts src/lib/core/__tests__/cdn-url.test.ts src/lib/core/__tests__/r2-upload.test.ts
+```

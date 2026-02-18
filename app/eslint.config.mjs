@@ -30,6 +30,86 @@ const eslintConfig = [
       "simple-import-sort/exports": "error",
     },
   },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "MemberExpression[object.object.name='process'][object.property.name='env']",
+          message:
+            "Use centralized config modules instead of direct process.env access.",
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      "src/lib/core/config/**/*.ts",
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+      "src/**/__tests__/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
+    files: [
+      "src/components/**/*.{ts,tsx}",
+      "src/hooks/**/*.{ts,tsx}",
+      "src/app/telegram/**/*.{ts,tsx}",
+      "src/app/**/page.tsx",
+      "src/app/**/layout.tsx",
+      "src/app/**/template.tsx",
+      "src/app/**/loading.tsx",
+      "src/app/**/error.tsx",
+      "src/app/**/not-found.tsx",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "@/lib/core/config/server",
+                "@/lib/core/config/server/*",
+                "**/core/config/server",
+                "**/core/config/server/*",
+              ],
+              message:
+                "Client code must import public env from '@/lib/core/config/public'.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/lib/jupiter/**/*.{ts,tsx}"],
+    ignores: ["src/lib/jupiter/**/*.server.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "@/lib/core/config/server",
+                "@/lib/core/config/server/*",
+                "**/core/config/server",
+                "**/core/config/server/*",
+              ],
+              message:
+                "Do not import server config into shared/client jupiter modules. Use '@/lib/jupiter/server' for server-only entrypoints.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

@@ -33,13 +33,62 @@ cn(...inputs) // Merges classes, resolves conflicts
 
 ## `/core`
 
-HTTP utilities and database connections.
+HTTP, database, and storage/CDN utilities.
 
 | File | Exports | Description |
 |------|---------|-------------|
 | `http.ts` | `fetchJson()`, `fetchStream()` | Typed fetch wrappers |
-| `api.ts` | `resolveEndpoint()` | Builds URLs from `NEXT_PUBLIC_SERVER_HOST` |
+| `api.ts` | `resolveEndpoint()` | Builds URLs from `publicEnv.serverHost` (`NEXT_PUBLIC_SERVER_HOST`) |
 | `database.ts` | `getDatabase()` | Neon PostgreSQL connection via Drizzle ORM |
+| `r2-upload.ts` | `createCloudflareR2UploadClient()`, `getCloudflareR2UploadClientFromEnv()` | Server-side Cloudflare R2 image upload client |
+| `cdn-url.ts` | `createCloudflareCdnUrlClient()`, `getCloudflareCdnUrlClientFromEnv()` | Resolves public CDN URLs from object keys |
+| `config/public.ts` | `publicEnv` | Public env access (`NEXT_PUBLIC_*`) |
+| `config/server.ts` | `serverEnv` | Server-only env access (`server-only`) |
+| `config/shared.ts` | parsing helpers | Shared env normalization helpers |
+
+### `r2-upload.ts` (server-side only)
+
+Minimal upload client for Cloudflare R2 (S3-compatible API), intended for use in API routes and other server functions.
+
+**Key exports:**
+- `isCloudflareR2UploadConfigured()` - checks required env vars
+- `getCloudflareR2UploadClientFromEnv()` - lazy singleton from env config
+- `createCloudflareR2UploadClient(config)` - explicit client factory
+- `uploadImage({ key, body, contentType, ... })` - uploads image bytes to a bucket key
+
+**Behavior:**
+- Keys are normalized (`a//b/` -> `a/b`)
+- Unsafe path segments (`.` or `..`) are rejected
+
+**Required env vars:**
+- `CLOUDFLARE_R2_ACCOUNT_ID`
+- `CLOUDFLARE_R2_ACCESS_KEY_ID`
+- `CLOUDFLARE_R2_SECRET_ACCESS_KEY`
+- `CLOUDFLARE_R2_BUCKET_NAME`
+
+**Optional env vars:**
+- `CLOUDFLARE_R2_S3_ENDPOINT` (defaults to `https://<account_id>.r2.cloudflarestorage.com`)
+- `CLOUDFLARE_R2_UPLOAD_PREFIX` (prepends a key prefix like `telegram/photos`)
+
+### `cdn-url.ts`
+
+Small URL resolver client for converting object keys into public CDN URLs.
+
+**Key exports:**
+- `createCloudflareCdnUrlClient(config)` - explicit client factory
+- `getCloudflareCdnUrlClientFromEnv()` - lazy singleton from env config
+- `resolveUrl({ key, query })` - resolves one URL
+- `resolveUrls(keys, { query })` - resolves many URLs
+
+**Behavior:**
+- Keys are normalized consistently with the upload client
+- Path segments are URL-encoded and unsafe segments (`.`/`..`) are rejected
+
+**Base URL resolution order (`getCloudflareCdnUrlClientFromEnv`)**:
+1. `CLOUDFLARE_CDN_BASE_URL`
+2. `NEXT_PUBLIC_CLOUDFLARE_CDN_BASE_URL`
+3. `CLOUDFLARE_R2_PUBLIC_DEV_URL`
+4. `NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_DEV_URL`
 
 ---
 
@@ -97,11 +146,13 @@ RPC connection management using Helius endpoints (mainnet/devnet) or local valid
 | Constant | Source | Value |
 |----------|--------|-------|
 | `SECURE_MAINNET_RPC_URL` | Hardcoded | Helius mainnet endpoint |
+| `TESTNET_RPC_URL` | Hardcoded | Solana testnet endpoint |
 | `SECURE_DEVNET_RPC_URL` | Hardcoded | Helius devnet endpoint |
 | `LOCALNET_RPC_URL` | Hardcoded | `http://127.0.0.1:8899` |
 
 Selected by `NEXT_PUBLIC_SOLANA_ENV`:
 - `"mainnet"` - Production (Helius)
+- `"testnet"` - Test network
 - `"devnet"` - Testing (Helius, default)
 - `"localnet"` - Local development (`solana-test-validator`)
 
@@ -114,6 +165,40 @@ Selected by `NEXT_PUBLIC_SOLANA_ENV`:
 Wallet keypair management. Keypairs stored in **Telegram Cloud Storage** (not localStorage).
 
 **Key exports:** `ensureWalletKeypair()`, `getWalletBalance()`, `sendSolTransaction()`
+
+#### `subscribe-wallet-asset-changes.ts`
+
+Subscribes to WebSocket changes that can affect a wallet's portfolio value:
+- Native SOL (system account)
+- SPL Token accounts (Token program)
+- SPL Token-2022 accounts (Token-2022 program)
+
+Emits debounced `onChange()` callbacks to avoid refetch storms when multiple account updates arrive in quick succession.
+
+**Key export:** `subscribeToWalletAssetChanges(walletAddress, onChange, options?)`
+
+**Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `commitment` | `"confirmed"` | Solana commitment level |
+| `debounceMs` | `750` | Debounce interval for change callbacks |
+| `includeNative` | `true` | Subscribe to native SOL changes (disable if already subscribed elsewhere) |
+
+**Usage:**
+
+```typescript
+import { subscribeToWalletAssetChanges } from "@/lib/solana/wallet/subscribe-wallet-asset-changes";
+
+const unsubscribe = await subscribeToWalletAssetChanges(
+  walletAddress,
+  () => { void refreshTokenHoldings(true); },
+  { debounceMs: 750, commitment: "confirmed" }
+);
+
+// Cleanup
+await unsubscribe();
+```
 
 ### `/solana/deposits/`
 
@@ -137,9 +222,9 @@ Fetches all fungible token holdings (SPL tokens + native SOL) with USD prices vi
 | `NATIVE_SOL_MINT` | `So111...112` | Native SOL mint address |
 | `NATIVE_SOL_DECIMALS` | `9` | SOL decimal places |
 
-**Key exports:** `fetchTokenHoldings(publicKey, forceRefresh?)`
+**Key exports:** `fetchTokenHoldings(publicKey, forceRefresh?)`, `computePortfolioTotals(holdings, fallbackSolPriceUsd)`
 
-**Type exports:** `TokenHolding`
+**Type exports:** `TokenHolding`, `PortfolioTotals`
 
 ```typescript
 type TokenHolding = {
@@ -151,21 +236,33 @@ type TokenHolding = {
   priceUsd: number | null;  // Price per token (null if unavailable)
   valueUsd: number | null;  // Total value (null if unavailable)
 };
+
+type PortfolioTotals = {
+  totalUsd: number;                  // Sum of all priced holdings (floor to 2 decimals)
+  totalSol: number | null;           // totalUsd / SOL price (floor to 4 decimals), null if no SOL price
+  pricedCount: number;               // Holdings with a known USD value
+  unpricedCount: number;             // Holdings without price data
+  effectiveSolPriceUsd: number | null; // SOL price used (from holdings → fallback → constant)
+};
 ```
 
 **Usage:**
 
 ```typescript
-import { fetchTokenHoldings } from "@/lib/solana/token-holdings";
+import { fetchTokenHoldings, computePortfolioTotals } from "@/lib/solana/token-holdings";
 
 const holdings = await fetchTokenHoldings("ADDRESS");
-const totalValue = holdings.reduce((sum, h) => sum + (h.valueUsd ?? 0), 0);
+const totals = computePortfolioTotals(holdings, solPriceUsd);
+// totals.totalUsd  — portfolio value in USD
+// totals.totalSol  — portfolio value in SOL
 ```
 
 **Notes:**
 - Returns cached data for 30s (use `forceRefresh: true` to bypass)
+- Concurrent requests are coalesced (even forced refreshes share an in-flight request)
 - Returns empty array on localnet (DAS API unavailable)
 - Price data available for top 10k tokens by volume
+- `computePortfolioTotals` resolves SOL price via a fallback chain: holdings price → passed-in `fallbackSolPriceUsd` → `SOL_PRICE_USD` constant
 
 ### `solana-helpers.ts`
 
@@ -196,6 +293,7 @@ For browser/mini app context.
 ### `/telegram/bot-api/` (Server-side)
 
 For API routes. Requires `ASKLOYAL_TGBOT_KEY` env var.
+`/api/telegram/setup-commands` additionally uses `TELEGRAM_SETUP_SECRET` for route auth.
 
 | Constant | Value |
 |----------|-------|

@@ -25,12 +25,9 @@ import { ScanIcon } from "@/components/ui/icons/ScanIcon";
 import { ActionButton } from "@/components/wallet/ActionButton";
 import ActivitySheet from "@/components/wallet/ActivitySheet";
 import BalanceBackgroundPicker from "@/components/wallet/BalanceBackgroundPicker";
+import BannerCarousel from "@/components/wallet/BannerCarousel";
 import ReceiveSheet from "@/components/wallet/ReceiveSheet";
-import SendSheet, {
-  addRecentRecipient,
-  isValidSolanaAddress,
-  isValidTelegramUsername,
-} from "@/components/wallet/SendSheet";
+import SendSheet, { addRecentRecipient } from "@/components/wallet/SendSheet";
 import SwapSheet, {
   type SecureFormValues,
   type SwapFormValues,
@@ -48,7 +45,7 @@ import {
   TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
 } from "@/lib/constants";
-import { fetchInvoiceState } from "@/lib/irys/fetch-invoice-state";
+import { track } from "@/lib/core/analytics";
 import {
   refundDeposit,
   subscribeToDepositsWithUsername,
@@ -70,7 +67,10 @@ import {
 } from "@/lib/solana/rpc/get-account-txn-history";
 import type { WalletTransfer } from "@/lib/solana/rpc/types";
 import {
+  computePortfolioTotals,
   fetchTokenHoldings,
+  resolveTokenIcon,
+  subscribeToTokenHoldings,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
 import {
@@ -80,10 +80,8 @@ import {
 } from "@/lib/solana/verify-and-claim-deposit";
 import {
   formatAddress,
-  formatBalance,
   formatSenderAddress,
   formatTransactionAmount,
-  formatUsdValue,
 } from "@/lib/solana/wallet/formatters";
 import {
   getGaslessPublicKey,
@@ -114,7 +112,6 @@ import {
   validateInitData,
 } from "@/lib/telegram/mini-app/init-data-transform";
 import { parseUsernameFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
-import { openInvoice } from "@/lib/telegram/mini-app/invoice";
 import { openQrScanner } from "@/lib/telegram/mini-app/qr-code";
 import {
   createShareMessage,
@@ -128,11 +125,39 @@ import type {
   TransactionDetailsData,
 } from "@/types/wallet";
 
+import {
+  CLAIM_SOURCES,
+  type ClaimSource,
+  getSendMethod,
+  SEND_METHODS,
+  SWAP_METHODS,
+  type SwapMethod,
+  WALLET_ANALYTICS_EVENTS,
+  WALLET_ANALYTICS_PATH,
+} from "./wallet-analytics";
+
 hashes.sha512 = sha512;
 
 // ─── Mock data for development ─────────────────────────────────────────────
 const USE_MOCK_DATA = false;
 const TELEGRAM_USERNAME_PATTERN = /^[A-Za-z0-9_]{5,32}$/;
+
+function getAnalyticsErrorProperties(error: unknown): {
+  error_name: string;
+  error_message: string;
+} {
+  if (error instanceof Error) {
+    return {
+      error_name: error.name || "Error",
+      error_message: error.message || "Unknown error",
+    };
+  }
+
+  return {
+    error_name: "UnknownError",
+    error_message: typeof error === "string" ? error : "Unknown error",
+  };
+}
 
 const MOCK_WALLET_ADDRESS = "UQAt7f8Kq9xZ3mNpR2vL5wYcD4bJ6hTgSoAeWnFqZir";
 const MOCK_BALANCE_LAMPORTS = 1_267_476_540_000; // ~1267.47654 SOL
@@ -278,6 +303,8 @@ const MOCK_WALLET_TRANSACTIONS: Transaction[] = [
     timestamp: Date.now() - 86400000 * 2,
     status: "completed",
     signature: "mock-sig-1",
+    swapFromMint: "usdc",
+    swapToMint: "sol",
     swapFromSymbol: "USDC",
     swapToSymbol: "SOL",
     swapToAmount: 0.25,
@@ -377,6 +404,8 @@ const walletBalanceListeners = new Set<(lamports: number) => void>();
 let walletBalanceSubscriptionPromise: Promise<() => Promise<void>> | null =
   null;
 
+const HOLDINGS_REFRESH_DEBOUNCE_MS = 750;
+
 const getCachedWalletBalance = (
   walletAddress: string | null
 ): number | null => {
@@ -464,23 +493,6 @@ const getCachedSolPrice = (): number | null => {
 const setCachedSolPrice = (price: number): void => {
   cachedSolPriceUsd = price;
   solPriceFetchedAt = Date.now();
-};
-
-// Stars balance cache (keyed by wallet address)
-const starsBalanceCache = new Map<string, number>();
-
-const getCachedStarsBalance = (walletAddress: string | null): number | null => {
-  if (!walletAddress) return null;
-  const cached = starsBalanceCache.get(walletAddress);
-  return typeof cached === "number" ? cached : null;
-};
-
-const setCachedStarsBalance = (
-  walletAddress: string | null,
-  stars: number
-): void => {
-  if (!walletAddress) return;
-  starsBalanceCache.set(walletAddress, stars);
 };
 
 // Incoming transactions cache (keyed by username)
@@ -582,25 +594,20 @@ export default function Home() {
   const [walletAddress, setWalletAddress] = useState<string | null>(() =>
     USE_MOCK_DATA ? MOCK_WALLET_ADDRESS : cachedWalletAddress
   );
-  const [balance, setBalance] = useState<number | null>(() =>
-    USE_MOCK_DATA
-      ? MOCK_BALANCE_LAMPORTS
-      : cachedWalletAddress
-      ? getCachedWalletBalance(cachedWalletAddress)
-      : null
+  const [solBalanceLamports, setSolBalanceLamports] = useState<number | null>(
+    () =>
+      USE_MOCK_DATA
+        ? MOCK_BALANCE_LAMPORTS
+        : cachedWalletAddress
+        ? getCachedWalletBalance(cachedWalletAddress)
+        : null
   );
   const [tokenHoldings, setTokenHoldings] = useState<TokenHolding[]>(() =>
     USE_MOCK_DATA ? MOCK_TOKEN_HOLDINGS : []
   );
-  const [starsBalance, setStarsBalance] = useState<number>(() =>
-    cachedWalletAddress ? getCachedStarsBalance(cachedWalletAddress) ?? 0 : 0
+  const [isHoldingsLoading, setIsHoldingsLoading] = useState(() =>
+    USE_MOCK_DATA ? false : true
   );
-  const [isStarsLoading, setIsStarsLoading] = useState(
-    () =>
-      !cachedWalletAddress ||
-      getCachedStarsBalance(cachedWalletAddress) === null
-  );
-  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   const [isLoading, setIsLoading] = useState(() =>
     USE_MOCK_DATA ? false : !hasCachedWalletData()
   );
@@ -682,14 +689,17 @@ export default function Home() {
     new Set()
   );
 
-  // Sticky balance pill state
+  // Sticky balance pill state (scroll-driven, synced with header logo fade)
   const balanceRef = useRef<HTMLDivElement>(null);
-  const [showStickyBalance, setShowStickyBalance] = useState(false);
+  const [stickyBalanceOpacity, setStickyBalanceOpacity] = useState(0);
 
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
+    track(WALLET_ANALYTICS_EVENTS.openSend, {
+      path: WALLET_ANALYTICS_PATH,
+    });
     setSendStep(1); // Reset step
     if (recipientName) {
       setSelectedRecipient(recipientName);
@@ -709,73 +719,19 @@ export default function Home() {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
+    track(WALLET_ANALYTICS_EVENTS.openReceive, {
+      path: WALLET_ANALYTICS_PATH,
+    });
     setReceiveSheetOpen(true);
   }, []);
-  const handleTopUpStars = useCallback(async () => {
-    if (isCreatingInvoice) return;
 
-    if (hapticFeedback.impactOccurred.isAvailable()) {
-      hapticFeedback.impactOccurred("light");
-    }
-
-    if (!rawInitData) {
-      console.error("Cannot create invoice: init data is missing");
-      return;
-    }
-
-    setIsCreatingInvoice(true);
-    try {
-      const serverHost = process.env.NEXT_PUBLIC_SERVER_HOST;
-      const endpoint = (() => {
-        // prefer same-origin to avoid CORS
-        if (typeof window !== "undefined") {
-          if (!serverHost) return "/api/telegram/invoice";
-          try {
-            const configured = new URL(serverHost);
-            const current = new URL(window.location.origin);
-            const hostsMatch =
-              configured.protocol === current.protocol &&
-              configured.host === current.host;
-            return hostsMatch
-              ? new URL("/api/telegram/invoice", configured).toString()
-              : "/api/telegram/invoice";
-          } catch {
-            return "/api/telegram/invoice";
-          }
-        }
-        // fall back to configured host if provided
-        return serverHost
-          ? new URL("/api/telegram/invoice", serverHost).toString()
-          : "/api/telegram/invoice";
-      })();
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        body: new TextEncoder().encode(rawInitData),
-      });
-
-      if (!response.ok) {
-        console.error(
-          "Failed to create invoice",
-          await response.text().catch(() => response.statusText)
-        );
-        return;
-      }
-
-      const data = (await response.json()) as { invoiceLink?: string };
-      if (!data.invoiceLink) {
-        console.error("Invoice link missing from response");
-        return;
-      }
-
-      await openInvoice(data.invoiceLink);
-    } catch (error) {
-      console.error("Failed to open invoice", error);
-    } finally {
-      setIsCreatingInvoice(false);
-    }
-  }, [isCreatingInvoice, rawInitData]);
-
+  const handleOpenSwapSheet = useCallback(() => {
+    hapticFeedback.impactOccurred("light");
+    track(WALLET_ANALYTICS_EVENTS.openSwap, {
+      path: WALLET_ANALYTICS_PATH,
+    });
+    setSwapSheetOpen(true);
+  }, []);
   const handleOpenWalletTransactionDetails = useCallback(
     (transaction: Transaction) => {
       if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -798,6 +754,9 @@ export default function Home() {
         type: transaction.type === "incoming" ? "incoming" : "outgoing",
         amountLamports: transaction.amountLamports,
         transferType: transaction.transferType,
+        tokenMint: transaction.tokenMint,
+        tokenAmount: transaction.tokenAmount,
+        tokenDecimals: transaction.tokenDecimals,
         recipient: transaction.recipient,
         recipientUsername,
         sender: transaction.sender,
@@ -868,6 +827,7 @@ export default function Home() {
       return;
     }
 
+    const swapMethod: SwapMethod = SWAP_METHODS.regular;
     setIsSwapping(true);
     hapticFeedback.impactOccurred("medium");
 
@@ -881,16 +841,61 @@ export default function Home() {
         setSwappedToSymbol(result.toSymbol);
         setSwapError(null);
         setSwapView("result");
+        track(WALLET_ANALYTICS_EVENTS.swapTokens, {
+          path: WALLET_ANALYTICS_PATH,
+          method: swapMethod,
+          from_symbol: result.fromSymbol,
+          to_symbol: result.toSymbol,
+          from_amount: result.fromAmount,
+          to_amount: result.toAmount,
+        });
+
+        // Inject swap transaction immediately for instant feedback
+        if (result.signature && swapFormValues) {
+          const swapTx: Transaction = {
+            id: result.signature,
+            type: "outgoing",
+            transferType: "swap",
+            amountLamports: 0,
+            signature: result.signature,
+            timestamp: Date.now(),
+            status: "completed",
+            swapFromMint: swapFormValues.fromMint,
+            swapToMint: swapFormValues.toMint,
+            swapFromSymbol: result.fromSymbol,
+            swapToSymbol: result.toSymbol,
+            swapToAmount: result.toAmount,
+          };
+          setWalletTransactions((prev) => {
+            const updated = [swapTx, ...prev];
+            if (walletAddress) {
+              walletTransactionsCache.set(walletAddress, updated);
+            }
+            return updated;
+          });
+        }
+
         // Refresh balance after successful swap
         void refreshWalletBalance(true);
       } else {
         setSwapError(result.error || "Swap failed");
         setSwapView("result");
+        track(WALLET_ANALYTICS_EVENTS.swapTokensFailed, {
+          path: WALLET_ANALYTICS_PATH,
+          method: swapMethod,
+          error_name: "SwapError",
+          error_message: result.error || "Swap failed",
+        });
       }
     } catch (error) {
       console.error("[swap] Error:", error);
       setSwapError(error instanceof Error ? error.message : "Swap failed");
       setSwapView("result");
+      track(WALLET_ANALYTICS_EVENTS.swapTokensFailed, {
+        path: WALLET_ANALYTICS_PATH,
+        method: swapMethod,
+        ...getAnalyticsErrorProperties(error),
+      });
     } finally {
       setIsSwapping(false);
     }
@@ -900,6 +905,7 @@ export default function Home() {
   const handleSubmitSecure = useCallback(async () => {
     if (!secureFormValues || !isSwapFormValid || isSwapping) return;
 
+    const swapMethod: SwapMethod = SWAP_METHODS.secure;
     setIsSwapping(true);
     hapticFeedback.impactOccurred("medium");
 
@@ -919,29 +925,104 @@ export default function Home() {
       setSwappedToSymbol(secureFormValues.symbol);
       setSwapError(null);
       setSwapView("result");
+      track(WALLET_ANALYTICS_EVENTS.swapTokens, {
+        path: WALLET_ANALYTICS_PATH,
+        method: swapMethod,
+        secure_direction: secureDirection,
+        token_symbol: secureFormValues.symbol,
+        amount: secureFormValues.amount,
+      });
       void refreshWalletBalance(true);
     } catch (error) {
       console.error("[secure] Error:", error);
       setSwapError(error instanceof Error ? error.message : "Operation failed");
       setSwapView("result");
+      track(WALLET_ANALYTICS_EVENTS.swapTokensFailed, {
+        path: WALLET_ANALYTICS_PATH,
+        method: swapMethod,
+        secure_direction: secureDirection,
+        ...getAnalyticsErrorProperties(error),
+      });
     } finally {
       setIsSwapping(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secureFormValues, secureDirection, isSwapFormValid, isSwapping]);
+  }, [secureDirection, secureFormValues, isSwapFormValid, isSwapping]);
 
   const refreshWalletBalance = useCallback(
     async (forceRefresh = false) => {
       try {
         const balanceLamports = await getWalletBalance(forceRefresh);
         setCachedWalletBalance(walletAddress, balanceLamports);
-        setBalance(balanceLamports);
+        setSolBalanceLamports(balanceLamports);
       } catch (error) {
         console.error("Failed to refresh wallet balance", error);
       }
     },
     [walletAddress]
   );
+
+  const hasLoadedHoldingsRef = useRef(USE_MOCK_DATA);
+  const walletAddressRef = useRef<string | null>(walletAddress);
+  const holdingsFetchIdRef = useRef(0);
+
+  useEffect(() => {
+    walletAddressRef.current = walletAddress;
+  }, [walletAddress]);
+
+  const refreshTokenHoldings = useCallback(async (forceRefresh = false) => {
+    const addr = walletAddressRef.current;
+    if (!addr) return;
+
+    const fetchId = ++holdingsFetchIdRef.current;
+
+    if (!hasLoadedHoldingsRef.current) {
+      setIsHoldingsLoading(true);
+    }
+
+    try {
+      const holdings = await fetchTokenHoldings(addr, forceRefresh);
+      if (walletAddressRef.current !== addr) return;
+      if (holdingsFetchIdRef.current !== fetchId) return;
+
+      // Enrich with Loyal deposits (secured holdings)
+      const userPubkey = new PublicKey(addr);
+      const mints = holdings.map((h) => h.mint);
+      const loyalDeposits = await fetchLoyalDeposits(userPubkey, mints);
+      if (walletAddressRef.current !== addr) return;
+      if (holdingsFetchIdRef.current !== fetchId) return;
+
+      const securedHoldings: TokenHolding[] = [];
+      for (const [mint, amount] of loyalDeposits) {
+        const original = holdings.find((h) => h.mint === mint);
+        if (original) {
+          const securedBalance = amount / Math.pow(10, original.decimals);
+          securedHoldings.push({
+            ...original,
+            balance: securedBalance,
+            valueUsd: original.priceUsd
+              ? securedBalance * original.priceUsd
+              : null,
+            isSecured: true,
+          });
+        }
+      }
+
+      setTokenHoldings([...holdings, ...securedHoldings]);
+      hasLoadedHoldingsRef.current = true;
+    } catch (error) {
+      console.error("Failed to fetch token holdings:", error);
+    } finally {
+      if (walletAddressRef.current !== addr) return;
+      if (holdingsFetchIdRef.current !== fetchId) return;
+      if (!hasLoadedHoldingsRef.current) {
+        // If we never loaded successfully, keep showing skeleton.
+        setIsHoldingsLoading(true);
+      } else {
+        setIsHoldingsLoading(false);
+      }
+    }
+  }, []);
 
   const mapTransferToTransaction = useCallback(
     (transfer: WalletTransfer): Transaction => {
@@ -950,11 +1031,14 @@ export default function Home() {
         transfer.counterparty ||
         (isIncoming ? "Unknown sender" : "Unknown recipient");
 
-      return {
+      const base: Transaction = {
         id: transfer.signature,
         type: isIncoming ? "incoming" : "outgoing",
         transferType: transfer.type,
         amountLamports: transfer.amountLamports,
+        tokenMint: transfer.tokenMint,
+        tokenAmount: transfer.tokenAmount,
+        tokenDecimals: transfer.tokenDecimals,
         sender: isIncoming ? counterparty : undefined,
         recipient: !isIncoming ? counterparty : undefined,
         timestamp: transfer.timestamp ?? Date.now(),
@@ -962,6 +1046,16 @@ export default function Home() {
         signature: transfer.signature,
         status: transfer.status === "failed" ? "error" : "completed",
       };
+
+      if (transfer.type === "swap") {
+        base.swapFromMint = transfer.swapFromMint;
+        base.swapToMint = transfer.swapToMint;
+        if (transfer.swapToAmount) {
+          base.swapToAmount = parseFloat(transfer.swapToAmount);
+        }
+      }
+
+      return base;
     },
     []
   );
@@ -1008,7 +1102,15 @@ export default function Home() {
           const merged = mappedTransactions.map((tx) => {
             if (!tx.signature) return tx;
             const existing = existingBySignature.get(tx.signature);
-            return existing ? { ...existing, ...tx } : tx;
+            if (!existing) return tx;
+            // Preserve app-injected swap data when on-chain data arrives
+            if (
+              existing.transferType === "swap" &&
+              tx.transferType !== "swap"
+            ) {
+              return { ...tx, ...existing };
+            }
+            return { ...existing, ...tx };
           });
 
           const combined = [...pending, ...merged].sort(
@@ -1037,6 +1139,7 @@ export default function Home() {
     try {
       // Refresh wallet balance
       await refreshWalletBalance(true);
+      await refreshTokenHoldings(true);
 
       try {
         const latestPrice = await fetchSolUsdPrice();
@@ -1078,7 +1181,13 @@ export default function Home() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [isRefreshing, loadWalletTransactions, rawInitData, refreshWalletBalance]);
+  }, [
+    isRefreshing,
+    loadWalletTransactions,
+    rawInitData,
+    refreshTokenHoldings,
+    refreshWalletBalance,
+  ]);
 
   const handleSubmitSend = useCallback(async () => {
     if (!isSendFormValid || isSendingTransaction) {
@@ -1086,6 +1195,7 @@ export default function Home() {
     }
 
     const trimmedRecipient = sendFormValues.recipient.trim();
+    const sendMethod = getSendMethod(trimmedRecipient);
     const amountSol = parseFloat(sendFormValues.amount);
     if (Number.isNaN(amountSol) || amountSol <= 0) {
       return;
@@ -1102,7 +1212,7 @@ export default function Home() {
     try {
       let signature: string | null = null;
 
-      if (isValidSolanaAddress(trimmedRecipient)) {
+      if (sendMethod === SEND_METHODS.walletAddress) {
         if (sendFormValues.isSecured) {
           const destinationUser = new PublicKey(trimmedRecipient);
 
@@ -1115,7 +1225,7 @@ export default function Home() {
         } else {
           signature = await sendSolTransaction(trimmedRecipient, lamports);
         }
-      } else if (isValidTelegramUsername(trimmedRecipient)) {
+      } else if (sendMethod === SEND_METHODS.telegram) {
         const username = trimmedRecipient.replace(/^@/, "");
         signature = await transferTokensToUsername({
           tokenMint: NATIVE_MINT,
@@ -1141,11 +1251,22 @@ export default function Home() {
       // Calculate and save the sent amount in SOL for the success screen
       const sentSolAmount = lamports / LAMPORTS_PER_SOL;
       setSentAmountSol(sentSolAmount);
+      track(WALLET_ANALYTICS_EVENTS.sendFunds, {
+        path: WALLET_ANALYTICS_PATH,
+        method: sendMethod,
+        amount_sol: sentSolAmount,
+        amount_lamports: lamports,
+      });
     } catch (error) {
       console.error("Failed to send transaction", error);
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred("error");
       }
+      track(WALLET_ANALYTICS_EVENTS.sendFundsFailed, {
+        path: WALLET_ANALYTICS_PATH,
+        method: sendMethod,
+        ...getAnalyticsErrorProperties(error),
+      });
 
       const errorMessage =
         error instanceof Error
@@ -1220,7 +1341,7 @@ export default function Home() {
         setSelectedTransaction(null);
 
         // Refresh balance and transactions
-        void getWalletBalance(true).then(setBalance);
+        void getWalletBalance(true).then(setSolBalanceLamports);
       } catch (error) {
         console.error("Failed to refund deposit:", error);
         if (hapticFeedback.notificationOccurred.isAvailable()) {
@@ -1330,8 +1451,17 @@ export default function Home() {
     void openQrScanner();
   }, []);
 
+  const handleSwapTabChange = useCallback((tab: "swap" | "secure") => {
+    setSwapActiveTab(tab);
+    if (tab === "secure") {
+      track(WALLET_ANALYTICS_EVENTS.openSecureSwap, {
+        path: WALLET_ANALYTICS_PATH,
+      });
+    }
+  }, []);
+
   const handleApproveTransaction = useCallback(
-    async (transactionId: string) => {
+    async (transactionId: string, claimSource: ClaimSource) => {
       if (claimInFlightRef.current) {
         return;
       }
@@ -1436,6 +1566,12 @@ export default function Home() {
 
         await refreshWalletBalance(true);
         void loadWalletTransactions({ force: true });
+        track(WALLET_ANALYTICS_EVENTS.claimFunds, {
+          path: WALLET_ANALYTICS_PATH,
+          claim_source: claimSource,
+          transaction_id: transactionId,
+          amount_lamports: amountLamports,
+        });
 
         // Trigger confetti celebration
         setShowConfetti(true);
@@ -1827,13 +1963,13 @@ export default function Home() {
           setIsLoading(false);
           void getWalletBalance().then((freshBalance) => {
             setCachedWalletBalance(publicKeyBase58, freshBalance);
-            setBalance(freshBalance);
+            setSolBalanceLamports(freshBalance);
           });
         } else {
           // First load - need to fetch balance
           const balanceLamports = await getWalletBalance();
           setCachedWalletBalance(publicKeyBase58, balanceLamports);
-          setBalance(balanceLamports);
+          setSolBalanceLamports(balanceLamports);
           setIsLoading(false);
         }
       } catch (error) {
@@ -1849,54 +1985,6 @@ export default function Home() {
     void loadWalletTransactions();
   }, [walletAddress, loadWalletTransactions]);
 
-  useEffect(() => {
-    if (USE_MOCK_DATA) return;
-    if (!walletAddress) return;
-
-    let isCancelled = false;
-
-    // Check if we have cached stars (state may have been initialized from it)
-    const hasCache = getCachedStarsBalance(walletAddress) !== null;
-
-    // Only show loading if we don't have cache
-    if (!hasCache) {
-      setIsStarsLoading(true);
-    } else {
-      // Ensure loading is false if we have cache
-      setIsStarsLoading(false);
-    }
-
-    const loadStarsBalance = async () => {
-      try {
-        const invoice = await fetchInvoiceState(walletAddress);
-        if (isCancelled) return;
-        const remaining = Number.isFinite(invoice.remainingStars)
-          ? Number(invoice.remainingStars)
-          : 0;
-        setCachedStarsBalance(walletAddress, remaining);
-        setStarsBalance(remaining);
-      } catch (error) {
-        if (!isCancelled) {
-          console.error("Failed to fetch Stars balance", error);
-          // Only reset to 0 if we don't have cached data
-          if (!hasCache) {
-            setStarsBalance(0);
-          }
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsStarsLoading(false);
-        }
-      }
-    };
-
-    void loadStarsBalance();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [walletAddress]);
-
   // Subscribe to websocket balance updates so inbound funds appear in real time
   useEffect(() => {
     if (USE_MOCK_DATA) return;
@@ -1906,12 +1994,14 @@ export default function Home() {
 
     const handleBalanceUpdate = (lamports: number) => {
       if (isCancelled) return;
-      setBalance((prev) => (prev === lamports ? prev : lamports));
+      setSolBalanceLamports((prev) => (prev === lamports ? prev : lamports));
     };
 
     const cachedBalance = getCachedWalletBalance(walletAddress);
     if (cachedBalance !== null) {
-      setBalance((prev) => (prev === cachedBalance ? prev : cachedBalance));
+      setSolBalanceLamports((prev) =>
+        prev === cachedBalance ? prev : cachedBalance
+      );
     }
 
     walletBalanceListeners.add(handleBalanceUpdate);
@@ -2005,86 +2095,57 @@ export default function Home() {
     if (USE_MOCK_DATA) return;
     if (!walletAddress) return;
 
-    let isMounted = true;
+    hasLoadedHoldingsRef.current = false;
+    setIsHoldingsLoading(true);
+    setTokenHoldings([]);
 
-    const loadHoldings = async () => {
-      try {
-        const holdings = await fetchTokenHoldings(walletAddress);
-        if (!isMounted) return;
+    void refreshTokenHoldings(false);
+  }, [refreshTokenHoldings, walletAddress]);
 
-        // Check Loyal deposits for all tokens
-        const userPubkey = new PublicKey(walletAddress);
-        const mints = holdings.map((h) => h.mint);
-        const loyalDeposits = await fetchLoyalDeposits(userPubkey, mints);
-
-        if (!isMounted) return;
-
-        // Add secured entries for tokens with Loyal deposits
-        const securedHoldings: TokenHolding[] = [];
-        for (const [mint, amount] of loyalDeposits) {
-          const original = holdings.find((h) => h.mint === mint);
-          if (original) {
-            securedHoldings.push({
-              ...original,
-              balance: amount / Math.pow(10, original.decimals),
-              valueUsd: original.priceUsd
-                ? (amount / Math.pow(10, original.decimals)) * original.priceUsd
-                : null,
-              isSecured: true,
-            });
-          }
-        }
-
-        setTokenHoldings([...holdings, ...securedHoldings]);
-      } catch (error) {
-        console.error("Failed to fetch token holdings:", error);
-      }
-    };
-
-    void loadHoldings();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [walletAddress]);
-
-  // Refresh token holdings when balance changes (transaction completed)
+  // Keep holdings in sync with wallet asset websocket updates.
   useEffect(() => {
     if (USE_MOCK_DATA) return;
-    if (!walletAddress || balance === null) return;
+    if (!walletAddress) return;
 
-    // Debounce the refresh to avoid rapid refetches
-    const timer = setTimeout(() => {
-      void fetchTokenHoldings(walletAddress, true)
-        .then(async (holdings) => {
-          const userPubkey = new PublicKey(walletAddress);
-          const mints = holdings.map((h) => h.mint);
-          const loyalDeposits = await fetchLoyalDeposits(userPubkey, mints);
+    let isCancelled = false;
+    let unsubscribe: (() => Promise<void>) | null = null;
 
-          const securedHoldings: TokenHolding[] = [];
-          for (const [mint, amount] of loyalDeposits) {
-            const original = holdings.find((h) => h.mint === mint);
-            if (original) {
-              const securedBalance =
-                Number(amount) / Math.pow(10, original.decimals);
-              securedHoldings.push({
-                ...original,
-                balance: securedBalance,
-                valueUsd: original.priceUsd
-                  ? securedBalance * original.priceUsd
-                  : null,
-                isSecured: true,
-              });
-            }
+    void (async () => {
+      try {
+        unsubscribe = await subscribeToTokenHoldings(
+          walletAddress,
+          (holdings) => {
+            if (isCancelled) return;
+            holdingsFetchIdRef.current += 1;
+            setTokenHoldings(holdings);
+            hasLoadedHoldingsRef.current = true;
+            setIsHoldingsLoading(false);
+          },
+          {
+            debounceMs: HOLDINGS_REFRESH_DEBOUNCE_MS,
+            commitment: "confirmed",
+            includeNative: true,
+            emitInitial: false,
+            onError: (error) => {
+              console.error(
+                "Failed to refresh token holdings from websocket",
+                error
+              );
+            },
           }
+        );
+      } catch (error) {
+        console.error("Failed to subscribe to token holdings", error);
+      }
+    })();
 
-          setTokenHoldings([...holdings, ...securedHoldings]);
-        })
-        .catch(console.error);
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [balance, walletAddress]);
+    return () => {
+      isCancelled = true;
+      if (unsubscribe) {
+        void unsubscribe();
+      }
+    };
+  }, [walletAddress]);
 
   useEffect(() => {
     if (USE_MOCK_DATA) return;
@@ -2108,7 +2169,16 @@ export default function Home() {
                 : next.findIndex((tx) => tx.id === mapped.id);
 
               if (matchIndex >= 0) {
-                next[matchIndex] = { ...next[matchIndex], ...mapped };
+                const existing = next[matchIndex];
+                // Preserve app-injected swap data when on-chain data arrives
+                if (
+                  existing.transferType === "swap" &&
+                  mapped.transferType !== "swap"
+                ) {
+                  next[matchIndex] = { ...mapped, ...existing };
+                } else {
+                  next[matchIndex] = { ...existing, ...mapped };
+                }
               } else {
                 next.unshift(mapped);
               }
@@ -2191,7 +2261,10 @@ export default function Home() {
           showMainButton({
             text: "Claim",
             onClick: () =>
-              handleApproveTransaction(selectedIncomingTransaction.id),
+              handleApproveTransaction(
+                selectedIncomingTransaction.id,
+                CLAIM_SOURCES.manual
+              ),
           });
         }
       } else {
@@ -2405,29 +2478,22 @@ export default function Home() {
     isSwapping,
   ]);
 
-  const formattedUsdBalance = formatUsdValue(balance, solPriceUsd);
-  const formattedSolBalance = formatBalance(balance);
+  const portfolioTotals = useMemo(
+    () => computePortfolioTotals(tokenHoldings, solPriceUsd),
+    [tokenHoldings, solPriceUsd]
+  );
+
   const showBalanceSkeleton =
-    isLoading || (displayCurrency === "USD" && isSolPriceLoading);
+    isLoading ||
+    isHoldingsLoading ||
+    (displayCurrency === "SOL" && portfolioTotals.totalSol === null);
   const showSecondarySkeleton =
-    isLoading || (displayCurrency === "SOL" && isSolPriceLoading);
-  const showStarsSkeleton = isLoading || isStarsLoading;
-
-  // Computed numeric values for NumberFlow animations
-  const solBalanceNumeric = useMemo(() => {
-    if (balance === null) return 0;
-    // Truncate to 4 decimal places (floor, no rounding)
-    const sol = balance / LAMPORTS_PER_SOL;
-    return Math.floor(sol * 10000) / 10000;
-  }, [balance]);
-
-  const usdBalanceNumeric = useMemo(() => {
-    if (balance === null || solPriceUsd === null) return 0;
-    const sol = balance / LAMPORTS_PER_SOL;
-    const usd = sol * solPriceUsd;
-    // Truncate to 2 decimal places (floor, no rounding)
-    return Math.floor(usd * 100) / 100;
-  }, [balance, solPriceUsd]);
+    isLoading ||
+    isHoldingsLoading ||
+    (displayCurrency === "USD" && portfolioTotals.totalSol === null);
+  // Computed numeric values for NumberFlow animations (portfolio totals)
+  const usdBalanceNumeric = portfolioTotals.totalUsd;
+  const solBalanceNumeric = portfolioTotals.totalSol ?? 0;
 
   // Combine and limit transactions for main Activity section (max 10)
   const limitedActivityItems = useMemo(() => {
@@ -2494,26 +2560,38 @@ export default function Home() {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // Track balance visibility for sticky pill
+  // Track balance card position for sticky pill crossfade with header logo.
+  // Crossfade starts as the card bottom approaches the header — i.e. when
+  // the card is almost fully scrolled behind the header, not when its top
+  // edge first touches it.
   useEffect(() => {
-    const balanceElement = balanceRef.current;
-    if (!balanceElement) return;
+    const headerBottom = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
+    const fadeRange = 50; // px over which the crossfade happens
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        // Show sticky pill when balance is not visible
-        setShowStickyBalance(!entry.isIntersecting);
-      },
-      {
-        threshold: 0,
-        rootMargin: `-${
-          Math.max(safeAreaInsetTop || 0, 12) + 15
-        }px 0px 0px 0px`,
-      }
-    );
+    const handleScroll = () => {
+      const el = balanceRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      // Progress 0→1 as the card bottom moves from (headerBottom + fadeRange) to headerBottom
+      const progress =
+        rect.bottom >= headerBottom + fadeRange
+          ? 0
+          : rect.bottom <= headerBottom
+          ? 1
+          : 1 - (rect.bottom - headerBottom) / fadeRange;
+      setStickyBalanceOpacity(progress);
+      document.documentElement.style.setProperty(
+        "--header-logo-opacity",
+        String(1 - progress)
+      );
+    };
 
-    observer.observe(balanceElement);
-    return () => observer.disconnect();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      document.documentElement.style.removeProperty("--header-logo-opacity");
+    };
   }, [safeAreaInsetTop]);
 
   const handleScrollToTop = useCallback(() => {
@@ -2544,38 +2622,35 @@ export default function Home() {
         className="min-h-screen font-sans overflow-hidden relative flex flex-col"
         style={{ background: "#fff" }}
       >
-        {/* Sticky Balance Pill — crossfades with logo in header */}
-        <AnimatePresence>
-          {showStickyBalance && !isLoading && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.7 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.7 }}
-              transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
-              onClick={handleScrollToTop}
-              className="fixed left-1/2 -translate-x-1/2 z-[51] flex items-center px-4 py-1.5 rounded-[54px] active:opacity-80 transition-opacity"
-              style={{
-                top: `${Math.max(safeAreaInsetTop || 0, 12) + 4}px`,
-                background: "#fff",
-              }}
+        {/* Sticky Balance Pill — scroll-driven crossfade with header logo */}
+        {!showBalanceSkeleton && (
+          <button
+            onClick={handleScrollToTop}
+            className="fixed left-1/2 -translate-x-1/2 z-[51] flex items-center px-4 py-1.5 rounded-[54px] active:opacity-80"
+            style={{
+              top: `${Math.max(safeAreaInsetTop || 0, 12) + 4}px`,
+              background: "#fff",
+              opacity: stickyBalanceOpacity,
+              pointerEvents: stickyBalanceOpacity > 0.1 ? "auto" : "none",
+              willChange: "opacity",
+            }}
+          >
+            <span
+              className="text-sm font-medium text-black"
+              style={{ fontVariantNumeric: "tabular-nums" }}
             >
-              <span
-                className="text-sm font-medium text-black"
-                style={{ fontVariantNumeric: "tabular-nums" }}
-              >
-                {displayCurrency === "USD"
-                  ? `$${usdBalanceNumeric.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}`
-                  : `${solBalanceNumeric.toLocaleString("en-US", {
-                      minimumFractionDigits: 4,
-                      maximumFractionDigits: 4,
-                    })} SOL`}
-              </span>
-            </motion.button>
-          )}
-        </AnimatePresence>
+              {displayCurrency === "USD"
+                ? `$${usdBalanceNumeric.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}`
+                : `${solBalanceNumeric.toLocaleString("en-US", {
+                    minimumFractionDigits: 4,
+                    maximumFractionDigits: 4,
+                  })} SOL`}
+            </span>
+          </button>
+        )}
 
         {/* Main Content */}
         <div className="relative flex-1 flex flex-col w-full">
@@ -2687,21 +2762,34 @@ export default function Home() {
                     className="active:scale-[0.98] transition-transform self-start"
                   >
                     {(() => {
-                      const value =
-                        displayCurrency === "USD"
-                          ? usdBalanceNumeric
-                          : solBalanceNumeric;
-                      const decimals = displayCurrency === "USD" ? 2 : 5;
-                      const intPart = Math.trunc(value);
-                      const decimalDigits = Math.round(
-                        Math.abs(value - intPart) * Math.pow(10, decimals)
-                      );
-                      const prefix = displayCurrency === "USD" ? "$" : "";
-                      const suffix = displayCurrency === "SOL" ? " SOL" : "";
                       const mainColor = balanceBg ? "white" : "#1c1c1e";
                       const decimalColor = balanceBg
                         ? "white"
                         : "rgba(60, 60, 67, 0.6)";
+
+                      if (showBalanceSkeleton) {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <div className="w-40 h-10 bg-white/20 animate-pulse rounded" />
+                            <div className="w-16 h-8 bg-white/20 animate-pulse rounded" />
+                          </div>
+                        );
+                      }
+
+                      const value =
+                        displayCurrency === "USD"
+                          ? usdBalanceNumeric
+                          : solBalanceNumeric;
+                      const decimals = displayCurrency === "USD" ? 2 : 4;
+                      const prefix = displayCurrency === "USD" ? "$" : "";
+                      const suffix = displayCurrency === "SOL" ? " SOL" : "";
+
+                      // Convert to a stable fixed string so decimal digits never drift due to float math.
+                      const fixed = value.toFixed(decimals);
+                      const [intStr, decStr = "0"] = fixed.split(".");
+                      const intPart = Number(intStr);
+                      const decimalDigits = Number(decStr);
+
                       return (
                         <span
                           className="font-semibold inline-flex items-baseline"
@@ -2747,15 +2835,19 @@ export default function Home() {
                         color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
                       }}
                     >
-                      {displayCurrency === "USD"
-                        ? `${solBalanceNumeric.toLocaleString("en-US", {
-                            minimumFractionDigits: 4,
-                            maximumFractionDigits: 4,
-                          })} SOL`
-                        : `$${usdBalanceNumeric.toLocaleString("en-US", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}`}
+                      {showSecondarySkeleton ? (
+                        <span className="inline-block w-28 h-5 bg-white/20 animate-pulse rounded" />
+                      ) : displayCurrency === "USD" ? (
+                        `${solBalanceNumeric.toLocaleString("en-US", {
+                          minimumFractionDigits: 4,
+                          maximumFractionDigits: 4,
+                        })} SOL`
+                      ) : (
+                        `$${usdBalanceNumeric.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
+                      )}
                     </span>
                   </div>
                 </div>
@@ -2797,7 +2889,7 @@ export default function Home() {
               icon={<ArrowUp />}
               label="Send"
               onClick={() => handleOpenSendSheet()}
-              disabled={balance === null || balance === 0}
+              disabled={solBalanceLamports === null || solBalanceLamports === 0}
             />
             <ActionButton
               icon={<ArrowDown />}
@@ -2807,10 +2899,7 @@ export default function Home() {
             <ActionButton
               icon={<RefreshCcw />}
               label="Swap"
-              onClick={() => {
-                hapticFeedback.impactOccurred("light");
-                setSwapSheetOpen(true);
-              }}
+              onClick={handleOpenSwapSheet}
             />
             <ActionButton
               icon={<ScanIcon />}
@@ -2819,6 +2908,9 @@ export default function Home() {
               disabled={!isMobilePlatform}
             />
           </div>
+
+          {/* Banner Carousel */}
+          <BannerCarousel isMobilePlatform={isMobilePlatform} />
 
           {/* Tokens Section */}
           {(() => {
@@ -2846,11 +2938,13 @@ export default function Home() {
                 </div>
                 <div className="flex flex-col gap-2 items-center px-4 pb-4">
                   {displayTokens.slice(0, 5).map((token) => {
+                    const iconSrc = resolveTokenIcon(token);
                     const displaySymbol =
                       token.symbol === "SOL" &&
                       token.name.toLowerCase().includes("wrapped")
                         ? "wSOL"
                         : token.symbol;
+
                     return (
                       <div
                         key={`${token.mint} (${token.name})${
@@ -2863,14 +2957,12 @@ export default function Home() {
                         <div className="py-1.5 pr-3">
                           <div className="w-12 h-12 relative">
                             <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
-                              {token.imageUrl && (
-                                <Image
-                                  src={token.imageUrl}
-                                  alt={displaySymbol}
-                                  fill
-                                  className="object-cover"
-                                />
-                              )}
+                              <Image
+                                src={iconSrc}
+                                alt={displaySymbol}
+                                fill
+                                className="object-cover"
+                              />
                             </div>
                             {token.isSecured && (
                               <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
@@ -3275,7 +3367,7 @@ export default function Home() {
                               {/* Left - Icon */}
                               <div className="py-1.5 pr-3">
                                 <div className="w-12 h-12 relative">
-                                  <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
+                                  <div className="absolute left-0 top-0 w-8 h-8 rounded-full overflow-hidden bg-[#f2f2f7]">
                                     <Image
                                       src={
                                         transaction.secureTokenIcon ||
@@ -3288,23 +3380,31 @@ export default function Home() {
                                       className="object-cover"
                                     />
                                   </div>
-                                  {isSecureTransaction && (
-                                    <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
-                                      <Image
-                                        src="/Shield.svg"
-                                        alt="Shield"
-                                        width={20}
-                                        height={20}
-                                      />
-                                    </div>
-                                  )}
+                                  <div className="absolute bottom-0 right-0 w-8 h-8">
+                                    <Image
+                                      src={
+                                        isSecureTransaction
+                                          ? "/icons/Shield_32.png"
+                                          : "/icons/Unshield_32.png"
+                                      }
+                                      alt={
+                                        isSecureTransaction
+                                          ? "Shielded"
+                                          : "Unshielded"
+                                      }
+                                      width={32}
+                                      height={32}
+                                    />
+                                  </div>
                                 </div>
                               </div>
 
                               {/* Middle - Text */}
                               <div className="flex-1 py-2.5 flex flex-col gap-0.5">
                                 <p className="text-base text-black leading-5">
-                                  {isSecureTransaction ? "Secure" : "Unshield"}
+                                  {isSecureTransaction
+                                    ? "Shielded"
+                                    : "Unshielded"}
                                 </p>
                                 <p
                                   className="text-[13px] leading-4"
@@ -3325,6 +3425,134 @@ export default function Home() {
                                     : `${formatTransactionAmount(
                                         transaction.amountLamports
                                       )} SOL`}
+                                </p>
+                                <p
+                                  className="text-[13px] leading-4"
+                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                >
+                                  {timestamp.toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                  ,{" "}
+                                  {timestamp.toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })}
+                                </p>
+                              </div>
+                            </motion.button>
+                          );
+                        }
+
+                        // Swap transaction view
+                        if (transaction.transferType === "swap") {
+                          const swapFromHolding = transaction.swapFromMint
+                            ? tokenHoldings.find(
+                                (h) => h.mint === transaction.swapFromMint
+                              )
+                            : undefined;
+                          const swapToHolding = transaction.swapToMint
+                            ? tokenHoldings.find(
+                                (h) => h.mint === transaction.swapToMint
+                              )
+                            : undefined;
+                          const swapFromIcon = transaction.swapFromMint
+                            ? resolveTokenIcon({
+                                mint: transaction.swapFromMint,
+                                imageUrl: swapFromHolding?.imageUrl,
+                              })
+                            : "/tokens/solana-sol-logo.png";
+                          const swapToIcon = transaction.swapToMint
+                            ? resolveTokenIcon({
+                                mint: transaction.swapToMint,
+                                imageUrl: swapToHolding?.imageUrl,
+                              })
+                            : "/tokens/solana-sol-logo.png";
+                          const swapFromSymbol =
+                            transaction.swapFromSymbol ||
+                            swapFromHolding?.symbol ||
+                            "?";
+                          const swapToSymbol =
+                            transaction.swapToSymbol ||
+                            swapToHolding?.symbol ||
+                            "?";
+                          const swapToAmount = transaction.swapToAmount;
+
+                          return (
+                            <motion.button
+                              key={transaction.id}
+                              layout
+                              initial={
+                                isNewTransaction
+                                  ? { opacity: 0, scale: 0.85, y: -10 }
+                                  : false
+                              }
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.85 }}
+                              transition={{
+                                layout: {
+                                  type: "spring",
+                                  stiffness: 500,
+                                  damping: 35,
+                                },
+                                opacity: { duration: 0.25 },
+                                scale: {
+                                  duration: 0.3,
+                                  ease: [0.34, 1.56, 0.64, 1],
+                                },
+                              }}
+                              onClick={() =>
+                                handleOpenWalletTransactionDetails(transaction)
+                              }
+                              className="flex items-center px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
+                            >
+                              {/* Swap token icons - from (back) + to (front) */}
+                              <div className="py-1.5 pr-3">
+                                <div className="w-12 h-12 relative">
+                                  <div className="absolute left-0.5 top-0.5 w-7 h-7 rounded-full border-2 border-white overflow-hidden bg-[#f2f2f7]">
+                                    <Image
+                                      src={swapFromIcon}
+                                      alt={swapFromSymbol}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                  <div className="absolute right-0.5 bottom-0.5 w-7 h-7 rounded-full border-2 border-white overflow-hidden bg-[#f2f2f7]">
+                                    <Image
+                                      src={swapToIcon}
+                                      alt={swapToSymbol}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Middle - Text */}
+                              <div className="flex-1 py-2.5 flex flex-col gap-0.5">
+                                <p className="text-base text-black leading-5">
+                                  Swap
+                                </p>
+                                <p
+                                  className="text-[13px] leading-4"
+                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                >
+                                  {swapFromSymbol} to {swapToSymbol}
+                                </p>
+                              </div>
+
+                              {/* Right - Value */}
+                              <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
+                                <p
+                                  className="text-base leading-5"
+                                  style={{ color: "#32e55e" }}
+                                >
+                                  {swapToAmount != null
+                                    ? `+${swapToAmount.toLocaleString("en-US", {
+                                        maximumFractionDigits: 4,
+                                      })} ${swapToSymbol}`
+                                    : "Swap"}
                                 </p>
                                 <p
                                   className="text-[13px] leading-4"
@@ -3518,10 +3746,8 @@ export default function Home() {
         onFormValuesChange={handleSendFormValuesChange}
         step={sendStep}
         onStepChange={setSendStep}
-        balance={balance}
+        balance={solBalanceLamports}
         walletAddress={walletAddress ?? undefined}
-        starsBalance={starsBalance}
-        onTopUpStars={handleTopUpStars}
         solPriceUsd={solPriceUsd}
         isSolPriceLoading={isSolPriceLoading}
         sentAmountSol={sentAmountSol}
@@ -3552,7 +3778,7 @@ export default function Home() {
         onSwapParamsChange={handleSwapParamsChange}
         onSecureParamsChange={handleSecureParamsChange}
         activeTab={swapActiveTab}
-        onTabChange={setSwapActiveTab}
+        onTabChange={handleSwapTabChange}
         secureDirection={secureDirection}
         onSecureDirectionChange={setSecureDirection}
         view={swapView}
@@ -3576,6 +3802,7 @@ export default function Home() {
         showSuccess={showClaimSuccess}
         showError={claimError}
         solPriceUsd={solPriceUsd}
+        tokenHoldings={tokenHoldings}
         onShare={
           selectedTransaction?.transferType === "deposit_for_username"
             ? handleShareDepositTransaction
@@ -3597,6 +3824,7 @@ export default function Home() {
         walletTransactions={walletTransactions}
         incomingTransactions={incomingTransactions}
         onTransactionClick={handleOpenWalletTransactionDetails}
+        tokenHoldings={tokenHoldings}
         isLoading={
           (isFetchingTransactions && walletTransactions.length === 0) ||
           (isFetchingDeposits && incomingTransactions.length === 0)

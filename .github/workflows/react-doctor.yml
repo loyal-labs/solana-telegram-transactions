@@ -1,0 +1,56 @@
+name: React Doctor
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "app/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  react-doctor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Run react-doctor on the app directory, scanning only files changed in this PR.
+
+            Execute this command:
+            ```
+            npx -y react-doctor@latest ./app --diff origin/${{ github.base_ref }} --verbose
+            ```
+
+            After the scan completes, format your response as:
+
+            ## React Doctor Score: **X/100**
+
+            | Category | Issues |
+            |----------|--------|
+            | ... | ... |
+
+            ### Top 5 Issues
+            1. ...
+
+            Where X is the actual score from the scan.
+
+            If the command fails or produces no output, report that react-doctor
+            could not run and include the error message.
+          claude_args: >-
+            --model claude-sonnet-4-6
+            --max-turns 5
+            --allowedTools Bash(npx*)

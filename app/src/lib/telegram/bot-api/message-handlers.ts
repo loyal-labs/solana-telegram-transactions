@@ -2,22 +2,9 @@ import { and, eq } from "drizzle-orm";
 import type { Bot, Context } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
-import {
-  communities,
-  communityMembers,
-  messages,
-  summaries,
-} from "@/lib/core/schema";
+import { communities, communityMembers, messages } from "@/lib/core/schema";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
-import {
-  getTelegramDisplayName,
-  isCommunityChat,
-  isGroupChat,
-  SUMMARY_INTERVAL_MS,
-} from "@/lib/telegram/utils";
-
-import { getBot } from "./bot";
-import { generateChatSummary, sendLatestSummary } from "./summaries";
+import { getTelegramDisplayName, isCommunityChat, isGroupChat } from "@/lib/telegram/utils";
 
 const POSITIVE_REACTIONS = [
   "❤",
@@ -63,8 +50,12 @@ export async function handleGLoyalReaction(ctx: Context, bot: Bot): Promise<void
 
 // Cache of active community IDs (chatId string -> communityUUID)
 const activeCommunities = new Map<string, string>();
-// Cache last summary timestamps (communityUUID -> ISO date string)
-const lastSummaryTimestamps = new Map<string, string>();
+
+export function evictActiveCommunityCache(
+  chatId: bigint | number | string
+): void {
+  activeCommunities.delete(String(chatId));
+}
 
 export async function handleCommunityMessage(ctx: Context): Promise<void> {
   const chat = ctx.chat;
@@ -121,74 +112,7 @@ export async function handleCommunityMessage(ctx: Context): Promise<void> {
         content: message.text,
       })
       .onConflictDoNothing();
-
-    // Check if summary is needed
-    const chatTitle =
-      "title" in chat ? (chat.title as string) : `Chat ${chatIdStr}`;
-    triggerSummaryIfNeeded(communityId, chatTitle, chatId);
   } catch (error) {
     console.error("Failed to handle community message", error);
-  }
-}
-
-function triggerSummaryIfNeeded(
-  communityId: string,
-  chatTitle: string,
-  chatId: bigint
-) {
-  const now = Date.now();
-
-  // Check cache first
-  const cachedTimestamp = lastSummaryTimestamps.get(communityId);
-  if (cachedTimestamp) {
-    const elapsed = now - new Date(cachedTimestamp).getTime();
-    if (elapsed < SUMMARY_INTERVAL_MS) return;
-  }
-
-  // Check DB for last summary if not cached (async, fire-and-forget style)
-  checkAndTriggerSummary(communityId, chatTitle, cachedTimestamp, chatId).catch(
-    console.error
-  );
-}
-
-async function checkAndTriggerSummary(
-  communityId: string,
-  chatTitle: string,
-  cachedTimestamp: string | undefined,
-  chatId: bigint
-) {
-  const now = Date.now();
-  const db = getDatabase();
-
-  // Check DB for last summary if not cached
-  if (!cachedTimestamp) {
-    const latestSummary = await db.query.summaries.findFirst({
-      where: eq(summaries.communityId, communityId),
-      orderBy: (summaries, { desc }) => [desc(summaries.createdAt)],
-    });
-
-    if (latestSummary) {
-      const timestamp = latestSummary.createdAt.toISOString();
-      lastSummaryTimestamps.set(communityId, timestamp);
-      const elapsed = now - latestSummary.createdAt.getTime();
-      if (elapsed < SUMMARY_INTERVAL_MS) return;
-    }
-  }
-
-  // Generate summary and only update timestamp on success
-  try {
-    await generateChatSummary(communityId, chatTitle);
-    lastSummaryTimestamps.set(communityId, new Date().toISOString());
-
-    // Auto-post the summary to the chat
-    try {
-      const bot = await getBot();
-      await sendLatestSummary(bot, chatId);
-    } catch (postError) {
-      console.error("Failed to auto-post summary", postError);
-    }
-  } catch (error) {
-    console.error("Summary generation failed, will retry later", error);
-    // Don't update timestamp on failure - allows retry on next message
   }
 }

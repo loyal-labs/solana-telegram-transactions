@@ -1,14 +1,19 @@
 # Environment Variables
 
-All environment variables used by `/app/src/lib/`.
+All environment variables used by `/app/src/`.
+
+Environment access is centralized in:
+- `core/config/public.ts` for `NEXT_PUBLIC_*` values
+- `core/config/server.ts` for server-only values
 
 ## Required
 
 | Variable | Used By | Description |
 |----------|---------|-------------|
 | `NEXT_PUBLIC_TELEGRAM_BOT_ID` | `constants.ts` | Telegram bot ID |
-| `NEXT_PUBLIC_SOLANA_ENV` | `solana/rpc/` | `"mainnet"`, `"devnet"`, or `"localnet"` (defaults to devnet) |
-| `ASKLOYAL_TGBOT_KEY` | `telegram/bot-api/` | Telegram bot token from BotFather |
+| `NEXT_PUBLIC_SOLANA_ENV` | `solana/rpc/` | `"mainnet"`, `"testnet"`, `"devnet"`, or `"localnet"` (defaults to devnet) |
+| `ASKLOYAL_TGBOT_KEY` | `telegram/bot-api/` | Telegram bot token from BotFather (bot API only) |
+| `TELEGRAM_SETUP_SECRET` | `api/telegram/setup-commands` | Bearer token for `/api/telegram/setup-commands` |
 | `REDPILL_AI_API_KEY` | `redpill/` | API key for RedPill AI service |
 | `DATABASE_URL` | `core/database.ts` | Neon PostgreSQL connection string |
 | `MESSAGE_ENCRYPTION_KEY` | `encryption/` | Base64-encoded 32-byte key for AES-256-GCM |
@@ -18,8 +23,34 @@ All environment variables used by `/app/src/lib/`.
 | Variable | Used By | Description |
 |----------|---------|-------------|
 | `NEXT_PUBLIC_SERVER_HOST` | `core/api.ts` | Base URL for API endpoints |
-| `DEPLOYMENT_PK` | `solana/wallet/` | Deployment keypair for gasless transactions (base58) |
+| `DEPLOYMENT_PK` | `solana/wallet/gasless-keypair.server.ts` | Gasless payer keypair (required for gasless claim flow) |
 | `NEXT_PUBLIC_GAS_PUBLIC_KEY` | `solana/wallet/` | Public key for gasless payer |
+
+## Cloudflare R2/CDN (Feature-specific)
+
+These are required only when using `core/r2-upload.ts` and `core/cdn-url.ts`.
+
+### R2 Upload Client (`core/r2-upload.ts`)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CLOUDFLARE_R2_ACCOUNT_ID` | Yes | Cloudflare account ID for R2 endpoint construction |
+| `CLOUDFLARE_R2_ACCESS_KEY_ID` | Yes | R2 access key ID (S3-compatible token) |
+| `CLOUDFLARE_R2_SECRET_ACCESS_KEY` | Yes | R2 secret access key |
+| `CLOUDFLARE_R2_BUCKET_NAME` | Yes | Bucket name to upload into |
+| `CLOUDFLARE_R2_S3_ENDPOINT` | No | Custom S3 endpoint override. Default: `https://<account_id>.r2.cloudflarestorage.com` |
+| `CLOUDFLARE_R2_UPLOAD_PREFIX` | No | Prefix prepended to all object keys (e.g. `telegram/photos`) |
+
+### CDN URL Client (`core/cdn-url.ts`)
+
+At least one base URL must be set:
+
+| Variable | Recommended | Description |
+|----------|-------------|-------------|
+| `CLOUDFLARE_CDN_BASE_URL` | Yes | Primary server-side CDN base URL (for example custom domain) |
+| `NEXT_PUBLIC_CLOUDFLARE_CDN_BASE_URL` | Optional | Public CDN base URL accessible in client bundles if needed |
+| `CLOUDFLARE_R2_PUBLIC_DEV_URL` | Dev only | Fallback R2 public dev URL (for example `https://pub-xxxx.r2.dev`) |
+| `NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_DEV_URL` | Dev only | Public variant of the R2 dev URL |
 
 ## Example `.env.local`
 
@@ -27,8 +58,9 @@ All environment variables used by `/app/src/lib/`.
 # Telegram
 NEXT_PUBLIC_TELEGRAM_BOT_ID=your_bot_id
 ASKLOYAL_TGBOT_KEY=your_bot_token
+TELEGRAM_SETUP_SECRET=your_setup_secret
 
-# Solana - use "mainnet", "devnet", or "localnet"
+# Solana - use "mainnet", "testnet", "devnet", or "localnet"
 NEXT_PUBLIC_SOLANA_ENV=devnet
 
 # AI
@@ -42,6 +74,23 @@ MESSAGE_ENCRYPTION_KEY=your_base64_key
 
 # Optional - API host
 NEXT_PUBLIC_SERVER_HOST=https://your-api.com
+
+# Optional - Cloudflare R2/CDN
+CLOUDFLARE_R2_ACCOUNT_ID=your_account_id
+CLOUDFLARE_R2_ACCESS_KEY_ID=your_r2_access_key_id
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
+CLOUDFLARE_R2_BUCKET_NAME=your_bucket_name
+# Optional override
+# CLOUDFLARE_R2_S3_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com
+# Optional prefix for object keys
+# CLOUDFLARE_R2_UPLOAD_PREFIX=telegram/photos
+
+# Preferred public URL for frontend links
+CLOUDFLARE_CDN_BASE_URL=https://cdn.your-domain.com
+# Optional public build-time variant
+# NEXT_PUBLIC_CLOUDFLARE_CDN_BASE_URL=https://cdn.your-domain.com
+# Dev fallback if no custom domain exists yet
+# CLOUDFLARE_R2_PUBLIC_DEV_URL=https://pub-xxxx.r2.dev
 ```
 
 ## Localnet Setup
@@ -59,6 +108,7 @@ NEXT_PUBLIC_SOLANA_ENV=localnet bun dev
 | Environment | RPC Endpoint | WebSocket |
 |-------------|--------------|-----------|
 | `mainnet` | Helius mainnet | Helius WSS |
+| `testnet` | Solana testnet RPC | Solana testnet WS |
 | `devnet` | Helius devnet | Helius WSS |
 | `localnet` | `http://127.0.0.1:8899` | `ws://127.0.0.1:8900` |
 

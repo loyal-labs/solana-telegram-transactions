@@ -1,27 +1,36 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDatabase } from "@/lib/core/database";
 import { communities, summaries, type Summary } from "@/lib/core/schema";
 
+type CommunityPhotoSettings = {
+  photoBase64?: string;
+  photoMimeType?: string;
+};
+
 export async function GET(req: Request): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(req.url);
-    const chatId = searchParams.get("chatId");
+    const groupChatId = searchParams.get("groupChatId");
     const db = getDatabase();
 
-    const result = chatId
-      ? await fetchSummariesByChatId(db, chatId)
-      : await db.query.summaries.findMany({
-          with: { community: true },
-          orderBy: [desc(summaries.createdAt)],
-        });
+    const result = groupChatId
+      ? await fetchSummariesByGroupChatId(db, groupChatId)
+      : (
+          await db
+            .select({
+              summary: summaries,
+              community: communities,
+            })
+            .from(summaries)
+            .innerJoin(communities, eq(summaries.communityId, communities.id))
+            .where(eq(communities.isPublic, true))
+            .orderBy(desc(summaries.createdAt))
+        ).map(({ summary, community }) => ({ ...summary, community }));
 
     const transformedSummaries = result.map((item) => {
-      const settings = item.community.settings as {
-        photoBase64?: string;
-        photoMimeType?: string;
-      } | null;
+      const settings = item.community.settings as CommunityPhotoSettings | null;
       return {
         id: item.id,
         chatId: String(item.community.chatId),
@@ -54,12 +63,15 @@ type SummaryWithCommunity = Summary & {
   community: { chatId: bigint; settings: unknown };
 };
 
-async function fetchSummariesByChatId(
+async function fetchSummariesByGroupChatId(
   db: ReturnType<typeof getDatabase>,
-  chatId: string
+  groupChatId: string
 ): Promise<SummaryWithCommunity[]> {
   const community = await db.query.communities.findFirst({
-    where: eq(communities.chatId, BigInt(chatId)),
+    where: and(
+      eq(communities.chatId, BigInt(groupChatId)),
+      eq(communities.isPublic, true)
+    ),
   });
 
   if (!community) return [];

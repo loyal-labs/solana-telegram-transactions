@@ -2,13 +2,134 @@ import { eq } from "drizzle-orm";
 
 import { getDatabase } from "@/lib/core/database";
 import { users } from "@/lib/core/schema";
+import { captureTelegramProfilePhotoToCdn } from "@/lib/telegram/profile-photo-service";
 
-// Cache of known users (telegramId string -> userUUID)
-const knownUsers = new Map<string, string>();
+type KnownUser = {
+  id: string;
+  hasAvatar: boolean;
+};
+
+// Cache of known users (telegramId string -> user metadata)
+const knownUsers = new Map<string, KnownUser>();
+// In-flight dedupe for get/create operations (telegramId string -> Promise<userUUID>)
+const inFlightUsers = new Map<string, Promise<string>>();
+// In-flight dedupe for avatar backfills (telegramId string -> Promise<didUpdate>)
+const inFlightAvatarBackfills = new Map<string, Promise<boolean>>();
+
+async function backfillUserAvatar(
+  telegramId: bigint,
+  userId: string
+): Promise<boolean> {
+  const telegramIdStr = String(telegramId);
+  const pendingBackfill = inFlightAvatarBackfills.get(telegramIdStr);
+  if (pendingBackfill) {
+    return pendingBackfill;
+  }
+
+  const backfillPromise = (async () => {
+    const avatarUrl = await captureTelegramProfilePhotoToCdn(telegramId);
+
+    if (!avatarUrl) {
+      return false;
+    }
+
+    const db = getDatabase();
+    await db
+      .update(users)
+      .set({
+        avatarUrl,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    knownUsers.set(telegramIdStr, {
+      id: userId,
+      hasAvatar: true,
+    });
+
+    return true;
+  })().finally(() => {
+    inFlightAvatarBackfills.delete(telegramIdStr);
+  });
+
+  inFlightAvatarBackfills.set(telegramIdStr, backfillPromise);
+  return backfillPromise;
+}
+
+async function resolveOrCreateUser(
+  telegramId: bigint,
+  userData: {
+    username: string | null;
+    displayName: string;
+  },
+  options: {
+    backfillAvatar: boolean;
+  }
+): Promise<string> {
+  const telegramIdStr = String(telegramId);
+  const db = getDatabase();
+
+  const existingUser = await db.query.users.findFirst({
+    where: eq(users.telegramId, telegramId),
+  });
+
+  if (existingUser) {
+    const hasAvatar = Boolean(existingUser.avatarUrl);
+    knownUsers.set(telegramIdStr, {
+      id: existingUser.id,
+      hasAvatar,
+    });
+
+    if (!hasAvatar && options.backfillAvatar) {
+      await backfillUserAvatar(telegramId, existingUser.id);
+    }
+
+    return existingUser.id;
+  }
+
+  const insertedUser = await db
+    .insert(users)
+    .values({
+      telegramId,
+      username: userData.username,
+      displayName: userData.displayName,
+    })
+    .onConflictDoNothing()
+    .returning({
+      id: users.id,
+      avatarUrl: users.avatarUrl,
+    });
+
+  const userRecord =
+    insertedUser[0] ??
+    (await db.query.users.findFirst({
+      where: eq(users.telegramId, telegramId),
+      columns: {
+        id: true,
+        avatarUrl: true,
+      },
+    }));
+
+  if (!userRecord) {
+    throw new Error(`Failed to resolve user ${telegramIdStr} after conflict`);
+  }
+
+  const hasAvatar = Boolean(userRecord.avatarUrl);
+  knownUsers.set(telegramIdStr, {
+    id: userRecord.id,
+    hasAvatar,
+  });
+
+  if (!hasAvatar && options.backfillAvatar) {
+    await backfillUserAvatar(telegramId, userRecord.id);
+  }
+
+  return userRecord.id;
+}
 
 /**
  * Gets or creates a user by their Telegram ID.
- * Uses an in-memory cache to avoid repeated database queries.
+ * Uses in-memory caches to reduce duplicate DB/network work.
  * Returns the user's UUID.
  */
 export async function getOrCreateUser(
@@ -16,38 +137,37 @@ export async function getOrCreateUser(
   userData: {
     username: string | null;
     displayName: string;
+  },
+  options?: {
+    backfillAvatar?: boolean;
   }
 ): Promise<string> {
   const telegramIdStr = String(telegramId);
+  const cachedUser = knownUsers.get(telegramIdStr);
+  const shouldBackfillAvatar = options?.backfillAvatar ?? true;
 
-  // Check cache first
-  const cachedUserId = knownUsers.get(telegramIdStr);
-  if (cachedUserId) {
-    return cachedUserId;
+  if (cachedUser) {
+    if (!cachedUser.hasAvatar && shouldBackfillAvatar) {
+      await backfillUserAvatar(telegramId, cachedUser.id);
+    }
+    return cachedUser.id;
   }
 
-  const db = getDatabase();
+  const pendingUser = inFlightUsers.get(telegramIdStr);
+  if (pendingUser) {
+    return pendingUser;
+  }
 
-  // Check database
-  const existingUser = await db.query.users.findFirst({
-    where: eq(users.telegramId, telegramId),
+  const resolvePromise = resolveOrCreateUser(
+    telegramId,
+    userData,
+    {
+      backfillAvatar: shouldBackfillAvatar,
+    }
+  ).finally(() => {
+    inFlightUsers.delete(telegramIdStr);
   });
 
-  if (existingUser) {
-    knownUsers.set(telegramIdStr, existingUser.id);
-    return existingUser.id;
-  }
-
-  // Create new user
-  const [newUser] = await db
-    .insert(users)
-    .values({
-      telegramId,
-      username: userData.username,
-      displayName: userData.displayName,
-    })
-    .returning({ id: users.id });
-
-  knownUsers.set(telegramIdStr, newUser.id);
-  return newUser.id;
+  inFlightUsers.set(telegramIdStr, resolvePromise);
+  return resolvePromise;
 }

@@ -9,10 +9,11 @@ import {
   addMessage,
   getOrCreateThread,
   getThreadMessagesForAI,
+  updateThread,
 } from "@/lib/telegram/bot-thread-service";
 import { streamResponse } from "@/lib/telegram/streaming-service";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
-import { getTelegramDisplayName } from "@/lib/telegram/utils";
+import { getTelegramDisplayName, isPrivateChat } from "@/lib/telegram/utils";
 
 // ============================================================================
 // CONSTANTS
@@ -32,6 +33,51 @@ Guidelines:
 // ============================================================================
 // PUBLIC API
 // ============================================================================
+
+/**
+ * Syncs a DM topic creation event to our bot thread store.
+ * This keeps thread metadata ready before the first user text message arrives.
+ */
+export async function handleDirectTopicCreatedMessage(
+  ctx: Context
+): Promise<void> {
+  const message = ctx.message;
+  const chat = ctx.chat;
+  const from = message?.from;
+
+  if (!chat || !isPrivateChat(chat.type)) {
+    return;
+  }
+
+  const telegramThreadId = message?.message_thread_id;
+  const topicName = message?.forum_topic_created?.name;
+
+  if (!message || !from || telegramThreadId === undefined || !topicName) {
+    console.warn("Missing required fields in direct topic created message");
+    return;
+  }
+
+  try {
+    const displayName = getTelegramDisplayName(from);
+    const telegramChatId = BigInt(chat.id);
+    const telegramUserId = BigInt(from.id);
+    const userId = await getOrCreateUser(telegramUserId, {
+      username: from.username || null,
+      displayName,
+    });
+
+    const threadId = await getOrCreateThread({
+      userId,
+      telegramChatId,
+      telegramThreadId,
+      title: topicName,
+    });
+
+    await updateThread(threadId, { title: topicName });
+  } catch (error) {
+    console.error("Error handling direct topic created message:", error);
+  }
+}
 
 /**
  * Handles a direct message from a user to the bot.
@@ -97,7 +143,9 @@ export async function handleDirectMessage(
 
     if (!userMsgId) {
       console.error("Failed to store user message");
-      await ctx.reply("Sorry, I couldn't process your message. Please try again.");
+      await ctx.reply("Sorry, I couldn't process your message. Please try again.", {
+        message_thread_id: telegramThreadId,
+      });
       return;
     }
 
@@ -121,7 +169,10 @@ export async function handleDirectMessage(
     // Send error message to user
     try {
       await ctx.reply(
-        "Sorry, I encountered an error processing your message. Please try again."
+        "Sorry, I encountered an error processing your message. Please try again.",
+        {
+          message_thread_id: telegramThreadId,
+        }
       );
     } catch (replyError) {
       console.error("Failed to send error reply:", replyError);

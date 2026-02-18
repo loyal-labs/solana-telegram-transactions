@@ -1,4 +1,30 @@
 # How-tos
+## Commit Message Style
+We use Conventional Commits for commit messages and pull request titles.
+
+1. Install dependencies:
+```bash
+bun install
+```
+
+2. Enable repo hooks (one-time per clone):
+```bash
+./scripts/setup-git-hooks.sh
+```
+
+Enabled hooks:
+- `commit-msg`: validates Conventional Commit messages.
+- `pre-push`: runs `cd app && bun run lint` to catch lint issues before push.
+- Bypass only when necessary: `SKIP_VERIFY=1 git push`
+- CI note: app build is not run in GitHub Actions; Vercel is the build/deploy gate.
+
+3. Optional local check:
+```bash
+echo "feat(scope): short description" | bunx commitlint --verbose
+```
+
+GitHub pull requests also enforce commit messages and PR titles with the same rules.
+
 ## Local Development
 1. Run Solana validator
 ```bash

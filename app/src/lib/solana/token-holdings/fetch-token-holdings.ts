@@ -1,15 +1,17 @@
 import { PublicKey } from "@solana/web3.js";
 
-import { NATIVE_SOL_DECIMALS, NATIVE_SOL_MINT } from "@/lib/constants";
-
 import { fetchJson } from "../../core/http";
 import { getSolanaEnv } from "../rpc/connection";
 import {
   SECURE_DEVNET_RPC_URL,
   SECURE_MAINNET_RPC_URL,
-  TESTNET_RPC_URL,
 } from "../rpc/constants";
-import { CACHE_TTL_MS } from "./constants";
+import {
+  CACHE_TTL_MS,
+  NATIVE_SOL_DECIMALS,
+  NATIVE_SOL_MINT,
+} from "./constants";
+import { resolveTokenIcon } from "./resolve-token-info";
 import type {
   CachedHoldings,
   HeliusAsset,
@@ -95,7 +97,7 @@ function mapNativeBalance(
     decimals: NATIVE_SOL_DECIMALS,
     priceUsd: price_per_sol ?? null,
     valueUsd: total_price ?? null,
-    imageUrl: "/tokens/solana-sol-logo.png",
+    imageUrl: resolveTokenIcon({ mint: NATIVE_SOL_MINT, imageUrl: null }),
   };
 }
 
@@ -157,8 +159,23 @@ export async function fetchTokenHoldings(
   }
 
   const inflight = inflightRequests.get(publicKey);
-  if (!forceRefresh && inflight) {
-    return inflight;
+  if (inflight) {
+    if (!forceRefresh) {
+      return inflight;
+    }
+
+    // If a force refresh arrives while another request is in flight, wait for
+    // it to settle and then issue a fresh request.
+    try {
+      await inflight;
+    } catch {
+      // Ignore previous request failure; a fresh forced request is next.
+    }
+
+    const nextInflight = inflightRequests.get(publicKey);
+    if (nextInflight) {
+      return nextInflight;
+    }
   }
 
   const rpcUrl = getRpcUrl();

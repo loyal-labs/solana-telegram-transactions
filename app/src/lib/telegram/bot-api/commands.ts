@@ -3,18 +3,52 @@ import type { CommandContext, Context } from "grammy";
 import { Bot, InlineKeyboard } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
-import { admins, communities } from "@/lib/core/schema";
+import { admins, communities, userSettings } from "@/lib/core/schema";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
 
-import { CA_COMMAND_CHAT_ID, MINI_APP_LINK } from "./constants";
+import {
+  createBotTrackingProperties,
+  type MixpanelTrackProperties,
+  trackBotEvent,
+} from "./analytics";
+import { CA_COMMAND_CHAT_ID } from "./constants";
 import { getChat } from "./get-chat";
-import { getFileUrl } from "./get-file";
+import { downloadTelegramFile } from "./get-file";
+import { evictActiveCommunityCache } from "./message-handlers";
+import { sendNotificationSettingsMessage } from "./notification-settings";
+import { sendStartCarousel } from "./start-carousel";
 import { sendLatestSummary } from "./summaries";
+import type { HandleSummaryCommandOptions } from "./types";
+import { sendUserSettingsMessage } from "./user-settings";
 
 interface CommunityPhoto {
   base64: string;
   mimeType: string;
+}
+
+const COMMUNITY_NOT_ACTIVATED_YET_REPLY_TEXT =
+  "This community is not activated yet. Use /activate_community to enable it.";
+const SETTINGS_LOAD_ERROR_REPLY_TEXT =
+  "Unable to load your settings right now. Please try again.";
+const UNAUTHORIZED_VISIBILITY_REPLY_TEXT =
+  "You are not authorized to manage community visibility. Contact an administrator to be added to the whitelist.";
+const VISIBILITY_UPDATE_ERROR_REPLY_TEXT =
+  "An error occurred while updating community visibility. Please try again.";
+
+type VisibilityAction = "HIDE" | "UNHIDE";
+
+const BOT_START_COMMAND_EVENT = "Bot /start Command";
+const BOT_SUMMARY_COMMAND_EVENT = "Bot /summary Command";
+
+function createCommandTrackingProperties(
+  ctx: CommandContext<Context>
+): MixpanelTrackProperties {
+  return createBotTrackingProperties({
+    chatId: ctx.chat?.id,
+    chatType: ctx.chat?.type,
+    userId: ctx.from?.id,
+  });
 }
 
 /**
@@ -29,16 +63,10 @@ async function fetchCommunityPhoto(
     if (!chatInfo.photo?.small_file_id) {
       return undefined;
     }
-    const photoUrl = await getFileUrl(chatInfo.photo.small_file_id);
-    const response = await fetch(photoUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch photo: ${response.status}`);
-    }
-    const contentType = response.headers.get("content-type") || "image/jpeg";
-    const buffer = await response.arrayBuffer();
+    const photo = await downloadTelegramFile(chatInfo.photo.small_file_id);
     return {
-      base64: Buffer.from(buffer).toString("base64"),
-      mimeType: contentType,
+      base64: photo.body.toString("base64"),
+      mimeType: photo.contentType,
     };
   } catch (error) {
     console.warn("Failed to fetch community photo:", error);
@@ -46,27 +74,58 @@ async function fetchCommunityPhoto(
   }
 }
 
+async function assertWhitelistedAdminOrThrow(
+  db: ReturnType<typeof getDatabase>,
+  telegramUserId: bigint,
+  action: VisibilityAction
+): Promise<void> {
+  const admin = await db.query.admins.findFirst({
+    where: eq(admins.telegramId, telegramUserId),
+  });
+
+  if (!admin) {
+    throw new Error(`UNAUTHORIZED_${action}`);
+  }
+}
+
+function isUnauthorizedVisibilityError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.message.startsWith("UNAUTHORIZED_HIDE") ||
+      error.message.startsWith("UNAUTHORIZED_UNHIDE"))
+  );
+}
+
+async function findActiveCommunityOrReply(
+  ctx: CommandContext<Context>,
+  db: ReturnType<typeof getDatabase>
+) {
+  if (!ctx.chat) {
+    return null;
+  }
+
+  const chatId = BigInt(ctx.chat.id);
+  const existingCommunity = await db.query.communities.findFirst({
+    where: eq(communities.chatId, chatId),
+  });
+
+  if (!existingCommunity || !existingCommunity.isActive) {
+    await ctx.reply(COMMUNITY_NOT_ACTIVATED_YET_REPLY_TEXT);
+    return null;
+  }
+
+  return existingCommunity;
+}
+
 export async function handleStartCommand(
   ctx: CommandContext<Context>,
   bot: Bot
 ): Promise<void> {
-  const welcomeText = `<b>Welcome to Loyal!</b>\n\nThis bot utilizes Loyal private AI to summarize, prioritize and filter your Telegram chat.\n\nAll your messages are encrypted, and neither the Loyal team nor our compute providers can see them. For more info, visit our GitHub: https://github.com/loyal-labs\n\nWARNING: this product is in open test phase, so the functionality may be incomplete and you may encounter bugs.\n\nWe appreciate any feedback in our @loyal_tgchat`;
-  const buttonText = "Go Loyal";
-  const keyboard = new InlineKeyboard().url(buttonText, MINI_APP_LINK);
-
-  const user = ctx.from;
-  if (!user) {
-    console.error("User not found in start command");
-    return;
-  }
-  const userId = user.id;
-
-  const welcomeMessage = await bot.api.sendMessage(userId, welcomeText, {
-    reply_markup: keyboard,
-    parse_mode: "HTML",
-  });
-
-  await bot.api.pinChatMessage(userId, welcomeMessage.message_id);
+  await sendStartCarousel(ctx, bot);
+  trackBotEvent(
+    BOT_START_COMMAND_EVENT,
+    createCommandTrackingProperties(ctx)
+  );
 }
 
 export async function handleCaCommand(
@@ -146,8 +205,7 @@ export async function handleCaCommand(
 }
 
 export async function handleActivateCommunityCommand(
-  ctx: CommandContext<Context>,
-  bot: Bot
+  ctx: CommandContext<Context>
 ): Promise<void> {
   if (!ctx.from || !ctx.chat) return;
 
@@ -177,13 +235,6 @@ export async function handleActivateCommunityCommand(
       await ctx.reply(
         "You are not authorized to activate communities. Contact an administrator to be added to the whitelist."
       );
-      return;
-    }
-
-    // Check if user is a Telegram group admin
-    const member = await bot.api.getChatMember(ctx.chat.id, ctx.from.id);
-    if (member.status !== "creator" && member.status !== "administrator") {
-      await ctx.reply("Only group admins can activate community tracking.");
       return;
     }
 
@@ -251,6 +302,7 @@ export async function handleActivateCommunityCommand(
       chatId,
       chatTitle: ctx.chat.title || "Untitled",
       activatedBy: telegramUserId,
+      isPublic: false,
       settings,
     });
 
@@ -265,7 +317,8 @@ export async function handleActivateCommunityCommand(
 
 export async function handleSummaryCommand(
   ctx: CommandContext<Context>,
-  bot: Bot
+  bot: Bot,
+  options?: HandleSummaryCommandOptions
 ): Promise<void> {
   if (!ctx.chat) return;
 
@@ -274,21 +327,36 @@ export async function handleSummaryCommand(
     return;
   }
 
-  const chatId = BigInt(ctx.chat.id);
+  const requestChatId = BigInt(ctx.chat.id);
+  const summarySourceChatId = options?.summarySourceChatId ?? requestChatId;
 
   try {
-    const result = await sendLatestSummary(bot, chatId, ctx.msg?.message_id);
+    const result = await sendLatestSummary(bot, summarySourceChatId, {
+      destinationChatId: requestChatId,
+      replyToMessageId: ctx.msg?.message_id,
+    });
 
-    if (!result.sent) {
-      if (result.reason === "not_activated") {
-        await ctx.reply(
-          "This community is not activated. Use /activate_community to enable summaries."
-        );
-      } else if (result.reason === "no_summaries") {
-        await ctx.reply(
-          "No summaries available yet. Summaries are generated daily when there's enough activity."
-        );
-      }
+    if (result.sent) {
+      trackBotEvent(BOT_SUMMARY_COMMAND_EVENT, {
+        ...createCommandTrackingProperties(ctx),
+        summary_destination_chat_id: requestChatId.toString(),
+        summary_source_chat_id: summarySourceChatId.toString(),
+      });
+      return;
+    }
+
+    if (result.reason === "not_activated") {
+      await ctx.reply(
+        "This community is not activated. Use /activate_community to enable summaries."
+      );
+    } else if (result.reason === "notifications_disabled") {
+      await ctx.reply(
+        "Summary notifications are turned off for this community. Use /notifications to turn them on."
+      );
+    } else if (result.reason === "no_summaries") {
+      await ctx.reply(
+        "No summaries available yet. Summaries are generated daily when there's enough activity."
+      );
     }
   } catch (error) {
     console.error("Failed to send summary", error);
@@ -298,9 +366,73 @@ export async function handleSummaryCommand(
   }
 }
 
+export async function handleNotificationsCommand(
+  ctx: CommandContext<Context>
+): Promise<void> {
+  if (!ctx.chat) return;
+
+  if (!isCommunityChat(ctx.chat.type)) {
+    await ctx.reply("This command can only be used in group chats.");
+    return;
+  }
+
+  try {
+    const db = getDatabase();
+    const chatId = BigInt(ctx.chat.id);
+    const community = await db.query.communities.findFirst({
+      where: eq(communities.chatId, chatId),
+    });
+
+    if (!community || !community.isActive) {
+      await ctx.reply(
+        "This community is not activated. Use /activate_community to enable summaries."
+      );
+      return;
+    }
+
+    await sendNotificationSettingsMessage(ctx, community);
+  } catch (error) {
+    console.error("Failed to send notification settings", error);
+    await ctx.reply(
+      "An error occurred while loading notification settings. Please try again."
+    );
+  }
+}
+
+export async function handleSettingsCommand(
+  ctx: CommandContext<Context>
+): Promise<void> {
+  if (!ctx.from || !ctx.chat) return;
+  if (ctx.chat.type !== "private") return;
+
+  try {
+    const db = getDatabase();
+    const telegramUserId = BigInt(ctx.from.id);
+    const userId = await getOrCreateUser(telegramUserId, {
+      username: ctx.from.username || null,
+      displayName: getTelegramDisplayName(ctx.from),
+    });
+
+    await db.insert(userSettings).values({ userId }).onConflictDoNothing();
+
+    const settings = await db.query.userSettings.findFirst({
+      where: eq(userSettings.userId, userId),
+    });
+
+    if (!settings) {
+      await ctx.reply(SETTINGS_LOAD_ERROR_REPLY_TEXT);
+      return;
+    }
+
+    await sendUserSettingsMessage(ctx, settings);
+  } catch (error) {
+    console.error("Failed to send user settings", error);
+    await ctx.reply(SETTINGS_LOAD_ERROR_REPLY_TEXT);
+  }
+}
+
 export async function handleDeactivateCommunityCommand(
-  ctx: CommandContext<Context>,
-  bot: Bot
+  ctx: CommandContext<Context>
 ): Promise<void> {
   if (!ctx.from || !ctx.chat) return;
 
@@ -331,23 +463,8 @@ export async function handleDeactivateCommunityCommand(
 
     if (!admin) {
       await ctx.reply(
-        "You are not authorized to deactivate communities. Contact an administrator."
+        "You are not authorized to deactivate communities. Contact an administrator to be added to the whitelist."
       );
-      return;
-    }
-
-    // Check if user is a Telegram group admin
-    let member;
-    try {
-      member = await bot.api.getChatMember(ctx.chat.id, ctx.from.id);
-    } catch {
-      await ctx.reply(
-        "Unable to verify admin status. Ensure the bot has permission to view chat members."
-      );
-      return;
-    }
-    if (member.status !== "creator" && member.status !== "administrator") {
-      await ctx.reply("Only group admins can deactivate community tracking.");
       return;
     }
 
@@ -374,11 +491,112 @@ export async function handleDeactivateCommunityCommand(
       .set({ isActive: false, updatedAt: new Date() })
       .where(eq(communities.id, existingCommunity.id));
 
+    evictActiveCommunityCache(chatId);
     await ctx.reply("Community deactivated. Message tracking has been disabled.");
   } catch (error) {
     console.error("Failed to deactivate community", error);
     await ctx.reply(
       "An error occurred while deactivating the community. Please try again."
     );
+  }
+}
+
+export async function handleHideCommunityCommand(
+  ctx: CommandContext<Context>
+): Promise<void> {
+  if (!ctx.from || !ctx.chat) return;
+
+  try {
+    await ctx.deleteMessage();
+  } catch (error) {
+    console.warn("Failed to delete /hide command message", error);
+  }
+
+  if (!isCommunityChat(ctx.chat.type)) {
+    await ctx.reply("This command can only be used in group chats.");
+    return;
+  }
+
+  const telegramUserId = BigInt(ctx.from.id);
+
+  try {
+    const db = getDatabase();
+    await assertWhitelistedAdminOrThrow(db, telegramUserId, "HIDE");
+
+    const existingCommunity = await findActiveCommunityOrReply(ctx, db);
+    if (!existingCommunity) {
+      return;
+    }
+
+    if (!existingCommunity.isPublic) {
+      await ctx.reply("This community is already hidden.");
+      return;
+    }
+
+    await db
+      .update(communities)
+      .set({ isPublic: false, updatedAt: new Date() })
+      .where(eq(communities.id, existingCommunity.id));
+
+    await ctx.reply("Community hidden from public summaries.");
+  } catch (error) {
+    if (isUnauthorizedVisibilityError(error)) {
+      console.warn("Unauthorized /hide command attempt", error);
+      await ctx.reply(UNAUTHORIZED_VISIBILITY_REPLY_TEXT);
+      return;
+    }
+
+    console.error("Failed to hide community", error);
+    await ctx.reply(VISIBILITY_UPDATE_ERROR_REPLY_TEXT);
+  }
+}
+
+export async function handleUnhideCommunityCommand(
+  ctx: CommandContext<Context>
+): Promise<void> {
+  if (!ctx.from || !ctx.chat) return;
+
+  try {
+    await ctx.deleteMessage();
+  } catch (error) {
+    console.warn("Failed to delete /unhide command message", error);
+  }
+
+  if (!isCommunityChat(ctx.chat.type)) {
+    await ctx.reply("This command can only be used in group chats.");
+    return;
+  }
+
+  const telegramUserId = BigInt(ctx.from.id);
+
+  try {
+    const db = getDatabase();
+    await assertWhitelistedAdminOrThrow(db, telegramUserId, "UNHIDE");
+
+    const existingCommunity = await findActiveCommunityOrReply(ctx, db);
+    if (!existingCommunity) {
+      return;
+    }
+
+    if (existingCommunity.isPublic) {
+      await ctx.reply("This community is already visible.");
+      return;
+    }
+
+    await db
+      .update(communities)
+      .set({ isPublic: true, updatedAt: new Date() })
+      .where(eq(communities.id, existingCommunity.id));
+
+    await ctx.reply("Community is now visible in public summaries.");
+  } catch (error) {
+    if (isUnauthorizedVisibilityError(error)) {
+      console.warn("Unauthorized /unhide command attempt", error);
+      await ctx.reply(UNAUTHORIZED_VISIBILITY_REPLY_TEXT);
+      return;
+    }
+
+    console.error("Failed to unhide community", error);
+    await ctx.reply(VISIBILITY_UPDATE_ERROR_REPLY_TEXT);
   }
 }

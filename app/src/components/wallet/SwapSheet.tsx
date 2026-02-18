@@ -21,6 +21,7 @@ import {
   KNOWN_TOKEN_ICONS,
   type TokenHolding,
 } from "@/lib/solana/token-holdings";
+import { hideAllButtons } from "@/lib/telegram/mini-app/buttons";
 
 // iOS-style sheet timing (shared with other sheets)
 const SHEET_TRANSITION = "transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)";
@@ -604,12 +605,15 @@ export default function SwapSheet({
     onSecureParamsChange,
   ]);
 
-  // Insufficient balance check
+  // Insufficient balance check (reserve gas fee when swapping from SOL)
   const insufficientBalance = useMemo(() => {
     const val = parseFloat(amountStr);
     if (isNaN(val) || val <= 0) return false;
+    if (fromToken.symbol === "SOL") {
+      return val + SOLANA_FEE_SOL > fromToken.balance;
+    }
     return val > fromToken.balance;
-  }, [amountStr, fromToken.balance]);
+  }, [amountStr, fromToken.balance, fromToken.symbol]);
 
   // Swap from/to tokens
   const handleSwapTokens = useCallback(() => {
@@ -671,15 +675,15 @@ export default function SwapSheet({
     [fromToken, toToken, solPriceUsd, setView]
   );
 
-  // Handle preset percentage
+  // Handle preset percentage (reserve gas fee for SOL at 100%)
   const handlePresetPercentage = useCallback(
     (percentage: number) => {
       hapticFeedback.impactOccurred("light");
-      const amount = fromToken.balance * (percentage / 100);
-      const formatted =
-        amount
-          .toFixed(getMaxDecimals(fromToken.symbol))
-          .replace(/\.?0+$/, "") || "0";
+      let amount = fromToken.balance * (percentage / 100);
+      if (percentage === 100 && fromToken.symbol === "SOL") {
+        amount = Math.max(0, amount - SOLANA_FEE_SOL);
+      }
+      const formatted = amount.toFixed(getMaxDecimals(fromToken.symbol)).replace(/\.?0+$/, "") || "0";
       setAmountStr(formatted);
       amountInputRef.current?.focus({ preventScroll: true });
     },
@@ -710,19 +714,19 @@ export default function SwapSheet({
     [solPriceUsd, setView]
   );
 
-  // Handle secure preset percentage
+  // Handle secure preset percentage (reserve gas fee for SOL shield at 100%)
   const handleSecurePresetPercentage = useCallback(
     (percentage: number) => {
       hapticFeedback.impactOccurred("light");
-      const amount = secureToken.balance * (percentage / 100);
-      const formatted =
-        amount
-          .toFixed(getMaxDecimals(secureToken.symbol))
-          .replace(/\.?0+$/, "") || "0";
+      let amount = secureToken.balance * (percentage / 100);
+      if (percentage === 100 && secureToken.symbol === "SOL" && secureDirection === "shield") {
+        amount = Math.max(0, amount - SOLANA_FEE_SOL);
+      }
+      const formatted = amount.toFixed(getMaxDecimals(secureToken.symbol)).replace(/\.?0+$/, "") || "0";
       setSecureAmountStr(formatted);
       secureAmountInputRef.current?.focus({ preventScroll: true });
     },
-    [secureToken.balance, secureToken.symbol]
+    [secureToken.balance, secureToken.symbol, secureDirection]
   );
 
   // Handler wrappers for TokenSelectView callbacks
@@ -774,6 +778,7 @@ export default function SwapSheet({
   const closeSheet = useCallback(() => {
     if (isClosing.current) return;
     isClosing.current = true;
+    hideAllButtons();
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
@@ -1007,7 +1012,7 @@ export default function SwapSheet({
         {/* Content Container */}
         <div
           className="relative flex-1 overflow-hidden"
-          style={{ paddingBottom: Math.max(safeBottom, 24) }}
+          style={{ paddingBottom: Math.max(safeBottom, 24) + 80 }}
         >
           {/* MAIN VIEW */}
           <div
