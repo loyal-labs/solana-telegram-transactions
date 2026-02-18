@@ -69,6 +69,7 @@ import {
 import {
   prepareStoreInitDataTxn,
   sendStoreInitDataTxn,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   verifyAndClaimDeposit,
 } from "@/lib/solana/verify-and-claim-deposit";
 import {
@@ -1670,7 +1671,7 @@ export default function Home() {
 
       if (closingBehavior.enableConfirmation.isAvailable()) {
         closingBehavior.enableConfirmation();
-        const isEnabled = closingBehavior.isConfirmationEnabled();
+        const _isEnabled = closingBehavior.isConfirmationEnabled();
       } else {
         console.warn("enableConfirmation is not available");
       }
@@ -1771,7 +1772,7 @@ export default function Home() {
 
     void (async () => {
       try {
-        const { keypair, isNew } = await ensureWalletKeypair();
+        const { keypair, isNew: _isNew } = await ensureWalletKeypair();
         const publicKeyBase58 = keypair.publicKey.toBase58();
 
         // Store wallet address in module-level cache for future mounts
@@ -2971,7 +2972,7 @@ export default function Home() {
                           transaction.transferType === "unshield";
                         const isSecureOrUnshield =
                           isSecureTransaction || isUnshieldTransaction;
-                        const isDepositForUsername =
+                        const _isDepositForUsername =
                           transaction.transferType === "deposit_for_username";
                         const transferTypeLabel =
                           transaction.transferType === "store"

@@ -94,6 +94,7 @@ export default function TransactionDetailsSheet({
   swapToAmount,
   swapToAmountUsd,
   secureTokenSymbol,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   secureTokenIcon,
   secureAmount,
   secureAmountUsd,

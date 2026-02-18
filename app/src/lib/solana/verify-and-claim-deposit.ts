@@ -1,7 +1,7 @@
-import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import { PublicKey, Transaction } from "@solana/web3.js";
 
-import { TelegramVerification } from "../../../../target/types/telegram_verification";
+// import { TelegramVerification } from "../../../../target/types/telegram_verification";
 import { resolveEndpoint } from "../core/api";
 import { claimDeposit } from "./deposits/claim-deposit";
 import {
@@ -28,14 +28,14 @@ export const verifyAndClaimDeposit = async (
   const transferProgram = getTelegramTransferProgram(provider);
   const verificationProgram = getTelegramVerificationProgram(provider);
 
-  const sessionData = await storeInitData(
+  const _sessionData = await storeInitData(
     provider,
     verificationProgram,
     recipient,
     processedInitDataBytes
   );
 
-  const verified = await verifyInitData(
+  const _verified = await verifyInitData(
     provider,
     wallet,
     recipient,

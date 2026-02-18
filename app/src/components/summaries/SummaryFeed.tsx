@@ -67,6 +67,7 @@ function SourceAvatars({ sources }: { sources: string[] }) {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center px-8 py-16">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/dogs/dog-green.png"
         alt=""
@@ -658,6 +659,7 @@ export default function SummaryFeed({
         >
           {/* Avatar */}
           {groupPhoto ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={`data:${groupPhoto.mimeType};base64,${groupPhoto.base64}`}
               alt={groupTitle}
