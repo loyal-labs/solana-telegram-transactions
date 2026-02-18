@@ -42,7 +42,7 @@ export const getWalletProvider = async (): Promise<AnchorProvider> => {
 export const getCustomWalletProvider = async (
   keypair: Keypair
 ): Promise<AnchorProvider> => {
-  const connection = getConnection();
+  const connection = getWebsocketConnection();
   const wallet = new SimpleWallet(keypair);
   return new AnchorProvider(connection, wallet);
 };
