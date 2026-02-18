@@ -10,6 +10,7 @@ import { getDatabase } from "@/lib/core/database";
 import type { UserSettings } from "@/lib/core/schema";
 import { userSettings } from "@/lib/core/schema";
 import { users } from "@/lib/core/schema";
+import { getOrCreateUser } from "@/lib/telegram/user-service";
 
 import { isMessageNotModifiedError } from "./callback-query-utils";
 
@@ -34,6 +35,12 @@ type UserSettingsState = Pick<UserSettings, "model" | "notifications" | "userId"
 export type UserSettingsUpdateValues = {
   notifications: boolean;
   updatedAt: Date;
+};
+
+export type DisableNotificationsForTelegramUserInput = {
+  telegramUserId: bigint;
+  username?: string | null;
+  displayName?: string | null;
 };
 
 export function encodeUserSettingsCallbackData(
@@ -109,6 +116,84 @@ export function buildUserSettingsUpdateValues(
     notifications: callbackData.value === "on",
     updatedAt: new Date(),
   };
+}
+
+function resolveDisplayName(
+  input: DisableNotificationsForTelegramUserInput
+): string {
+  if (input.displayName && input.displayName.trim().length > 0) {
+    return input.displayName;
+  }
+
+  if (input.username && input.username.trim().length > 0) {
+    return input.username;
+  }
+
+  return `Telegram User ${input.telegramUserId.toString()}`;
+}
+
+export async function disableNotificationsForTelegramUser(
+  input: DisableNotificationsForTelegramUserInput
+): Promise<void> {
+  const userId = await getOrCreateUser(
+    input.telegramUserId,
+    {
+      displayName: resolveDisplayName(input),
+      username: input.username ?? null,
+    },
+    {
+      backfillAvatar: false,
+    }
+  );
+  const now = new Date();
+  const db = getDatabase();
+
+  await db
+    .insert(userSettings)
+    .values({
+      notifications: false,
+      updatedAt: now,
+      userId,
+    })
+    .onConflictDoUpdate({
+      set: {
+        notifications: false,
+        updatedAt: now,
+      },
+      target: userSettings.userId,
+    });
+}
+
+export async function isNotificationsEnabledForTelegramUser(
+  telegramUserId: bigint
+): Promise<boolean> {
+  const db = getDatabase();
+  const user = await db.query.users.findFirst({
+    columns: { id: true },
+    where: eq(users.telegramId, telegramUserId),
+  });
+
+  if (!user) {
+    return true;
+  }
+
+  return isNotificationsEnabledForUserId(user.id);
+}
+
+export async function isNotificationsEnabledForUserId(
+  userId: string
+): Promise<boolean> {
+  const db = getDatabase();
+  const settings = await db.query.userSettings.findFirst({
+    columns: { notifications: true },
+    where: eq(userSettings.userId, userId),
+  });
+
+  if (!settings) {
+    return true;
+  }
+
+  return settings.notifications;
 }
 
 export async function sendUserSettingsMessage(

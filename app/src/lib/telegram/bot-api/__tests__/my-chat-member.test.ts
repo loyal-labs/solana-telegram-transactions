@@ -14,7 +14,10 @@ mock.module("server-only", () => ({}));
 let mockDb: {
   insert: () => {
     values: (values: Record<string, unknown>) => {
-      onConflictDoUpdate: (config: {
+      onConflictDoNothing?: () => {
+        returning: () => Promise<Array<{ id: string }>>;
+      };
+      onConflictDoUpdate?: (config: {
         set: Record<string, unknown>;
         target: unknown;
       }) => Promise<void>;
@@ -41,6 +44,17 @@ const mixpanelTrackCalls: Array<{
   eventName: string;
   properties: Record<string, unknown>;
 }> = [];
+const getOrCreateUserCalls: Array<{
+  telegramId: bigint;
+  userData: {
+    username: string | null;
+    displayName: string;
+  };
+  options?: {
+    backfillAvatar?: boolean;
+  };
+}> = [];
+let privateUserSettingsDisableValuesCaptured: Array<Record<string, unknown>> = [];
 
 mock.module("@/lib/core/database", () => ({
   getDatabase: () => mockDb,
@@ -70,6 +84,22 @@ mock.module("../message-handlers", () => ({
   },
 }));
 
+mock.module("@/lib/telegram/user-service", () => ({
+  getOrCreateUser: async (
+    telegramId: bigint,
+    userData: {
+      username: string | null;
+      displayName: string;
+    },
+    options?: {
+      backfillAvatar?: boolean;
+    }
+  ) => {
+    getOrCreateUserCalls.push({ telegramId, userData, options });
+    return "private-user-id";
+  },
+}));
+
 let handleMyChatMemberUpdate: (ctx: Context) => Promise<void>;
 
 const COMMUNITY_CHAT_ID = -1009876543210;
@@ -77,6 +107,8 @@ const ONBOARDING_MESSAGE =
   "Thanks for adding me. Run /activate_community to enable summaries for this community.\nAfter activation, summaries are available in this chat and in the app.\nUse /notifications to set notification cycles.\nUse /hide or /unhide to control public visibility.";
 const BOT_ADDED_TO_GROUP_EVENT = "Bot Added to Group";
 const BOT_REMOVED_FROM_GROUP_EVENT = "Bot Removed from Group";
+const BOT_BLOCKED_BY_USER_EVENT = "Bot Blocked by User";
+const BOT_UNBLOCKED_BY_USER_EVENT = "Bot Unblocked by User";
 
 function createContext(options: {
   chatType: "group" | "supergroup" | "channel" | "private";
@@ -117,6 +149,9 @@ function createContext(options: {
         },
         from: {
           id: 777,
+          first_name: "Taylor",
+          last_name: "Agent",
+          username: "taylor",
         },
         new_chat_member: {
           status: options.newStatus,
@@ -149,20 +184,33 @@ describe("my chat member onboarding", () => {
     removalWhereCalls = 0;
     mixpanelInitTokens.length = 0;
     mixpanelTrackCalls.length = 0;
+    getOrCreateUserCalls.length = 0;
+    privateUserSettingsDisableValuesCaptured = [];
 
     mockDb = {
       insert: () => ({
         values: (values: Record<string, unknown>) => {
-          insertValuesCaptured.push(values);
-          return {
-            onConflictDoUpdate: async (config) => {
-              conflictSetCaptured.push(config.set);
-              conflictTargetCaptured.push(config.target);
-              if (upsertShouldThrow) {
-                throw new Error("upsert failed");
-              }
-            },
-          };
+          if ("chatId" in values) {
+            insertValuesCaptured.push(values);
+            return {
+              onConflictDoUpdate: async (config) => {
+                conflictSetCaptured.push(config.set);
+                conflictTargetCaptured.push(config.target);
+                if (upsertShouldThrow) {
+                  throw new Error("upsert failed");
+                }
+              },
+            };
+          }
+
+          if ("userId" in values && "notifications" in values) {
+            privateUserSettingsDisableValuesCaptured.push(values);
+            return {
+              onConflictDoUpdate: async () => {},
+            };
+          }
+
+          throw new Error("Unexpected insert payload");
         },
       }),
       update: () => ({
@@ -270,7 +318,88 @@ describe("my chat member onboarding", () => {
     expect(mixpanelTrackCalls).toHaveLength(0);
   });
 
-  test("ignores unsupported chat types", async () => {
+  test("tracks private member -> kicked as bot blocked by user", async () => {
+    const { ctx, sendMessageCalls } = createContext({
+      chatType: "private",
+      oldStatus: "member",
+      newStatus: "kicked",
+    });
+
+    await handleMyChatMemberUpdate(ctx);
+
+    expect(insertValuesCaptured).toHaveLength(0);
+    expect(removalUpdateValuesCaptured).toHaveLength(0);
+    expect(conflictSetCaptured).toHaveLength(0);
+    expect(evictCalls).toHaveLength(0);
+    expect(sendMessageCalls).toHaveLength(0);
+    expect(getOrCreateUserCalls).toEqual([
+      {
+        telegramId: BigInt(777),
+        userData: {
+          username: "taylor",
+          displayName: "Taylor Agent",
+        },
+        options: {
+          backfillAvatar: false,
+        },
+      },
+    ]);
+    expect(privateUserSettingsDisableValuesCaptured).toHaveLength(1);
+    expect(privateUserSettingsDisableValuesCaptured[0]?.userId).toBe(
+      "private-user-id"
+    );
+    expect(privateUserSettingsDisableValuesCaptured[0]?.notifications).toBe(
+      false
+    );
+    expect(mixpanelTrackCalls).toEqual([
+      {
+        eventName: BOT_BLOCKED_BY_USER_EVENT,
+        properties: {
+          distinct_id: "tg:777",
+          telegram_chat_id: String(COMMUNITY_CHAT_ID),
+          telegram_chat_type: "private",
+          telegram_user_id: "777",
+          old_status: "member",
+          new_status: "kicked",
+          transition_type: "block",
+        },
+      },
+    ]);
+  });
+
+  test("tracks private kicked -> member as bot unblocked by user", async () => {
+    const { ctx, sendMessageCalls } = createContext({
+      chatType: "private",
+      oldStatus: "kicked",
+      newStatus: "member",
+    });
+
+    await handleMyChatMemberUpdate(ctx);
+
+    expect(insertValuesCaptured).toHaveLength(0);
+    expect(removalUpdateValuesCaptured).toHaveLength(0);
+    expect(conflictSetCaptured).toHaveLength(0);
+    expect(evictCalls).toHaveLength(0);
+    expect(sendMessageCalls).toHaveLength(0);
+    expect(getOrCreateUserCalls).toHaveLength(0);
+    expect(privateUserSettingsDisableValuesCaptured).toHaveLength(0);
+    expect(mixpanelTrackCalls).toEqual([
+      {
+        eventName: BOT_UNBLOCKED_BY_USER_EVENT,
+        properties: {
+          distinct_id: "tg:777",
+          telegram_chat_id: String(COMMUNITY_CHAT_ID),
+          telegram_chat_type: "private",
+          telegram_user_id: "777",
+          old_status: "kicked",
+          new_status: "member",
+          transition_type: "unblock",
+        },
+      },
+    ]);
+  });
+
+  test("ignores private transitions that are not block or unblock", async () => {
     const { ctx, sendMessageCalls } = createContext({
       chatType: "private",
       oldStatus: "left",
@@ -284,6 +413,8 @@ describe("my chat member onboarding", () => {
     expect(conflictSetCaptured).toHaveLength(0);
     expect(evictCalls).toHaveLength(0);
     expect(sendMessageCalls).toHaveLength(0);
+    expect(getOrCreateUserCalls).toHaveLength(0);
+    expect(privateUserSettingsDisableValuesCaptured).toHaveLength(0);
     expect(mixpanelTrackCalls).toHaveLength(0);
   });
 

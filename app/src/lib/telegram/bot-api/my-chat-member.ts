@@ -3,15 +3,18 @@ import type { Context } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
 import { communities } from "@/lib/core/schema";
-import { isCommunityChat } from "@/lib/telegram/utils";
+import { isCommunityChat, isPrivateChat } from "@/lib/telegram/utils";
 
 import { createBotTrackingProperties, trackBotEvent } from "./analytics";
 import { evictActiveCommunityCache } from "./message-handlers";
+import { disableNotificationsForTelegramUser } from "./user-settings";
 
 const ONBOARDING_MESSAGE =
   "Thanks for adding me. Run /activate_community to enable summaries for this community.\nAfter activation, summaries are available in this chat and in the app.\nUse /notifications to set notification cycles.\nUse /hide or /unhide to control public visibility.";
 const BOT_ADDED_TO_GROUP_EVENT = "Bot Added to Group";
 const BOT_REMOVED_FROM_GROUP_EVENT = "Bot Removed from Group";
+const BOT_BLOCKED_BY_USER_EVENT = "Bot Blocked by User";
+const BOT_UNBLOCKED_BY_USER_EVENT = "Bot Unblocked by User";
 
 function isFreshJoinTransition(oldStatus: string, newStatus: string): boolean {
   const joinedFrom = oldStatus === "left" || oldStatus === "kicked";
@@ -33,18 +36,77 @@ function isSupportedCommunityChat(chatType: string): boolean {
   return isCommunityChat(chatType);
 }
 
+function isPrivateBlockTransition(oldStatus: string, newStatus: string): boolean {
+  const blockedFrom = oldStatus === "member" || oldStatus === "restricted";
+  const blockedTo = newStatus === "kicked";
+  return blockedFrom && blockedTo;
+}
+
+function isPrivateUnblockTransition(oldStatus: string, newStatus: string): boolean {
+  const unblockedFrom = oldStatus === "kicked";
+  const unblockedTo = newStatus === "member" || newStatus === "restricted";
+  return unblockedFrom && unblockedTo;
+}
+
 export async function handleMyChatMemberUpdate(ctx: Context): Promise<void> {
   const myChatMemberUpdate = ctx.update.my_chat_member;
   if (!myChatMemberUpdate) {
     return;
   }
 
-  if (!isSupportedCommunityChat(myChatMemberUpdate.chat.type)) {
+  const chatType = myChatMemberUpdate.chat.type;
+  const oldStatus = myChatMemberUpdate.old_chat_member.status;
+  const newStatus = myChatMemberUpdate.new_chat_member.status;
+  if (isPrivateChat(chatType)) {
+    const isBlockTransition = isPrivateBlockTransition(oldStatus, newStatus);
+    const isUnblockTransition = isPrivateUnblockTransition(oldStatus, newStatus);
+
+    if (!isBlockTransition && !isUnblockTransition) {
+      return;
+    }
+
+    if (isBlockTransition) {
+      try {
+        const displayName = myChatMemberUpdate.from.last_name
+          ? `${myChatMemberUpdate.from.first_name} ${myChatMemberUpdate.from.last_name}`
+          : myChatMemberUpdate.from.first_name;
+        await disableNotificationsForTelegramUser({
+          displayName,
+          telegramUserId: BigInt(myChatMemberUpdate.from.id),
+          username: myChatMemberUpdate.from.username ?? null,
+        });
+      } catch (error) {
+        console.error(
+          "Failed to disable user notifications after block",
+          error
+        );
+      }
+    }
+
+    const eventName = isBlockTransition
+      ? BOT_BLOCKED_BY_USER_EVENT
+      : BOT_UNBLOCKED_BY_USER_EVENT;
+    const transitionType = isBlockTransition ? "block" : "unblock";
+    trackBotEvent(
+      eventName,
+      {
+        ...createBotTrackingProperties({
+          chatId: myChatMemberUpdate.chat.id,
+          chatType,
+          userId: myChatMemberUpdate.from.id,
+        }),
+        new_status: newStatus,
+        old_status: oldStatus,
+        transition_type: transitionType,
+      }
+    );
     return;
   }
 
-  const oldStatus = myChatMemberUpdate.old_chat_member.status;
-  const newStatus = myChatMemberUpdate.new_chat_member.status;
+  if (!isSupportedCommunityChat(chatType)) {
+    return;
+  }
+
   const isJoinTransition = isFreshJoinTransition(oldStatus, newStatus);
   const isRemovedTransition = isRemovalTransition(oldStatus, newStatus);
 

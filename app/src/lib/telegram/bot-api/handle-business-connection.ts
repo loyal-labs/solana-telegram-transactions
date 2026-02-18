@@ -8,6 +8,8 @@ import {
 import { getBot } from "@/lib/telegram/bot-api/bot";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 
+import { isNotificationsEnabledForUserId } from "./user-settings";
+
 const bot = await getBot();
 
 /**
@@ -40,6 +42,11 @@ export async function handleBusinessConnection(
     rights: (rights as BusinessBotRights) ?? {},
     connectedAt: new Date(date * 1000),
   });
+
+  const notificationsEnabled = await isNotificationsEnabledForUserId(userId);
+  if (!notificationsEnabled) {
+    return;
+  }
 
   // Notify user
   await sendBusinessConnectionMessage(userChatId, isEnabled);

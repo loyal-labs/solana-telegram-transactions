@@ -61,6 +61,9 @@ async function resolveOrCreateUser(
   userData: {
     username: string | null;
     displayName: string;
+  },
+  options: {
+    backfillAvatar: boolean;
   }
 ): Promise<string> {
   const telegramIdStr = String(telegramId);
@@ -77,7 +80,7 @@ async function resolveOrCreateUser(
       hasAvatar,
     });
 
-    if (!hasAvatar) {
+    if (!hasAvatar && options.backfillAvatar) {
       await backfillUserAvatar(telegramId, existingUser.id);
     }
 
@@ -117,7 +120,7 @@ async function resolveOrCreateUser(
     hasAvatar,
   });
 
-  if (!hasAvatar) {
+  if (!hasAvatar && options.backfillAvatar) {
     await backfillUserAvatar(telegramId, userRecord.id);
   }
 
@@ -134,13 +137,17 @@ export async function getOrCreateUser(
   userData: {
     username: string | null;
     displayName: string;
+  },
+  options?: {
+    backfillAvatar?: boolean;
   }
 ): Promise<string> {
   const telegramIdStr = String(telegramId);
   const cachedUser = knownUsers.get(telegramIdStr);
+  const shouldBackfillAvatar = options?.backfillAvatar ?? true;
 
   if (cachedUser) {
-    if (!cachedUser.hasAvatar) {
+    if (!cachedUser.hasAvatar && shouldBackfillAvatar) {
       await backfillUserAvatar(telegramId, cachedUser.id);
     }
     return cachedUser.id;
@@ -151,7 +158,13 @@ export async function getOrCreateUser(
     return pendingUser;
   }
 
-  const resolvePromise = resolveOrCreateUser(telegramId, userData).finally(() => {
+  const resolvePromise = resolveOrCreateUser(
+    telegramId,
+    userData,
+    {
+      backfillAvatar: shouldBackfillAvatar,
+    }
+  ).finally(() => {
     inFlightUsers.delete(telegramIdStr);
   });
 
