@@ -241,7 +241,7 @@ When asked to work on a new issue/branch:
 1. Create the worktree from the repo root:
 
 ```bash
-git worktree add ../solana-telegram-transactions-ASK-123 -b ASK-123-short-description main
+git worktree add ../loyal-app-ASK-123 -b ASK-123-short-description main
 ```
 
    - Worktrees live as sibling directories to the main repo
@@ -260,7 +260,7 @@ git worktree list
 When done with a branch:
 
 ```bash
-git worktree remove ../solana-telegram-transactions-ASK-123
+git worktree remove ../loyal-app-ASK-123
 ```
 
 Or if already deleted the directory:
