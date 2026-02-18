@@ -14,6 +14,7 @@ permissions:
 jobs:
   react-doctor:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,4 +47,10 @@ jobs:
             1. ...
 
             Where X is the actual score from the scan.
-          claude_args: "--model claude-sonnet-4-6 --max-turns 5"
+
+            If the command fails or produces no output, report that react-doctor
+            could not run and include the error message.
+          claude_args: >-
+            --model claude-sonnet-4-6
+            --max-turns 5
+            --allowedTools Bash(npx*)
