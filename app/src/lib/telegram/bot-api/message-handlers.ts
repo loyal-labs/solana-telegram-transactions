@@ -51,6 +51,12 @@ export async function handleGLoyalReaction(ctx: Context, bot: Bot): Promise<void
 // Cache of active community IDs (chatId string -> communityUUID)
 const activeCommunities = new Map<string, string>();
 
+export function evictActiveCommunityCache(
+  chatId: bigint | number | string
+): void {
+  activeCommunities.delete(String(chatId));
+}
+
 export async function handleCommunityMessage(ctx: Context): Promise<void> {
   const chat = ctx.chat;
   if (!chat) return;

@@ -11,12 +11,12 @@ Step-by-step onboarding for Telegram community admins and bot operators.
 
 1. Prepare bot/operator prerequisites
 2. Add the bot to a Telegram community
-3. Activate community tracking with `/activate_community`
-4. Configure summary notifications with `/notifications`
-5. Validate behavior for authorized and unauthorized users
+3. Bot join webhook (`my_chat_member`) creates or resets community as inactive + non-public
+4. Activate community tracking with `/activate_community`
+5. Configure summary notifications with `/notifications`
+6. Validate behavior for authorized and unauthorized users
 
 ## Guides
 
 - [Add Bot and Activate Community](./add-bot-and-activate-community.md)
 - [Set Up Notification Settings](./notifications.md)
-

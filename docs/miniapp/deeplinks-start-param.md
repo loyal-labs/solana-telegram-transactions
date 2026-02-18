@@ -11,6 +11,7 @@ Webhook wiring lives in `/app/src/app/api/telegram/webhook/route.ts`.
 
 - `bot.command("summary", ...)` enters the summary delivery flow.
 - `bot.callbackQuery(SUMMARY_VOTE_CALLBACK_DATA_REGEX, ...)` handles vote button callbacks that also rebuild the same keyboard.
+- `bot.on("my_chat_member", ...)` handles bot add/remove lifecycle updates for community state. This does not create deep links, but it does affect whether a community is active/public.
 
 Deep-link generation path:
 

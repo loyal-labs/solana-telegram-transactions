@@ -56,6 +56,14 @@ ON CONFLICT (telegram_id) DO NOTHING;
 3. Promote the bot to admin if your community policy requires elevated permissions.
 4. Send a test text message in the group (used later to verify tracking).
 
+When the bot is added, Telegram sends a `my_chat_member` update.  
+The webhook handles this by creating or updating the community row as:
+
+- `isActive = false`
+- `isPublic = false`
+
+The bot also sends a short onboarding message in chat with next steps.
+
 ## Activate Community
 
 1. In the target community chat, run `/activate_community`.
@@ -71,7 +79,7 @@ Expected bot message:
 
 What happens:
 
-- Community row is created in `communities`
+- Community row is created in `communities` (or reused if it already exists from join webhook onboarding)
 - Community is marked active
 - Message tracking for this chat becomes eligible immediately
 
@@ -107,6 +115,15 @@ What happens:
 
 - Activation is denied
 - No community activation state change is applied
+
+### Bot removed from community
+
+When the bot is removed (via `my_chat_member` transition to `left` or `kicked`), webhook handling updates the community to:
+
+- `isActive = false`
+- `isPublic = false`
+
+No onboarding message is sent on removal.
 
 ## Verify Message Collection
 
