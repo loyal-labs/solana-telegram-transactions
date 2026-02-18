@@ -3,8 +3,8 @@
 import { retrieveLaunchParams } from "@telegram-apps/sdk-react";
 
 import {
-  isBioStartParam,
   parseSummaryFeedStartParam,
+  parseVerifyStartParam,
 } from "@/lib/telegram/mini-app/start-param";
 
 /**
@@ -37,9 +37,10 @@ export function getStartParamRoute(): string | undefined {
   if (typeof window === "undefined") return undefined;
 
   const mapStartParamToRoute = (startParam: string | null | undefined): string | undefined => {
-    // Check for bio (verification) deeplink first
-    if (isBioStartParam(startParam)) {
-      return "/telegram/verify";
+    // Check for verification deeplink (vr_<userId>) first
+    const verifyUserId = parseVerifyStartParam(startParam);
+    if (verifyUserId) {
+      return `/telegram/verify?userId=${verifyUserId}`;
     }
 
     const parsed = parseSummaryFeedStartParam(startParam ?? null);

@@ -213,7 +213,7 @@ export default function ProfilePage() {
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred("success");
       }
-      router.push("/telegram/verify");
+      router.push("/telegram/verify?userId=111");
       return;
     }
 

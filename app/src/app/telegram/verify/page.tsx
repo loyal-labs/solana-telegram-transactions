@@ -4,14 +4,14 @@ import { biometry } from "@telegram-apps/sdk";
 import { hapticFeedback, retrieveLaunchParams } from "@telegram-apps/sdk-react";
 import Lottie from "lottie-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import QRCodeLib from "qrcode";
 import { useCallback, useEffect, useState } from "react";
 import Confetti from "react-confetti";
 import { sileo } from "sileo";
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
-import { buildBioMiniAppUrl } from "@/lib/telegram/mini-app/start-param";
+import { buildVerifyMiniAppUrl } from "@/lib/telegram/mini-app/start-param";
 
 import dogAnimation from "../../../../public/biometrics/dog.json";
 import shieldAnimation from "../../../../public/biometrics/shield.json";
@@ -186,6 +186,8 @@ export default function VerifyPage() {
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
   const { bottom: safeBottom } = useTelegramSafeArea();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const userId = searchParams.get("userId") ?? "111";
 
   // ---- Determine step on mount ----
   useEffect(() => {
@@ -287,14 +289,14 @@ export default function VerifyPage() {
 
   // ---- Actions ----
 
-  const bioUrl = buildBioMiniAppUrl();
+  const verifyUrl = buildVerifyMiniAppUrl(userId);
 
   const handleCopyLink = useCallback(async () => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
     try {
-      await navigator.clipboard.writeText(bioUrl);
+      await navigator.clipboard.writeText(verifyUrl);
       setCopied(true);
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred("success");
@@ -306,7 +308,7 @@ export default function VerifyPage() {
         description: "Please copy it manually."
       });
     }
-  }, [bioUrl]);
+  }, [verifyUrl]);
 
   const handleRequestAccess = useCallback(async () => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -407,7 +409,7 @@ export default function VerifyPage() {
         >
           <div className="flex flex-1 flex-col items-center justify-center">
             <div className="mb-8">
-              <VerifyQRCode value={bioUrl} size={240} />
+              <VerifyQRCode value={verifyUrl} size={240} />
             </div>
             <h1 className="mb-3 text-center text-[22px] font-semibold leading-[28px] text-black">
               Verification Requires a Mobile Device
