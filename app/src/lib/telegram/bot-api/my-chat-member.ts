@@ -5,10 +5,13 @@ import { getDatabase } from "@/lib/core/database";
 import { communities } from "@/lib/core/schema";
 import { isCommunityChat } from "@/lib/telegram/utils";
 
+import { createBotTrackingProperties, trackBotEvent } from "./analytics";
 import { evictActiveCommunityCache } from "./message-handlers";
 
 const ONBOARDING_MESSAGE =
   "Thanks for adding me. Run /activate_community to enable summaries for this community.\nAfter activation, summaries are available in this chat and in the app.\nUse /notifications to set notification cycles.\nUse /hide or /unhide to control public visibility.";
+const BOT_ADDED_TO_GROUP_EVENT = "Bot Added to Group";
+const BOT_REMOVED_FROM_GROUP_EVENT = "Bot Removed from Group";
 
 function isFreshJoinTransition(oldStatus: string, newStatus: string): boolean {
   const joinedFrom = oldStatus === "left" || oldStatus === "kicked";
@@ -92,7 +95,23 @@ export async function handleMyChatMemberUpdate(ctx: Context): Promise<void> {
     evictActiveCommunityCache(chatId);
   }
 
-  if (!isJoinTransition || !isDatabaseOperationSuccessful) {
+  if (!isDatabaseOperationSuccessful) {
+    return;
+  }
+
+  const eventName = isJoinTransition
+    ? BOT_ADDED_TO_GROUP_EVENT
+    : BOT_REMOVED_FROM_GROUP_EVENT;
+  trackBotEvent(
+    eventName,
+    createBotTrackingProperties({
+      chatId: myChatMemberUpdate.chat.id,
+      chatType: myChatMemberUpdate.chat.type,
+      userId: myChatMemberUpdate.from.id,
+    })
+  );
+
+  if (!isJoinTransition) {
     return;
   }
 

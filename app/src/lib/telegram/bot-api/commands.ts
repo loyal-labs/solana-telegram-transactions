@@ -1,14 +1,17 @@
 import { eq } from "drizzle-orm";
 import type { CommandContext, Context } from "grammy";
 import { Bot, InlineKeyboard } from "grammy";
-import Mixpanel from "mixpanel";
 
-import { serverEnv } from "@/lib/core/config/server";
 import { getDatabase } from "@/lib/core/database";
 import { admins, communities, userSettings } from "@/lib/core/schema";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
 
+import {
+  createBotTrackingProperties,
+  type MixpanelTrackProperties,
+  trackBotEvent,
+} from "./analytics";
 import { CA_COMMAND_CHAT_ID } from "./constants";
 import { getChat } from "./get-chat";
 import { downloadTelegramFile } from "./get-file";
@@ -34,56 +37,18 @@ const VISIBILITY_UPDATE_ERROR_REPLY_TEXT =
   "An error occurred while updating community visibility. Please try again.";
 
 type VisibilityAction = "HIDE" | "UNHIDE";
-type MixpanelTrackProperties = Record<string, boolean | null | number | string>;
 
 const BOT_START_COMMAND_EVENT = "Bot /start Command";
 const BOT_SUMMARY_COMMAND_EVENT = "Bot /summary Command";
 
-function resolveDistinctId(ctx: CommandContext<Context>): string {
-  if (ctx.from?.id) {
-    return `tg:${ctx.from.id}`;
-  }
-
-  if (ctx.chat?.id) {
-    return `tg-chat:${ctx.chat.id}`;
-  }
-
-  return "tg:unknown";
-}
-
 function createCommandTrackingProperties(
   ctx: CommandContext<Context>
 ): MixpanelTrackProperties {
-  return {
-    distinct_id: resolveDistinctId(ctx),
-    telegram_chat_id: ctx.chat?.id.toString() ?? null,
-    telegram_chat_type: ctx.chat?.type ?? null,
-    telegram_user_id: ctx.from?.id.toString() ?? null,
-  };
-}
-
-async function trackBotCommandEvent(
-  eventName: string,
-  properties: MixpanelTrackProperties
-): Promise<void> {
-  const token = serverEnv.mixpanelToken;
-  if (!token) {
-    return;
-  }
-
-  try {
-    const mixpanel = Mixpanel.init(token);
-    await new Promise<void>((resolve) => {
-      mixpanel.track(eventName, properties, (error: unknown) => {
-        if (error) {
-          console.error(`Failed to track Mixpanel event: ${eventName}`, error);
-        }
-        resolve();
-      });
-    });
-  } catch (error) {
-    console.error(`Failed to track Mixpanel event: ${eventName}`, error);
-  }
+  return createBotTrackingProperties({
+    chatId: ctx.chat?.id,
+    chatType: ctx.chat?.type,
+    userId: ctx.from?.id,
+  });
 }
 
 /**
@@ -157,7 +122,7 @@ export async function handleStartCommand(
   bot: Bot
 ): Promise<void> {
   await sendStartCarousel(ctx, bot);
-  await trackBotCommandEvent(
+  trackBotEvent(
     BOT_START_COMMAND_EVENT,
     createCommandTrackingProperties(ctx)
   );
@@ -372,7 +337,7 @@ export async function handleSummaryCommand(
     });
 
     if (result.sent) {
-      await trackBotCommandEvent(BOT_SUMMARY_COMMAND_EVENT, {
+      trackBotEvent(BOT_SUMMARY_COMMAND_EVENT, {
         ...createCommandTrackingProperties(ctx),
         summary_destination_chat_id: requestChatId.toString(),
         summary_source_chat_id: summarySourceChatId.toString(),
