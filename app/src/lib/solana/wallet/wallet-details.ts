@@ -7,7 +7,7 @@ import {
   Transaction,
 } from "@solana/web3.js";
 
-import { getConnection } from "../rpc/connection";
+import { getConnection, getWebsocketConnection } from "../rpc/connection";
 import { SimpleWallet } from "./wallet-implementation";
 import { ensureWalletKeypair } from "./wallet-keypair-logic";
 
@@ -133,7 +133,7 @@ const invalidateBalanceCache = () => {
 export const subscribeToWalletBalance = async (
   onChange: (lamports: number) => void
 ): Promise<() => Promise<void>> => {
-  const connection = getConnection();
+  const connection = getWebsocketConnection();
   const keypair = await getWalletKeypair();
 
   let lastLamports = balanceCache?.lamports;
