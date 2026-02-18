@@ -77,6 +77,8 @@ const ONBOARDING_MESSAGE =
   "Thanks for adding me. Run /activate_community to enable summaries for this community.\nAfter activation, summaries are available in this chat and in the app.\nUse /notifications to set notification cycles.\nUse /hide or /unhide to control public visibility.";
 const BOT_ADDED_TO_GROUP_EVENT = "Bot Added to Group";
 const BOT_REMOVED_FROM_GROUP_EVENT = "Bot Removed from Group";
+const BOT_BLOCKED_BY_USER_EVENT = "Bot Blocked by User";
+const BOT_UNBLOCKED_BY_USER_EVENT = "Bot Unblocked by User";
 
 function createContext(options: {
   chatType: "group" | "supergroup" | "channel" | "private";
@@ -270,7 +272,67 @@ describe("my chat member onboarding", () => {
     expect(mixpanelTrackCalls).toHaveLength(0);
   });
 
-  test("ignores unsupported chat types", async () => {
+  test("tracks private member -> kicked as bot blocked by user", async () => {
+    const { ctx, sendMessageCalls } = createContext({
+      chatType: "private",
+      oldStatus: "member",
+      newStatus: "kicked",
+    });
+
+    await handleMyChatMemberUpdate(ctx);
+
+    expect(insertValuesCaptured).toHaveLength(0);
+    expect(removalUpdateValuesCaptured).toHaveLength(0);
+    expect(conflictSetCaptured).toHaveLength(0);
+    expect(evictCalls).toHaveLength(0);
+    expect(sendMessageCalls).toHaveLength(0);
+    expect(mixpanelTrackCalls).toEqual([
+      {
+        eventName: BOT_BLOCKED_BY_USER_EVENT,
+        properties: {
+          distinct_id: "tg:777",
+          telegram_chat_id: String(COMMUNITY_CHAT_ID),
+          telegram_chat_type: "private",
+          telegram_user_id: "777",
+          old_status: "member",
+          new_status: "kicked",
+          transition_type: "block",
+        },
+      },
+    ]);
+  });
+
+  test("tracks private kicked -> member as bot unblocked by user", async () => {
+    const { ctx, sendMessageCalls } = createContext({
+      chatType: "private",
+      oldStatus: "kicked",
+      newStatus: "member",
+    });
+
+    await handleMyChatMemberUpdate(ctx);
+
+    expect(insertValuesCaptured).toHaveLength(0);
+    expect(removalUpdateValuesCaptured).toHaveLength(0);
+    expect(conflictSetCaptured).toHaveLength(0);
+    expect(evictCalls).toHaveLength(0);
+    expect(sendMessageCalls).toHaveLength(0);
+    expect(mixpanelTrackCalls).toEqual([
+      {
+        eventName: BOT_UNBLOCKED_BY_USER_EVENT,
+        properties: {
+          distinct_id: "tg:777",
+          telegram_chat_id: String(COMMUNITY_CHAT_ID),
+          telegram_chat_type: "private",
+          telegram_user_id: "777",
+          old_status: "kicked",
+          new_status: "member",
+          transition_type: "unblock",
+        },
+      },
+    ]);
+  });
+
+  test("ignores private transitions that are not block or unblock", async () => {
     const { ctx, sendMessageCalls } = createContext({
       chatType: "private",
       oldStatus: "left",
