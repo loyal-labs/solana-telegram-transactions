@@ -102,15 +102,26 @@ export function buildSummaryFeedMiniAppUrl(
   return `${MINI_APP_LINK}?startapp=${encodeURIComponent(startParam)}`;
 }
 
-// --- Biometrics verification deeplink ("bio") ---
+// --- Verification deeplink ("vr_<telegramUserId>") ---
 
-const BIO_START_PARAM = "bio";
+const VERIFY_START_PARAM_PREFIX = "vr_";
+const VERIFY_USER_ID_REGEX = /^\d+$/;
 
-export function isBioStartParam(raw: string | null | undefined): boolean {
-  if (!raw) return false;
-  return raw.trim() === BIO_START_PARAM;
+export function parseVerifyStartParam(
+  raw: string | null | undefined,
+): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith(VERIFY_START_PARAM_PREFIX)) return null;
+  const userId = trimmed.slice(VERIFY_START_PARAM_PREFIX.length);
+  if (!VERIFY_USER_ID_REGEX.test(userId)) return null;
+  return userId;
 }
 
-export function buildBioMiniAppUrl(): string {
-  return `${MINI_APP_LINK}?startapp=${BIO_START_PARAM}`;
+export function isVerifyStartParam(raw: string | null | undefined): boolean {
+  return parseVerifyStartParam(raw) !== null;
+}
+
+export function buildVerifyMiniAppUrl(userId: string | number): string {
+  return `${MINI_APP_LINK}?startapp=vr_${userId}`;
 }
