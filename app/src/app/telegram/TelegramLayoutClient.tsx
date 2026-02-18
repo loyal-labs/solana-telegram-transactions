@@ -16,10 +16,14 @@ import {
   getUnconsumedStartParamRoute,
   markStartParamConsumed,
 } from "@/hooks/useStartParam";
+import { track } from "@/lib/core/analytics";
 import {
   getCloudValue,
   setCloudValue,
 } from "@/lib/telegram/mini-app/cloud-storage";
+
+import type { OnboardingCompletionMethod } from "./onboarding-analytics";
+import { ONBOARDING_ANALYTICS_EVENTS } from "./onboarding-analytics";
 
 const ONBOARDING_DONE_KEY = "onboarding_done";
 
@@ -67,11 +71,16 @@ export default function TelegramLayoutClient({
   // Check cloud storage for onboarding completion
   useEffect(() => {
     getCloudValue(ONBOARDING_DONE_KEY).then((value) => {
-      setShowOnboarding(value !== "1");
+      const shouldShow = value !== "1";
+      setShowOnboarding(shouldShow);
+      if (shouldShow) {
+        track(ONBOARDING_ANALYTICS_EVENTS.onboardingStarted);
+      }
     });
   }, []);
 
-  const handleOnboardingDone = () => {
+  const handleOnboardingDone = (method: OnboardingCompletionMethod) => {
+    track(ONBOARDING_ANALYTICS_EVENTS.onboardingEnded, { method });
     setShowOnboarding(false);
     void setCloudValue(ONBOARDING_DONE_KEY, "1");
   };

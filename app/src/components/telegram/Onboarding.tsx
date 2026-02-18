@@ -4,6 +4,9 @@ import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 
+import type { OnboardingCompletionMethod } from "@/app/telegram/onboarding-analytics";
+import { ONBOARDING_COMPLETION_METHODS } from "@/app/telegram/onboarding-analytics";
+
 const screens = [
   {
     title: "Group Summaries",
@@ -63,7 +66,7 @@ export default function Onboarding({
   onDone,
   headerHeight,
 }: {
-  onDone: () => void;
+  onDone: (method: OnboardingCompletionMethod) => void;
   headerHeight: number;
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -93,14 +96,14 @@ export default function Onboarding({
 
   const handleNext = () => {
     if (isLast) {
-      onDone();
+      onDone(ONBOARDING_COMPLETION_METHODS.completed);
     } else {
       paginate(1);
     }
   };
 
   const handleSkip = () => {
-    onDone();
+    onDone(ONBOARDING_COMPLETION_METHODS.skipped);
   };
 
   return (
