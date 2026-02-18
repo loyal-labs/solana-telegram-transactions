@@ -60,7 +60,7 @@ export function AnalyticsBootstrap() {
   const [canTrackWithoutIdentity, setCanTrackWithoutIdentity] = useState(false);
 
   useEffect(() => {
-    initAnalytics();
+    void initAnalytics();
   }, []);
 
   useEffect(() => {

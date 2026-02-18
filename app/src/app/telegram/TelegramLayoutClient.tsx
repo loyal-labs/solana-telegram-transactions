@@ -2,6 +2,7 @@
 
 import { useSignal, viewport } from "@telegram-apps/sdk-react";
 import type { Signal } from "@telegram-apps/signals";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Toaster } from "sileo";
@@ -9,8 +10,12 @@ import { Toaster } from "sileo";
 import { AnalyticsBootstrapClient } from "@/components/analytics/AnalyticsBootstrapClient";
 import Header from "@/components/Header";
 import BottomNav from "@/components/telegram/BottomNav";
-import Onboarding from "@/components/telegram/Onboarding";
 import { TelegramAppRootClient } from "@/components/telegram/TelegramAppRootClient";
+
+const Onboarding = dynamic(
+  () => import("@/components/telegram/Onboarding"),
+  { ssr: false }
+);
 import { TelegramProvider } from "@/components/telegram/TelegramProvider";
 import {
   getUnconsumedStartParamRoute,

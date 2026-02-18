@@ -2,13 +2,17 @@
 
 import { biometry } from "@telegram-apps/sdk";
 import { hapticFeedback, retrieveLaunchParams } from "@telegram-apps/sdk-react";
-import Lottie from "lottie-react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import QRCodeLib from "qrcode";
 import { useCallback, useEffect, useState } from "react";
-import Confetti from "react-confetti";
 import { sileo } from "sileo";
+
+const Lottie = dynamic(() => import("lottie-react").then(m => m.default), {
+  ssr: false,
+});
+
+const Confetti = dynamic(() => import("react-confetti"), { ssr: false });
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import { buildVerifyMiniAppUrl } from "@/lib/telegram/mini-app/start-param";
@@ -36,6 +40,7 @@ function VerifyQRCode({ value, size }: { value: string; size: number }) {
   useEffect(() => {
     const generateQR = async () => {
       try {
+        const QRCodeLib = (await import("qrcode")).default;
         const qr = QRCodeLib.create(value, { errorCorrectionLevel: "M" });
         const data = qr.modules.data;
         const moduleCount = qr.modules.size;
