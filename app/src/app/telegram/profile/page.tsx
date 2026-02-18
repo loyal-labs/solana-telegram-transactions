@@ -1,6 +1,6 @@
 "use client";
 
-import { addToHomeScreen, postEvent } from "@telegram-apps/sdk";
+import { addToHomeScreen, biometry, postEvent } from "@telegram-apps/sdk";
 import {
   hapticFeedback,
   openTelegramLink,
@@ -15,6 +15,7 @@ import {
   ChevronRight,
   CircleHelp,
   CirclePlus,
+  Fingerprint,
   Globe,
   Network,
   Smile,
@@ -283,9 +284,6 @@ export default function ProfilePage() {
   }, [fullName]);
 
   const addToHomeScreenDisabled = !isMobilePlatform;
-  const addToHomeScreenTitle = isMobilePlatform
-    ? "Add App to Home Screen"
-    : "Add App to Home Screen (Mobile only)";
 
   const handleAddToHomeScreen = useCallback(() => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -311,6 +309,15 @@ export default function ProfilePage() {
     }
     if (openTelegramLink.isAvailable()) {
       openTelegramLink("https://t.me/spacesymmetry");
+    }
+  }, []);
+
+  const handleBiometrics = useCallback(() => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    if (biometry.openSettings.isAvailable()) {
+      biometry.openSettings();
     }
   }, []);
 
@@ -531,7 +538,7 @@ export default function ProfilePage() {
           <SettingsSection>
             <ProfileCell
               icon={<CirclePlus size={28} strokeWidth={1.5} />}
-              title={addToHomeScreenTitle}
+              title="Add App to Home Screen"
               showArrow
               onClick={handleAddToHomeScreen}
               disabled={addToHomeScreenDisabled}
@@ -605,7 +612,18 @@ export default function ProfilePage() {
             </div>
           </SettingsSection>
 
-          {/* Section 4: Support */}
+          {/* Section 4: Biometrics */}
+          <SettingsSection>
+            <ProfileCell
+              icon={<Fingerprint size={28} strokeWidth={1.5} />}
+              title="Biometrics"
+              showChevron
+              onClick={handleBiometrics}
+              disabled={!isMobilePlatform}
+            />
+          </SettingsSection>
+
+          {/* Section 5: Support */}
           <SettingsSection>
             <ProfileCell
               icon={<CircleHelp size={28} strokeWidth={1.5} />}
