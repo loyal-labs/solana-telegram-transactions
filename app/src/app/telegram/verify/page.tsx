@@ -7,6 +7,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import QRCodeLib from "qrcode";
 import { useCallback, useEffect, useState } from "react";
+import Confetti from "react-confetti";
 import { sileo } from "sileo";
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
@@ -21,6 +22,7 @@ type VerifyStep =
   | "no-biometrics"
   | "no-access"
   | "ready"
+  | "transitioning"
   | "verified";
 
 // ---------------------------------------------------------------------------
@@ -180,6 +182,8 @@ function VerifyQRCode({ value, size }: { value: string; size: number }) {
 export default function VerifyPage() {
   const [step, setStep] = useState<VerifyStep>("checking");
   const [copied, setCopied] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
   const { bottom: safeBottom } = useTelegramSafeArea();
   const router = useRouter();
 
@@ -248,6 +252,38 @@ export default function VerifyPage() {
       }
     };
   }, []);
+
+  // ---- Window size for confetti ----
+  useEffect(() => {
+    const updateSize = () =>
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
+
+  // ---- Transitioning → Verified with confetti + celebration haptics ----
+  useEffect(() => {
+    if (step !== "transitioning") return;
+    const timer = setTimeout(() => {
+      setStep("verified");
+      setShowConfetti(true);
+
+      // Celebration haptic bursts
+      if (hapticFeedback.impactOccurred.isAvailable()) {
+        hapticFeedback.impactOccurred("heavy");
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 80);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 160);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 300);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 380);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 460);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 600);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 680);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 760);
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [step]);
 
   // ---- Actions ----
 
@@ -321,7 +357,8 @@ export default function VerifyPage() {
           if (hapticFeedback.notificationOccurred.isAvailable()) {
             hapticFeedback.notificationOccurred("success");
           }
-          setStep("verified");
+          // Delay to let the native biometric UI dismiss before cross-fade
+          setTimeout(() => setStep("transitioning"), 300);
         } else {
           sileo.error({
             title: "Verification failed",
@@ -459,79 +496,88 @@ export default function VerifyPage() {
     );
   }
 
-  // ---- Ready — Confirm You're Human ----
+  // ---- Ready / Transitioning / Verified — single mounted tree, CSS transitions ----
 
-  if (step === "ready") {
-    return (
-      <main className="flex flex-1 flex-col bg-white font-sans">
-        <div
-          className="flex flex-1 flex-col items-center justify-between px-8"
-          style={{ paddingBottom: bottomPadding }}
-        >
-          <div className="flex flex-1 flex-col items-center justify-center">
-            <div className="mb-8 h-[200px] w-[200px]">
-              <Lottie animationData={shieldAnimation} loop />
-            </div>
-            <h1 className="mb-3 text-center text-[22px] font-semibold leading-[28px] text-black">
-              Confirm You&apos;re Human
-            </h1>
-            <p className="max-w-[300px] text-center text-[17px] font-normal leading-[22px] text-[rgba(60,60,67,0.6)]">
-              We detected unusual activity. Please complete a quick biometric
-              check to continue. It only takes a moment.
-            </p>
-          </div>
-
-          <button
-            onClick={handleVerify}
-            className="h-[50px] w-full max-w-[358px] rounded-full bg-black text-[17px] font-normal leading-[22px] text-white active:opacity-80 transition-opacity"
-          >
-            Verify
-          </button>
-        </div>
-      </main>
-    );
-  }
-
-  // ---- Verified ----
+  const showDog = step === "transitioning" || step === "verified";
+  const isVerified = step === "verified";
 
   return (
     <main className="flex flex-1 flex-col bg-white font-sans">
+      {showConfetti && (
+        <Confetti
+          width={windowSize.width}
+          height={windowSize.height}
+          recycle={false}
+          numberOfPieces={500}
+          gravity={0.2}
+          initialVelocityX={8}
+          initialVelocityY={25}
+          tweenDuration={100}
+          style={{ position: "fixed", top: 0, left: 0, zIndex: 100 }}
+          onConfettiComplete={() => setShowConfetti(false)}
+        />
+      )}
       <div
         className="flex flex-1 flex-col items-center justify-between px-8"
         style={{ paddingBottom: bottomPadding }}
       >
         <div className="flex flex-1 flex-col items-center justify-center">
-          <div className="mb-8 h-[200px] w-[200px]">
-            <Lottie animationData={dogAnimation} loop />
+          <div className="relative mb-8 h-[200px] w-[200px]">
+            <div
+              className="absolute inset-0 transition-opacity duration-700"
+              style={{ opacity: showDog ? 0 : 1 }}
+            >
+              <Lottie animationData={shieldAnimation} loop />
+            </div>
+            <div
+              className="absolute inset-0 transition-opacity duration-700"
+              style={{ opacity: showDog ? 1 : 0 }}
+            >
+              <Lottie animationData={dogAnimation} loop />
+            </div>
           </div>
-          <h1 className="mb-3 text-center text-[22px] font-semibold leading-[28px] text-black">
-            You&apos;re Verified
-          </h1>
-          <p className="max-w-[300px] text-center text-[17px] font-normal leading-[22px] text-[rgba(60,60,67,0.6)]">
-            Thanks for confirming. You can now continue using the app.
-          </p>
+
+          {/* Text cross-fade: ready text stays in flow to hold layout height */}
+          <div className="relative w-full flex flex-col items-center">
+            <div
+              className="transition-opacity duration-500"
+              style={{ opacity: isVerified ? 0 : 1 }}
+            >
+              <h1 className="mb-3 text-center text-[22px] font-semibold leading-[28px] text-black">
+                Confirm You&apos;re Human
+              </h1>
+              <p className="mx-auto max-w-[300px] text-center text-[17px] font-normal leading-[22px] text-[rgba(60,60,67,0.6)]">
+                We detected unusual activity. Please complete a quick biometric
+                check to continue. It only takes a moment.
+              </p>
+            </div>
+            <div
+              className="absolute inset-0 flex flex-col items-center transition-opacity duration-500"
+              style={{ opacity: isVerified ? 1 : 0 }}
+            >
+              <h1 className="mb-3 text-center text-[22px] font-semibold leading-[28px] text-black">
+                You&apos;re Verified
+              </h1>
+              <p className="max-w-[300px] text-center text-[17px] font-normal leading-[22px] text-[rgba(60,60,67,0.6)]">
+                Thanks for confirming. You can now continue using the app.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="flex w-full max-w-[358px] flex-col items-center gap-4">
-          <button
-            onClick={handleDone}
-            className="h-[50px] w-full rounded-full bg-black text-[17px] font-normal leading-[22px] text-white active:opacity-80 transition-opacity"
-          >
-            Done
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              sileo.error({
-                title: "Something went wrong",
-                description: "Please try again later."
-              });
-            }}
-            className="py-2 px-4 text-[13px] text-[rgba(60,60,67,0.4)] underline active:opacity-60"
-          >
-            Test error toast
-          </button>
-        </div>
+        <button
+          onClick={
+            isVerified
+              ? handleDone
+              : step === "transitioning"
+                ? undefined
+                : handleVerify
+          }
+          disabled={step === "transitioning"}
+          className="h-[50px] w-full max-w-[358px] rounded-full bg-black text-[17px] font-normal leading-[22px] text-white active:opacity-80 transition-opacity disabled:opacity-60"
+        >
+          {isVerified ? "Done" : "Verify"}
+        </button>
       </div>
     </main>
   );
