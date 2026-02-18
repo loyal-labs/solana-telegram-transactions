@@ -80,14 +80,17 @@ export async function GET(req: Request) {
     if (auth.error) return auth.error;
 
     const db = getDatabase();
-    await db
+    const inserted = await db
       .insert(userSettings)
       .values({ userId: auth.userId })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning();
 
-    const settings = await db.query.userSettings.findFirst({
-      where: eq(userSettings.userId, auth.userId),
-    });
+    const settings =
+      inserted[0] ??
+      (await db.query.userSettings.findFirst({
+        where: eq(userSettings.userId, auth.userId),
+      }));
 
     if (!settings) {
       return NextResponse.json(
@@ -133,23 +136,18 @@ export async function PATCH(req: Request) {
     if (auth.error) return auth.error;
 
     const db = getDatabase();
-    await db
+    const [updated] = await db
       .insert(userSettings)
-      .values({ userId: auth.userId })
-      .onConflictDoNothing();
-
-    await db
-      .update(userSettings)
-      .set({ notifications, updatedAt: new Date() })
-      .where(eq(userSettings.userId, auth.userId));
-
-    const updated = await db.query.userSettings.findFirst({
-      where: eq(userSettings.userId, auth.userId),
-    });
+      .values({ userId: auth.userId, notifications, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: userSettings.userId,
+        set: { notifications, updatedAt: new Date() },
+      })
+      .returning();
 
     return NextResponse.json({
-      notifications: updated?.notifications ?? notifications,
-      model: updated?.model,
+      notifications: updated.notifications,
+      model: updated.model,
     });
   } catch (error) {
     console.error("[telegram][settings] PATCH failed", error);
