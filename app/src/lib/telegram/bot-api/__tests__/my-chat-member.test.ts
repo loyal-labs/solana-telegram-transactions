@@ -14,7 +14,10 @@ mock.module("server-only", () => ({}));
 let mockDb: {
   insert: () => {
     values: (values: Record<string, unknown>) => {
-      onConflictDoUpdate: (config: {
+      onConflictDoNothing?: () => {
+        returning: () => Promise<Array<{ id: string }>>;
+      };
+      onConflictDoUpdate?: (config: {
         set: Record<string, unknown>;
         target: unknown;
       }) => Promise<void>;
@@ -41,6 +44,17 @@ const mixpanelTrackCalls: Array<{
   eventName: string;
   properties: Record<string, unknown>;
 }> = [];
+const getOrCreateUserCalls: Array<{
+  telegramId: bigint;
+  userData: {
+    username: string | null;
+    displayName: string;
+  };
+  options?: {
+    backfillAvatar?: boolean;
+  };
+}> = [];
+let privateUserSettingsDisableValuesCaptured: Array<Record<string, unknown>> = [];
 
 mock.module("@/lib/core/database", () => ({
   getDatabase: () => mockDb,
@@ -67,6 +81,22 @@ mock.module("mixpanel", () => ({
 mock.module("../message-handlers", () => ({
   evictActiveCommunityCache: (chatId: bigint | number | string) => {
     evictCalls.push(chatId);
+  },
+}));
+
+mock.module("@/lib/telegram/user-service", () => ({
+  getOrCreateUser: async (
+    telegramId: bigint,
+    userData: {
+      username: string | null;
+      displayName: string;
+    },
+    options?: {
+      backfillAvatar?: boolean;
+    }
+  ) => {
+    getOrCreateUserCalls.push({ telegramId, userData, options });
+    return "private-user-id";
   },
 }));
 
@@ -119,6 +149,9 @@ function createContext(options: {
         },
         from: {
           id: 777,
+          first_name: "Taylor",
+          last_name: "Agent",
+          username: "taylor",
         },
         new_chat_member: {
           status: options.newStatus,
@@ -151,20 +184,33 @@ describe("my chat member onboarding", () => {
     removalWhereCalls = 0;
     mixpanelInitTokens.length = 0;
     mixpanelTrackCalls.length = 0;
+    getOrCreateUserCalls.length = 0;
+    privateUserSettingsDisableValuesCaptured = [];
 
     mockDb = {
       insert: () => ({
         values: (values: Record<string, unknown>) => {
-          insertValuesCaptured.push(values);
-          return {
-            onConflictDoUpdate: async (config) => {
-              conflictSetCaptured.push(config.set);
-              conflictTargetCaptured.push(config.target);
-              if (upsertShouldThrow) {
-                throw new Error("upsert failed");
-              }
-            },
-          };
+          if ("chatId" in values) {
+            insertValuesCaptured.push(values);
+            return {
+              onConflictDoUpdate: async (config) => {
+                conflictSetCaptured.push(config.set);
+                conflictTargetCaptured.push(config.target);
+                if (upsertShouldThrow) {
+                  throw new Error("upsert failed");
+                }
+              },
+            };
+          }
+
+          if ("userId" in values && "notifications" in values) {
+            privateUserSettingsDisableValuesCaptured.push(values);
+            return {
+              onConflictDoUpdate: async () => {},
+            };
+          }
+
+          throw new Error("Unexpected insert payload");
         },
       }),
       update: () => ({
@@ -286,6 +332,25 @@ describe("my chat member onboarding", () => {
     expect(conflictSetCaptured).toHaveLength(0);
     expect(evictCalls).toHaveLength(0);
     expect(sendMessageCalls).toHaveLength(0);
+    expect(getOrCreateUserCalls).toEqual([
+      {
+        telegramId: BigInt(777),
+        userData: {
+          username: "taylor",
+          displayName: "Taylor Agent",
+        },
+        options: {
+          backfillAvatar: false,
+        },
+      },
+    ]);
+    expect(privateUserSettingsDisableValuesCaptured).toHaveLength(1);
+    expect(privateUserSettingsDisableValuesCaptured[0]?.userId).toBe(
+      "private-user-id"
+    );
+    expect(privateUserSettingsDisableValuesCaptured[0]?.notifications).toBe(
+      false
+    );
     expect(mixpanelTrackCalls).toEqual([
       {
         eventName: BOT_BLOCKED_BY_USER_EVENT,
@@ -316,6 +381,8 @@ describe("my chat member onboarding", () => {
     expect(conflictSetCaptured).toHaveLength(0);
     expect(evictCalls).toHaveLength(0);
     expect(sendMessageCalls).toHaveLength(0);
+    expect(getOrCreateUserCalls).toHaveLength(0);
+    expect(privateUserSettingsDisableValuesCaptured).toHaveLength(0);
     expect(mixpanelTrackCalls).toEqual([
       {
         eventName: BOT_UNBLOCKED_BY_USER_EVENT,
@@ -346,6 +413,8 @@ describe("my chat member onboarding", () => {
     expect(conflictSetCaptured).toHaveLength(0);
     expect(evictCalls).toHaveLength(0);
     expect(sendMessageCalls).toHaveLength(0);
+    expect(getOrCreateUserCalls).toHaveLength(0);
+    expect(privateUserSettingsDisableValuesCaptured).toHaveLength(0);
     expect(mixpanelTrackCalls).toHaveLength(0);
   });
 

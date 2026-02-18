@@ -7,6 +7,7 @@ import { isCommunityChat, isPrivateChat } from "@/lib/telegram/utils";
 
 import { createBotTrackingProperties, trackBotEvent } from "./analytics";
 import { evictActiveCommunityCache } from "./message-handlers";
+import { disableNotificationsForTelegramUser } from "./user-settings";
 
 const ONBOARDING_MESSAGE =
   "Thanks for adding me. Run /activate_community to enable summaries for this community.\nAfter activation, summaries are available in this chat and in the app.\nUse /notifications to set notification cycles.\nUse /hide or /unhide to control public visibility.";
@@ -62,6 +63,24 @@ export async function handleMyChatMemberUpdate(ctx: Context): Promise<void> {
 
     if (!isBlockTransition && !isUnblockTransition) {
       return;
+    }
+
+    if (isBlockTransition) {
+      try {
+        const displayName = myChatMemberUpdate.from.last_name
+          ? `${myChatMemberUpdate.from.first_name} ${myChatMemberUpdate.from.last_name}`
+          : myChatMemberUpdate.from.first_name;
+        await disableNotificationsForTelegramUser({
+          displayName,
+          telegramUserId: BigInt(myChatMemberUpdate.from.id),
+          username: myChatMemberUpdate.from.username ?? null,
+        });
+      } catch (error) {
+        console.error(
+          "Failed to disable user notifications after block",
+          error
+        );
+      }
     }
 
     const eventName = isBlockTransition

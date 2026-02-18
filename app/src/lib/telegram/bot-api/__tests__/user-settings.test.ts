@@ -8,6 +8,16 @@ let mockDb: {
     users: { findFirst: () => Promise<{ id: string } | null> };
     userSettings: { findFirst: () => Promise<UserSettings | null> };
   };
+  insert: () => {
+    values: (
+      values: Record<string, unknown>
+    ) => {
+      onConflictDoUpdate: (config: {
+        set: Record<string, unknown>;
+        target: unknown;
+      }) => Promise<void>;
+    };
+  };
   update: () => {
     set: (values: Record<string, unknown>) => {
       where: () => Promise<void>;
@@ -43,9 +53,18 @@ let encodeUserSettingsCallbackData: (callbackData: {
   dimension: "notif";
   value: "off" | "on";
 }) => string;
+let disableNotificationsForTelegramUser: (input: {
+  telegramUserId: bigint;
+  username?: string | null;
+  displayName?: string | null;
+}) => Promise<void>;
 let handleUserSettingsCallback: (
   ctx: CallbackQueryContext<Context>
 ) => Promise<void>;
+let isNotificationsEnabledForTelegramUser: (
+  telegramUserId: bigint
+) => Promise<boolean>;
+let isNotificationsEnabledForUserId: (userId: string) => Promise<boolean>;
 let parseUserSettingsCallbackData: (data: string) => {
   userId: string;
   dimension: "notif";
@@ -55,6 +74,38 @@ let parseUserSettingsCallbackData: (data: string) => {
 let actorResult: { id: string } | null;
 let settingsFindResults: Array<UserSettings | null>;
 let updateValuesCaptured: Array<Record<string, unknown>>;
+let getOrCreateUserResult = "resolved-user-id";
+const getOrCreateUserCalls: Array<{
+  telegramId: bigint;
+  userData: {
+    username: string | null;
+    displayName: string;
+  };
+  options?: {
+    backfillAvatar?: boolean;
+  };
+}> = [];
+const insertValuesCaptured: Array<Record<string, unknown>> = [];
+const insertUpsertConfigCaptured: Array<{
+  set: Record<string, unknown>;
+  target: unknown;
+}> = [];
+
+mock.module("@/lib/telegram/user-service", () => ({
+  getOrCreateUser: async (
+    telegramId: bigint,
+    userData: {
+      username: string | null;
+      displayName: string;
+    },
+    options?: {
+      backfillAvatar?: boolean;
+    }
+  ) => {
+    getOrCreateUserCalls.push({ telegramId, userData, options });
+    return getOrCreateUserResult;
+  },
+}));
 
 function createUserSettings(overrides?: Partial<UserSettings>): UserSettings {
   return {
@@ -118,8 +169,11 @@ describe("user settings helpers", () => {
       USER_SETTINGS_CALLBACK_DATA_REGEX,
       buildUserSettingsKeyboard,
       buildUserSettingsUpdateValues,
+      disableNotificationsForTelegramUser,
       encodeUserSettingsCallbackData,
       handleUserSettingsCallback,
+      isNotificationsEnabledForTelegramUser,
+      isNotificationsEnabledForUserId,
       parseUserSettingsCallbackData,
     } = loadedModule);
   });
@@ -128,8 +182,22 @@ describe("user settings helpers", () => {
     actorResult = null;
     settingsFindResults = [];
     updateValuesCaptured = [];
+    getOrCreateUserResult = "resolved-user-id";
+    getOrCreateUserCalls.length = 0;
+    insertValuesCaptured.length = 0;
+    insertUpsertConfigCaptured.length = 0;
 
     mockDb = {
+      insert: () => ({
+        values: (values: Record<string, unknown>) => {
+          insertValuesCaptured.push(values);
+          return {
+            onConflictDoUpdate: async (config) => {
+              insertUpsertConfigCaptured.push(config);
+            },
+          };
+        },
+      }),
       query: {
         users: {
           findFirst: async () => actorResult,
@@ -147,6 +215,58 @@ describe("user settings helpers", () => {
         },
       }),
     };
+  });
+
+  test("disables notifications and upserts settings using user-service", async () => {
+    getOrCreateUserResult = "user-42";
+
+    await disableNotificationsForTelegramUser({
+      telegramUserId: BigInt(777),
+      username: "taylor",
+      displayName: "Taylor Agent",
+    });
+
+    expect(getOrCreateUserCalls).toHaveLength(1);
+    expect(getOrCreateUserCalls[0]).toEqual({
+      telegramId: BigInt(777),
+      userData: {
+        username: "taylor",
+        displayName: "Taylor Agent",
+      },
+      options: {
+        backfillAvatar: false,
+      },
+    });
+    expect(insertValuesCaptured).toHaveLength(1);
+    expect(insertValuesCaptured[0]?.userId).toBe("user-42");
+    expect(insertValuesCaptured[0]?.notifications).toBe(false);
+    expect(insertUpsertConfigCaptured).toHaveLength(1);
+    expect(insertUpsertConfigCaptured[0]?.set.notifications).toBe(false);
+  });
+
+  test("isNotificationsEnabledForTelegramUser returns false when disabled", async () => {
+    actorResult = { id: "user-42" };
+    settingsFindResults = [createUserSettings({ notifications: false })];
+
+    const result = await isNotificationsEnabledForTelegramUser(BigInt(777));
+
+    expect(result).toBe(false);
+  });
+
+  test("isNotificationsEnabledForTelegramUser returns true when user is missing", async () => {
+    actorResult = null;
+
+    const result = await isNotificationsEnabledForTelegramUser(BigInt(777));
+
+    expect(result).toBe(true);
+  });
+
+  test("isNotificationsEnabledForUserId returns true when settings row is missing", async () => {
+    settingsFindResults = [null];
+
+    const result = await isNotificationsEnabledForUserId("user-42");
+
+    expect(result).toBe(true);
   });
 
   test("parses valid callback data", () => {
