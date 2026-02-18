@@ -6,7 +6,7 @@ import {
 } from "@vladarbatov/private-transactions-test";
 
 import { getWalletKeypair } from "../wallet/wallet-details";
-import { prettyStringify, waitForAccount } from "./loyal-deposits";
+import { waitForAccount } from "./loyal-deposits";
 import { getPrivateClient } from "./private-client";
 
 export async function transferTokensToUsername(params: {
@@ -26,14 +26,7 @@ export async function transferTokensToUsername(params: {
   );
   const existingEphemeralUsernameDeposit =
     await client.getEphemeralUsernameDeposit(destinationUsername, tokenMint);
-  console.log(
-    "existingBaseUsernameDeposit",
-    prettyStringify(existingBaseUsernameDeposit)
-  );
-  console.log(
-    "existingEphemeralUsernameDeposit",
-    prettyStringify(existingEphemeralUsernameDeposit)
-  );
+
   if (!existingBaseUsernameDeposit && !existingEphemeralUsernameDeposit) {
     console.log("initializeUsernameDeposit");
     const initializeUsernameDepositSig = await client.initializeUsernameDeposit(
@@ -51,19 +44,6 @@ export async function transferTokensToUsername(params: {
   const [depositPda] = findUsernameDepositPda(destinationUsername, tokenMint);
   const baseAccountInfo =
     await client.baseProgram.provider.connection.getAccountInfo(depositPda);
-  const ephemeralAccountInfo =
-    await client.ephemeralProgram.provider.connection.getAccountInfo(
-      depositPda
-    );
-  console.log(
-    "delegateUsernameDeposit baseAccountInfo",
-    prettyStringify(baseAccountInfo)
-  );
-  console.log(
-    "delegateUsernameDeposit ephemeralAccountInfo",
-    prettyStringify(ephemeralAccountInfo)
-  );
-
   const isDelegated = baseAccountInfo?.owner.equals(DELEGATION_PROGRAM_ID);
 
   if (!isDelegated) {
