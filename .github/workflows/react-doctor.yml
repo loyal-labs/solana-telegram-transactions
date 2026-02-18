@@ -63,7 +63,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          jq -r '.result // empty' /home/runner/work/_temp/claude-execution-output.json > /tmp/comment-body.md
+          jq -r '.[] | select(.type == "result") | .result // empty' /home/runner/work/_temp/claude-execution-output.json > /tmp/comment-body.md
           if [ -s /tmp/comment-body.md ]; then
             gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/comment-body.md
           fi
