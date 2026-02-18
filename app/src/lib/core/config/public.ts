@@ -48,4 +48,10 @@ export const publicEnv = {
 
     return value.startsWith("/") ? value : `/${value}`;
   },
+  get gitBranch(): string {
+    return normalizeOptionalValue(process.env.NEXT_PUBLIC_GIT_BRANCH) ?? "unknown";
+  },
+  get gitCommitHash(): string {
+    return normalizeOptionalValue(process.env.NEXT_PUBLIC_GIT_COMMIT_HASH) ?? "unknown";
+  },
 } as const;
