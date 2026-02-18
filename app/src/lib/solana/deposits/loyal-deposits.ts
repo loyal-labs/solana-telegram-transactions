@@ -13,7 +13,7 @@ import {
   MAGIC_PROGRAM_ID,
 } from "@vladarbatov/private-transactions-test";
 
-import { getConnection } from "../rpc/connection";
+import { getWebsocketConnection } from "../rpc/connection";
 import { getWalletKeypair } from "../wallet/wallet-details";
 import { getPrivateClient } from "./private-client";
 import { closeWsolAta, wrapSolToWSol } from "./wsol-utils";
@@ -172,7 +172,7 @@ export async function shieldTokens(params: {
 
   // 2. Wrap native SOL → wSOL if needed
   const isNativeSol = tokenMint.equals(NATIVE_MINT);
-  const connection = getConnection();
+  const connection = getWebsocketConnection();
   let createdAta = false;
 
   if (isNativeSol) {
@@ -280,7 +280,7 @@ export async function unshieldTokens(params: {
 
   const keypair = await getWalletKeypair();
   const client = await getPrivateClient();
-  const connection = getConnection();
+  const connection = getWebsocketConnection();
 
   // 1. Undelegate from PER (waits for owner to be PROGRAM_ID on both connections)
   console.log("undelegateDeposit");
