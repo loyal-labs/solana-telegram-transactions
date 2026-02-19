@@ -1351,9 +1351,10 @@ export default function SendSheet({
                 <button
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
+                    const isSecured = selectedToken?.isSecured === true;
                     if (currency === "SOL") {
                       const maxVal = truncateDecimals(
-                        Math.max(0, balanceInSol - SOLANA_FEE_SOL),
+                        Math.max(0, isSecured ? balanceInSol : balanceInSol - SOLANA_FEE_SOL),
                         4
                       ).replace(/\.?0+$/, "");
                       handlePresetAmount(maxVal || "0");
@@ -1364,7 +1365,7 @@ export default function SendSheet({
                       const maxVal =
                         balanceInUsd !== null
                           ? truncateDecimals(
-                              Math.max(0, balanceInUsd - feeUsd),
+                              Math.max(0, isSecured ? balanceInUsd : balanceInUsd - feeUsd),
                               2
                             ).replace(/\.?0+$/, "")
                           : "0";
