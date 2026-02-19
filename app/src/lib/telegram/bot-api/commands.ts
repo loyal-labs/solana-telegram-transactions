@@ -15,6 +15,7 @@ import {
 import { CA_COMMAND_CHAT_ID } from "./constants";
 import { getChat } from "./get-chat";
 import { downloadTelegramFile } from "./get-file";
+import { replyWithAutoCleanup } from "./helper-message-cleanup";
 import { evictActiveCommunityCache } from "./message-handlers";
 import { sendNotificationSettingsMessage } from "./notification-settings";
 import { sendStartCarousel } from "./start-carousel";
@@ -110,7 +111,7 @@ async function findActiveCommunityOrReply(
   });
 
   if (!existingCommunity || !existingCommunity.isActive) {
-    await ctx.reply(COMMUNITY_NOT_ACTIVATED_YET_REPLY_TEXT);
+    await replyWithAutoCleanup(ctx, COMMUNITY_NOT_ACTIVATED_YET_REPLY_TEXT);
     return null;
   }
 
@@ -122,10 +123,7 @@ export async function handleStartCommand(
   bot: Bot
 ): Promise<void> {
   await sendStartCarousel(ctx, bot);
-  trackBotEvent(
-    BOT_START_COMMAND_EVENT,
-    createCommandTrackingProperties(ctx)
-  );
+  trackBotEvent(BOT_START_COMMAND_EVENT, createCommandTrackingProperties(ctx));
 }
 
 export async function handleCaCommand(
@@ -217,7 +215,10 @@ export async function handleActivateCommunityCommand(
   }
 
   if (!isCommunityChat(ctx.chat.type)) {
-    await ctx.reply("This command can only be used in group chats.");
+    await replyWithAutoCleanup(
+      ctx,
+      "This command can only be used in group chats."
+    );
     return;
   }
 
@@ -232,7 +233,8 @@ export async function handleActivateCommunityCommand(
     });
 
     if (!admin) {
-      await ctx.reply(
+      await replyWithAutoCleanup(
+        ctx,
         "You are not authorized to activate communities. Contact an administrator to be added to the whitelist."
       );
       return;
@@ -272,7 +274,10 @@ export async function handleActivateCommunityCommand(
             updatedAt: new Date(),
           })
           .where(eq(communities.id, existingCommunity.id));
-        await ctx.reply("Community is already activated. Data updated!");
+        await replyWithAutoCleanup(
+          ctx,
+          "Community is already activated. Data updated!"
+        );
         return;
       }
 
@@ -286,7 +291,10 @@ export async function handleActivateCommunityCommand(
           updatedAt: new Date(),
         })
         .where(eq(communities.id, existingCommunity.id));
-      await ctx.reply("Community reactivated for message tracking!");
+      await replyWithAutoCleanup(
+        ctx,
+        "Community reactivated for message tracking!"
+      );
       return;
     }
 
@@ -306,10 +314,14 @@ export async function handleActivateCommunityCommand(
       settings,
     });
 
-    await ctx.reply("Community activated for message tracking!");
+    await replyWithAutoCleanup(
+      ctx,
+      "Community activated for message tracking!"
+    );
   } catch (error) {
     console.error("Failed to activate community", error);
-    await ctx.reply(
+    await replyWithAutoCleanup(
+      ctx,
       "An error occurred while activating the community. Please try again."
     );
   }
@@ -323,7 +335,10 @@ export async function handleSummaryCommand(
   if (!ctx.chat) return;
 
   if (!isCommunityChat(ctx.chat.type)) {
-    await ctx.reply("This command can only be used in group chats.");
+    await replyWithAutoCleanup(
+      ctx,
+      "This command can only be used in group chats."
+    );
     return;
   }
 
@@ -346,21 +361,25 @@ export async function handleSummaryCommand(
     }
 
     if (result.reason === "not_activated") {
-      await ctx.reply(
+      await replyWithAutoCleanup(
+        ctx,
         "This community is not activated. Use /activate_community to enable summaries."
       );
     } else if (result.reason === "notifications_disabled") {
-      await ctx.reply(
+      await replyWithAutoCleanup(
+        ctx,
         "Summary notifications are turned off for this community. Use /notifications to turn them on."
       );
     } else if (result.reason === "no_summaries") {
-      await ctx.reply(
+      await replyWithAutoCleanup(
+        ctx,
         "No summaries available yet. Summaries are generated daily when there's enough activity."
       );
     }
   } catch (error) {
     console.error("Failed to send summary", error);
-    await ctx.reply(
+    await replyWithAutoCleanup(
+      ctx,
       "An error occurred while fetching the summary. Please try again."
     );
   }
@@ -372,7 +391,10 @@ export async function handleNotificationsCommand(
   if (!ctx.chat) return;
 
   if (!isCommunityChat(ctx.chat.type)) {
-    await ctx.reply("This command can only be used in group chats.");
+    await replyWithAutoCleanup(
+      ctx,
+      "This command can only be used in group chats."
+    );
     return;
   }
 
@@ -384,7 +406,8 @@ export async function handleNotificationsCommand(
     });
 
     if (!community || !community.isActive) {
-      await ctx.reply(
+      await replyWithAutoCleanup(
+        ctx,
         "This community is not activated. Use /activate_community to enable summaries."
       );
       return;
@@ -393,7 +416,8 @@ export async function handleNotificationsCommand(
     await sendNotificationSettingsMessage(ctx, community);
   } catch (error) {
     console.error("Failed to send notification settings", error);
-    await ctx.reply(
+    await replyWithAutoCleanup(
+      ctx,
       "An error occurred while loading notification settings. Please try again."
     );
   }
@@ -447,7 +471,10 @@ export async function handleDeactivateCommunityCommand(
   }
 
   if (!isCommunityChat(ctx.chat.type)) {
-    await ctx.reply("This command can only be used in group chats.");
+    await replyWithAutoCleanup(
+      ctx,
+      "This command can only be used in group chats."
+    );
     return;
   }
 
@@ -462,7 +489,8 @@ export async function handleDeactivateCommunityCommand(
     });
 
     if (!admin) {
-      await ctx.reply(
+      await replyWithAutoCleanup(
+        ctx,
         "You are not authorized to deactivate communities. Contact an administrator to be added to the whitelist."
       );
       return;
@@ -476,12 +504,12 @@ export async function handleDeactivateCommunityCommand(
     });
 
     if (!existingCommunity) {
-      await ctx.reply("This community is not activated.");
+      await replyWithAutoCleanup(ctx, "This community is not activated.");
       return;
     }
 
     if (!existingCommunity.isActive) {
-      await ctx.reply("This community is already deactivated.");
+      await replyWithAutoCleanup(ctx, "This community is already deactivated.");
       return;
     }
 
@@ -492,10 +520,14 @@ export async function handleDeactivateCommunityCommand(
       .where(eq(communities.id, existingCommunity.id));
 
     evictActiveCommunityCache(chatId);
-    await ctx.reply("Community deactivated. Message tracking has been disabled.");
+    await replyWithAutoCleanup(
+      ctx,
+      "Community deactivated. Message tracking has been disabled."
+    );
   } catch (error) {
     console.error("Failed to deactivate community", error);
-    await ctx.reply(
+    await replyWithAutoCleanup(
+      ctx,
       "An error occurred while deactivating the community. Please try again."
     );
   }
@@ -513,7 +545,10 @@ export async function handleHideCommunityCommand(
   }
 
   if (!isCommunityChat(ctx.chat.type)) {
-    await ctx.reply("This command can only be used in group chats.");
+    await replyWithAutoCleanup(
+      ctx,
+      "This command can only be used in group chats."
+    );
     return;
   }
 
@@ -529,7 +564,7 @@ export async function handleHideCommunityCommand(
     }
 
     if (!existingCommunity.isPublic) {
-      await ctx.reply("This community is already hidden.");
+      await replyWithAutoCleanup(ctx, "This community is already hidden.");
       return;
     }
 
@@ -538,16 +573,16 @@ export async function handleHideCommunityCommand(
       .set({ isPublic: false, updatedAt: new Date() })
       .where(eq(communities.id, existingCommunity.id));
 
-    await ctx.reply("Community hidden from public summaries.");
+    await replyWithAutoCleanup(ctx, "Community hidden from public summaries.");
   } catch (error) {
     if (isUnauthorizedVisibilityError(error)) {
       console.warn("Unauthorized /hide command attempt", error);
-      await ctx.reply(UNAUTHORIZED_VISIBILITY_REPLY_TEXT);
+      await replyWithAutoCleanup(ctx, UNAUTHORIZED_VISIBILITY_REPLY_TEXT);
       return;
     }
 
     console.error("Failed to hide community", error);
-    await ctx.reply(VISIBILITY_UPDATE_ERROR_REPLY_TEXT);
+    await replyWithAutoCleanup(ctx, VISIBILITY_UPDATE_ERROR_REPLY_TEXT);
   }
 }
 
@@ -563,7 +598,10 @@ export async function handleUnhideCommunityCommand(
   }
 
   if (!isCommunityChat(ctx.chat.type)) {
-    await ctx.reply("This command can only be used in group chats.");
+    await replyWithAutoCleanup(
+      ctx,
+      "This command can only be used in group chats."
+    );
     return;
   }
 
@@ -579,7 +617,7 @@ export async function handleUnhideCommunityCommand(
     }
 
     if (existingCommunity.isPublic) {
-      await ctx.reply("This community is already visible.");
+      await replyWithAutoCleanup(ctx, "This community is already visible.");
       return;
     }
 
@@ -588,15 +626,18 @@ export async function handleUnhideCommunityCommand(
       .set({ isPublic: true, updatedAt: new Date() })
       .where(eq(communities.id, existingCommunity.id));
 
-    await ctx.reply("Community is now visible in public summaries.");
+    await replyWithAutoCleanup(
+      ctx,
+      "Community is now visible in public summaries."
+    );
   } catch (error) {
     if (isUnauthorizedVisibilityError(error)) {
       console.warn("Unauthorized /unhide command attempt", error);
-      await ctx.reply(UNAUTHORIZED_VISIBILITY_REPLY_TEXT);
+      await replyWithAutoCleanup(ctx, UNAUTHORIZED_VISIBILITY_REPLY_TEXT);
       return;
     }
 
     console.error("Failed to unhide community", error);
-    await ctx.reply(VISIBILITY_UPDATE_ERROR_REPLY_TEXT);
+    await replyWithAutoCleanup(ctx, VISIBILITY_UPDATE_ERROR_REPLY_TEXT);
   }
 }

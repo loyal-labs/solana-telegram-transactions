@@ -27,6 +27,7 @@ const mixpanelTrackCalls: Array<{
 }> = [];
 let sendStartCarouselShouldThrow = false;
 let sendStartCarouselCalls = 0;
+let autoCleanupReplyTexts: string[] = [];
 
 mock.module("mixpanel", () => ({
   default: {
@@ -74,14 +75,21 @@ mock.module("../start-carousel", () => ({
   },
 }));
 
-mock.module("../notification-settings", () => ({
-  sendNotificationSettingsMessage: async () => {},
-}));
-
 mock.module("../summaries", () => ({
   sendLatestSummary: async (...args: unknown[]) => {
     sendLatestSummaryCalls.push(args);
     return sendLatestSummaryResult;
+  },
+}));
+
+mock.module("../helper-message-cleanup", () => ({
+  replyWithAutoCleanup: async (
+    ctx: CommandContext<Context>,
+    text: string,
+    options?: unknown
+  ) => {
+    autoCleanupReplyTexts.push(text);
+    await ctx.reply(text, options as never);
   },
 }));
 
@@ -140,6 +148,7 @@ describe("commands analytics tracking", () => {
     mixpanelTrackCalls.length = 0;
     sendStartCarouselCalls = 0;
     sendStartCarouselShouldThrow = false;
+    autoCleanupReplyTexts = [];
   });
 
   afterEach(() => {
@@ -209,6 +218,9 @@ describe("commands analytics tracking", () => {
     await handleSummaryCommand(ctx, {} as Bot);
 
     expect(replyCalls).toEqual([
+      "Summary notifications are turned off for this community. Use /notifications to turn them on.",
+    ]);
+    expect(autoCleanupReplyTexts).toEqual([
       "Summary notifications are turned off for this community. Use /notifications to turn them on.",
     ]);
     expect(sendLatestSummaryCalls).toHaveLength(1);

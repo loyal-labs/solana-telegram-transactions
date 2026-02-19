@@ -7,9 +7,9 @@ mock.module("server-only", () => ({}));
 
 let mockDb: {
   insert: () => {
-    values: (
-      values: Record<string, unknown>
-    ) => { onConflictDoNothing: () => Promise<void> };
+    values: (values: Record<string, unknown>) => {
+      onConflictDoNothing: () => Promise<void>;
+    };
   };
   query: {
     userSettings: { findFirst: () => Promise<UserSettings | null> };
@@ -40,10 +40,6 @@ mock.module("@/lib/core/database", () => ({
 
 mock.module("@/lib/telegram/user-service", () => ({
   getOrCreateUser: async () => getOrCreateUserImpl(),
-}));
-
-mock.module("../notification-settings", () => ({
-  sendNotificationSettingsMessage: async () => {},
 }));
 
 mock.module("../start-carousel", () => ({

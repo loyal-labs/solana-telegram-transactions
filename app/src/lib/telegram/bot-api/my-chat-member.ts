@@ -6,6 +6,7 @@ import { communities } from "@/lib/core/schema";
 import { isCommunityChat, isPrivateChat } from "@/lib/telegram/utils";
 
 import { createBotTrackingProperties, trackBotEvent } from "./analytics";
+import { sendMessageWithAutoCleanup } from "./helper-message-cleanup";
 import { evictActiveCommunityCache } from "./message-handlers";
 import { disableNotificationsForTelegramUser } from "./user-settings";
 
@@ -36,13 +37,19 @@ function isSupportedCommunityChat(chatType: string): boolean {
   return isCommunityChat(chatType);
 }
 
-function isPrivateBlockTransition(oldStatus: string, newStatus: string): boolean {
+function isPrivateBlockTransition(
+  oldStatus: string,
+  newStatus: string
+): boolean {
   const blockedFrom = oldStatus === "member" || oldStatus === "restricted";
   const blockedTo = newStatus === "kicked";
   return blockedFrom && blockedTo;
 }
 
-function isPrivateUnblockTransition(oldStatus: string, newStatus: string): boolean {
+function isPrivateUnblockTransition(
+  oldStatus: string,
+  newStatus: string
+): boolean {
   const unblockedFrom = oldStatus === "kicked";
   const unblockedTo = newStatus === "member" || newStatus === "restricted";
   return unblockedFrom && unblockedTo;
@@ -59,7 +66,10 @@ export async function handleMyChatMemberUpdate(ctx: Context): Promise<void> {
   const newStatus = myChatMemberUpdate.new_chat_member.status;
   if (isPrivateChat(chatType)) {
     const isBlockTransition = isPrivateBlockTransition(oldStatus, newStatus);
-    const isUnblockTransition = isPrivateUnblockTransition(oldStatus, newStatus);
+    const isUnblockTransition = isPrivateUnblockTransition(
+      oldStatus,
+      newStatus
+    );
 
     if (!isBlockTransition && !isUnblockTransition) {
       return;
@@ -87,19 +97,16 @@ export async function handleMyChatMemberUpdate(ctx: Context): Promise<void> {
       ? BOT_BLOCKED_BY_USER_EVENT
       : BOT_UNBLOCKED_BY_USER_EVENT;
     const transitionType = isBlockTransition ? "block" : "unblock";
-    trackBotEvent(
-      eventName,
-      {
-        ...createBotTrackingProperties({
-          chatId: myChatMemberUpdate.chat.id,
-          chatType,
-          userId: myChatMemberUpdate.from.id,
-        }),
-        new_status: newStatus,
-        old_status: oldStatus,
-        transition_type: transitionType,
-      }
-    );
+    trackBotEvent(eventName, {
+      ...createBotTrackingProperties({
+        chatId: myChatMemberUpdate.chat.id,
+        chatType,
+        userId: myChatMemberUpdate.from.id,
+      }),
+      new_status: newStatus,
+      old_status: oldStatus,
+      transition_type: transitionType,
+    });
     return;
   }
 
@@ -178,7 +185,12 @@ export async function handleMyChatMemberUpdate(ctx: Context): Promise<void> {
   }
 
   try {
-    await ctx.api.sendMessage(myChatMemberUpdate.chat.id, ONBOARDING_MESSAGE);
+    await sendMessageWithAutoCleanup({
+      api: ctx.api,
+      chatId: myChatMemberUpdate.chat.id,
+      chatType: myChatMemberUpdate.chat.type,
+      text: ONBOARDING_MESSAGE,
+    });
   } catch (error) {
     console.error(
       "Failed to send onboarding message for my_chat_member update",

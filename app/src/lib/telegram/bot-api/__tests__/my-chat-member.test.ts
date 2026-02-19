@@ -54,7 +54,13 @@ const getOrCreateUserCalls: Array<{
     backfillAvatar?: boolean;
   };
 }> = [];
-let privateUserSettingsDisableValuesCaptured: Array<Record<string, unknown>> = [];
+let privateUserSettingsDisableValuesCaptured: Array<Record<string, unknown>> =
+  [];
+let sendMessageWithAutoCleanupCalls: Array<{
+  chatId: bigint | number | string;
+  chatType: string;
+  text: string;
+}> = [];
 
 mock.module("@/lib/core/database", () => ({
   getDatabase: () => mockDb,
@@ -97,6 +103,27 @@ mock.module("@/lib/telegram/user-service", () => ({
   ) => {
     getOrCreateUserCalls.push({ telegramId, userData, options });
     return "private-user-id";
+  },
+}));
+
+mock.module("../helper-message-cleanup", () => ({
+  sendMessageWithAutoCleanup: async (params: {
+    api: Pick<Context["api"], "sendMessage">;
+    chatId: bigint | number | string;
+    chatType: string;
+    text: string;
+    options?: unknown;
+  }) => {
+    sendMessageWithAutoCleanupCalls.push({
+      chatId: params.chatId,
+      chatType: params.chatType,
+      text: params.text,
+    });
+    await params.api.sendMessage(
+      params.chatId,
+      params.text,
+      params.options as never
+    );
   },
 }));
 
@@ -186,6 +213,7 @@ describe("my chat member onboarding", () => {
     mixpanelTrackCalls.length = 0;
     getOrCreateUserCalls.length = 0;
     privateUserSettingsDisableValuesCaptured = [];
+    sendMessageWithAutoCleanupCalls = [];
 
     mockDb = {
       insert: () => ({
@@ -259,6 +287,13 @@ describe("my chat member onboarding", () => {
     expect(evictCalls).toEqual([BigInt(COMMUNITY_CHAT_ID)]);
     expect(sendMessageCalls).toEqual([
       { chatId: COMMUNITY_CHAT_ID, text: ONBOARDING_MESSAGE },
+    ]);
+    expect(sendMessageWithAutoCleanupCalls).toEqual([
+      {
+        chatId: COMMUNITY_CHAT_ID,
+        chatType: "supergroup",
+        text: ONBOARDING_MESSAGE,
+      },
     ]);
     expect(mixpanelInitTokens).toEqual(["test-mixpanel-token"]);
     expect(mixpanelTrackCalls).toEqual([
@@ -506,7 +541,9 @@ describe("my chat member onboarding", () => {
     expect(insertValuesCaptured).toHaveLength(0);
     expect(conflictSetCaptured).toHaveLength(0);
     expect(removalUpdateValuesCaptured).toHaveLength(1);
-    expect(removalUpdateValuesCaptured[0]?.chatTitle).toBe("New Community Title");
+    expect(removalUpdateValuesCaptured[0]?.chatTitle).toBe(
+      "New Community Title"
+    );
     expect(removalUpdateValuesCaptured[0]?.isActive).toBe(false);
     expect(removalUpdateValuesCaptured[0]?.isPublic).toBe(false);
     expect(removalUpdateValuesCaptured[0]?.updatedAt).toBeInstanceOf(Date);

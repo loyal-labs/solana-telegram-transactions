@@ -22,6 +22,7 @@ let mockDb: {
 
 let getChatCalls = 0;
 let evictCalls: Array<bigint | number | string> = [];
+let autoCleanupReplyTexts: string[] = [];
 
 mock.module("@/lib/core/database", () => ({
   getDatabase: () => mockDb,
@@ -48,6 +49,17 @@ mock.module("@/lib/telegram/user-service", () => ({
 mock.module("../message-handlers", () => ({
   evictActiveCommunityCache: (chatId: bigint | number | string) => {
     evictCalls.push(chatId);
+  },
+}));
+
+mock.module("../helper-message-cleanup", () => ({
+  replyWithAutoCleanup: async (
+    ctx: CommandContext<Context>,
+    text: string,
+    options?: unknown
+  ) => {
+    autoCleanupReplyTexts.push(text);
+    await ctx.reply(text, options as never);
   },
 }));
 
@@ -112,8 +124,10 @@ function createCommandContext() {
 describe("commands admin authorization", () => {
   beforeAll(async () => {
     const loadedModule = await import("../commands");
-    handleActivateCommunityCommand = loadedModule.handleActivateCommunityCommand;
-    handleDeactivateCommunityCommand = loadedModule.handleDeactivateCommunityCommand;
+    handleActivateCommunityCommand =
+      loadedModule.handleActivateCommunityCommand;
+    handleDeactivateCommunityCommand =
+      loadedModule.handleDeactivateCommunityCommand;
     handleHideCommunityCommand = loadedModule.handleHideCommunityCommand;
     handleUnhideCommunityCommand = loadedModule.handleUnhideCommunityCommand;
   });
@@ -123,6 +137,7 @@ describe("commands admin authorization", () => {
     communityResult = null;
     getChatCalls = 0;
     evictCalls = [];
+    autoCleanupReplyTexts = [];
     insertValuesCaptured = [];
     updateValuesCaptured = [];
 
@@ -161,7 +176,12 @@ describe("commands admin authorization", () => {
     expect(getChatCalls).toBe(1);
     expect(updateValuesCaptured).toHaveLength(1);
     expect(updateValuesCaptured[0]?.updatedAt).toBeInstanceOf(Date);
-    expect(replyCalls).toContain("Community is already activated. Data updated!");
+    expect(replyCalls).toContain(
+      "Community is already activated. Data updated!"
+    );
+    expect(autoCleanupReplyTexts).toContain(
+      "Community is already activated. Data updated!"
+    );
   });
 
   test("activate rejects non-whitelisted user", async () => {
@@ -242,7 +262,9 @@ describe("commands admin authorization", () => {
     expect(updateValuesCaptured).toHaveLength(1);
     expect(updateValuesCaptured[0]?.isPublic).toBe(true);
     expect(updateValuesCaptured[0]?.updatedAt).toBeInstanceOf(Date);
-    expect(replyCalls).toEqual(["Community is now visible in public summaries."]);
+    expect(replyCalls).toEqual([
+      "Community is now visible in public summaries.",
+    ]);
   });
 
   test("hide rejects non-whitelisted user", async () => {
