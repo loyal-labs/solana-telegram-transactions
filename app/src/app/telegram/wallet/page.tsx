@@ -63,10 +63,12 @@ import type {
 
 import { ActivityFeed } from "./components/ActivityFeed";
 import { BalanceCard } from "./components/BalanceCard";
+import { PullToRefreshIndicator } from "./components/PullToRefreshIndicator";
 import { StickyBalancePill } from "./components/StickyBalancePill";
 import { TokensList } from "./components/TokensList";
 import { useDisplayPreferences } from "./hooks/useDisplayPreferences";
 import { useIncomingDeposits } from "./hooks/useIncomingDeposits";
+import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useSolPrice } from "./hooks/useSolPrice";
 import { useTelegramMainButton } from "./hooks/useTelegramMainButton";
 import { useTelegramSetup } from "./hooks/useTelegramSetup";
@@ -425,7 +427,7 @@ export default function Home() {
     }
   }, [secureDirection, secureFormValues, isSwapFormValid, isSwapping, refreshBalance]);
 
-  const _handleRefresh = useCallback(async () => {
+  const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
 
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -487,6 +489,21 @@ export default function Home() {
     setIncomingTransactions,
     setSolPriceUsd,
   ]);
+
+  const anySheetOpen =
+    isSendSheetOpen ||
+    isSwapSheetOpen ||
+    isReceiveSheetOpen ||
+    isActivitySheetOpen ||
+    isTokensSheetOpen ||
+    isTransactionDetailsSheetOpen ||
+    isBgPickerOpen;
+
+  const { pullDistance, isRefreshing: isPullRefreshing, containerRef } =
+    usePullToRefresh({
+      onRefresh: handleRefresh,
+      disabled: anySheetOpen,
+    });
 
   const handleSubmitSend = useCallback(async () => {
     if (!isSendFormValid || isSendingTransaction) {
@@ -885,7 +902,19 @@ export default function Home() {
         />
 
         {/* Main Content */}
-        <div className="relative flex-1 flex flex-col w-full">
+        <div
+          ref={containerRef}
+          className="relative flex-1 flex flex-col w-full"
+          style={{
+            transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
+            transition: pullDistance > 0 && !isPullRefreshing ? "none" : "transform 0.3s cubic-bezier(0.2, 0, 0, 1)",
+          }}
+        >
+          <PullToRefreshIndicator
+            pullDistance={pullDistance}
+            isRefreshing={isPullRefreshing}
+            threshold={80}
+          />
           <BalanceCard
             balanceRef={balanceRef}
             walletAddress={walletAddress}
