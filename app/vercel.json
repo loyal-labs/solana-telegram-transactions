@@ -1,4 +1,5 @@
 {
+  "buildCommand": "bun run build && bash scripts/upload-sourcemaps.sh",
   "crons": [
     {
       "path": "/api/cron/telegram-helper-cleanup",

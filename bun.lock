@@ -4,6 +4,8 @@
     "": {
       "dependencies": {
         "@coral-xyz/anchor": "^0.32.1",
+        "@datadog/browser-rum": "^6.27.1",
+        "@datadog/browser-rum-react": "^6.27.1",
         "lightningcss": "^1.30.2",
       },
       "devDependencies": {
@@ -70,6 +72,14 @@
     "@coral-xyz/anchor-errors": ["@coral-xyz/anchor-errors@0.31.1", "", {}, "sha512-NhNEku4F3zzUSBtrYz84FzYWm48+9OvmT1Hhnwr6GnPQry2dsEqH/ti/7ASjjpoFTWRnPXrjAIT1qM6Isop+LQ=="],
 
     "@coral-xyz/borsh": ["@coral-xyz/borsh@0.31.1", "", { "dependencies": { "bn.js": "^5.1.2", "buffer-layout": "^1.2.0" }, "peerDependencies": { "@solana/web3.js": "^1.69.0" } }, "sha512-9N8AU9F0ubriKfNE3g1WF0/4dtlGXoBN/hd1PvbNBamBNwRgHxH4P+o3Zt7rSEloW1HUs6LfZEchlx9fW7POYw=="],
+
+    "@datadog/browser-core": ["@datadog/browser-core@6.27.1", "", {}, "sha512-Az3ko7cCZgdgbugY+C+/AdWW5bMPgtjZ3mSRAQUZpamCptqEhms5iXl5S2ZOzIkvZZprcyZGwpDo9K8GF7XZoA=="],
+
+    "@datadog/browser-rum": ["@datadog/browser-rum@6.27.1", "", { "dependencies": { "@datadog/browser-core": "6.27.1", "@datadog/browser-rum-core": "6.27.1" }, "peerDependencies": { "@datadog/browser-logs": "6.27.1" }, "optionalPeers": ["@datadog/browser-logs"] }, "sha512-dApySQaAzl5TkTAk8IZZiiJyNJCLQH8RKdzgu5SWTYgTePqy0Sk+aurnTKQcS4zA9LFxf4qzBCTWYMEb+XU+HA=="],
+
+    "@datadog/browser-rum-core": ["@datadog/browser-rum-core@6.27.1", "", { "dependencies": { "@datadog/browser-core": "6.27.1" } }, "sha512-pDZu44IuQynm0Ts3XF4b4jhGRxdOCIQHZ0DbBtdvAt7w6mxYxAdF1hUBdKzaSiPwO6rZ4VleiBJVfyE0p9gNkA=="],
+
+    "@datadog/browser-rum-react": ["@datadog/browser-rum-react@6.27.1", "", { "dependencies": { "@datadog/browser-core": "6.27.1", "@datadog/browser-rum-core": "6.27.1" }, "peerDependencies": { "react": "18 || 19", "react-router": "6 || 7", "react-router-dom": "6 || 7" }, "optionalPeers": ["react", "react-router", "react-router-dom"] }, "sha512-790+pfP6GTnWUppxJyDySQy1KlUuRyu93TMC60t5wjXB5ezajPbazTYm63rOSC+oUYdEEC8FAnjmM3r5pHjA4A=="],
 
     "@magicblock-labs/ephemeral-rollups-sdk": ["@magicblock-labs/ephemeral-rollups-sdk@0.8.0", "", { "dependencies": { "@phala/dcap-qvl-web": "^0.2.7", "@solana/spl-token": "^0.4.9", "@solana/web3.js": "^1.98.0", "bs58": "^6.0.0", "rpc-websockets": "^9.0.4", "typescript": "^5.3.0" } }, "sha512-Eelgua6ub0+8sB+YgwceW5PNLTNCkJVE66QeEUwkxjVl3ulUu8iCbPQk0E4huHLGlSeoG9UxDypAIhdlmimuyQ=="],
 

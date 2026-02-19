@@ -11,6 +11,7 @@ import {
   setTelegramLaunchContext,
   track,
 } from "@/lib/core/analytics";
+import { identifyDatadogUser } from "@/lib/core/datadog";
 import { parseTelegramAnalyticsContextFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
 
 const IDENTITY_WAIT_TIMEOUT_MS = 1500;
@@ -73,6 +74,7 @@ export function AnalyticsBootstrap() {
 
     if (telegramIdentity) {
       identifyTelegramUser(telegramIdentity);
+      identifyDatadogUser(telegramIdentity);
     }
   }, [pathname, telegramIdentity, telegramLaunchContext]);
 
