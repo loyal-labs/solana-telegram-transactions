@@ -37,6 +37,23 @@ export type SendMethod = (typeof SEND_METHODS)[keyof typeof SEND_METHODS];
 export type SwapMethod = (typeof SWAP_METHODS)[keyof typeof SWAP_METHODS];
 export type ClaimSource = (typeof CLAIM_SOURCES)[keyof typeof CLAIM_SOURCES];
 
+export function getAnalyticsErrorProperties(error: unknown): {
+  error_name: string;
+  error_message: string;
+} {
+  if (error instanceof Error) {
+    return {
+      error_name: error.name || "Error",
+      error_message: error.message || "Unknown error",
+    };
+  }
+
+  return {
+    error_name: "UnknownError",
+    error_message: typeof error === "string" ? error : "Unknown error",
+  };
+}
+
 export function getSendMethod(recipient: string): SendMethod {
   const trimmedRecipient = recipient.trim();
 

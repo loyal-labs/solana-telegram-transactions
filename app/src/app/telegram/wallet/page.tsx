@@ -120,6 +120,7 @@ import type {
 import {
   CLAIM_SOURCES,
   type ClaimSource,
+  getAnalyticsErrorProperties,
   getSendMethod,
   SEND_METHODS,
   SWAP_METHODS,
@@ -159,23 +160,6 @@ import {
 } from "./wallet-mock-data";
 
 hashes.sha512 = sha512;
-
-function getAnalyticsErrorProperties(error: unknown): {
-  error_name: string;
-  error_message: string;
-} {
-  if (error instanceof Error) {
-    return {
-      error_name: error.name || "Error",
-      error_message: error.message || "Unknown error",
-    };
-  }
-
-  return {
-    error_name: "UnknownError",
-    error_message: typeof error === "string" ? error : "Unknown error",
-  };
-}
 
 export default function Home() {
   const rawInitData = useRawInitData();
