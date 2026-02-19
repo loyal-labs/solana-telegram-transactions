@@ -36,7 +36,6 @@ export function initDatadog() {
     trackUserInteractions: true,
     trackResources: true,
     trackLongTasks: true,
-    trackErrors: true,
     defaultPrivacyLevel: "mask-user-input",
     plugins: [reactPlugin({ router: false })],
   });
