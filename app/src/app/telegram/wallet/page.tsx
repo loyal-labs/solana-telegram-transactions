@@ -80,7 +80,6 @@ import {
   sendSolTransaction,
 } from "@/lib/solana/wallet/wallet-details";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
-import { ensureWalletKeypair } from "@/lib/solana/wallet/wallet-keypair-logic";
 import { sendString } from "@/lib/telegram/mini-app";
 import {
   hideMainButton,
@@ -108,6 +107,8 @@ import type {
 import { useDisplayPreferences } from "./hooks/useDisplayPreferences";
 import { useSolPrice } from "./hooks/useSolPrice";
 import { useTelegramSetup } from "./hooks/useTelegramSetup";
+import { useWalletBalance } from "./hooks/useWalletBalance";
+import { useWalletInit } from "./hooks/useWalletInit";
 import {
   CLAIM_SOURCES,
   type ClaimSource,
@@ -122,25 +123,17 @@ import {
 import {
   cachedUsername,
   cachedWalletAddress,
-  ensureWalletBalanceSubscription,
   getCachedIncomingTransactions,
-  getCachedWalletBalance,
-  hasCachedWalletData,
   HOLDINGS_REFRESH_DEBOUNCE_MS,
   mapDepositToIncomingTransaction,
   setCachedDisplayCurrency,
   setCachedIncomingTransactions,
   setCachedSolPrice,
-  setCachedWalletAddress,
-  setCachedWalletBalance,
-  walletBalanceListeners,
   walletTransactionsCache,
 } from "./wallet-cache";
 import {
   MOCK_ACTIVITY_INFO,
-  MOCK_BALANCE_LAMPORTS,
   MOCK_TOKEN_HOLDINGS,
-  MOCK_WALLET_ADDRESS,
   MOCK_WALLET_TRANSACTIONS,
   USE_MOCK_DATA,
 } from "./wallet-mock-data";
@@ -190,25 +183,13 @@ export default function Home() {
     useState(false);
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string | null>(() =>
-    USE_MOCK_DATA ? MOCK_WALLET_ADDRESS : cachedWalletAddress
-  );
-  const [solBalanceLamports, setSolBalanceLamports] = useState<number | null>(
-    () =>
-      USE_MOCK_DATA
-        ? MOCK_BALANCE_LAMPORTS
-        : cachedWalletAddress
-        ? getCachedWalletBalance(cachedWalletAddress)
-        : null
-  );
+  const { walletAddress, setWalletAddress, isLoading } = useWalletInit();
+  const { solBalanceLamports, setSolBalanceLamports, refreshBalance } = useWalletBalance(walletAddress);
   const [tokenHoldings, setTokenHoldings] = useState<TokenHolding[]>(() =>
     USE_MOCK_DATA ? MOCK_TOKEN_HOLDINGS : []
   );
   const [isHoldingsLoading, setIsHoldingsLoading] = useState(() =>
     USE_MOCK_DATA ? false : true
-  );
-  const [isLoading, setIsLoading] = useState(() =>
-    USE_MOCK_DATA ? false : !hasCachedWalletData()
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
@@ -264,8 +245,6 @@ export default function Home() {
   const secondaryButtonAvailable = useSignal(
     secondaryButton.setParams.isAvailable
   );
-  const ensuredWalletRef = useRef(false);
-
   // Track seen transaction IDs to detect new ones for animation
   const seenTransactionIdsRef = useRef<Set<string>>(new Set());
   const [newTransactionIds, setNewTransactionIds] = useState<Set<string>>(
@@ -455,7 +434,7 @@ export default function Home() {
         }
 
         // Refresh balance after successful swap
-        void refreshWalletBalance(true);
+        void refreshBalance(true);
       } else {
         setSwapError(result.error || "Swap failed");
         setSwapView("result");
@@ -504,7 +483,7 @@ export default function Home() {
         token_symbol: secureFormValues.symbol,
         amount: secureFormValues.amount,
       });
-      void refreshWalletBalance(true);
+      void refreshBalance(true);
     } catch (error) {
       console.error("[secure] Error:", error);
       setSwapError(error instanceof Error ? error.message : "Operation failed");
@@ -520,19 +499,6 @@ export default function Home() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secureDirection, secureFormValues, isSwapFormValid, isSwapping]);
-
-  const refreshWalletBalance = useCallback(
-    async (forceRefresh = false) => {
-      try {
-        const balanceLamports = await getWalletBalance(forceRefresh);
-        setCachedWalletBalance(walletAddress, balanceLamports);
-        setSolBalanceLamports(balanceLamports);
-      } catch (error) {
-        console.error("Failed to refresh wallet balance", error);
-      }
-    },
-    [walletAddress]
-  );
 
   const hasLoadedHoldingsRef = useRef(USE_MOCK_DATA);
   const walletAddressRef = useRef<string | null>(walletAddress);
@@ -686,7 +652,7 @@ export default function Home() {
     setIsRefreshing(true);
     try {
       // Refresh wallet balance
-      await refreshWalletBalance(true);
+      await refreshBalance(true);
       await refreshTokenHoldings(true);
 
       try {
@@ -749,7 +715,7 @@ export default function Home() {
     loadWalletTransactions,
     rawInitData,
     refreshTokenHoldings,
-    refreshWalletBalance,
+    refreshBalance,
     setSolPriceUsd,
   ]);
 
@@ -787,7 +753,7 @@ export default function Home() {
         throw new Error("Invalid recipient");
       }
 
-      await refreshWalletBalance(true);
+      await refreshBalance(true);
       if (signature) {
         void loadWalletTransactions({ force: true });
       }
@@ -832,7 +798,7 @@ export default function Home() {
     isSendingTransaction,
     sendFormValues,
     loadWalletTransactions,
-    refreshWalletBalance,
+    refreshBalance,
   ]);
 
   const handleReceiveSheetChange = useCallback((open: boolean) => {
@@ -896,7 +862,7 @@ export default function Home() {
         throw error; // Re-throw so the sheet can handle it
       }
     },
-    []
+    [setSolBalanceLamports]
   );
 
   const handleShareAddress = useCallback(async () => {
@@ -951,7 +917,7 @@ export default function Home() {
     } catch (error) {
       console.error("Failed to share wallet address", error);
     }
-  }, [walletAddress]);
+  }, [setWalletAddress, walletAddress]);
 
   const handleShareDepositTransaction = useCallback(async () => {
     if (!selectedTransaction || !rawInitData || !solPriceUsd) {
@@ -1062,7 +1028,7 @@ export default function Home() {
           prev.filter((tx) => tx.id !== transactionId)
         );
 
-        await refreshWalletBalance(true);
+        await refreshBalance(true);
         void loadWalletTransactions({ force: true });
         track(WALLET_ANALYTICS_EVENTS.claimFunds, {
           path: WALLET_ANALYTICS_PATH,
@@ -1112,7 +1078,7 @@ export default function Home() {
     [
       incomingTransactions,
       rawInitData,
-      refreshWalletBalance,
+      refreshBalance,
       loadWalletTransactions,
     ]
   );
@@ -1221,79 +1187,9 @@ export default function Home() {
 
   useEffect(() => {
     if (USE_MOCK_DATA) return;
-    if (ensuredWalletRef.current) return;
-    ensuredWalletRef.current = true;
-
-    void (async () => {
-      try {
-        const { keypair, isNew: _isNew } = await ensureWalletKeypair();
-        const publicKeyBase58 = keypair.publicKey.toBase58();
-
-        // Store wallet address in module-level cache for future mounts
-        setCachedWalletAddress(publicKeyBase58);
-        setWalletAddress(publicKeyBase58);
-
-        // Check if we already have cached balance (from previous visit)
-        const cachedBalance = getCachedWalletBalance(publicKeyBase58);
-
-        if (cachedBalance !== null) {
-          // We have cache - state was already initialized from it
-          // Just refresh in background without loading state
-          setIsLoading(false);
-          void getWalletBalance().then((freshBalance) => {
-            setCachedWalletBalance(publicKeyBase58, freshBalance);
-            setSolBalanceLamports(freshBalance);
-          });
-        } else {
-          // First load - need to fetch balance
-          const balanceLamports = await getWalletBalance();
-          setCachedWalletBalance(publicKeyBase58, balanceLamports);
-          setSolBalanceLamports(balanceLamports);
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error("Failed to ensure wallet keypair", error);
-        setIsLoading(false);
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (USE_MOCK_DATA) return;
     if (!walletAddress) return;
     void loadWalletTransactions();
   }, [walletAddress, loadWalletTransactions]);
-
-  // Subscribe to websocket balance updates so inbound funds appear in real time
-  useEffect(() => {
-    if (USE_MOCK_DATA) return;
-    if (!walletAddress) return;
-
-    let isCancelled = false;
-
-    const handleBalanceUpdate = (lamports: number) => {
-      if (isCancelled) return;
-      setSolBalanceLamports((prev) => (prev === lamports ? prev : lamports));
-    };
-
-    const cachedBalance = getCachedWalletBalance(walletAddress);
-    if (cachedBalance !== null) {
-      setSolBalanceLamports((prev) =>
-        prev === cachedBalance ? prev : cachedBalance
-      );
-    }
-
-    walletBalanceListeners.add(handleBalanceUpdate);
-
-    void ensureWalletBalanceSubscription(walletAddress).catch((error) => {
-      console.error("Failed to subscribe to wallet balance", error);
-    });
-
-    return () => {
-      isCancelled = true;
-      walletBalanceListeners.delete(handleBalanceUpdate);
-    };
-  }, [walletAddress]);
 
   // Fetch token holdings
   useEffect(() => {
