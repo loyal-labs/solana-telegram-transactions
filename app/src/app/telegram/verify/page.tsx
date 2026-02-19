@@ -300,17 +300,17 @@ export default function VerifyPage() {
       setStep("verified");
       setShowConfetti(true);
 
-      // Celebration haptic bursts
+      // Celebration haptics — escalating burst pattern (iOS-safe: ≥150ms gaps)
+      if (hapticFeedback.notificationOccurred.isAvailable()) {
+        hapticFeedback.notificationOccurred("success");
+      }
       if (hapticFeedback.impactOccurred.isAvailable()) {
-        hapticFeedback.impactOccurred("heavy");
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 80);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 160);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 300);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 380);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 460);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 600);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 680);
-        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 760);
+        setTimeout(() => hapticFeedback.impactOccurred("medium"), 200);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 400);
+        setTimeout(() => hapticFeedback.impactOccurred("rigid"), 600);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 800);
+        setTimeout(() => hapticFeedback.impactOccurred("rigid"), 1000);
+        setTimeout(() => hapticFeedback.impactOccurred("heavy"), 1200);
       }
     }, 800);
     return () => clearTimeout(timer);
