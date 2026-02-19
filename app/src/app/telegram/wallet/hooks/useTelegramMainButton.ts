@@ -71,7 +71,6 @@ interface TelegramMainButtonParams {
   setSwappedFromSymbol: React.Dispatch<React.SetStateAction<string | undefined>>;
   setSwappedToAmount: React.Dispatch<React.SetStateAction<number | undefined>>;
   setSwappedToSymbol: React.Dispatch<React.SetStateAction<string | undefined>>;
-  setSecureDirection: React.Dispatch<React.SetStateAction<"shield" | "unshield">>;
   setTransactionDetailsSheetOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setSelectedTransaction: React.Dispatch<
     React.SetStateAction<TransactionDetailsData | null>

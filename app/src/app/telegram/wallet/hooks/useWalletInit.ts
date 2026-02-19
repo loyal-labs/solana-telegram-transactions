@@ -10,6 +10,7 @@ import {
   hasCachedWalletData,
   setCachedWalletAddress,
   setCachedWalletBalance,
+  walletBalanceListeners,
 } from "../wallet-cache";
 import { MOCK_WALLET_ADDRESS, USE_MOCK_DATA } from "../wallet-mock-data";
 
@@ -49,6 +50,7 @@ export function useWalletInit(): {
           setIsLoading(false);
           void getWalletBalance().then((freshBalance) => {
             setCachedWalletBalance(publicKeyBase58, freshBalance);
+            walletBalanceListeners.forEach((listener) => listener(freshBalance));
           });
         } else {
           // First load - need to fetch balance

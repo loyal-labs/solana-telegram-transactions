@@ -796,7 +796,6 @@ export default function Home() {
     setSwappedFromSymbol,
     setSwappedToAmount,
     setSwappedToSymbol,
-    setSecureDirection,
     setTransactionDetailsSheetOpen,
     setSelectedTransaction,
     setSelectedIncomingTransaction,
