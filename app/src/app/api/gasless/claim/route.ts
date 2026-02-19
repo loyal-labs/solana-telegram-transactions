@@ -1,5 +1,3 @@
-"use server";
-
 import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
 import {
   Ed25519Program,

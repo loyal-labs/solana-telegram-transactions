@@ -1,5 +1,3 @@
-"use server";
-
 import { NextResponse } from "next/server";
 
 import { hasCustomEmoji } from "@/lib/telegram/bot-api/check-custom-emoji";
