@@ -32,6 +32,7 @@ const mixpanelProxyPath = mixpanelProxyPathRaw
   : "/ingest";
 
 const nextConfig: NextConfig = {
+  productionBrowserSourceMaps: Boolean(process.env.DATADOG_API_KEY),
   env: {
     NEXT_PUBLIC_GIT_COMMIT_HASH: commitHash,
     NEXT_PUBLIC_GIT_BRANCH: branch,
