@@ -11,7 +11,11 @@ let mockDb: {
     communities: { findFirst: () => Promise<Community | null> };
   };
   insert: () => {
-    values: (values: Record<string, unknown>) => Promise<void>;
+    values: (values: Record<string, unknown>) => {
+      onConflictDoNothing: () => {
+        returning: () => Promise<Array<{ id: string }>>;
+      };
+    };
   };
   update: () => {
     set: (values: Record<string, unknown>) => {
@@ -23,6 +27,10 @@ let mockDb: {
 let getChatCalls = 0;
 let evictCalls: Array<bigint | number | string> = [];
 let autoCleanupReplyTexts: string[] = [];
+let notificationSettingsCalls: Array<{
+  community: Community;
+  ctx: CommandContext<Context>;
+}> = [];
 
 mock.module("@/lib/core/database", () => ({
   getDatabase: () => mockDb,
@@ -63,10 +71,22 @@ mock.module("../helper-message-cleanup", () => ({
   },
 }));
 
+mock.module("../notification-settings", () => ({
+  sendNotificationSettingsMessage: async (
+    ctx: CommandContext<Context>,
+    community: Community
+  ) => {
+    notificationSettingsCalls.push({ community, ctx });
+  },
+}));
+
 let handleActivateCommunityCommand: (
   ctx: CommandContext<Context>
 ) => Promise<void>;
 let handleDeactivateCommunityCommand: (
+  ctx: CommandContext<Context>
+) => Promise<void>;
+let handleNotificationsCommand: (
   ctx: CommandContext<Context>
 ) => Promise<void>;
 let handleHideCommunityCommand: (ctx: CommandContext<Context>) => Promise<void>;
@@ -76,6 +96,8 @@ let handleUnhideCommunityCommand: (
 
 let adminResult: { id: string } | null;
 let communityResult: Community | null;
+let communityFindResults: Array<Community | null>;
+let insertReturningRows: Array<{ id: string }>;
 let insertValuesCaptured: Array<Record<string, unknown>>;
 let updateValuesCaptured: Array<Record<string, unknown>>;
 
@@ -128,6 +150,7 @@ describe("commands admin authorization", () => {
       loadedModule.handleActivateCommunityCommand;
     handleDeactivateCommunityCommand =
       loadedModule.handleDeactivateCommunityCommand;
+    handleNotificationsCommand = loadedModule.handleNotificationsCommand;
     handleHideCommunityCommand = loadedModule.handleHideCommunityCommand;
     handleUnhideCommunityCommand = loadedModule.handleUnhideCommunityCommand;
   });
@@ -135,9 +158,12 @@ describe("commands admin authorization", () => {
   beforeEach(() => {
     adminResult = null;
     communityResult = null;
+    communityFindResults = [];
+    insertReturningRows = [{ id: "new-community" }];
     getChatCalls = 0;
     evictCalls = [];
     autoCleanupReplyTexts = [];
+    notificationSettingsCalls = [];
     insertValuesCaptured = [];
     updateValuesCaptured = [];
 
@@ -147,12 +173,20 @@ describe("commands admin authorization", () => {
           findFirst: async () => adminResult,
         },
         communities: {
-          findFirst: async () => communityResult,
+          findFirst: async () =>
+            communityFindResults.length > 0
+              ? (communityFindResults.shift() ?? null)
+              : communityResult,
         },
       },
       insert: () => ({
-        values: async (values: Record<string, unknown>) => {
+        values: (values: Record<string, unknown>) => {
           insertValuesCaptured.push(values);
+          return {
+            onConflictDoNothing: () => ({
+              returning: async () => insertReturningRows,
+            }),
+          };
         },
       }),
       update: () => ({
@@ -191,9 +225,7 @@ describe("commands admin authorization", () => {
     await handleActivateCommunityCommand(ctx);
 
     expect(updateValuesCaptured).toHaveLength(0);
-    expect(replyCalls).toEqual([
-      "You are not authorized to activate communities. Contact an administrator to be added to the whitelist.",
-    ]);
+    expect(replyCalls).toHaveLength(0);
   });
 
   test("activate creates new community as hidden by default", async () => {
@@ -208,6 +240,35 @@ describe("commands admin authorization", () => {
     expect(insertValuesCaptured).toHaveLength(1);
     expect(insertValuesCaptured[0]?.isPublic).toBe(false);
     expect(replyCalls).toContain("Community activated for message tracking!");
+  });
+
+  test("activate handles insert conflict by updating existing active community", async () => {
+    adminResult = { id: "admin-1" };
+    const racedCommunity = createCommunity({ isActive: true });
+    communityFindResults = [null, racedCommunity];
+    insertReturningRows = [];
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleActivateCommunityCommand(ctx);
+
+    expect(insertValuesCaptured).toHaveLength(1);
+    expect(updateValuesCaptured).toHaveLength(1);
+    expect(replyCalls).toEqual(["Community is already activated. Data updated!"]);
+  });
+
+  test("activate handles insert conflict by reactivating existing inactive community", async () => {
+    adminResult = { id: "admin-1" };
+    const racedCommunity = createCommunity({ isActive: false });
+    communityFindResults = [null, racedCommunity];
+    insertReturningRows = [];
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleActivateCommunityCommand(ctx);
+
+    expect(insertValuesCaptured).toHaveLength(1);
+    expect(updateValuesCaptured).toHaveLength(1);
+    expect(updateValuesCaptured[0]?.isActive).toBe(true);
+    expect(replyCalls).toEqual(["Community reactivated for message tracking!"]);
   });
 
   test("deactivate succeeds for whitelisted user without requiring Telegram chat-admin check", async () => {
@@ -234,9 +295,7 @@ describe("commands admin authorization", () => {
 
     expect(updateValuesCaptured).toHaveLength(0);
     expect(evictCalls).toHaveLength(0);
-    expect(replyCalls).toEqual([
-      "You are not authorized to deactivate communities. Contact an administrator to be added to the whitelist.",
-    ]);
+    expect(replyCalls).toHaveLength(0);
   });
 
   test("hide succeeds for whitelisted user and sets isPublic to false", async () => {
@@ -275,9 +334,7 @@ describe("commands admin authorization", () => {
     await handleHideCommunityCommand(ctx);
 
     expect(updateValuesCaptured).toHaveLength(0);
-    expect(replyCalls).toEqual([
-      "You are not authorized to manage community visibility. Contact an administrator to be added to the whitelist.",
-    ]);
+    expect(replyCalls).toHaveLength(0);
   });
 
   test("unhide rejects non-whitelisted user", async () => {
@@ -288,12 +345,10 @@ describe("commands admin authorization", () => {
     await handleUnhideCommunityCommand(ctx);
 
     expect(updateValuesCaptured).toHaveLength(0);
-    expect(replyCalls).toEqual([
-      "You are not authorized to manage community visibility. Contact an administrator to be added to the whitelist.",
-    ]);
+    expect(replyCalls).toHaveLength(0);
   });
 
-  test("hide notifies when community is not activated yet (missing row)", async () => {
+  test("hide suppresses output when community is not activated yet (missing row)", async () => {
     adminResult = { id: "admin-1" };
     communityResult = null;
     const { ctx, replyCalls } = createCommandContext();
@@ -301,12 +356,10 @@ describe("commands admin authorization", () => {
     await handleHideCommunityCommand(ctx);
 
     expect(updateValuesCaptured).toHaveLength(0);
-    expect(replyCalls).toEqual([
-      "This community is not activated yet. Use /activate_community to enable it.",
-    ]);
+    expect(replyCalls).toHaveLength(0);
   });
 
-  test("unhide notifies when community is not activated yet (inactive row)", async () => {
+  test("unhide suppresses output when community is not activated yet (inactive row)", async () => {
     adminResult = { id: "admin-1" };
     communityResult = createCommunity({ isActive: false, isPublic: false });
     const { ctx, replyCalls } = createCommandContext();
@@ -314,9 +367,7 @@ describe("commands admin authorization", () => {
     await handleUnhideCommunityCommand(ctx);
 
     expect(updateValuesCaptured).toHaveLength(0);
-    expect(replyCalls).toEqual([
-      "This community is not activated yet. Use /activate_community to enable it.",
-    ]);
+    expect(replyCalls).toHaveLength(0);
   });
 
   test("hide is idempotent when community is already hidden", async () => {
@@ -327,7 +378,7 @@ describe("commands admin authorization", () => {
     await handleHideCommunityCommand(ctx);
 
     expect(updateValuesCaptured).toHaveLength(0);
-    expect(replyCalls).toEqual(["This community is already hidden."]);
+    expect(replyCalls).toHaveLength(0);
   });
 
   test("unhide is idempotent when community is already visible", async () => {
@@ -338,6 +389,51 @@ describe("commands admin authorization", () => {
     await handleUnhideCommunityCommand(ctx);
 
     expect(updateValuesCaptured).toHaveLength(0);
-    expect(replyCalls).toEqual(["This community is already visible."]);
+    expect(replyCalls).toHaveLength(0);
+  });
+
+  test("notifications sends settings panel for whitelisted admin in active community", async () => {
+    adminResult = { id: "admin-1" };
+    communityResult = createCommunity({ isActive: true });
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleNotificationsCommand(ctx);
+
+    expect(replyCalls).toHaveLength(0);
+    expect(notificationSettingsCalls).toHaveLength(1);
+    expect(notificationSettingsCalls[0]?.community.id).toBe(communityResult!.id);
+  });
+
+  test("notifications suppresses output for non-whitelisted user", async () => {
+    adminResult = null;
+    communityResult = createCommunity({ isActive: true });
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleNotificationsCommand(ctx);
+
+    expect(replyCalls).toHaveLength(0);
+    expect(notificationSettingsCalls).toHaveLength(0);
+  });
+
+  test("notifications suppresses output when community is missing", async () => {
+    adminResult = { id: "admin-1" };
+    communityResult = null;
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleNotificationsCommand(ctx);
+
+    expect(replyCalls).toHaveLength(0);
+    expect(notificationSettingsCalls).toHaveLength(0);
+  });
+
+  test("notifications suppresses output when community is inactive", async () => {
+    adminResult = { id: "admin-1" };
+    communityResult = createCommunity({ isActive: false });
+    const { ctx, replyCalls } = createCommandContext();
+
+    await handleNotificationsCommand(ctx);
+
+    expect(replyCalls).toHaveLength(0);
+    expect(notificationSettingsCalls).toHaveLength(0);
   });
 });
