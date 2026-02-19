@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { getDatabase } from "@/lib/core/database";
-import { userSettings, users } from "@/lib/core/schema";
+import { users, userSettings } from "@/lib/core/schema";
 import { captureTelegramProfilePhotoToCdn } from "@/lib/telegram/profile-photo-service";
 
 type KnownUser = {
