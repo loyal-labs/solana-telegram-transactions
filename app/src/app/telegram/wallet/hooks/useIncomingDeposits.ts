@@ -153,6 +153,7 @@ export function useIncomingDeposits(params: {
 
         // Trigger confetti celebration
         setShowConfetti(true);
+        setShowClaimSuccess(true);
 
         // Extended intense haptic pattern for celebration
         if (hapticFeedback.impactOccurred.isAvailable()) {

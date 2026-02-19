@@ -84,7 +84,9 @@ import {
   WALLET_ANALYTICS_PATH,
 } from "./wallet-analytics";
 import {
+  mapDepositToIncomingTransaction,
   setCachedDisplayCurrency,
+  setCachedIncomingTransactions,
   setCachedSolPrice,
   walletTransactionsCache,
 } from "./wallet-cache";
@@ -421,8 +423,7 @@ export default function Home() {
     } finally {
       setIsSwapping(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secureDirection, secureFormValues, isSwapFormValid, isSwapping]);
+  }, [secureDirection, secureFormValues, isSwapFormValid, isSwapping, refreshBalance]);
 
   const _handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
@@ -460,23 +461,8 @@ export default function Home() {
           const provider = await getWalletProvider();
           const deposits = await fetchDeposits(provider, username);
 
-          const mappedTransactions: IncomingTransaction[] = deposits.map(
-            (deposit) => {
-              const senderBase58 =
-                typeof (deposit.user as { toBase58?: () => string })
-                  .toBase58 === "function"
-                  ? deposit.user.toBase58()
-                  : String(deposit.user);
-
-              return {
-                id: `${senderBase58}-${deposit.lastNonce}`,
-                amountLamports: deposit.amount,
-                sender: senderBase58,
-                username: username,
-              };
-            }
-          );
-
+          const mappedTransactions = deposits.map(mapDepositToIncomingTransaction);
+          setCachedIncomingTransactions(username, mappedTransactions);
           setIncomingTransactions(mappedTransactions);
         }
       }
