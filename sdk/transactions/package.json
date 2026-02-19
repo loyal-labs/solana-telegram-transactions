@@ -38,13 +38,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/loyal/solana-telegram-transactions.git",
+    "url": "https://github.com/loyal/loyal-app.git",
     "directory": "sdk/transactions"
   },
   "bugs": {
-    "url": "https://github.com/loyal/solana-telegram-transactions/issues"
+    "url": "https://github.com/loyal/loyal-app/issues"
   },
-  "homepage": "https://github.com/loyal/solana-telegram-transactions/tree/main/sdk/transactions#readme",
+  "homepage": "https://github.com/loyal/loyal-app/tree/main/sdk/transactions#readme",
   "peerDependencies": {
     "@coral-xyz/anchor": "^0.32.0",
     "@solana/web3.js": "^1.95.0"
