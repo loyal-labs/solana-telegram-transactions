@@ -15,10 +15,17 @@ const Lottie = dynamic(() => import("lottie-react").then(m => m.default), {
 const Confetti = dynamic(() => import("react-confetti"), { ssr: false });
 
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+import { track } from "@/lib/core/analytics";
 import { buildVerifyMiniAppUrl } from "@/lib/telegram/mini-app/start-param";
 
 import dogAnimation from "../../../../public/biometrics/dog.json";
 import shieldAnimation from "../../../../public/biometrics/shield.json";
+import {
+  VERIFY_ANALYTICS_EVENTS,
+  VERIFY_ANALYTICS_PATH,
+  VERIFY_BIOMETRICS_OUTCOMES,
+  type VerifyBiometricsOutcome,
+} from "./verify-analytics";
 
 type VerifyStep =
   | "checking"
@@ -28,6 +35,23 @@ type VerifyStep =
   | "ready"
   | "transitioning"
   | "verified";
+
+function getAnalyticsErrorProperties(error: unknown): {
+  error_name: string;
+  error_message: string;
+} {
+  if (error instanceof Error) {
+    return {
+      error_name: error.name || "Error",
+      error_message: error.message || "Unknown error",
+    };
+  }
+
+  return {
+    error_name: "UnknownError",
+    error_message: typeof error === "string" ? error : "Unknown error",
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Styled QR Code (same rendering approach as ReceiveSheet)
@@ -319,6 +343,9 @@ export default function VerifyPage() {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
+    track(VERIFY_ANALYTICS_EVENTS.openEnableBiometrics, {
+      path: VERIFY_ANALYTICS_PATH,
+    });
     try {
       if (biometry.requestAccess.isAvailable()) {
         const granted = await biometry.requestAccess({
@@ -355,25 +382,51 @@ export default function VerifyPage() {
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("light");
     }
+    track(VERIFY_ANALYTICS_EVENTS.openVerify, {
+      path: VERIFY_ANALYTICS_PATH,
+    });
+
+    const trackVerifyFailure = (
+      outcome: VerifyBiometricsOutcome,
+      properties?: Record<string, unknown>
+    ) => {
+      track(VERIFY_ANALYTICS_EVENTS.verifyBiometricsFailed, {
+        path: VERIFY_ANALYTICS_PATH,
+        outcome,
+        ...(properties ?? {}),
+      });
+    };
+
     try {
       if (biometry.authenticate.isAvailable()) {
         const { status } = await biometry.authenticate({
           reason: "Confirm you're human"
         });
         if (status === "authorized") {
+          track(VERIFY_ANALYTICS_EVENTS.verifyBiometrics, {
+            path: VERIFY_ANALYTICS_PATH,
+            outcome: VERIFY_BIOMETRICS_OUTCOMES.authorized,
+          });
           if (hapticFeedback.notificationOccurred.isAvailable()) {
             hapticFeedback.notificationOccurred("success");
           }
           // Delay to let the native biometric UI dismiss before cross-fade
           setTimeout(() => setStep("transitioning"), 300);
         } else {
+          trackVerifyFailure(VERIFY_BIOMETRICS_OUTCOMES.denied, { status });
           sileo.error({
             title: "Verification failed",
             description: "Biometric check was not successful. Please try again."
           });
         }
+      } else {
+        trackVerifyFailure(VERIFY_BIOMETRICS_OUTCOMES.not_available);
       }
     } catch (err) {
+      trackVerifyFailure(
+        VERIFY_BIOMETRICS_OUTCOMES.error,
+        getAnalyticsErrorProperties(err)
+      );
       console.error("Biometry authentication failed", err);
       sileo.error({
         title: "Something went wrong",
