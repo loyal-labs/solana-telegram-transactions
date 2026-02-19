@@ -2,7 +2,6 @@
 
 import { addToHomeScreen, postEvent } from "@telegram-apps/sdk";
 import { hapticFeedback } from "@telegram-apps/sdk-react";
-import { ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -22,56 +21,63 @@ const AUTO_ROTATE_INTERVAL = 3000;
 
 function BannerCard({
   banner,
+  onClose,
   onTouchStart,
   onTouchMove,
   onTouchEnd,
 }: {
   banner: Banner;
+  onClose: () => void;
   onTouchStart: (e: React.TouchEvent) => void;
   onTouchMove: (e: React.TouchEvent) => void;
   onTouchEnd: (e: React.TouchEvent) => void;
 }) {
   return (
-    <button
-      className="relative w-full rounded-[20px] text-left active:opacity-80 transition-opacity"
-      style={{ backgroundColor: "#f2f2f7" }}
-      onClick={banner.onPress}
+    <div
+      className="relative w-full rounded-[20px] overflow-clip h-[112px]"
+      style={{
+        backgroundImage:
+          "linear-gradient(90deg, rgba(249, 54, 60, 0) 0%, rgba(249, 54, 60, 0.14) 100%), linear-gradient(90deg, #f2f2f7 0%, #f2f2f7 100%)",
+      }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      <div className="flex gap-4 items-start pl-4 pr-[120px] py-3 min-h-[76px]">
-        <div className="flex flex-col flex-1 justify-between min-h-[52px]">
-          <p className="font-medium text-[17px] leading-[22px] tracking-[-0.187px] text-black">
-            {banner.title}
-          </p>
-          <div className="flex items-center">
-            <span
-              className="text-[15px] leading-5"
-              style={{ color: "rgba(60, 60, 67, 0.6)" }}
-            >
-              {banner.cta}
-            </span>
-            <ChevronRight
-              size={12}
-              strokeWidth={1.5}
-              style={{ color: "rgba(60, 60, 67, 0.6)" }}
-              className="mt-0.5"
-            />
-          </div>
-        </div>
+      <div className="flex flex-col justify-between h-full pl-4 pr-[172px] py-3">
+        <p className="font-medium text-[17px] leading-[22px] tracking-[-0.187px] text-black">
+          {banner.title}
+        </p>
+        <button
+          className="flex items-center justify-center min-w-[72px] w-fit px-3 py-2 rounded-[20px] font-normal text-[15px] leading-5 text-white active:opacity-80 transition-opacity"
+          style={{ backgroundColor: "#f9363c" }}
+          onClick={banner.onPress}
+        >
+          {banner.cta}
+        </button>
       </div>
 
-      {/* Mascot image — bottom-aligned, overflows above the card */}
-      <div className="absolute bottom-0 right-0 w-[100px] h-[120px] pointer-events-none">
+      {/* Mascot image */}
+      <div className="absolute bottom-0 right-0 w-[172px] h-[112px] rounded-br-[20px] pointer-events-none">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={banner.image}
           alt=""
-          className="absolute bottom-0 right-0 w-full h-auto"
+          className="absolute bottom-0 right-0 w-[85%] h-auto"
         />
       </div>
-    </button>
+
+      {/* Close button */}
+      <button
+        className="absolute top-[10px] right-[10px] w-[28px] h-[28px] z-10 active:opacity-60 transition-opacity"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/banners/close_icon.png" alt="Close" className="w-full h-full" />
+      </button>
+    </div>
   );
 }
 
@@ -83,8 +89,9 @@ export default function BannerCarousel({
   isMobilePlatform,
 }: BannerCarouselProps) {
   const router = useRouter();
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
-  const banners = useMemo(() => {
+  const allBanners = useMemo(() => {
     const list: Banner[] = [];
 
     if (isMobilePlatform) {
@@ -134,6 +141,11 @@ export default function BannerCarousel({
 
     return list;
   }, [isMobilePlatform]); // eslint-disable-line react-hooks/exhaustive-deps -- router is intentionally omitted: it's unstable (new ref each render) and callbacks only use router.push on click, which works from stale closures
+
+  const banners = useMemo(
+    () => allBanners.filter((b) => !dismissedIds.has(b.id)),
+    [allBanners, dismissedIds],
+  );
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [swipeX, setSwipeX] = useState(0);
@@ -267,6 +279,23 @@ export default function BannerCarousel({
     [activeIndex, goTo],
   );
 
+  const dismissBanner = useCallback(
+    (id: string) => {
+      if (hapticFeedback.impactOccurred.isAvailable()) {
+        hapticFeedback.impactOccurred("light");
+      }
+      setDismissedIds((prev) => new Set(prev).add(id));
+      setAutoRotate(false);
+      // Adjust active index so we don't show an out-of-bounds slide
+      setActiveIndex((prev) => {
+        const remaining = banners.filter((b) => b.id !== id).length;
+        if (remaining === 0) return 0;
+        return prev >= remaining ? remaining - 1 : prev;
+      });
+    },
+    [banners],
+  );
+
   const banner = banners[activeIndex];
 
   // Compute card transform: swipe drag OR slide animation
@@ -291,7 +320,7 @@ export default function BannerCarousel({
   if (banners.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1 pt-4 px-4">
+    <div className={`flex flex-col pt-4 px-4 ${banners.length <= 1 ? "pb-4" : ""}`}>
       {/* Slide-in keyframes */}
       <style>{`
         @keyframes banner-slide-in-left {
@@ -309,6 +338,7 @@ export default function BannerCarousel({
         <div style={getCardStyle()}>
           <BannerCard
             banner={banner}
+            onClose={() => dismissBanner(banner.id)}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -318,14 +348,14 @@ export default function BannerCarousel({
 
       {/* Dot indicators */}
       {banners.length > 1 && (
-        <div className="flex items-center justify-center gap-1.5">
-          {banners.map((_, i) => (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          {banners.map((b, i) => (
             <div
-              key={i}
+              key={b.id}
               className="rounded-full transition-all duration-200"
               style={{
-                width: 7,
-                height: 7,
+                width: 8,
+                height: 8,
                 backgroundColor:
                   i === activeIndex
                     ? "#F9363C"
