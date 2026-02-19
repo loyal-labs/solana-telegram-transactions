@@ -47,18 +47,10 @@ import {
 } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
-import {
-  getAccountTransactionHistory,
-  listenForAccountTransactions,
-} from "@/lib/solana/rpc/get-account-txn-history";
-import type { WalletTransfer } from "@/lib/solana/rpc/types";
 import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import {
   computePortfolioTotals,
-  fetchTokenHoldings,
   resolveTokenIcon,
-  subscribeToTokenHoldings,
-  type TokenHolding,
 } from "@/lib/solana/token-holdings";
 import {
   prepareStoreInitDataTxn,
@@ -107,8 +99,10 @@ import type {
 import { useDisplayPreferences } from "./hooks/useDisplayPreferences";
 import { useSolPrice } from "./hooks/useSolPrice";
 import { useTelegramSetup } from "./hooks/useTelegramSetup";
+import { useTokenHoldings } from "./hooks/useTokenHoldings";
 import { useWalletBalance } from "./hooks/useWalletBalance";
 import { useWalletInit } from "./hooks/useWalletInit";
+import { useWalletTransactions } from "./hooks/useWalletTransactions";
 import {
   CLAIM_SOURCES,
   type ClaimSource,
@@ -122,21 +116,14 @@ import {
 } from "./wallet-analytics";
 import {
   cachedUsername,
-  cachedWalletAddress,
   getCachedIncomingTransactions,
-  HOLDINGS_REFRESH_DEBOUNCE_MS,
   mapDepositToIncomingTransaction,
   setCachedDisplayCurrency,
   setCachedIncomingTransactions,
   setCachedSolPrice,
   walletTransactionsCache,
 } from "./wallet-cache";
-import {
-  MOCK_ACTIVITY_INFO,
-  MOCK_TOKEN_HOLDINGS,
-  MOCK_WALLET_TRANSACTIONS,
-  USE_MOCK_DATA,
-} from "./wallet-mock-data";
+import { MOCK_ACTIVITY_INFO, USE_MOCK_DATA } from "./wallet-mock-data";
 
 hashes.sha512 = sha512;
 
@@ -185,12 +172,8 @@ export default function Home() {
   const [claimError, setClaimError] = useState<string | null>(null);
   const { walletAddress, setWalletAddress, isLoading } = useWalletInit();
   const { solBalanceLamports, setSolBalanceLamports, refreshBalance } = useWalletBalance(walletAddress);
-  const [tokenHoldings, setTokenHoldings] = useState<TokenHolding[]>(() =>
-    USE_MOCK_DATA ? MOCK_TOKEN_HOLDINGS : []
-  );
-  const [isHoldingsLoading, setIsHoldingsLoading] = useState(() =>
-    USE_MOCK_DATA ? false : true
-  );
+  const { tokenHoldings, isHoldingsLoading, refreshTokenHoldings } = useTokenHoldings(walletAddress);
+  const { walletTransactions, setWalletTransactions, isFetchingTransactions, loadWalletTransactions } = useWalletTransactions(walletAddress);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
   const [incomingTransactions, setIncomingTransactions] = useState<
@@ -201,15 +184,6 @@ export default function Home() {
       : [];
     return cached;
   });
-  const [walletTransactions, setWalletTransactions] = useState<Transaction[]>(
-    () =>
-      USE_MOCK_DATA
-        ? MOCK_WALLET_TRANSACTIONS
-        : cachedWalletAddress
-        ? walletTransactionsCache.get(cachedWalletAddress) ?? []
-        : []
-  );
-  const [isFetchingTransactions, setIsFetchingTransactions] = useState(false);
   const [isFetchingDeposits, setIsFetchingDeposits] = useState(() => {
     if (USE_MOCK_DATA) return false;
     // Only show loading if we don't have cached deposits
@@ -499,148 +473,6 @@ export default function Home() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secureDirection, secureFormValues, isSwapFormValid, isSwapping]);
-
-  const hasLoadedHoldingsRef = useRef(USE_MOCK_DATA);
-  const walletAddressRef = useRef<string | null>(walletAddress);
-  const holdingsFetchIdRef = useRef(0);
-
-  useEffect(() => {
-    walletAddressRef.current = walletAddress;
-  }, [walletAddress]);
-
-  const refreshTokenHoldings = useCallback(async (forceRefresh = false) => {
-    const addr = walletAddressRef.current;
-    if (!addr) return;
-
-    const fetchId = ++holdingsFetchIdRef.current;
-
-    if (!hasLoadedHoldingsRef.current) {
-      setIsHoldingsLoading(true);
-    }
-
-    try {
-      const holdings = await fetchTokenHoldings(addr, forceRefresh);
-      if (walletAddressRef.current !== addr) return;
-      if (holdingsFetchIdRef.current !== fetchId) return;
-      setTokenHoldings(holdings);
-      hasLoadedHoldingsRef.current = true;
-    } catch (error) {
-      console.error("Failed to fetch token holdings:", error);
-    } finally {
-      if (walletAddressRef.current !== addr) return;
-      if (holdingsFetchIdRef.current !== fetchId) return;
-      if (!hasLoadedHoldingsRef.current) {
-        // If we never loaded successfully, keep showing skeleton.
-        setIsHoldingsLoading(true);
-      } else {
-        setIsHoldingsLoading(false);
-      }
-    }
-  }, []);
-
-  const mapTransferToTransaction = useCallback(
-    (transfer: WalletTransfer): Transaction => {
-      const isIncoming = transfer.direction === "in";
-      const counterparty =
-        transfer.counterparty ||
-        (isIncoming ? "Unknown sender" : "Unknown recipient");
-
-      const base: Transaction = {
-        id: transfer.signature,
-        type: isIncoming ? "incoming" : "outgoing",
-        transferType: transfer.type,
-        amountLamports: transfer.amountLamports,
-        tokenMint: transfer.tokenMint,
-        tokenAmount: transfer.tokenAmount,
-        tokenDecimals: transfer.tokenDecimals,
-        sender: isIncoming ? counterparty : undefined,
-        recipient: !isIncoming ? counterparty : undefined,
-        timestamp: transfer.timestamp ?? Date.now(),
-        networkFeeLamports: transfer.feeLamports,
-        signature: transfer.signature,
-        status: transfer.status === "failed" ? "error" : "completed",
-      };
-
-      if (transfer.type === "swap") {
-        base.swapFromMint = transfer.swapFromMint;
-        base.swapToMint = transfer.swapToMint;
-        if (transfer.swapToAmount) {
-          base.swapToAmount = parseFloat(transfer.swapToAmount);
-        }
-      }
-
-      return base;
-    },
-    []
-  );
-
-  const loadWalletTransactions = useCallback(
-    async ({ force = false }: { force?: boolean } = {}) => {
-      if (!walletAddress) return;
-
-      const cached = walletTransactionsCache.get(walletAddress);
-
-      if (!force && cached) {
-        // Use cached data immediately, no loading state
-        setWalletTransactions(cached);
-        return;
-      }
-
-      // Only show loading if we don't have cached data to display
-      if (!cached) {
-        setIsFetchingTransactions(true);
-      }
-      try {
-        const { transfers } = await getAccountTransactionHistory(
-          new PublicKey(walletAddress),
-          {
-            limit: 10,
-            onlySystemTransfers: false,
-          }
-        );
-
-        const mappedTransactions: Transaction[] = transfers.map(
-          mapTransferToTransaction
-        );
-
-        setWalletTransactions((prev) => {
-          const pending = prev.filter(
-            (tx) => tx.type === "pending" && !tx.signature
-          );
-          const existingBySignature = new Map(
-            prev
-              .filter((tx) => tx.signature)
-              .map((tx) => [tx.signature as string, tx])
-          );
-
-          const merged = mappedTransactions.map((tx) => {
-            if (!tx.signature) return tx;
-            const existing = existingBySignature.get(tx.signature);
-            if (!existing) return tx;
-            // Preserve app-injected swap data when on-chain data arrives
-            if (
-              existing.transferType === "swap" &&
-              tx.transferType !== "swap"
-            ) {
-              return { ...tx, ...existing };
-            }
-            return { ...existing, ...tx };
-          });
-
-          const combined = [...pending, ...merged].sort(
-            (a, b) => b.timestamp - a.timestamp
-          );
-          walletTransactionsCache.set(walletAddress, combined);
-          return combined;
-        });
-      } catch (error) {
-        console.error("Failed to fetch wallet transactions", error);
-      } finally {
-        setIsFetchingTransactions(false);
-      }
-    },
-    [mapTransferToTransaction, walletAddress]
-  );
 
   const _handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
@@ -1184,125 +1016,6 @@ export default function Home() {
       void handleApproveTransaction(firstTransaction.id, CLAIM_SOURCES.auto);
     }
   }, [incomingTransactions, isClaimingTransaction, handleApproveTransaction]);
-
-  useEffect(() => {
-    if (USE_MOCK_DATA) return;
-    if (!walletAddress) return;
-    void loadWalletTransactions();
-  }, [walletAddress, loadWalletTransactions]);
-
-  // Fetch token holdings
-  useEffect(() => {
-    if (USE_MOCK_DATA) return;
-    if (!walletAddress) return;
-
-    hasLoadedHoldingsRef.current = false;
-    setIsHoldingsLoading(true);
-    setTokenHoldings([]);
-
-    void refreshTokenHoldings(false);
-  }, [refreshTokenHoldings, walletAddress]);
-
-  // Keep holdings in sync with wallet asset websocket updates.
-  useEffect(() => {
-    if (USE_MOCK_DATA) return;
-    if (!walletAddress) return;
-
-    let isCancelled = false;
-    let unsubscribe: (() => Promise<void>) | null = null;
-
-    void (async () => {
-      try {
-        unsubscribe = await subscribeToTokenHoldings(
-          walletAddress,
-          (holdings) => {
-            if (isCancelled) return;
-            holdingsFetchIdRef.current += 1;
-            setTokenHoldings(holdings);
-            hasLoadedHoldingsRef.current = true;
-            setIsHoldingsLoading(false);
-          },
-          {
-            debounceMs: HOLDINGS_REFRESH_DEBOUNCE_MS,
-            commitment: "confirmed",
-            includeNative: true,
-            emitInitial: false,
-            onError: (error) => {
-              console.error(
-                "Failed to refresh token holdings from websocket",
-                error
-              );
-            },
-          }
-        );
-      } catch (error) {
-        console.error("Failed to subscribe to token holdings", error);
-      }
-    })();
-
-    return () => {
-      isCancelled = true;
-      if (unsubscribe) {
-        void unsubscribe();
-      }
-    };
-  }, [walletAddress]);
-
-  useEffect(() => {
-    if (USE_MOCK_DATA) return;
-    if (!walletAddress) return;
-
-    let isCancelled = false;
-    let unsubscribe: (() => Promise<void>) | null = null;
-
-    void (async () => {
-      try {
-        unsubscribe = await listenForAccountTransactions(
-          new PublicKey(walletAddress),
-          (transfer) => {
-            if (isCancelled) return;
-            const mapped = mapTransferToTransaction(transfer);
-            setWalletTransactions((prev) => {
-              const next = [...prev];
-
-              const matchIndex = mapped.signature
-                ? next.findIndex((tx) => tx.signature === mapped.signature)
-                : next.findIndex((tx) => tx.id === mapped.id);
-
-              if (matchIndex >= 0) {
-                const existing = next[matchIndex];
-                // Preserve app-injected swap data when on-chain data arrives
-                if (
-                  existing.transferType === "swap" &&
-                  mapped.transferType !== "swap"
-                ) {
-                  next[matchIndex] = { ...mapped, ...existing };
-                } else {
-                  next[matchIndex] = { ...existing, ...mapped };
-                }
-              } else {
-                next.unshift(mapped);
-              }
-
-              const sorted = next.sort((a, b) => b.timestamp - a.timestamp);
-              walletTransactionsCache.set(walletAddress, sorted);
-              return sorted;
-            });
-          },
-          { onlySystemTransfers: false }
-        );
-      } catch (error) {
-        console.error("Failed to subscribe to transaction updates", error);
-      }
-    })();
-
-    return () => {
-      isCancelled = true;
-      if (unsubscribe) {
-        void unsubscribe();
-      }
-    };
-  }, [mapTransferToTransaction, walletAddress]);
 
   useEffect(() => {
     if (!mainButtonAvailable) {
