@@ -7,6 +7,8 @@
         "@aws-sdk/client-s3": "^3.918.0",
         "@coral-xyz/anchor": "^0.32.1",
         "@datadog/browser-logs": "^6.27.1",
+        "@datadog/browser-rum": "^6.27.1",
+        "@datadog/browser-rum-react": "^6.27.1",
         "@neondatabase/serverless": "^1.0.2",
         "@noble/ed25519": "^3.0.0",
         "@number-flow/react": "^0.5.10",
@@ -232,6 +234,12 @@
     "@datadog/browser-core": ["@datadog/browser-core@6.27.1", "", {}, "sha512-Az3ko7cCZgdgbugY+C+/AdWW5bMPgtjZ3mSRAQUZpamCptqEhms5iXl5S2ZOzIkvZZprcyZGwpDo9K8GF7XZoA=="],
 
     "@datadog/browser-logs": ["@datadog/browser-logs@6.27.1", "", { "dependencies": { "@datadog/browser-core": "6.27.1" }, "peerDependencies": { "@datadog/browser-rum": "6.27.1" }, "optionalPeers": ["@datadog/browser-rum"] }, "sha512-OUgS0OapfIr3K/KEyPGOoM9rC5tOtgPF3jQusluq6wz/M7fl0AhcIFI8D0eLfhdNRbLfR7wAGpl/2DDKT3Oq+Q=="],
+
+    "@datadog/browser-rum": ["@datadog/browser-rum@6.27.1", "", { "dependencies": { "@datadog/browser-core": "6.27.1", "@datadog/browser-rum-core": "6.27.1" }, "peerDependencies": { "@datadog/browser-logs": "6.27.1" }, "optionalPeers": ["@datadog/browser-logs"] }, "sha512-dApySQaAzl5TkTAk8IZZiiJyNJCLQH8RKdzgu5SWTYgTePqy0Sk+aurnTKQcS4zA9LFxf4qzBCTWYMEb+XU+HA=="],
+
+    "@datadog/browser-rum-core": ["@datadog/browser-rum-core@6.27.1", "", { "dependencies": { "@datadog/browser-core": "6.27.1" } }, "sha512-pDZu44IuQynm0Ts3XF4b4jhGRxdOCIQHZ0DbBtdvAt7w6mxYxAdF1hUBdKzaSiPwO6rZ4VleiBJVfyE0p9gNkA=="],
+
+    "@datadog/browser-rum-react": ["@datadog/browser-rum-react@6.27.1", "", { "dependencies": { "@datadog/browser-core": "6.27.1", "@datadog/browser-rum-core": "6.27.1" }, "peerDependencies": { "react": "18 || 19", "react-router": "6 || 7", "react-router-dom": "6 || 7" }, "optionalPeers": ["react", "react-router", "react-router-dom"] }, "sha512-790+pfP6GTnWUppxJyDySQy1KlUuRyu93TMC60t5wjXB5ezajPbazTYm63rOSC+oUYdEEC8FAnjmM3r5pHjA4A=="],
 
     "@datadog/datadog-ci": ["@datadog/datadog-ci@5.8.0", "", { "dependencies": { "@datadog/datadog-ci-base": "5.8.0", "@datadog/datadog-ci-plugin-coverage": "5.8.0", "@datadog/datadog-ci-plugin-deployment": "5.8.0", "@datadog/datadog-ci-plugin-dora": "5.8.0", "@datadog/datadog-ci-plugin-gate": "5.8.0", "@datadog/datadog-ci-plugin-junit": "5.8.0", "@datadog/datadog-ci-plugin-sarif": "5.8.0", "@datadog/datadog-ci-plugin-sbom": "5.8.0", "axios": "^1.13.5", "chalk": "3.0.0", "clipanion": "^3.2.1", "js-yaml": "4.1.1", "semver": "^7.5.3", "typanion": "^3.14.0", "upath": "^2.0.1" }, "bin": "dist/cli.js" }, "sha512-76axFLAaCTt+0EXOr3l44wXQ/RQxp39MrtstCXxg3yTtZRe0bdu7ckXoPMmHzmTsoty3bXpt2zJ+gLFkHKL8/A=="],
 

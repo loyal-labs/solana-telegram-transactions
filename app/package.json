@@ -18,6 +18,8 @@
     "@aws-sdk/client-s3": "^3.918.0",
     "@coral-xyz/anchor": "^0.32.1",
     "@datadog/browser-logs": "^6.27.1",
+    "@datadog/browser-rum": "^6.27.1",
+    "@datadog/browser-rum-react": "^6.27.1",
     "@neondatabase/serverless": "^1.0.2",
     "@noble/ed25519": "^3.0.0",
     "@number-flow/react": "^0.5.10",
