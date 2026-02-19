@@ -6,10 +6,7 @@ import NumberFlow from "@number-flow/react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import {
   hapticFeedback,
-  mainButton,
-  secondaryButton,
   useRawInitData,
-  useSignal,
 } from "@telegram-apps/sdk-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Brush, Copy, RefreshCcw } from "lucide-react";
@@ -58,12 +55,6 @@ import {
   sendSolTransaction,
 } from "@/lib/solana/wallet/wallet-details";
 import { sendString } from "@/lib/telegram/mini-app";
-import {
-  hideMainButton,
-  hideSecondaryButton,
-  showMainButton,
-  showReceiveShareButton,
-} from "@/lib/telegram/mini-app/buttons";
 import { setCloudValue } from "@/lib/telegram/mini-app/cloud-storage";
 import {
   cleanInitData,
@@ -83,13 +74,13 @@ import type {
 import { useDisplayPreferences } from "./hooks/useDisplayPreferences";
 import { useIncomingDeposits } from "./hooks/useIncomingDeposits";
 import { useSolPrice } from "./hooks/useSolPrice";
+import { useTelegramMainButton } from "./hooks/useTelegramMainButton";
 import { useTelegramSetup } from "./hooks/useTelegramSetup";
 import { useTokenHoldings } from "./hooks/useTokenHoldings";
 import { useWalletBalance } from "./hooks/useWalletBalance";
 import { useWalletInit } from "./hooks/useWalletInit";
 import { useWalletTransactions } from "./hooks/useWalletTransactions";
 import {
-  CLAIM_SOURCES,
   getAnalyticsErrorProperties,
   getSendMethod,
   SEND_METHODS,
@@ -194,10 +185,6 @@ export default function Home() {
   const { solPriceUsd, setSolPriceUsd, isSolPriceLoading } = useSolPrice();
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
-  const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
-  const secondaryButtonAvailable = useSignal(
-    secondaryButton.setParams.isAvailable
-  );
   // Track seen transaction IDs to detect new ones for animation
   const seenTransactionIdsRef = useRef<Set<string>>(new Set());
   const [newTransactionIds, setNewTransactionIds] = useState<Set<string>>(
@@ -784,247 +771,7 @@ export default function Home() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!mainButtonAvailable) {
-      mainButton.mount.ifAvailable?.();
-      hideMainButton();
-    }
-
-    if (!secondaryButtonAvailable) {
-      secondaryButton.mount.ifAvailable?.();
-      hideSecondaryButton();
-    }
-
-    if (!mainButtonAvailable) {
-      return () => {
-        hideMainButton();
-        hideSecondaryButton();
-      };
-    }
-
-    // Bg picker manages its own main button
-    if (isBgPickerOpen) {
-      return () => {
-        hideMainButton();
-        hideSecondaryButton();
-      };
-    }
-
-    if (isTransactionDetailsSheetOpen && selectedTransaction) {
-      hideSecondaryButton();
-
-      // Show "Done" button on claim success or error
-      if (showClaimSuccess || claimError) {
-        showMainButton({
-          text: "Done",
-          onClick: () => {
-            setTransactionDetailsSheetOpen(false);
-            setSelectedTransaction(null);
-            setSelectedIncomingTransaction(null);
-            setShowClaimSuccess(false);
-            setClaimError(null);
-          },
-          isEnabled: true,
-          showLoader: false,
-        });
-      } else if (selectedIncomingTransaction) {
-        // Only show Claim button for incoming (claimable) transactions
-        if (isClaimingTransaction) {
-          // Show only main button with loader during claim
-          showMainButton({
-            text: "Claim",
-            onClick: () => {}, // No-op during loading
-            isEnabled: false,
-            showLoader: true,
-          });
-        } else {
-          // Show Claim button
-          showMainButton({
-            text: "Claim",
-            onClick: () =>
-              handleApproveTransaction(
-                selectedIncomingTransaction.id,
-                CLAIM_SOURCES.manual
-              ),
-          });
-        }
-      } else {
-        // For outgoing transactions, hide the main button
-        hideMainButton();
-      }
-    } else if (isSendSheetOpen) {
-      hideSecondaryButton();
-
-      if (sendStep === 1) {
-        // Token selection — no main button, token click auto-advances
-        hideMainButton();
-      } else if (sendStep === 2) {
-        showMainButton({
-          text: "Next",
-          onClick: () => {
-            if (isSendFormValid) setSendStep(3);
-          },
-          isEnabled: isSendFormValid,
-          showLoader: false,
-        });
-      } else if (sendStep === 3) {
-        showMainButton({
-          text: "Review",
-          onClick: () => {
-            if (isSendFormValid) setSendStep(4);
-          },
-          isEnabled: isSendFormValid,
-          showLoader: false,
-        });
-      } else if (sendStep === 4) {
-        showMainButton({
-          text: "Confirm and Send",
-          onClick: () => {
-            setIsSendingTransaction(true); // Set loading state BEFORE showing result view
-            setSendStep(5);
-            handleSubmitSend();
-          },
-          isEnabled: isSendFormValid && !isSendingTransaction,
-          showLoader: false,
-        });
-      } else if (sendStep === 5) {
-        if (isSendingTransaction) {
-          // In-progress — hide button while spinner shows
-          hideMainButton();
-        } else if (sendError) {
-          showMainButton({
-            text: "Done",
-            onClick: () => {
-              setSendSheetOpen(false);
-            },
-            isEnabled: true,
-            showLoader: false,
-          });
-        } else {
-          showMainButton({
-            text: "Share transaction",
-            onClick: async () => {
-              setSendSheetOpen(false);
-              const recipientUsername = sendFormValues.recipient
-                .trim()
-                .replace(/^@/, "");
-
-              if (
-                sentAmountSol &&
-                recipientUsername &&
-                rawInitData &&
-                solPriceUsd
-              ) {
-                try {
-                  const amountSol = sentAmountSol;
-                  const amountUsd = amountSol * (solPriceUsd || 0);
-                  const msgId = await createShareMessage(
-                    rawInitData,
-                    recipientUsername,
-                    amountSol,
-                    amountUsd
-                  );
-                  if (msgId) {
-                    await shareSavedInlineMessage(msgId);
-                  }
-                } catch (error) {
-                  console.error("Failed to share transaction", error);
-                }
-              } else {
-                console.error(
-                  "Failed to share transaction: missing required data"
-                );
-              }
-            },
-            isEnabled: true,
-            showLoader: false,
-          });
-        }
-      }
-    } else if (isSwapSheetOpen) {
-      hideSecondaryButton();
-      if (swapView === "result") {
-        if (isSwapping) {
-          // Swapping in progress - hide button
-          hideMainButton();
-        } else {
-          // Result view (success or error) - show Done button
-          showMainButton({
-            text: "Done",
-            onClick: () => {
-              hapticFeedback.impactOccurred("light");
-              setSwapSheetOpen(false);
-              // Reset swap state
-              setSwapView("main");
-              setSwapActiveTab("swap");
-              setSwapError(null);
-              setSwappedFromAmount(undefined);
-              setSwappedFromSymbol(undefined);
-              setSwappedToAmount(undefined);
-              setSwappedToSymbol(undefined);
-            },
-            isEnabled: true,
-            showLoader: false,
-          });
-        }
-      } else if (swapView === "confirm") {
-        // Confirm view - show "Confirm and Swap" button
-        showMainButton({
-          text: "Confirm and Swap",
-          onClick: () => {
-            hapticFeedback.impactOccurred("medium");
-            setIsSwapping(true); // Set loading state BEFORE showing result view
-            setSwapView("result");
-            void handleSubmitSwap();
-          },
-          isEnabled: !isSwapping,
-          showLoader: false,
-        });
-      } else if (swapView === "main") {
-        if (swapActiveTab === "swap") {
-          showMainButton({
-            text: "Review",
-            onClick: () => {
-              hapticFeedback.impactOccurred("light");
-              setSwapView("confirm");
-            },
-            isEnabled: isSwapFormValid && !isSwapping,
-            showLoader: false,
-          });
-        } else {
-          const btnText =
-            secureDirection === "shield"
-              ? "Confirm and Shield"
-              : "Confirm and Unshield";
-          showMainButton({
-            text: btnText,
-            onClick: () => {
-              hapticFeedback.impactOccurred("medium");
-              setIsSwapping(true);
-              setSwapView("result");
-              void handleSubmitSecure();
-            },
-            isEnabled: isSwapFormValid && !isSwapping,
-            showLoader: false,
-          });
-        }
-      } else {
-        // Token selection views - hide main button
-        hideMainButton();
-      }
-    } else if (isReceiveSheetOpen) {
-      hideSecondaryButton();
-      showReceiveShareButton({ onShare: handleShareAddress });
-    } else {
-      hideMainButton();
-      hideSecondaryButton();
-    }
-
-    return () => {
-      hideMainButton();
-      hideSecondaryButton();
-    };
-  }, [
+  useTelegramMainButton({
     isTransactionDetailsSheetOpen,
     isSendSheetOpen,
     isSwapSheetOpen,
@@ -1033,33 +780,47 @@ export default function Home() {
     isSendFormValid,
     isSwapFormValid,
     isSendingTransaction,
+    isSwapping,
+    isClaimingTransaction,
     selectedTransaction,
     selectedIncomingTransaction,
-    isClaimingTransaction,
-    mainButtonAvailable,
-    secondaryButtonAvailable,
+    showClaimSuccess,
+    claimError,
+    sendStep,
+    sendError,
+    sentAmountSol,
+    sendFormValues,
+    swapView,
+    swapActiveTab,
+    secureDirection,
+    rawInitData,
+    solPriceUsd,
     handleOpenSendSheet,
     handleOpenReceiveSheet,
     handleShareAddress,
     handleApproveTransaction,
     handleSubmitSend,
-    sendStep,
-    sentAmountSol,
-    sendFormValues,
-    showClaimSuccess,
-    setShowClaimSuccess,
-    claimError,
-    setClaimError,
-    sendError,
-    rawInitData,
-    solPriceUsd,
-    swapView,
-    swapActiveTab,
     handleSubmitSwap,
     handleSubmitSecure,
-    secureDirection,
-    isSwapping,
-  ]);
+    setSendSheetOpen,
+    setSendStep,
+    setSwapSheetOpen,
+    setSwapView,
+    setSwapActiveTab,
+    setSwapError,
+    setSwappedFromAmount,
+    setSwappedFromSymbol,
+    setSwappedToAmount,
+    setSwappedToSymbol,
+    setSecureDirection,
+    setTransactionDetailsSheetOpen,
+    setSelectedTransaction,
+    setSelectedIncomingTransaction,
+    setShowClaimSuccess,
+    setClaimError,
+    setIsSwapping,
+    setIsSendingTransaction,
+  });
 
   const portfolioTotals = useMemo(
     () => computePortfolioTotals(tokenHoldings, solPriceUsd),
