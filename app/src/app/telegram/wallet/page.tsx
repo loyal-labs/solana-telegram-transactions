@@ -3,7 +3,7 @@
 import { hashes } from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha512";
 import NumberFlow from "@number-flow/react";
-import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import {
   hapticFeedback,
   mainButton,
@@ -35,16 +35,9 @@ import TokensSheet from "@/components/wallet/TokensSheet";
 import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
 import { useSwap } from "@/hooks/useSwap";
 import { useDeviceSafeAreaTop, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
-import {
-  DISPLAY_CURRENCY_KEY,
-  TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
-} from "@/lib/constants";
+import { DISPLAY_CURRENCY_KEY } from "@/lib/constants";
 import { track } from "@/lib/core/analytics";
-import {
-  refundDeposit,
-  subscribeToDepositsWithUsername,
-  topUpDeposit,
-} from "@/lib/solana/deposits";
+import { refundDeposit, topUpDeposit } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
@@ -53,25 +46,17 @@ import {
   resolveTokenIcon,
 } from "@/lib/solana/token-holdings";
 import {
-  prepareStoreInitDataTxn,
-  sendStoreInitDataTxn,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  verifyAndClaimDeposit,
-} from "@/lib/solana/verify-and-claim-deposit";
-import {
   formatAddress,
   formatSenderAddress,
   formatTransactionAmount,
 } from "@/lib/solana/wallet/formatters";
 import {
-  getGaslessPublicKey,
   getWalletBalance,
   getWalletKeypair,
   getWalletProvider,
   getWalletPublicKey,
   sendSolTransaction,
 } from "@/lib/solana/wallet/wallet-details";
-import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
 import { sendString } from "@/lib/telegram/mini-app";
 import {
   hideMainButton,
@@ -82,9 +67,8 @@ import {
 import { setCloudValue } from "@/lib/telegram/mini-app/cloud-storage";
 import {
   cleanInitData,
-  createValidationBytesFromRawInitData,
+  parseUsernameFromInitData,
 } from "@/lib/telegram/mini-app/init-data-transform";
-import { parseUsernameFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
 import { openQrScanner } from "@/lib/telegram/mini-app/qr-code";
 import {
   createShareMessage,
@@ -97,6 +81,7 @@ import type {
 } from "@/types/wallet";
 
 import { useDisplayPreferences } from "./hooks/useDisplayPreferences";
+import { useIncomingDeposits } from "./hooks/useIncomingDeposits";
 import { useSolPrice } from "./hooks/useSolPrice";
 import { useTelegramSetup } from "./hooks/useTelegramSetup";
 import { useTokenHoldings } from "./hooks/useTokenHoldings";
@@ -105,7 +90,6 @@ import { useWalletInit } from "./hooks/useWalletInit";
 import { useWalletTransactions } from "./hooks/useWalletTransactions";
 import {
   CLAIM_SOURCES,
-  type ClaimSource,
   getAnalyticsErrorProperties,
   getSendMethod,
   SEND_METHODS,
@@ -115,11 +99,7 @@ import {
   WALLET_ANALYTICS_PATH,
 } from "./wallet-analytics";
 import {
-  cachedUsername,
-  getCachedIncomingTransactions,
-  mapDepositToIncomingTransaction,
   setCachedDisplayCurrency,
-  setCachedIncomingTransactions,
   setCachedSolPrice,
   walletTransactionsCache,
 } from "./wallet-cache";
@@ -168,29 +148,30 @@ export default function Home() {
   const [isTokensSheetOpen, setTokensSheetOpen] = useState(false);
   const [isTransactionDetailsSheetOpen, setTransactionDetailsSheetOpen] =
     useState(false);
-  const [showClaimSuccess, setShowClaimSuccess] = useState(false);
-  const [claimError, setClaimError] = useState<string | null>(null);
   const { walletAddress, setWalletAddress, isLoading } = useWalletInit();
   const { solBalanceLamports, setSolBalanceLamports, refreshBalance } = useWalletBalance(walletAddress);
   const { tokenHoldings, isHoldingsLoading, refreshTokenHoldings } = useTokenHoldings(walletAddress);
   const { walletTransactions, setWalletTransactions, isFetchingTransactions, loadWalletTransactions } = useWalletTransactions(walletAddress);
+  const {
+    incomingTransactions,
+    setIncomingTransactions,
+    isFetchingDeposits,
+    isClaimingTransaction,
+    showClaimSuccess,
+    setShowClaimSuccess,
+    claimError,
+    setClaimError,
+    showConfetti,
+    setShowConfetti,
+    handleApproveTransaction,
+  } = useIncomingDeposits({
+    rawInitData,
+    walletAddress,
+    refreshBalance,
+    loadWalletTransactions,
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string>("");
-  const [incomingTransactions, setIncomingTransactions] = useState<
-    IncomingTransaction[]
-  >(() => {
-    const cached = cachedUsername
-      ? getCachedIncomingTransactions(cachedUsername) ?? []
-      : [];
-    return cached;
-  });
-  const [isFetchingDeposits, setIsFetchingDeposits] = useState(() => {
-    if (USE_MOCK_DATA) return false;
-    // Only show loading if we don't have cached deposits
-    return cachedUsername
-      ? getCachedIncomingTransactions(cachedUsername) === null
-      : true;
-  });
   const [selectedTransaction, setSelectedTransaction] =
     useState<TransactionDetailsData | null>(null);
   // Keep original incoming transaction for claim functionality
@@ -198,7 +179,6 @@ export default function Home() {
     useState<IncomingTransaction | null>(null);
   const [isSendFormValid, setIsSendFormValid] = useState(false);
   const [isSwapFormValid, setIsSwapFormValid] = useState(false);
-  const [isClaimingTransaction, setIsClaimingTransaction] = useState(false);
   const [sendFormValues, setSendFormValues] = useState<{
     amount: string;
     recipient: string;
@@ -212,7 +192,6 @@ export default function Home() {
   const [addressCopied, setAddressCopied] = useState(false);
   const { isMobilePlatform } = useTelegramSetup(rawInitData);
   const { solPriceUsd, setSolPriceUsd, isSolPriceLoading } = useSolPrice();
-  const [showConfetti, setShowConfetti] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
   const mainButtonAvailable = useSignal(mainButton.setParams.isAvailable);
@@ -548,6 +527,7 @@ export default function Home() {
     rawInitData,
     refreshTokenHoldings,
     refreshBalance,
+    setIncomingTransactions,
     setSolPriceUsd,
   ]);
 
@@ -666,7 +646,7 @@ export default function Home() {
       setClaimError(null); // Reset claim error state
       setShowConfetti(false); // Reset confetti state
     }
-  }, []);
+  }, [setClaimError, setShowClaimSuccess, setShowConfetti]);
 
   // Handle canceling (refunding) a deposit_for_username transaction
   const handleCancelDeposit = useCallback(
@@ -803,219 +783,6 @@ export default function Home() {
       });
     }
   }, []);
-
-  const handleApproveTransaction = useCallback(
-    async (transactionId: string, claimSource: ClaimSource) => {
-      if (!rawInitData) {
-        console.error("Cannot verify init data: raw init data missing");
-        return;
-      }
-
-      const transaction = incomingTransactions.find(
-        (tx) => tx.id === transactionId
-      );
-      if (!transaction) {
-        console.warn("Transaction not found for approval:", transactionId);
-        return;
-      }
-
-      if (hapticFeedback.impactOccurred.isAvailable()) {
-        hapticFeedback.impactOccurred("medium");
-      }
-      setIsClaimingTransaction(true);
-      try {
-        const provider = await getWalletProvider();
-        const keypair = await getWalletKeypair();
-        const wallet = new SimpleWallet(keypair);
-        const recipientPublicKey = provider.publicKey;
-
-        const { validationBytes, signatureBytes } =
-          createValidationBytesFromRawInitData(rawInitData);
-        const senderPublicKey = new PublicKey(transaction.sender);
-
-        const username = transaction.username;
-        const amountLamports = transaction.amountLamports;
-        const payerPublicKey = await getGaslessPublicKey();
-        console.log("payerPublicKey", payerPublicKey);
-
-        const preparedStoreInitDataTxn = await prepareStoreInitDataTxn(
-          provider,
-          payerPublicKey,
-          validationBytes,
-          wallet
-        );
-
-        await sendStoreInitDataTxn(
-          preparedStoreInitDataTxn,
-          senderPublicKey,
-          recipientPublicKey,
-          username,
-          amountLamports,
-          validationBytes,
-          signatureBytes,
-          TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
-        );
-
-        setIncomingTransactions((prev) =>
-          prev.filter((tx) => tx.id !== transactionId)
-        );
-
-        await refreshBalance(true);
-        void loadWalletTransactions({ force: true });
-        track(WALLET_ANALYTICS_EVENTS.claimFunds, {
-          path: WALLET_ANALYTICS_PATH,
-          claim_source: claimSource,
-          transaction_id: transactionId,
-          amount_lamports: amountLamports,
-        });
-
-        // Trigger confetti celebration
-        setShowConfetti(true);
-
-        // Extended intense haptic pattern for celebration
-        if (hapticFeedback.impactOccurred.isAvailable()) {
-          // First burst
-          hapticFeedback.impactOccurred("heavy");
-          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 80);
-          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 160);
-          // Second burst
-          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 300);
-          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 380);
-          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 460);
-          // Third burst
-          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 600);
-          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 680);
-          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 760);
-          // Final burst
-          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 900);
-          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 980);
-          setTimeout(() => hapticFeedback.impactOccurred("heavy"), 1060);
-        }
-      } catch (error) {
-        console.error("Failed to claim transaction", error);
-        if (hapticFeedback.notificationOccurred.isAvailable()) {
-          hapticFeedback.notificationOccurred("error");
-        }
-
-        // Set error message and show error state
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "Something went wrong. Please try again.";
-        setClaimError(errorMessage);
-      } finally {
-        setIsClaimingTransaction(false);
-      }
-    },
-    [
-      incomingTransactions,
-      rawInitData,
-      refreshBalance,
-      loadWalletTransactions,
-    ]
-  );
-
-  useEffect(() => {
-    if (USE_MOCK_DATA) return;
-    if (!rawInitData) {
-      setIsFetchingDeposits(false);
-      return;
-    }
-
-    let isCancelled = false;
-    let unsubscribe: (() => Promise<void>) | null = null;
-
-    const subscribeAndFetchDeposits = async () => {
-      try {
-        const cleanInitDataResult = cleanInitData(rawInitData);
-        const username = parseUsernameFromInitData(cleanInitDataResult);
-
-        if (!username) {
-          setIncomingTransactions([]);
-          setIsFetchingDeposits(false);
-          return;
-        }
-
-        // Check cache first - state may have been initialized from it
-        const cached = getCachedIncomingTransactions(username);
-        if (cached !== null) {
-          // Use cached data, refresh in background
-          setIncomingTransactions(cached);
-          setIsFetchingDeposits(false);
-        }
-
-        const provider = await getWalletProvider();
-        const transferProgram = getTelegramTransferProgram(provider);
-        console.log("Fetching deposits for username:", username);
-        const deposits = await fetchDeposits(provider, username);
-        console.log("Deposits fetched:", deposits.length, deposits);
-        if (isCancelled) {
-          return;
-        }
-
-        const mappedTransactions = deposits.map(
-          mapDepositToIncomingTransaction
-        );
-
-        setCachedIncomingTransactions(username, mappedTransactions);
-        setIncomingTransactions(mappedTransactions);
-
-        unsubscribe = await subscribeToDepositsWithUsername(
-          transferProgram,
-          username,
-          (deposit) => {
-            if (isCancelled) {
-              return;
-            }
-            const mapped = mapDepositToIncomingTransaction(deposit);
-            setIncomingTransactions((prev) => {
-              const existingIndex = prev.findIndex((tx) => tx.id === mapped.id);
-              let next: IncomingTransaction[];
-              if (existingIndex >= 0) {
-                next = [...prev];
-                next[existingIndex] = mapped;
-              } else {
-                next = [mapped, ...prev];
-              }
-              setCachedIncomingTransactions(username, next);
-              return next;
-            });
-          }
-        );
-      } catch (error) {
-        console.error("Failed to fetch deposits", error);
-      } finally {
-        if (!isCancelled) {
-          setIsFetchingDeposits(false);
-        }
-      }
-    };
-
-    void subscribeAndFetchDeposits();
-
-    return () => {
-      isCancelled = true;
-      if (unsubscribe) {
-        void unsubscribe().catch((error) =>
-          console.error("Failed to remove deposit subscription", error)
-        );
-      }
-    };
-  }, [rawInitData]);
-
-  // Auto-claim incoming transactions
-  useEffect(() => {
-    // Don't auto-claim if already claiming or no transactions
-    if (isClaimingTransaction || incomingTransactions.length === 0) {
-      return;
-    }
-
-    // Auto-claim the first available transaction
-    const firstTransaction = incomingTransactions[0];
-    if (firstTransaction) {
-      void handleApproveTransaction(firstTransaction.id, CLAIM_SOURCES.auto);
-    }
-  }, [incomingTransactions, isClaimingTransaction, handleApproveTransaction]);
 
   useEffect(() => {
     if (!mainButtonAvailable) {
@@ -1280,7 +1047,9 @@ export default function Home() {
     sentAmountSol,
     sendFormValues,
     showClaimSuccess,
+    setShowClaimSuccess,
     claimError,
+    setClaimError,
     sendError,
     rawInitData,
     solPriceUsd,
