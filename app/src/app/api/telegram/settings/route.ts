@@ -1,5 +1,3 @@
-"use server";
-
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 

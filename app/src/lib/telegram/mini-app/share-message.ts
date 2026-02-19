@@ -15,9 +15,7 @@ export const createShareMessage = async (
   solAmount: number,
   usdAmount: number
 ): Promise<string> => {
-  const endpoint = resolveEndpoint("api/telegram/share");
-  console.log("endpoint", endpoint);
-  //put all the data into the body
+  const endpoint = resolveEndpoint("/api/telegram/share");
   const body = JSON.stringify({
     rawInitData,
     receiverUsername,

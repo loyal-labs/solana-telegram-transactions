@@ -1,5 +1,3 @@
-"use server";
-
 import { NextResponse } from "next/server";
 
 import { resolveEndpoint } from "@/lib/core/api";
@@ -8,14 +6,15 @@ import { createValidationBytesFromRawInitData } from "@/lib/telegram/mini-app/in
 import { cleanInitData } from "@/lib/telegram/mini-app/init-data-transform";
 import { verifyInitData } from "@/lib/telegram/mini-app/verify-init-data";
 
-const getPhotoUrl = async (
+const getPhotoUrl = (
+  requestUrl: string,
   senderUsername: string,
   receiverUsername: string,
   solAmount: number,
   usdAmount: number
 ) => {
-  const endpoint = resolveEndpoint("api/og/share");
-  const url = new URL(endpoint);
+  const endpoint = resolveEndpoint("/api/og/share");
+  const url = new URL(endpoint, requestUrl);
   url.searchParams.set("sender", senderUsername);
   url.searchParams.set("receiver", receiverUsername);
   url.searchParams.set("solAmount", solAmount.toString());
@@ -78,7 +77,8 @@ export async function POST(req: Request) {
     }
 
     const userId = user.id;
-    const photoUrl = await getPhotoUrl(
+    const photoUrl = getPhotoUrl(
+      req.url,
       senderUsername,
       receiverUsername,
       solAmount,
