@@ -2,16 +2,13 @@
 
 import { hashes } from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha512";
-import NumberFlow from "@number-flow/react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import {
   hapticFeedback,
   useRawInitData,
 } from "@telegram-apps/sdk-react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDown, ArrowUp, Brush, Copy, RefreshCcw } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, RefreshCcw } from "lucide-react";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const Confetti = dynamic(() => import("react-confetti"), { ssr: false });
@@ -38,15 +35,8 @@ import { refundDeposit, topUpDeposit } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
-import {
-  computePortfolioTotals,
-  resolveTokenIcon,
-} from "@/lib/solana/token-holdings";
-import {
-  formatAddress,
-  formatSenderAddress,
-  formatTransactionAmount,
-} from "@/lib/solana/wallet/formatters";
+import { computePortfolioTotals } from "@/lib/solana/token-holdings";
+import { formatAddress } from "@/lib/solana/wallet/formatters";
 import {
   getWalletBalance,
   getWalletKeypair,
@@ -71,6 +61,10 @@ import type {
   TransactionDetailsData,
 } from "@/types/wallet";
 
+import { ActivityFeed } from "./components/ActivityFeed";
+import { BalanceCard } from "./components/BalanceCard";
+import { StickyBalancePill } from "./components/StickyBalancePill";
+import { TokensList } from "./components/TokensList";
 import { useDisplayPreferences } from "./hooks/useDisplayPreferences";
 import { useIncomingDeposits } from "./hooks/useIncomingDeposits";
 import { useSolPrice } from "./hooks/useSolPrice";
@@ -94,7 +88,6 @@ import {
   setCachedSolPrice,
   walletTransactionsCache,
 } from "./wallet-cache";
-import { MOCK_ACTIVITY_INFO, USE_MOCK_DATA } from "./wallet-mock-data";
 
 hashes.sha512 = sha512;
 
@@ -180,20 +173,11 @@ export default function Home() {
   const [isSendingTransaction, setIsSendingTransaction] = useState(false);
   const { displayCurrency, setDisplayCurrency, balanceBg, bgLoaded, handleBgSelect } = useDisplayPreferences();
   const [isBgPickerOpen, setBgPickerOpen] = useState(false);
-  const [addressCopied, setAddressCopied] = useState(false);
   const { isMobilePlatform } = useTelegramSetup(rawInitData);
   const { solPriceUsd, setSolPriceUsd, isSolPriceLoading } = useSolPrice();
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
-  // Track seen transaction IDs to detect new ones for animation
-  const seenTransactionIdsRef = useRef<Set<string>>(new Set());
-  const [newTransactionIds, setNewTransactionIds] = useState<Set<string>>(
-    new Set()
-  );
-
-  // Sticky balance pill state (scroll-driven, synced with header logo fade)
   const balanceRef = useRef<HTMLDivElement>(null);
-  const [stickyBalanceOpacity, setStickyBalanceOpacity] = useState(0);
 
   const handleOpenSendSheet = useCallback((recipientName?: string) => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -863,37 +847,6 @@ export default function Home() {
     return items.slice(0, 10);
   }, [incomingTransactions, walletTransactions]);
 
-  // Detect new transactions for animation
-  useEffect(() => {
-    const currentIds = new Set(
-      limitedActivityItems.map((item) => item.transaction.id)
-    );
-    const previousIds = seenTransactionIdsRef.current;
-
-    // Find newly added transactions
-    const newIds = new Set<string>();
-    for (const id of currentIds) {
-      if (!previousIds.has(id)) {
-        newIds.add(id);
-      }
-    }
-
-    // Update seen transactions
-    seenTransactionIdsRef.current = currentIds;
-
-    // If we have new transactions, mark them for animation
-    if (newIds.size > 0) {
-      setNewTransactionIds(newIds);
-
-      // Clear the new status after animation completes (500ms)
-      const timer = setTimeout(() => {
-        setNewTransactionIds(new Set());
-      }, 500);
-
-      return () => clearTimeout(timer);
-    }
-  }, [limitedActivityItems]);
-
   // Track window size for confetti
   useEffect(() => {
     const updateSize = () => {
@@ -904,46 +857,17 @@ export default function Home() {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // Track balance card position for sticky pill crossfade with header logo.
-  // Crossfade starts as the card bottom approaches the header — i.e. when
-  // the card is almost fully scrolled behind the header, not when its top
-  // edge first touches it.
-  useEffect(() => {
-    const headerBottom = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
-    const fadeRange = 50; // px over which the crossfade happens
-
-    const handleScroll = () => {
-      const el = balanceRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      // Progress 0→1 as the card bottom moves from (headerBottom + fadeRange) to headerBottom
-      const progress =
-        rect.bottom >= headerBottom + fadeRange
-          ? 0
-          : rect.bottom <= headerBottom
-          ? 1
-          : 1 - (rect.bottom - headerBottom) / fadeRange;
-      setStickyBalanceOpacity(progress);
-      document.documentElement.style.setProperty(
-        "--header-logo-opacity",
-        String(1 - progress)
-      );
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      document.documentElement.style.removeProperty("--header-logo-opacity");
-    };
-  }, [safeAreaInsetTop]);
-
-  const handleScrollToTop = useCallback(() => {
-    if (hapticFeedback.impactOccurred.isAvailable()) {
-      hapticFeedback.impactOccurred("light");
+  const handleToggleCurrency = useCallback(() => {
+    if (hapticFeedback.selectionChanged.isAvailable()) {
+      hapticFeedback.selectionChanged();
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+    setDisplayCurrency((prev) => {
+      const newCurrency = prev === "USD" ? "SOL" : "USD";
+      setCachedDisplayCurrency(newCurrency);
+      void setCloudValue(DISPLAY_CURRENCY_KEY, newCurrency);
+      return newCurrency;
+    });
+  }, [setDisplayCurrency]);
 
   return (
     <>
@@ -966,258 +890,31 @@ export default function Home() {
         className="min-h-screen font-sans overflow-hidden relative flex flex-col"
         style={{ background: "#fff" }}
       >
-        {/* Sticky Balance Pill — scroll-driven crossfade with header logo */}
-        {!showBalanceSkeleton && (
-          <button
-            onClick={handleScrollToTop}
-            className="fixed left-1/2 -translate-x-1/2 z-[51] flex items-center px-4 py-1.5 rounded-[54px] active:opacity-80"
-            style={{
-              top: `${Math.max(safeAreaInsetTop || 0, 12) + 4}px`,
-              background: "#fff",
-              opacity: stickyBalanceOpacity,
-              pointerEvents: stickyBalanceOpacity > 0.1 ? "auto" : "none",
-              willChange: "opacity",
-            }}
-          >
-            <span
-              className="text-sm font-medium text-black"
-              style={{ fontVariantNumeric: "tabular-nums" }}
-            >
-              {displayCurrency === "USD"
-                ? `$${usdBalanceNumeric.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}`
-                : `${solBalanceNumeric.toLocaleString("en-US", {
-                    minimumFractionDigits: 4,
-                    maximumFractionDigits: 4,
-                  })} SOL`}
-            </span>
-          </button>
-        )}
+        <StickyBalancePill
+          safeAreaInsetTop={safeAreaInsetTop}
+          displayCurrency={displayCurrency}
+          usdBalance={usdBalanceNumeric}
+          solBalance={solBalanceNumeric}
+          visible={!showBalanceSkeleton}
+          balanceRef={balanceRef}
+        />
 
         {/* Main Content */}
         <div className="relative flex-1 flex flex-col w-full">
-          {/* Balance Card */}
-          <div className="flex flex-col items-center pt-5 px-4">
-            <div
-              ref={balanceRef}
-              className="relative w-full overflow-hidden rounded-[26px]"
-              style={{
-                border: "2px solid rgba(255, 255, 255, 0.1)",
-                aspectRatio: "361 / 203",
-              }}
-            >
-              {/* Card background layers */}
-              <div
-                className="absolute inset-0 rounded-[26px]"
-                style={{ background: "#f2f2f7" }}
-              />
-              {!bgLoaded && (
-                <div
-                  className="absolute inset-0 rounded-[26px] animate-pulse"
-                  style={{ background: "rgba(0, 0, 0, 0.04)" }}
-                />
-              )}
-              {balanceBg && (
-                <Image
-                  src={`/bgs/${balanceBg}.png`}
-                  alt=""
-                  fill
-                  className="object-cover rounded-[26px]"
-                  priority
-                />
-              )}
-              {/* Inner shadow overlay */}
-              <div
-                className="absolute inset-0 rounded-[26px] pointer-events-none"
-                style={{
-                  boxShadow: "inset 0px 0px 36px 0px rgba(255, 255, 255, 0.4)",
-                }}
-              />
-
-              {/* Card content */}
-              <div className="relative flex flex-col justify-between h-full p-4">
-                {/* Top: Wallet address */}
-                {isLoading || !walletAddress ? (
-                  <div className="flex items-center gap-1">
-                    <div className="w-4 h-4 bg-white/20 animate-pulse rounded" />
-                    <div className="w-24 h-5 bg-white/20 animate-pulse rounded" />
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => {
-                      if (hapticFeedback.impactOccurred.isAvailable()) {
-                        hapticFeedback.impactOccurred("light");
-                      }
-                      if (walletAddress) {
-                        if (navigator?.clipboard?.writeText) {
-                          navigator.clipboard.writeText(walletAddress);
-                          setAddressCopied(true);
-                          setTimeout(() => setAddressCopied(false), 2000);
-                        }
-                        if (hapticFeedback.notificationOccurred.isAvailable()) {
-                          hapticFeedback.notificationOccurred("success");
-                        }
-                      }
-                    }}
-                    className="flex items-center gap-1 active:opacity-70 transition-opacity self-start"
-                  >
-                    <Copy
-                      className="w-5 h-5"
-                      strokeWidth={1.5}
-                      style={{
-                        color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
-                      }}
-                    />
-                    <span
-                      className="text-[17px] leading-[22px]"
-                      style={{
-                        color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
-                      }}
-                    >
-                      {addressCopied ? "Copied!" : formatAddress(walletAddress)}
-                    </span>
-                  </button>
-                )}
-
-                {/* Bottom: Balance + USD value */}
-                <div className="flex flex-col gap-1.5">
-                  <button
-                    onClick={() => {
-                      if (hapticFeedback.selectionChanged.isAvailable()) {
-                        hapticFeedback.selectionChanged();
-                      }
-                      setDisplayCurrency((prev) => {
-                        const newCurrency = prev === "USD" ? "SOL" : "USD";
-                        setCachedDisplayCurrency(newCurrency);
-                        void setCloudValue(DISPLAY_CURRENCY_KEY, newCurrency);
-                        return newCurrency;
-                      });
-                    }}
-                    className="active:scale-[0.98] transition-transform self-start"
-                  >
-                    {(() => {
-                      const mainColor = balanceBg ? "white" : "#1c1c1e";
-                      const decimalColor = balanceBg
-                        ? "white"
-                        : "rgba(60, 60, 67, 0.6)";
-
-                      if (showBalanceSkeleton) {
-                        return (
-                          <div className="flex items-center gap-2">
-                            <div className="w-40 h-10 bg-white/20 animate-pulse rounded" />
-                            <div className="w-16 h-8 bg-white/20 animate-pulse rounded" />
-                          </div>
-                        );
-                      }
-
-                      const value =
-                        displayCurrency === "USD"
-                          ? usdBalanceNumeric
-                          : solBalanceNumeric;
-                      const decimals = displayCurrency === "USD" ? 2 : 4;
-                      const prefix = displayCurrency === "USD" ? "$" : "";
-                      const suffix = displayCurrency === "SOL" ? " SOL" : "";
-
-                      // Convert to a stable fixed string so decimal digits never drift due to float math.
-                      const fixed = value.toFixed(decimals);
-                      const [intStr, decStr = "0"] = fixed.split(".");
-                      const intPart = Number(intStr);
-                      const decimalDigits = Number(decStr);
-
-                      return (
-                        <span
-                          className="font-semibold inline-flex items-baseline"
-                          style={{
-                            fontVariantNumeric: "tabular-nums",
-                            lineHeight: "48px",
-                            color: mainColor,
-                          }}
-                        >
-                          {prefix && (
-                            <span className="text-[40px]">{prefix}</span>
-                          )}
-                          <NumberFlow
-                            value={intPart}
-                            style={{ fontSize: "40px" }}
-                            format={{
-                              maximumFractionDigits: 0,
-                              useGrouping: true,
-                            }}
-                            willChange
-                          />
-                          <NumberFlow
-                            value={decimalDigits}
-                            prefix="."
-                            suffix={suffix}
-                            style={{ fontSize: "28px", color: decimalColor }}
-                            format={{
-                              minimumIntegerDigits: decimals,
-                              useGrouping: false,
-                            }}
-                            willChange
-                          />
-                        </span>
-                      );
-                    })()}
-                  </button>
-
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="text-[17px] leading-[22px]"
-                      style={{
-                        fontVariantNumeric: "tabular-nums",
-                        color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
-                      }}
-                    >
-                      {showSecondarySkeleton ? (
-                        <span className="inline-block w-28 h-5 bg-white/20 animate-pulse rounded" />
-                      ) : displayCurrency === "USD" ? (
-                        `${solBalanceNumeric.toLocaleString("en-US", {
-                          minimumFractionDigits: 4,
-                          maximumFractionDigits: 4,
-                        })} SOL`
-                      ) : (
-                        `$${usdBalanceNumeric.toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}`
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Brush icon for background picker */}
-                {bgLoaded && (
-                  <button
-                    onClick={() => {
-                      if (hapticFeedback.impactOccurred.isAvailable()) {
-                        hapticFeedback.impactOccurred("light");
-                      }
-                      setBgPickerOpen(true);
-                    }}
-                    className="absolute bottom-4 right-4 p-2 rounded-full backdrop-blur-[8px] active:opacity-70 transition-opacity"
-                    style={{
-                      background: balanceBg
-                        ? "rgba(255, 255, 255, 0.15)"
-                        : "rgba(0, 0, 0, 0.05)",
-                    }}
-                  >
-                    <Brush
-                      size={20}
-                      strokeWidth={1.5}
-                      style={{
-                        color: balanceBg
-                          ? "rgba(255, 255, 255, 0.6)"
-                          : "rgba(60, 60, 67, 0.6)",
-                      }}
-                    />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          <BalanceCard
+            balanceRef={balanceRef}
+            walletAddress={walletAddress}
+            isLoading={isLoading}
+            balanceBg={balanceBg}
+            bgLoaded={bgLoaded}
+            displayCurrency={displayCurrency}
+            usdBalance={usdBalanceNumeric}
+            solBalance={solBalanceNumeric}
+            showBalanceSkeleton={showBalanceSkeleton}
+            showSecondarySkeleton={showSecondarySkeleton}
+            onToggleCurrency={handleToggleCurrency}
+            onOpenBgPicker={() => setBgPickerOpen(true)}
+          />
 
           {/* Action Buttons */}
           <div className="flex items-center px-4 pt-5 pb-4">
@@ -1248,814 +945,23 @@ export default function Home() {
           {/* Banner Carousel */}
           <BannerCarousel isMobilePlatform={isMobilePlatform} />
 
-          {/* Tokens Section */}
-          {(() => {
-            const displayTokens =
-              tokenHoldings.length > 0
-                ? tokenHoldings
-                : [
-                    {
-                      mint: "SOL",
-                      symbol: "SOL",
-                      name: "Solana",
-                      balance: 0,
-                      decimals: 9,
-                      priceUsd: solPriceUsd,
-                      valueUsd: 0,
-                      imageUrl: "/tokens/solana-sol-logo.png",
-                    },
-                  ];
-            return (
-              <>
-                <div className="px-3 pt-3 pb-2">
-                  <p className="text-base font-medium text-black leading-5 tracking-[-0.176px]">
-                    Tokens
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 items-center px-4 pb-4">
-                  {displayTokens.slice(0, 5).map((token) => {
-                    const iconSrc = resolveTokenIcon(token);
+          <TokensList
+            tokenHoldings={tokenHoldings}
+            solPriceUsd={solPriceUsd}
+            onShowAll={() => setTokensSheetOpen(true)}
+          />
 
-                    return (
-                      <div
-                        key={token.mint}
-                        className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
-                        style={{ border: "2px solid #f2f2f7" }}
-                      >
-                        {/* Token icon */}
-                        <div className="py-1.5 pr-3">
-                          <div className="w-12 h-12 relative">
-                            <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
-                              <Image
-                                src={iconSrc}
-                                alt={token.symbol}
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-                            {token.isSecured && (
-                              <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px]">
-                                <Image
-                                  src="/Shield.svg"
-                                  alt="Secured"
-                                  width={20}
-                                  height={20}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {/* Token info */}
-                        <div className="flex-1 flex flex-col py-2.5 min-w-0">
-                          <p className="text-[17px] font-medium text-black leading-[22px] tracking-[-0.187px]">
-                            {token.symbol}
-                          </p>
-                          <p
-                            className="text-[15px] leading-5"
-                            style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                          >
-                            {token.priceUsd !== null
-                              ? `$${token.priceUsd.toLocaleString("en-US", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}`
-                              : "—"}
-                          </p>
-                        </div>
-                        {/* Token amount */}
-                        <div className="flex flex-col items-end py-2.5 pl-3">
-                          <p className="text-[17px] text-black leading-[22px] text-right">
-                            {token.balance.toLocaleString("en-US", {
-                              maximumFractionDigits: 4,
-                            })}
-                          </p>
-                          <p
-                            className="text-[15px] leading-5 text-right"
-                            style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                          >
-                            {token.valueUsd !== null
-                              ? `$${token.valueUsd.toLocaleString("en-US", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}`
-                              : "—"}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Show All button */}
-                  {tokenHoldings.length > 5 && (
-                    <button
-                      onClick={() => {
-                        if (hapticFeedback.impactOccurred.isAvailable()) {
-                          hapticFeedback.impactOccurred("light");
-                        }
-                        setTokensSheetOpen(true);
-                      }}
-                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium leading-5"
-                      style={{
-                        background: "rgba(249, 54, 60, 0.14)",
-                        color: "#f9363c",
-                      }}
-                    >
-                      Show All
-                    </button>
-                  )}
-                </div>
-              </>
-            );
-          })()}
-
-          {/* Activity Section - conditionally rendered */}
-          {(() => {
-            const hasNoTransactions =
-              incomingTransactions.length === 0 &&
-              walletTransactions.length === 0;
-            const isActivityLoading =
-              isLoading ||
-              (isFetchingTransactions && walletTransactions.length === 0) ||
-              (isFetchingDeposits && incomingTransactions.length === 0);
-
-            // Loading state - show skeleton transaction cards
-            if (isActivityLoading) {
-              return (
-                <>
-                  <div className="px-3 pt-3 pb-2 flex items-center justify-between">
-                    <p className="text-base font-medium text-black leading-5 tracking-[-0.176px]">
-                      Activity
-                    </p>
-                  </div>
-                  <div className="flex-1 px-4 pb-4">
-                    <div className="flex flex-col">
-                      {/* Skeleton Transaction Card 1 */}
-                      <div className="flex items-center px-4 rounded-2xl overflow-hidden">
-                        <div className="py-1.5 pr-3">
-                          <div className="w-12 h-12 rounded-full bg-black/5 animate-pulse" />
-                        </div>
-                        <div className="flex-1 py-2.5 flex flex-col gap-1.5">
-                          <div className="w-20 h-5 bg-black/5 animate-pulse rounded" />
-                          <div className="w-28 h-4 bg-black/5 animate-pulse rounded" />
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
-                          <div className="w-16 h-5 bg-black/5 animate-pulse rounded" />
-                          <div className="w-12 h-4 bg-black/5 animate-pulse rounded" />
-                        </div>
-                      </div>
-                      {/* Skeleton Transaction Card 2 */}
-                      <div className="flex items-center px-4 rounded-2xl overflow-hidden">
-                        <div className="py-1.5 pr-3">
-                          <div className="w-12 h-12 rounded-full bg-black/5 animate-pulse" />
-                        </div>
-                        <div className="flex-1 py-2.5 flex flex-col gap-1.5">
-                          <div className="w-16 h-5 bg-black/5 animate-pulse rounded" />
-                          <div className="w-24 h-4 bg-black/5 animate-pulse rounded" />
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5 py-2.5 pl-3">
-                          <div className="w-20 h-5 bg-black/5 animate-pulse rounded" />
-                          <div className="w-14 h-4 bg-black/5 animate-pulse rounded" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              );
-            }
-
-            // No transactions - show empty state
-            if (hasNoTransactions) {
-              return (
-                <div className="flex-1">
-                  {/* Activity header */}
-                  <div className="px-3 pt-3 pb-2 flex items-center justify-between">
-                    <p className="text-base font-medium text-black leading-5 tracking-[-0.176px]">
-                      Activity
-                    </p>
-                  </div>
-                  {/* Empty transactions state */}
-                  <div className="px-4 pb-36">
-                    <div className="flex flex-col gap-4 items-center justify-center px-8 py-6 rounded-[20px]">
-                      <Image
-                        src="/dogs/dog-cry.png"
-                        alt=""
-                        width={60}
-                        height={48}
-                      />
-                      <p
-                        className="text-[17px] leading-[22px] text-center"
-                        style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                      >
-                        You don&apos;t have any transactions yet
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            // Normal state with transactions
-            return (
-              <>
-                <div className="px-3 pt-3 pb-2">
-                  <p className="text-base font-medium text-black leading-5 tracking-[-0.176px]">
-                    Activity
-                  </p>
-                </div>
-                <div className="flex-1 pb-4">
-                  <div className="flex flex-col pb-36">
-                    <AnimatePresence initial={false} mode="popLayout">
-                      {limitedActivityItems.map((item) => {
-                        const isNewTransaction = newTransactionIds.has(
-                          item.transaction.id
-                        );
-
-                        if (item.type === "incoming") {
-                          const transaction = item.transaction;
-                          return (
-                            <motion.div
-                              key={transaction.id}
-                              layout
-                              initial={
-                                isNewTransaction
-                                  ? { opacity: 0, scale: 0.85, y: -10 }
-                                  : false
-                              }
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.85 }}
-                              transition={{
-                                layout: {
-                                  type: "spring",
-                                  stiffness: 500,
-                                  damping: 35,
-                                },
-                                opacity: { duration: 0.25 },
-                                scale: {
-                                  duration: 0.3,
-                                  ease: [0.34, 1.56, 0.64, 1],
-                                },
-                              }}
-                              className="flex items-center px-4 rounded-2xl overflow-hidden w-full"
-                            >
-                              {/* Left - Icon */}
-                              <div className="py-1.5 pr-3">
-                                <div
-                                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                                  style={{
-                                    background: "rgba(50, 229, 94, 0.15)",
-                                  }}
-                                >
-                                  <ArrowDown
-                                    className="w-7 h-7"
-                                    strokeWidth={1.5}
-                                    style={{ color: "#32e55e" }}
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Middle - Text */}
-                              <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                                <p className="text-base text-black leading-5">
-                                  Receiving
-                                </p>
-                                <p
-                                  className="text-[13px] leading-4"
-                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                                >
-                                  {formatTransactionAmount(
-                                    transaction.amountLamports
-                                  )}{" "}
-                                  SOL from{" "}
-                                  {formatSenderAddress(transaction.sender)}
-                                </p>
-                              </div>
-
-                              {/* Right - Claiming Badge with pulse animation */}
-                              <div className="py-2.5 pl-3">
-                                <motion.div
-                                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm leading-5"
-                                  style={{
-                                    background: "rgba(50, 229, 94, 0.15)",
-                                    color: "#32e55e",
-                                  }}
-                                  animate={{ opacity: [1, 0.4, 1] }}
-                                  transition={{
-                                    duration: 1.5,
-                                    repeat: Infinity,
-                                    ease: "easeInOut",
-                                  }}
-                                >
-                                  Claiming...
-                                </motion.div>
-                              </div>
-                            </motion.div>
-                          );
-                        }
-
-                        // Wallet transaction
-                        const transaction = item.transaction;
-                        const isIncoming = transaction.type === "incoming";
-                        const isPending = transaction.type === "pending";
-                        const mockInfo = USE_MOCK_DATA
-                          ? MOCK_ACTIVITY_INFO[transaction.id]
-                          : undefined;
-                        const isSecureTransaction =
-                          transaction.transferType === "secure";
-                        const isUnshieldTransaction =
-                          transaction.transferType === "unshield";
-                        const isSecureOrUnshield =
-                          isSecureTransaction || isUnshieldTransaction;
-                        const _isDepositForUsername =
-                          transaction.transferType === "deposit_for_username";
-                        const transferTypeLabel =
-                          transaction.transferType === "store"
-                            ? "Store data"
-                            : transaction.transferType ===
-                              "verify_telegram_init_data"
-                            ? "Verify data"
-                            : null;
-                        const counterparty = isIncoming
-                          ? transaction.sender || "Unknown sender"
-                          : transaction.recipient || "Unknown recipient";
-                        const isUnknownRecipient = counterparty
-                          .toLowerCase()
-                          .startsWith("unknown recipient");
-                        const formattedCounterparty = isUnknownRecipient
-                          ? counterparty
-                          : counterparty.startsWith("@")
-                          ? counterparty
-                          : formatSenderAddress(counterparty);
-                        const isEffectivelyZero =
-                          Math.abs(transaction.amountLamports) <
-                          LAMPORTS_PER_SOL / 10000; // below 0.0001 SOL displays as 0
-                        const amountPrefix = isEffectivelyZero
-                          ? ""
-                          : isIncoming
-                          ? "+"
-                          : "−";
-                        const amountColor = isIncoming
-                          ? "#32e55e"
-                          : isPending
-                          ? "#00b1fb"
-                          : "#000";
-                        const timestamp = new Date(transaction.timestamp);
-
-                        // Compact view for store/verify transactions
-                        const isCompactTransaction = transferTypeLabel !== null;
-
-                        if (isCompactTransaction) {
-                          return (
-                            <motion.button
-                              key={transaction.id}
-                              layout
-                              initial={
-                                isNewTransaction
-                                  ? { opacity: 0, scale: 0.85, y: -10 }
-                                  : false
-                              }
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.85 }}
-                              transition={{
-                                layout: {
-                                  type: "spring",
-                                  stiffness: 500,
-                                  damping: 35,
-                                },
-                                opacity: { duration: 0.25 },
-                                scale: {
-                                  duration: 0.3,
-                                  ease: [0.34, 1.56, 0.64, 1],
-                                },
-                              }}
-                              onClick={() =>
-                                handleOpenWalletTransactionDetails(transaction)
-                              }
-                              className="flex items-center py-2 px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                            >
-                              {/* Left - Text */}
-                              <div className="flex-1 flex items-center">
-                                <p
-                                  className="text-sm leading-5"
-                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                                >
-                                  {transferTypeLabel}
-                                </p>
-                              </div>
-
-                              {/* Right - Date only */}
-                              <div className="pl-3">
-                                <p
-                                  className="text-[13px] leading-4"
-                                  style={{ color: "rgba(60, 60, 67, 0.4)" }}
-                                >
-                                  {timestamp.toLocaleDateString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                  })}
-                                  ,{" "}
-                                  {timestamp.toLocaleTimeString([], {
-                                    hour: "numeric",
-                                    minute: "2-digit",
-                                  })}
-                                </p>
-                              </div>
-                            </motion.button>
-                          );
-                        }
-
-                        // Secure/Unshield transaction view
-                        if (isSecureOrUnshield) {
-                          return (
-                            <motion.button
-                              key={transaction.id}
-                              layout
-                              initial={
-                                isNewTransaction
-                                  ? { opacity: 0, scale: 0.85, y: -10 }
-                                  : false
-                              }
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.85 }}
-                              transition={{
-                                layout: {
-                                  type: "spring",
-                                  stiffness: 500,
-                                  damping: 35,
-                                },
-                                opacity: { duration: 0.25 },
-                                scale: {
-                                  duration: 0.3,
-                                  ease: [0.34, 1.56, 0.64, 1],
-                                },
-                              }}
-                              onClick={() =>
-                                handleOpenWalletTransactionDetails(transaction)
-                              }
-                              className="flex items-center px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                            >
-                              {/* Left - Icon */}
-                              <div className="py-1.5 pr-3">
-                                <div className="w-12 h-12 relative">
-                                  <div className="absolute left-0 top-0 w-8 h-8 rounded-full overflow-hidden bg-[#f2f2f7]">
-                                    <Image
-                                      src={
-                                        transaction.secureTokenIcon ||
-                                        "/tokens/solana-sol-logo.png"
-                                      }
-                                      alt={
-                                        transaction.secureTokenSymbol || "Token"
-                                      }
-                                      fill
-                                      className="object-cover"
-                                    />
-                                  </div>
-                                  <div className="absolute bottom-0 right-0 w-8 h-8">
-                                    <Image
-                                      src={
-                                        isSecureTransaction
-                                          ? "/icons/Shield_32.png"
-                                          : "/icons/Unshield_32.png"
-                                      }
-                                      alt={
-                                        isSecureTransaction
-                                          ? "Shielded"
-                                          : "Unshielded"
-                                      }
-                                      width={32}
-                                      height={32}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Middle - Text */}
-                              <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                                <p className="text-base text-black leading-5">
-                                  {isSecureTransaction
-                                    ? "Shielded"
-                                    : "Unshielded"}
-                                </p>
-                                <p
-                                  className="text-[13px] leading-4"
-                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                                >
-                                  {transaction.secureTokenSymbol || "Token"}
-                                </p>
-                              </div>
-
-                              {/* Right - Value */}
-                              <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
-                                <p className="text-base leading-5 text-black">
-                                  {transaction.secureAmount
-                                    ? `${transaction.secureAmount.toLocaleString(
-                                        "en-US",
-                                        { maximumFractionDigits: 4 }
-                                      )} ${transaction.secureTokenSymbol || ""}`
-                                    : `${formatTransactionAmount(
-                                        transaction.amountLamports
-                                      )} SOL`}
-                                </p>
-                                <p
-                                  className="text-[13px] leading-4"
-                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                                >
-                                  {timestamp.toLocaleDateString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                  })}
-                                  ,{" "}
-                                  {timestamp.toLocaleTimeString([], {
-                                    hour: "numeric",
-                                    minute: "2-digit",
-                                  })}
-                                </p>
-                              </div>
-                            </motion.button>
-                          );
-                        }
-
-                        // Swap transaction view
-                        if (transaction.transferType === "swap") {
-                          const swapFromHolding = transaction.swapFromMint
-                            ? tokenHoldings.find(
-                                (h) => h.mint === transaction.swapFromMint
-                              )
-                            : undefined;
-                          const swapToHolding = transaction.swapToMint
-                            ? tokenHoldings.find(
-                                (h) => h.mint === transaction.swapToMint
-                              )
-                            : undefined;
-                          const swapFromIcon = transaction.swapFromMint
-                            ? resolveTokenIcon({
-                                mint: transaction.swapFromMint,
-                                imageUrl: swapFromHolding?.imageUrl,
-                              })
-                            : "/tokens/solana-sol-logo.png";
-                          const swapToIcon = transaction.swapToMint
-                            ? resolveTokenIcon({
-                                mint: transaction.swapToMint,
-                                imageUrl: swapToHolding?.imageUrl,
-                              })
-                            : "/tokens/solana-sol-logo.png";
-                          const swapFromSymbol =
-                            transaction.swapFromSymbol ||
-                            swapFromHolding?.symbol ||
-                            "?";
-                          const swapToSymbol =
-                            transaction.swapToSymbol ||
-                            swapToHolding?.symbol ||
-                            "?";
-                          const swapToAmount = transaction.swapToAmount;
-
-                          return (
-                            <motion.button
-                              key={transaction.id}
-                              layout
-                              initial={
-                                isNewTransaction
-                                  ? { opacity: 0, scale: 0.85, y: -10 }
-                                  : false
-                              }
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.85 }}
-                              transition={{
-                                layout: {
-                                  type: "spring",
-                                  stiffness: 500,
-                                  damping: 35,
-                                },
-                                opacity: { duration: 0.25 },
-                                scale: {
-                                  duration: 0.3,
-                                  ease: [0.34, 1.56, 0.64, 1],
-                                },
-                              }}
-                              onClick={() =>
-                                handleOpenWalletTransactionDetails(transaction)
-                              }
-                              className="flex items-center px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                            >
-                              {/* Swap token icons - from (back) + to (front) */}
-                              <div className="py-1.5 pr-3">
-                                <div className="w-12 h-12 relative">
-                                  <div className="absolute left-0.5 top-0.5 w-7 h-7 rounded-full border-2 border-white overflow-hidden bg-[#f2f2f7]">
-                                    <Image
-                                      src={swapFromIcon}
-                                      alt={swapFromSymbol}
-                                      fill
-                                      className="object-cover"
-                                    />
-                                  </div>
-                                  <div className="absolute right-0.5 bottom-0.5 w-7 h-7 rounded-full border-2 border-white overflow-hidden bg-[#f2f2f7]">
-                                    <Image
-                                      src={swapToIcon}
-                                      alt={swapToSymbol}
-                                      fill
-                                      className="object-cover"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Middle - Text */}
-                              <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                                <p className="text-base text-black leading-5">
-                                  Swap
-                                </p>
-                                <p
-                                  className="text-[13px] leading-4"
-                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                                >
-                                  {swapFromSymbol} to {swapToSymbol}
-                                </p>
-                              </div>
-
-                              {/* Right - Value */}
-                              <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
-                                <p
-                                  className="text-base leading-5"
-                                  style={{ color: "#32e55e" }}
-                                >
-                                  {swapToAmount != null
-                                    ? `+${swapToAmount.toLocaleString("en-US", {
-                                        maximumFractionDigits: 4,
-                                      })} ${swapToSymbol}`
-                                    : "Swap"}
-                                </p>
-                                <p
-                                  className="text-[13px] leading-4"
-                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                                >
-                                  {timestamp.toLocaleDateString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                  })}
-                                  ,{" "}
-                                  {timestamp.toLocaleTimeString([], {
-                                    hour: "numeric",
-                                    minute: "2-digit",
-                                  })}
-                                </p>
-                              </div>
-                            </motion.button>
-                          );
-                        }
-
-                        return (
-                          <motion.button
-                            key={transaction.id}
-                            layout
-                            initial={
-                              isNewTransaction
-                                ? { opacity: 0, scale: 0.85, y: -10 }
-                                : false
-                            }
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.85 }}
-                            transition={{
-                              layout: {
-                                type: "spring",
-                                stiffness: 500,
-                                damping: 35,
-                              },
-                              opacity: { duration: 0.25 },
-                              scale: {
-                                duration: 0.3,
-                                ease: [0.34, 1.56, 0.64, 1],
-                              },
-                            }}
-                            onClick={() =>
-                              handleOpenWalletTransactionDetails(transaction)
-                            }
-                            className="flex items-center px-4 rounded-2xl overflow-hidden w-full text-left active:opacity-80 transition-opacity"
-                          >
-                            {/* Left - Icon */}
-                            <div className="py-1.5 pr-3">
-                              {isPending ? (
-                                <div className="w-12 h-12 rounded-full overflow-hidden relative">
-                                  <Image
-                                    src="/loyal-shield.png"
-                                    alt="To be claimed"
-                                    fill
-                                    className="object-cover"
-                                  />
-                                </div>
-                              ) : mockInfo ? (
-                                <div className="w-12 h-12 rounded-full overflow-hidden relative bg-[#f2f2f7]">
-                                  <Image
-                                    src={mockInfo.tokenIcon}
-                                    alt={mockInfo.tokenSymbol}
-                                    fill
-                                    className="object-cover"
-                                  />
-                                </div>
-                              ) : (
-                                <div className="w-12 h-12 rounded-full overflow-hidden relative">
-                                  <Image
-                                    src="/tokens/solana-sol-logo.png"
-                                    alt="SOL"
-                                    fill
-                                    className="object-cover"
-                                  />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Middle - Text */}
-                            <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                              <p className="text-base text-black leading-5">
-                                {mockInfo
-                                  ? mockInfo.label
-                                  : isIncoming
-                                  ? "Received"
-                                  : isPending
-                                  ? "To be claimed"
-                                  : "Sent"}
-                              </p>
-                              {mockInfo ? (
-                                <p
-                                  className="text-[13px] leading-4"
-                                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                                >
-                                  {mockInfo.subtitle}
-                                </p>
-                              ) : (
-                                !(
-                                  isPending === false &&
-                                  !isIncoming &&
-                                  isUnknownRecipient
-                                ) && (
-                                  <p
-                                    className="text-[13px] leading-4"
-                                    style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                                  >
-                                    {isIncoming
-                                      ? "from"
-                                      : isPending
-                                      ? "by"
-                                      : "to"}{" "}
-                                    {formattedCounterparty}
-                                  </p>
-                                )
-                              )}
-                            </div>
-
-                            {/* Right - Value */}
-                            <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
-                              <p
-                                className="text-base leading-5"
-                                style={{ color: amountColor }}
-                              >
-                                {mockInfo
-                                  ? mockInfo.displayAmount
-                                  : `${amountPrefix}${
-                                      isEffectivelyZero
-                                        ? "0"
-                                        : formatTransactionAmount(
-                                            transaction.amountLamports
-                                          )
-                                    } SOL`}
-                              </p>
-                              <p
-                                className="text-[13px] leading-4"
-                                style={{ color: "rgba(60, 60, 67, 0.6)" }}
-                              >
-                                {timestamp.toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                })}
-                                ,{" "}
-                                {timestamp.toLocaleTimeString([], {
-                                  hour: "numeric",
-                                  minute: "2-digit",
-                                })}
-                              </p>
-                            </div>
-                          </motion.button>
-                        );
-                      })}
-                    </AnimatePresence>
-
-                    {/* Show All button */}
-                    {incomingTransactions.length + walletTransactions.length >
-                      10 && (
-                      <button
-                        onClick={handleOpenActivitySheet}
-                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium leading-5"
-                        style={{
-                          background: "rgba(249, 54, 60, 0.14)",
-                          color: "#f9363c",
-                        }}
-                      >
-                        Show All
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </>
-            );
-          })()}
+          <ActivityFeed
+            limitedActivityItems={limitedActivityItems}
+            incomingTransactions={incomingTransactions}
+            walletTransactions={walletTransactions}
+            tokenHoldings={tokenHoldings}
+            isLoading={isLoading}
+            isFetchingTransactions={isFetchingTransactions}
+            isFetchingDeposits={isFetchingDeposits}
+            onTransactionClick={handleOpenWalletTransactionDetails}
+            onShowAll={handleOpenActivitySheet}
+          />
         </div>
 
         {/* Bottom Fade Gradient */}
