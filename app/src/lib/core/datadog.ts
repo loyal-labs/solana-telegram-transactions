@@ -32,7 +32,7 @@ export function initDatadog() {
     ...sharedConfig,
     applicationId: "67ad7dc6-b0d4-4ef4-9dec-3ded01bf7a9a",
     sessionSampleRate: 100,
-    sessionReplaySampleRate: 20,
+    sessionReplaySampleRate: 0,
     trackUserInteractions: true,
     trackResources: true,
     trackLongTasks: true,
