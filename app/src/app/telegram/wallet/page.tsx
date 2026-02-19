@@ -2117,7 +2117,14 @@ export default function Home() {
           (holdings) => {
             if (isCancelled) return;
             holdingsFetchIdRef.current += 1;
-            setTokenHoldings(holdings);
+            // Preserve secured entries managed by the secure balance
+            // subscription — fetchTokenHoldings only returns regular holdings.
+            setTokenHoldings((prev) => {
+              const existingSecured = prev.filter((h) => h.isSecured);
+              return existingSecured.length > 0
+                ? [...holdings, ...existingSecured]
+                : holdings;
+            });
             hasLoadedHoldingsRef.current = true;
             setIsHoldingsLoading(false);
           },
