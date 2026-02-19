@@ -5,14 +5,11 @@ import { sha512 } from "@noble/hashes/sha512";
 import NumberFlow from "@number-flow/react";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import {
-  closingBehavior,
   hapticFeedback,
   mainButton,
-  retrieveLaunchParams,
   secondaryButton,
   useRawInitData,
   useSignal,
-  viewport,
 } from "@telegram-apps/sdk-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Brush, Copy, RefreshCcw } from "lucide-react";
@@ -39,10 +36,7 @@ import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet
 import { useSwap } from "@/hooks/useSwap";
 import { useDeviceSafeAreaTop, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import {
-  BALANCE_BG_KEY,
   DISPLAY_CURRENCY_KEY,
-  SOL_PRICE_USD,
-  TELEGRAM_BOT_ID,
   TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
 } from "@/lib/constants";
 import { track } from "@/lib/core/analytics";
@@ -87,22 +81,17 @@ import {
 } from "@/lib/solana/wallet/wallet-details";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
 import { ensureWalletKeypair } from "@/lib/solana/wallet/wallet-keypair-logic";
-import { initTelegram, sendString } from "@/lib/telegram/mini-app";
+import { sendString } from "@/lib/telegram/mini-app";
 import {
   hideMainButton,
   hideSecondaryButton,
   showMainButton,
   showReceiveShareButton,
 } from "@/lib/telegram/mini-app/buttons";
-import {
-  getCloudValue,
-  setCloudValue,
-} from "@/lib/telegram/mini-app/cloud-storage";
+import { setCloudValue } from "@/lib/telegram/mini-app/cloud-storage";
 import {
   cleanInitData,
   createValidationBytesFromRawInitData,
-  createValidationString,
-  validateInitData,
 } from "@/lib/telegram/mini-app/init-data-transform";
 import { parseUsernameFromInitData } from "@/lib/telegram/mini-app/init-data-transform";
 import { openQrScanner } from "@/lib/telegram/mini-app/qr-code";
@@ -110,13 +99,15 @@ import {
   createShareMessage,
   shareSavedInlineMessage,
 } from "@/lib/telegram/mini-app/share-message";
-import { ensureTelegramTheme } from "@/lib/telegram/mini-app/theme";
 import type {
   IncomingTransaction,
   Transaction,
   TransactionDetailsData,
 } from "@/types/wallet";
 
+import { useDisplayPreferences } from "./hooks/useDisplayPreferences";
+import { useSolPrice } from "./hooks/useSolPrice";
+import { useTelegramSetup } from "./hooks/useTelegramSetup";
 import {
   CLAIM_SOURCES,
   type ClaimSource,
@@ -129,18 +120,14 @@ import {
   WALLET_ANALYTICS_PATH,
 } from "./wallet-analytics";
 import {
-  cachedBalanceBg,
-  cachedDisplayCurrency,
   cachedUsername,
   cachedWalletAddress,
   ensureWalletBalanceSubscription,
   getCachedIncomingTransactions,
-  getCachedSolPrice,
   getCachedWalletBalance,
   hasCachedWalletData,
   HOLDINGS_REFRESH_DEBOUNCE_MS,
   mapDepositToIncomingTransaction,
-  setCachedBalanceBg,
   setCachedDisplayCurrency,
   setCachedIncomingTransactions,
   setCachedSolPrice,
@@ -152,7 +139,6 @@ import {
 import {
   MOCK_ACTIVITY_INFO,
   MOCK_BALANCE_LAMPORTS,
-  MOCK_SOL_PRICE_USD,
   MOCK_TOKEN_HOLDINGS,
   MOCK_WALLET_ADDRESS,
   MOCK_WALLET_TRANSACTIONS,
@@ -266,22 +252,11 @@ export default function Home() {
     recipient: "",
   });
   const [isSendingTransaction, setIsSendingTransaction] = useState(false);
-  const [displayCurrency, setDisplayCurrency] = useState<"USD" | "SOL">(
-    () => cachedDisplayCurrency ?? "USD"
-  );
-  const [balanceBg, setBalanceBg] = useState<string | null>(() =>
-    cachedBalanceBg !== undefined ? cachedBalanceBg : null
-  );
-  const [bgLoaded, setBgLoaded] = useState(() => cachedBalanceBg !== undefined);
+  const { displayCurrency, setDisplayCurrency, balanceBg, bgLoaded, handleBgSelect } = useDisplayPreferences();
   const [isBgPickerOpen, setBgPickerOpen] = useState(false);
   const [addressCopied, setAddressCopied] = useState(false);
-  const [isMobilePlatform, setIsMobilePlatform] = useState(false);
-  const [solPriceUsd, setSolPriceUsd] = useState<number | null>(() =>
-    USE_MOCK_DATA ? MOCK_SOL_PRICE_USD : getCachedSolPrice()
-  );
-  const [isSolPriceLoading, setIsSolPriceLoading] = useState(() =>
-    USE_MOCK_DATA ? false : getCachedSolPrice() === null
-  );
+  const { isMobilePlatform } = useTelegramSetup(rawInitData);
+  const { solPriceUsd, setSolPriceUsd, isSolPriceLoading } = useSolPrice();
   const [showConfetti, setShowConfetti] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
@@ -716,6 +691,7 @@ export default function Home() {
 
       try {
         const latestPrice = await fetchSolUsdPrice();
+        setCachedSolPrice(latestPrice);
         setSolPriceUsd(latestPrice);
       } catch (priceError) {
         console.error("Failed to refresh SOL price", priceError);
@@ -774,6 +750,7 @@ export default function Home() {
     rawInitData,
     refreshTokenHoldings,
     refreshWalletBalance,
+    setSolPriceUsd,
   ]);
 
   const handleSubmitSend = useCallback(async () => {
@@ -877,12 +854,6 @@ export default function Home() {
       hapticFeedback.impactOccurred("light");
     }
     setActivitySheetOpen(open);
-  }, []);
-
-  const handleBgSelect = useCallback((bg: string | null) => {
-    setBalanceBg(bg);
-    setCachedBalanceBg(bg);
-    void setCloudValue(BALANCE_BG_KEY, bg ?? "none");
   }, []);
 
   const handleTransactionDetailsSheetChange = useCallback((open: boolean) => {
@@ -1147,74 +1118,6 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (rawInitData) {
-      if (!TELEGRAM_BOT_ID) {
-        console.error("TELEGRAM_BOT_ID is not set in .env");
-        return;
-      }
-      const cleanInitDataResult = cleanInitData(rawInitData);
-      const validationString = createValidationString(
-        TELEGRAM_BOT_ID,
-        cleanInitDataResult
-      );
-      console.log("validationString:", validationString);
-      const signature = cleanInitDataResult.signature as string;
-      const isValid = validateInitData(validationString, signature);
-      console.log("Signature is valid: ", isValid);
-    }
-  }, [rawInitData]);
-
-  useEffect(() => {
-    if (USE_MOCK_DATA) return;
-    let isMounted = true;
-    let retryCount = 0;
-    const MAX_RETRIES = 3;
-    const RETRY_DELAY = 1000;
-
-    // Check cache first - if we have a cached price, use it immediately
-    const cached = getCachedSolPrice();
-    if (cached !== null) {
-      setSolPriceUsd(cached);
-      setIsSolPriceLoading(false);
-    }
-
-    const loadPrice = async () => {
-      while (retryCount < MAX_RETRIES && isMounted) {
-        try {
-          const price = await fetchSolUsdPrice();
-          if (!isMounted) return;
-          setCachedSolPrice(price);
-          setSolPriceUsd(price);
-          setIsSolPriceLoading(false);
-          return; // Success, exit
-        } catch (error) {
-          retryCount++;
-          console.error(
-            `Failed to fetch SOL price (attempt ${retryCount}/${MAX_RETRIES})`,
-            error
-          );
-          if (retryCount < MAX_RETRIES && isMounted) {
-            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-          }
-        }
-      }
-      // All retries failed, use fallback price
-      if (isMounted) {
-        console.warn("Using fallback SOL price after all retries failed");
-        setCachedSolPrice(SOL_PRICE_USD);
-        setSolPriceUsd(SOL_PRICE_USD);
-        setIsSolPriceLoading(false);
-      }
-    };
-
-    void loadPrice();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
     if (USE_MOCK_DATA) return;
     if (!rawInitData) {
       setIsFetchingDeposits(false);
@@ -1315,113 +1218,6 @@ export default function Home() {
       void handleApproveTransaction(firstTransaction.id, CLAIM_SOURCES.auto);
     }
   }, [incomingTransactions, isClaimingTransaction, handleApproveTransaction]);
-
-  useEffect(() => {
-    initTelegram();
-    void ensureTelegramTheme();
-
-    // Enable closing confirmation always
-    try {
-      // Mount closing behavior if needed
-      if (closingBehavior.mount.isAvailable?.()) {
-        closingBehavior.mount();
-      }
-
-      if (closingBehavior.enableConfirmation.isAvailable()) {
-        closingBehavior.enableConfirmation();
-        const _isEnabled = closingBehavior.isConfirmationEnabled();
-      } else {
-        console.warn("enableConfirmation is not available");
-      }
-    } catch (error) {
-      console.error("Failed to enable closing confirmation:", error);
-    }
-
-    // Check platform and enable fullscreen for mobile
-    let platform: string | undefined;
-    try {
-      const launchParams = retrieveLaunchParams();
-      platform = launchParams.tgWebAppPlatform;
-    } catch {
-      // Fallback to hash parsing if SDK fails
-      const hash = window.location.hash.slice(1);
-      const params = new URLSearchParams(hash);
-      platform = params.get("tgWebAppPlatform") || undefined;
-    }
-
-    const isMobile = platform === "ios" || platform === "android";
-    setIsMobilePlatform(isMobile);
-
-    if (isMobile) {
-      if (viewport.requestFullscreen.isAvailable()) {
-        void viewport.requestFullscreen().catch((error) => {
-          console.warn("Failed to enable fullscreen:", error);
-        });
-      }
-    }
-
-    // Suppress Telegram SDK viewport errors in non-TMA environment
-    const originalError = console.error;
-    console.error = (...args) => {
-      const message = args[0]?.toString() || "";
-      // Suppress viewport_changed and other bridge validation errors
-      if (
-        message.includes("viewport_changed") ||
-        message.includes(
-          "ValiError: Invalid type: Expected Object but received null"
-        )
-      ) {
-        return; // Silently ignore these errors
-      }
-      originalError.apply(console, args);
-    };
-
-    return () => {
-      console.error = originalError;
-    };
-  }, []);
-
-  // Load display currency preference from cloud storage
-  useEffect(() => {
-    if (cachedDisplayCurrency !== null) return; // Already loaded from cache
-
-    void (async () => {
-      try {
-        const stored = await getCloudValue(DISPLAY_CURRENCY_KEY);
-        if (stored === "USD" || stored === "SOL") {
-          setCachedDisplayCurrency(stored);
-          setDisplayCurrency(stored);
-        }
-      } catch (error) {
-        console.error("Failed to load display currency preference", error);
-      }
-    })();
-  }, []);
-
-  // Load balance background preference from cloud storage
-  useEffect(() => {
-    if (cachedBalanceBg !== undefined) return; // Already loaded from cache
-
-    void (async () => {
-      try {
-        const stored = await getCloudValue(BALANCE_BG_KEY);
-        if (typeof stored === "string" && stored.length > 0) {
-          const bg = stored === "none" ? null : stored;
-          setCachedBalanceBg(bg);
-          setBalanceBg(bg);
-        } else {
-          setCachedBalanceBg("balance-bg-01");
-          setBalanceBg("balance-bg-01");
-        }
-      } catch (error) {
-        console.error("Failed to load balance background preference", error);
-        setCachedBalanceBg("balance-bg-01");
-        setBalanceBg("balance-bg-01");
-      } finally {
-        setBgLoaded(true);
-      }
-    })();
-  }, []);
 
   useEffect(() => {
     if (USE_MOCK_DATA) return;
