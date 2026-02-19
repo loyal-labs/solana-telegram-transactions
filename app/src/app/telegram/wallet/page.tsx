@@ -84,7 +84,6 @@ import {
   getWalletProvider,
   getWalletPublicKey,
   sendSolTransaction,
-  subscribeToWalletBalance,
 } from "@/lib/solana/wallet/wallet-details";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
 import { ensureWalletKeypair } from "@/lib/solana/wallet/wallet-keypair-logic";
@@ -112,7 +111,6 @@ import {
   shareSavedInlineMessage,
 } from "@/lib/telegram/mini-app/share-message";
 import { ensureTelegramTheme } from "@/lib/telegram/mini-app/theme";
-import type { TelegramDeposit } from "@/types/deposits";
 import type {
   IncomingTransaction,
   Transaction,
@@ -129,6 +127,27 @@ import {
   WALLET_ANALYTICS_EVENTS,
   WALLET_ANALYTICS_PATH,
 } from "./wallet-analytics";
+import {
+  cachedBalanceBg,
+  cachedDisplayCurrency,
+  cachedUsername,
+  cachedWalletAddress,
+  ensureWalletBalanceSubscription,
+  getCachedIncomingTransactions,
+  getCachedSolPrice,
+  getCachedWalletBalance,
+  hasCachedWalletData,
+  HOLDINGS_REFRESH_DEBOUNCE_MS,
+  mapDepositToIncomingTransaction,
+  setCachedBalanceBg,
+  setCachedDisplayCurrency,
+  setCachedIncomingTransactions,
+  setCachedSolPrice,
+  setCachedWalletAddress,
+  setCachedWalletBalance,
+  walletBalanceListeners,
+  walletTransactionsCache,
+} from "./wallet-cache";
 import {
   MOCK_ACTIVITY_INFO,
   MOCK_BALANCE_LAMPORTS,
@@ -157,118 +176,6 @@ function getAnalyticsErrorProperties(error: unknown): {
     error_message: typeof error === "string" ? error : "Unknown error",
   };
 }
-
-const walletTransactionsCache = new Map<string, Transaction[]>();
-const walletBalanceCache = new Map<string, number>();
-const walletBalanceListeners = new Set<(lamports: number) => void>();
-let walletBalanceSubscriptionPromise: Promise<() => Promise<void>> | null =
-  null;
-
-const HOLDINGS_REFRESH_DEBOUNCE_MS = 750;
-
-const getCachedWalletBalance = (
-  walletAddress: string | null
-): number | null => {
-  if (!walletAddress) return null;
-  const cached = walletBalanceCache.get(walletAddress);
-  return typeof cached === "number" ? cached : null;
-};
-
-const setCachedWalletBalance = (
-  walletAddress: string | null,
-  lamports: number
-): void => {
-  if (!walletAddress) return;
-  walletBalanceCache.set(walletAddress, lamports);
-};
-
-const ensureWalletBalanceSubscription = async (walletAddress: string) => {
-  if (walletBalanceSubscriptionPromise) {
-    return walletBalanceSubscriptionPromise;
-  }
-
-  walletBalanceSubscriptionPromise = subscribeToWalletBalance((lamports) => {
-    setCachedWalletBalance(walletAddress, lamports);
-    walletBalanceListeners.forEach((listener) => listener(lamports));
-  }).catch((error) => {
-    walletBalanceSubscriptionPromise = null;
-    throw error;
-  });
-
-  return walletBalanceSubscriptionPromise;
-};
-
-// SOL price cache (shared across page visits)
-let cachedSolPriceUsd: number | null = null;
-let solPriceFetchedAt: number | null = null;
-const SOL_PRICE_CACHE_TTL = 60_000; // 1 minute
-
-const getCachedSolPrice = (): number | null => {
-  if (cachedSolPriceUsd === null || solPriceFetchedAt === null) return null;
-  // Return cached price if within TTL
-  if (Date.now() - solPriceFetchedAt < SOL_PRICE_CACHE_TTL) {
-    return cachedSolPriceUsd;
-  }
-  return cachedSolPriceUsd; // Still return stale price, but allow refresh
-};
-
-const setCachedSolPrice = (price: number): void => {
-  cachedSolPriceUsd = price;
-  solPriceFetchedAt = Date.now();
-};
-
-// Incoming transactions cache (keyed by username)
-let cachedUsername: string | null = null;
-const incomingTransactionsCache = new Map<string, IncomingTransaction[]>();
-
-const getCachedIncomingTransactions = (
-  username: string | null
-): IncomingTransaction[] | null => {
-  if (!username) return null;
-  return incomingTransactionsCache.get(username) ?? null;
-};
-
-const setCachedIncomingTransactions = (
-  username: string | null,
-  txns: IncomingTransaction[]
-): void => {
-  if (!username) return;
-  cachedUsername = username;
-  incomingTransactionsCache.set(username, txns);
-};
-
-const mapDepositToIncomingTransaction = (
-  deposit: TelegramDeposit
-): IncomingTransaction => {
-  const senderBase58 =
-    typeof (deposit.user as { toBase58?: () => string }).toBase58 === "function"
-      ? deposit.user.toBase58()
-      : String(deposit.user);
-
-  return {
-    id: `${senderBase58}-${deposit.lastNonce}`,
-    amountLamports: deposit.amount,
-    sender: senderBase58,
-    username: deposit.username,
-  };
-};
-
-// Track wallet address at module level for cache lookups on remount
-let cachedWalletAddress: string | null = null;
-
-// Display currency preference cache
-let cachedDisplayCurrency: "USD" | "SOL" | null = null;
-
-// Balance background preference cache
-let cachedBalanceBg: string | null | undefined = undefined; // undefined = not loaded yet
-
-// Check if we have enough cached data to skip loading
-const hasCachedWalletData = (): boolean => {
-  if (!cachedWalletAddress) return false;
-  const hasBalance = getCachedWalletBalance(cachedWalletAddress) !== null;
-  const hasPrice = getCachedSolPrice() !== null;
-  return hasBalance && hasPrice;
-};
 
 export default function Home() {
   const rawInitData = useRawInitData();
@@ -990,7 +897,7 @@ export default function Home() {
 
   const handleBgSelect = useCallback((bg: string | null) => {
     setBalanceBg(bg);
-    cachedBalanceBg = bg;
+    setCachedBalanceBg(bg);
     void setCloudValue(BALANCE_BG_KEY, bg ?? "none");
   }, []);
 
@@ -1498,7 +1405,7 @@ export default function Home() {
       try {
         const stored = await getCloudValue(DISPLAY_CURRENCY_KEY);
         if (stored === "USD" || stored === "SOL") {
-          cachedDisplayCurrency = stored;
+          setCachedDisplayCurrency(stored);
           setDisplayCurrency(stored);
         }
       } catch (error) {
@@ -1516,15 +1423,15 @@ export default function Home() {
         const stored = await getCloudValue(BALANCE_BG_KEY);
         if (typeof stored === "string" && stored.length > 0) {
           const bg = stored === "none" ? null : stored;
-          cachedBalanceBg = bg;
+          setCachedBalanceBg(bg);
           setBalanceBg(bg);
         } else {
-          cachedBalanceBg = "balance-bg-01";
+          setCachedBalanceBg("balance-bg-01");
           setBalanceBg("balance-bg-01");
         }
       } catch (error) {
         console.error("Failed to load balance background preference", error);
-        cachedBalanceBg = "balance-bg-01";
+        setCachedBalanceBg("balance-bg-01");
         setBalanceBg("balance-bg-01");
       } finally {
         setBgLoaded(true);
@@ -1543,7 +1450,7 @@ export default function Home() {
         const publicKeyBase58 = keypair.publicKey.toBase58();
 
         // Store wallet address in module-level cache for future mounts
-        cachedWalletAddress = publicKeyBase58;
+        setCachedWalletAddress(publicKeyBase58);
         setWalletAddress(publicKeyBase58);
 
         // Check if we already have cached balance (from previous visit)
@@ -2264,7 +2171,7 @@ export default function Home() {
                       }
                       setDisplayCurrency((prev) => {
                         const newCurrency = prev === "USD" ? "SOL" : "USD";
-                        cachedDisplayCurrency = newCurrency;
+                        setCachedDisplayCurrency(newCurrency);
                         void setCloudValue(DISPLAY_CURRENCY_KEY, newCurrency);
                         return newCurrency;
                       });
