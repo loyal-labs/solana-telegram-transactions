@@ -1,8 +1,6 @@
-import { timingSafeEqual } from "crypto";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { serverEnv } from "@/lib/core/config/server";
 import { getDatabase } from "@/lib/core/database";
 import { communities } from "@/lib/core/schema";
 import { getBot } from "@/lib/telegram/bot-api/bot";
@@ -17,6 +15,8 @@ import type {
   SummaryDeliveredMessage,
 } from "@/lib/telegram/bot-api/types";
 import { SUMMARY_INTERVAL_MS } from "@/lib/telegram/utils";
+
+import { validateCronAuthHeader } from "../_shared/auth";
 
 export const runtime = "nodejs";
 const SUMMARY_QUALITY_CONTROL_CHAT_ID = BigInt("-5173720920");
@@ -73,7 +73,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const authErrorResponse = validateAuthHeader(request);
+  const authErrorResponse = validateCronAuthHeader(request);
   if (authErrorResponse) {
     return authErrorResponse;
   }
@@ -286,30 +286,4 @@ function logQualityControlForwardFailure(
     sourceCommunityChatId: String(deliveredMessage.sourceCommunityChatId),
     summaryId,
   });
-}
-
-function validateAuthHeader(request: Request): NextResponse | null {
-  let expectedToken: string;
-  try {
-    expectedToken = serverEnv.cronSecret;
-  } catch {
-    console.error("CRON_SECRET environment variable is not set");
-    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
-  }
-
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const expected = Buffer.from(`Bearer ${expectedToken}`);
-  const provided = Buffer.from(authHeader);
-  if (
-    expected.length !== provided.length ||
-    !timingSafeEqual(expected, provided)
-  ) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  return null;
 }

@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import type { CallbackQueryContext, Context } from "grammy";
+import type { CallbackQueryContext, CommandContext, Context } from "grammy";
 
 import type { Community } from "@/lib/core/schema";
 
@@ -17,6 +17,22 @@ let mockDb: {
 
 mock.module("@/lib/core/database", () => ({
   getDatabase: () => mockDb,
+}));
+
+const autoCleanupReplyCalls: Array<{
+  options?: unknown;
+  text: string;
+}> = [];
+
+mock.module("../helper-message-cleanup", () => ({
+  replyWithAutoCleanup: async (
+    ctx: CommandContext<Context>,
+    text: string,
+    options?: unknown
+  ) => {
+    autoCleanupReplyCalls.push({ options, text });
+    await ctx.reply(text, options as never);
+  },
 }));
 
 let NOTIFICATION_SETTINGS_CALLBACK_DATA_REGEX: RegExp;
@@ -45,15 +61,12 @@ let encodeNotificationSettingsCallbackData: (callbackData: {
 let handleNotificationSettingsCallback: (
   ctx: CallbackQueryContext<Context>
 ) => Promise<void>;
-let parseNotificationSettingsCallbackData: (
-  data: string
-) =>
-  | {
-      communityId: string;
-      dimension: "time" | "msg" | "master";
-      value: "off" | "on" | 24 | 48 | 500 | 1000;
-    }
-  | null;
+let parseNotificationSettingsCallbackData: (data: string) => {
+  communityId: string;
+  dimension: "time" | "msg" | "master";
+  value: "off" | "on" | 24 | 48 | 500 | 1000;
+} | null;
+let sendNotificationSettingsMessage: typeof import("../notification-settings").sendNotificationSettingsMessage;
 
 let adminResult: { id: string } | null;
 let communityFindResults: Array<Community | null>;
@@ -130,6 +143,7 @@ describe("notification settings helpers", () => {
       encodeNotificationSettingsCallbackData,
       handleNotificationSettingsCallback,
       parseNotificationSettingsCallbackData,
+      sendNotificationSettingsMessage,
     } = loadedModule);
   });
 
@@ -137,6 +151,7 @@ describe("notification settings helpers", () => {
     adminResult = null;
     communityFindResults = [];
     updateValuesCaptured = [];
+    autoCleanupReplyCalls.length = 0;
 
     mockDb = {
       query: {
@@ -368,8 +383,39 @@ describe("notification settings helpers", () => {
     expect(editCalls).toHaveLength(1);
     expect(editCalls[0]?.[0]).toBe(-1009876543210);
     expect(editCalls[0]?.[1]).toBe(123);
-    expect(editCalls[0]?.[2]).toContain("Notification settings for this community");
+    expect(editCalls[0]?.[2]).toContain(
+      "Notification settings for this community"
+    );
 
     expect(answerCalls).toEqual([{ text: "Notification settings updated" }]);
+  });
+
+  test("sends settings panel using auto-cleanup reply wrapper", async () => {
+    const community = createCommunity({
+      summaryNotificationsEnabled: true,
+      summaryNotificationTimeHours: 24,
+    });
+    const replyCalls: Array<{ options?: unknown; text: string }> = [];
+    const ctx = {
+      chat: {
+        id: -1009876543210,
+        type: "supergroup",
+      },
+      reply: async (text: string, options?: unknown) => {
+        replyCalls.push({ options, text });
+        return {} as never;
+      },
+    } as unknown as CommandContext<Context>;
+
+    await sendNotificationSettingsMessage(ctx, community);
+
+    expect(replyCalls).toHaveLength(1);
+    expect(replyCalls[0]?.text).toContain(
+      "Notification settings for this community"
+    );
+    expect(replyCalls[0]?.options).toEqual(
+      expect.objectContaining({ parse_mode: "HTML" })
+    );
+    expect(autoCleanupReplyCalls).toHaveLength(1);
   });
 });

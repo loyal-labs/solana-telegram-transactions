@@ -19,6 +19,7 @@ type MockSendSummaryResult =
     };
 
 let sendLatestSummaryResult: MockSendSummaryResult = { sent: true };
+let sendLatestSummaryError: Error | null = null;
 const sendLatestSummaryCalls: unknown[] = [];
 const mixpanelInitTokens: string[] = [];
 const mixpanelTrackCalls: Array<{
@@ -27,6 +28,7 @@ const mixpanelTrackCalls: Array<{
 }> = [];
 let sendStartCarouselShouldThrow = false;
 let sendStartCarouselCalls = 0;
+let autoCleanupReplyTexts: string[] = [];
 
 mock.module("mixpanel", () => ({
   default: {
@@ -74,14 +76,24 @@ mock.module("../start-carousel", () => ({
   },
 }));
 
-mock.module("../notification-settings", () => ({
-  sendNotificationSettingsMessage: async () => {},
-}));
-
 mock.module("../summaries", () => ({
   sendLatestSummary: async (...args: unknown[]) => {
     sendLatestSummaryCalls.push(args);
+    if (sendLatestSummaryError) {
+      throw sendLatestSummaryError;
+    }
     return sendLatestSummaryResult;
+  },
+}));
+
+mock.module("../helper-message-cleanup", () => ({
+  replyWithAutoCleanup: async (
+    ctx: CommandContext<Context>,
+    text: string,
+    options?: unknown
+  ) => {
+    autoCleanupReplyTexts.push(text);
+    await ctx.reply(text, options as never);
   },
 }));
 
@@ -135,11 +147,13 @@ describe("commands analytics tracking", () => {
   beforeEach(() => {
     process.env.NEXT_PUBLIC_MIXPANEL_TOKEN = "test-mixpanel-token";
     sendLatestSummaryResult = { sent: true };
+    sendLatestSummaryError = null;
     sendLatestSummaryCalls.length = 0;
     mixpanelInitTokens.length = 0;
     mixpanelTrackCalls.length = 0;
     sendStartCarouselCalls = 0;
     sendStartCarouselShouldThrow = false;
+    autoCleanupReplyTexts = [];
   });
 
   afterEach(() => {
@@ -199,7 +213,7 @@ describe("commands analytics tracking", () => {
     ]);
   });
 
-  test("replies when summary notifications are disabled for community", async () => {
+  test("suppresses reply when summary notifications are disabled for community", async () => {
     sendLatestSummaryResult = {
       sent: false,
       reason: "notifications_disabled",
@@ -208,9 +222,8 @@ describe("commands analytics tracking", () => {
 
     await handleSummaryCommand(ctx, {} as Bot);
 
-    expect(replyCalls).toEqual([
-      "Summary notifications are turned off for this community. Use /notifications to turn them on.",
-    ]);
+    expect(replyCalls).toHaveLength(0);
+    expect(autoCleanupReplyTexts).toHaveLength(0);
     expect(sendLatestSummaryCalls).toHaveLength(1);
     expect(sendLatestSummaryCalls[0]).toEqual([
       {},
@@ -223,7 +236,7 @@ describe("commands analytics tracking", () => {
     expect(mixpanelTrackCalls).toHaveLength(0);
   });
 
-  test("keeps existing not_activated behavior", async () => {
+  test("suppresses reply when community is not activated", async () => {
     sendLatestSummaryResult = {
       sent: false,
       reason: "not_activated",
@@ -232,12 +245,11 @@ describe("commands analytics tracking", () => {
 
     await handleSummaryCommand(ctx, {} as Bot);
 
-    expect(replyCalls).toEqual([
-      "This community is not activated. Use /activate_community to enable summaries.",
-    ]);
+    expect(replyCalls).toHaveLength(0);
+    expect(autoCleanupReplyTexts).toHaveLength(0);
   });
 
-  test("keeps existing no_summaries behavior", async () => {
+  test("suppresses reply when no summaries are available", async () => {
     sendLatestSummaryResult = {
       sent: false,
       reason: "no_summaries",
@@ -246,8 +258,18 @@ describe("commands analytics tracking", () => {
 
     await handleSummaryCommand(ctx, {} as Bot);
 
-    expect(replyCalls).toEqual([
-      "No summaries available yet. Summaries are generated daily when there's enough activity.",
-    ]);
+    expect(replyCalls).toHaveLength(0);
+    expect(autoCleanupReplyTexts).toHaveLength(0);
+  });
+
+  test("suppresses reply when summary delivery throws", async () => {
+    sendLatestSummaryError = new Error("summary delivery failed");
+    const { ctx, replyCalls } = createSummaryCommandContext();
+
+    await handleSummaryCommand(ctx, {} as Bot);
+
+    expect(replyCalls).toHaveLength(0);
+    expect(autoCleanupReplyTexts).toHaveLength(0);
+    expect(mixpanelTrackCalls).toHaveLength(0);
   });
 });
