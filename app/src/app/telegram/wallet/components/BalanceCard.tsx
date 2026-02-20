@@ -2,16 +2,19 @@
 
 import NumberFlow from "@number-flow/react";
 import { hapticFeedback } from "@telegram-apps/sdk-react";
-import { Brush, Copy } from "lucide-react";
+import { Brush, Copy, RefreshCcw } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 
+import { getSolanaEnv } from "@/lib/solana/rpc/connection";
 import { formatAddress } from "@/lib/solana/wallet/formatters";
 
 interface BalanceCardProps {
   balanceRef: React.RefObject<HTMLDivElement | null>;
   walletAddress: string | null;
   isLoading: boolean;
+  walletError: string | null;
+  onRetry: () => void;
   balanceBg: string | null;
   bgLoaded: boolean;
   displayCurrency: "USD" | "SOL";
@@ -27,6 +30,8 @@ export function BalanceCard({
   balanceRef,
   walletAddress,
   isLoading,
+  walletError,
+  onRetry,
   balanceBg,
   bgLoaded,
   displayCurrency,
@@ -38,6 +43,7 @@ export function BalanceCard({
   onOpenBgPicker,
 }: BalanceCardProps) {
   const [addressCopied, setAddressCopied] = useState(false);
+  const solanaEnv = getSolanaEnv();
 
   return (
     <div className="flex flex-col items-center pt-5 px-4">
@@ -79,48 +85,94 @@ export function BalanceCard({
 
         {/* Card content */}
         <div className="relative flex flex-col justify-between h-full p-4">
-          {/* Top: Wallet address */}
-          {isLoading || !walletAddress ? (
-            <div className="flex items-center gap-1">
-              <div className="w-4 h-4 bg-white/20 animate-pulse rounded" />
-              <div className="w-24 h-5 bg-white/20 animate-pulse rounded" />
-            </div>
-          ) : (
-            <button
-              onClick={() => {
-                if (hapticFeedback.impactOccurred.isAvailable()) {
-                  hapticFeedback.impactOccurred("light");
-                }
-                if (walletAddress) {
-                  if (navigator?.clipboard?.writeText) {
-                    navigator.clipboard.writeText(walletAddress);
-                    setAddressCopied(true);
-                    setTimeout(() => setAddressCopied(false), 2000);
-                  }
-                  if (hapticFeedback.notificationOccurred.isAvailable()) {
-                    hapticFeedback.notificationOccurred("success");
-                  }
-                }
-              }}
-              className="flex items-center gap-1 active:opacity-70 transition-opacity self-start"
-            >
-              <Copy
-                className="w-5 h-5"
-                strokeWidth={1.5}
+          {walletError ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 py-2">
+              <p
+                className="text-[15px] leading-[20px] text-center px-4"
+                style={{ color: balanceBg ? "white" : "#1c1c1e" }}
+              >
+                {walletError}
+              </p>
+              <button
+                onClick={onRetry}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full active:scale-95 transition-transform"
                 style={{
-                  color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
-                }}
-              />
-              <span
-                className="text-[17px] leading-[22px]"
-                style={{
-                  color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
+                  background: balanceBg
+                    ? "rgba(255, 255, 255, 0.2)"
+                    : "rgba(0, 0, 0, 0.06)",
                 }}
               >
-                {addressCopied ? "Copied!" : formatAddress(walletAddress)}
-              </span>
-            </button>
-          )}
+                <RefreshCcw
+                  size={16}
+                  strokeWidth={2}
+                  style={{
+                    color: balanceBg ? "white" : "#1c1c1e",
+                  }}
+                />
+                <span
+                  className="text-[15px] font-medium"
+                  style={{ color: balanceBg ? "white" : "#1c1c1e" }}
+                >
+                  Retry
+                </span>
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Top: Wallet address + network */}
+              <div className="flex flex-col gap-0.5">
+                {isLoading || !walletAddress ? (
+                  <div className="flex items-center gap-1">
+                    <div className="w-4 h-4 bg-white/20 animate-pulse rounded" />
+                    <div className="w-24 h-5 bg-white/20 animate-pulse rounded" />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (hapticFeedback.impactOccurred.isAvailable()) {
+                        hapticFeedback.impactOccurred("light");
+                      }
+                      if (walletAddress) {
+                        if (navigator?.clipboard?.writeText) {
+                          navigator.clipboard.writeText(walletAddress);
+                          setAddressCopied(true);
+                          setTimeout(() => setAddressCopied(false), 2000);
+                        }
+                        if (hapticFeedback.notificationOccurred.isAvailable()) {
+                          hapticFeedback.notificationOccurred("success");
+                        }
+                      }
+                    }}
+                    className="flex items-center gap-1 active:opacity-70 transition-opacity self-start"
+                  >
+                    <Copy
+                      className="w-5 h-5"
+                      strokeWidth={1.5}
+                      style={{
+                        color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
+                      }}
+                    />
+                    <span
+                      className="text-[17px] leading-[22px]"
+                      style={{
+                        color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
+                      }}
+                    >
+                      {addressCopied ? "Copied!" : formatAddress(walletAddress)}
+                    </span>
+                  </button>
+                )}
+                <span
+                  className="text-[13px] leading-[18px] capitalize pl-0.5"
+                  style={{
+                    color: balanceBg
+                      ? "rgba(255, 255, 255, 0.7)"
+                      : "rgba(60, 60, 67, 0.45)",
+                  }}
+                >
+                  Solana {solanaEnv}
+                </span>
+              </div>
 
           {/* Bottom: Balance + USD value */}
           <div className="flex flex-col gap-1.5">
@@ -243,6 +295,8 @@ export function BalanceCard({
                 }}
               />
             </button>
+          )}
+            </>
           )}
         </div>
       </div>

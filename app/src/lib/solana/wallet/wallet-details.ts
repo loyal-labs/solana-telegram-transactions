@@ -203,3 +203,8 @@ export const sendSolTransaction = async (
 
   return signature;
 };
+
+export const resetWalletKeypairCache = () => {
+  cachedWalletKeypair = null;
+  walletKeypairPromise = null;
+};

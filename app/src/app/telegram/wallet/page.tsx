@@ -44,6 +44,7 @@ import {
 } from "@/lib/solana/deposits/loyal-deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
+import { getSolanaEnv } from "@/lib/solana/rpc/connection";
 import { computePortfolioTotals } from "@/lib/solana/token-holdings";
 import { formatAddress } from "@/lib/solana/wallet/formatters";
 import {
@@ -145,7 +146,13 @@ export default function Home() {
   const [isTokensSheetOpen, setTokensSheetOpen] = useState(false);
   const [isTransactionDetailsSheetOpen, setTransactionDetailsSheetOpen] =
     useState(false);
-  const { walletAddress, setWalletAddress, isLoading } = useWalletInit();
+  const {
+    walletAddress,
+    setWalletAddress,
+    isLoading,
+    walletError,
+    retryWalletInit,
+  } = useWalletInit();
   const { solBalanceLamports, setSolBalanceLamports, refreshBalance } =
     useWalletBalance(walletAddress);
   const { tokenHoldings, isHoldingsLoading, refreshTokenHoldings } =
@@ -987,6 +994,8 @@ export default function Home() {
             balanceRef={balanceRef}
             walletAddress={walletAddress}
             isLoading={isLoading}
+            walletError={walletError}
+            onRetry={retryWalletInit}
             balanceBg={balanceBg}
             bgLoaded={bgLoaded}
             displayCurrency={displayCurrency}
@@ -1173,17 +1182,31 @@ export default function Home() {
           const decimalStr = String(decimalDigits).padStart(decimals, "0");
           return (
             <>
-              <div className="flex items-center gap-1">
-                <Copy
-                  className="w-5 h-5"
-                  strokeWidth={1.5}
-                  style={{ color: decimalColor }}
-                />
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-1">
+                  <Copy
+                    className="w-5 h-5"
+                    strokeWidth={1.5}
+                    style={{ color: decimalColor }}
+                  />
+                  <span
+                    className="text-[17px] leading-[22px]"
+                    style={{ color: decimalColor }}
+                  >
+                    {walletAddress
+                      ? formatAddress(walletAddress)
+                      : "Loading..."}
+                  </span>
+                </div>
                 <span
-                  className="text-[17px] leading-[22px]"
-                  style={{ color: decimalColor }}
+                  className="text-[13px] leading-[18px] capitalize pl-0.5"
+                  style={{
+                    color: previewBg
+                      ? "rgba(255, 255, 255, 0.7)"
+                      : "rgba(60, 60, 67, 0.45)",
+                  }}
                 >
-                  {walletAddress ? formatAddress(walletAddress) : "Loading..."}
+                  Solana {getSolanaEnv()}
                 </span>
               </div>
               <div className="flex-1" />

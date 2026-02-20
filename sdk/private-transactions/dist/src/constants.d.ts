@@ -1,4 +1,9 @@
-import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+/// <reference types="node" />
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+/**
+ * TEE ER Validator
+ */
+export declare const ER_VALIDATOR: any;
 /**
  * TEE ER Validator
  */
@@ -6,23 +11,23 @@ export declare const ER_VALIDATOR: PublicKey;
 /**
  * Telegram Private Transfer program ID
  */
-export declare const PROGRAM_ID: PublicKey;
+export declare const PROGRAM_ID: any;
 /**
  * MagicBlock Delegation Program ID
  */
-export declare const DELEGATION_PROGRAM_ID: PublicKey;
+export declare const DELEGATION_PROGRAM_ID: any;
 /**
  * MagicBlock Permission Program ID (ACL)
  */
-export declare const PERMISSION_PROGRAM_ID: PublicKey;
+export declare const PERMISSION_PROGRAM_ID: any;
 /**
  * MagicBlock Magic Program ID (for undelegation)
  */
-export declare const MAGIC_PROGRAM_ID: PublicKey;
+export declare const MAGIC_PROGRAM_ID: any;
 /**
  * MagicBlock Magic Context Account (for undelegation)
  */
-export declare const MAGIC_CONTEXT_ID: PublicKey;
+export declare const MAGIC_CONTEXT_ID: any;
 /**
  * PDA seed for deposit accounts
  */
