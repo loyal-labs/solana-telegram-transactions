@@ -490,7 +490,19 @@ const mapTransactionToTransfer = (
       ? (decodedType as WalletTransfer["type"])
       : "transfer";
 
+  // Detect shield/unshield from private transfer program's modify_balance instruction
+  if (decodedType === "modify_balance" && decodedInstruction) {
+    const modifyArgs = (
+      decodedInstruction.data as { args?: { increase?: boolean } }
+    )?.args;
+    if (typeof modifyArgs?.increase === "boolean") {
+      type = modifyArgs.increase ? "secure" : "unshield";
+    }
+  }
+
   const isTokenTransfer = type === "transfer" && tokenChange !== null;
+  const isSecureWithToken =
+    (type === "secure" || type === "unshield") && tokenChange !== null;
 
   // Deterministic swap detection: check if any instruction targets Jupiter
   // Requires token balance changes so downstream consumers always get populated swapFields
@@ -586,11 +598,15 @@ const mapTransactionToTransfer = (
   const direction: "in" | "out" =
     type === "swap"
       ? "out" // swaps always show as outgoing (SOL/token spent)
-      : isTokenTransfer
+      : isTokenTransfer || isSecureWithToken
         ? tokenChange!.direction
         : solDirection;
   const amountLamports =
-    type === "swap" ? solAmountLamports : isTokenTransfer ? 0 : solAmountLamports;
+    type === "swap"
+      ? solAmountLamports
+      : isTokenTransfer || isSecureWithToken
+        ? 0
+        : solAmountLamports;
 
   if (type === "deposit_for_username") {
     const usernameFromInstruction = (
@@ -626,7 +642,7 @@ const mapTransactionToTransfer = (
     feeLamports: safeMeta.fee ?? 0,
     status: safeMeta.err ? "failed" : "success",
     counterparty,
-    ...(isTokenTransfer && type !== "swap"
+    ...((isTokenTransfer || isSecureWithToken) && type !== "swap"
       ? {
           tokenMint: tokenChange!.mint,
           tokenAmount: formatTokenAmountFromRaw({
