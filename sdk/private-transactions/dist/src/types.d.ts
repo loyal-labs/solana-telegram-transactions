@@ -27,11 +27,17 @@ export interface RpcOptions {
 /**
  * Configuration for creating an ephemeral client
  */
-export interface EphemeralClientConfig {
+export interface ClientConfig {
     signer: WalletSigner;
-    rpcEndpoint: string;
-    wsEndpoint?: string;
+    baseRpcEndpoint: string;
+    baseWsEndpoint?: string;
+    ephemeralRpcEndpoint: string;
+    ephemeralWsEndpoint?: string;
     commitment?: Commitment;
+    authToken?: {
+        token: string;
+        expiresAt: number;
+    };
 }
 /**
  * Data structure for a user deposit account
@@ -39,7 +45,7 @@ export interface EphemeralClientConfig {
 export interface DepositData {
     user: PublicKey;
     tokenMint: PublicKey;
-    amount: number;
+    amount: bigint;
     address: PublicKey;
 }
 /**
@@ -48,7 +54,7 @@ export interface DepositData {
 export interface UsernameDepositData {
     username: string;
     tokenMint: PublicKey;
-    amount: number;
+    amount: bigint;
     address: PublicKey;
 }
 /**
@@ -56,6 +62,12 @@ export interface UsernameDepositData {
  */
 export interface InitializeDepositParams {
     user: PublicKey;
+    tokenMint: PublicKey;
+    payer: PublicKey;
+    rpcOptions?: RpcOptions;
+}
+export interface InitializeUsernameDepositParams {
+    username: string;
     tokenMint: PublicKey;
     payer: PublicKey;
     rpcOptions?: RpcOptions;
@@ -103,6 +115,14 @@ export interface ClaimUsernameDepositParams {
     session: PublicKey;
     rpcOptions?: RpcOptions;
 }
+export interface ClaimUsernameDepositToDepositParams {
+    username: string;
+    tokenMint: PublicKey;
+    amount: number | bigint;
+    recipient: PublicKey;
+    session: PublicKey;
+    rpcOptions?: RpcOptions;
+}
 /**
  * Parameters for creating a permission for a deposit
  */
@@ -130,7 +150,7 @@ export interface DelegateDepositParams {
     user: PublicKey;
     tokenMint: PublicKey;
     payer: PublicKey;
-    validator?: PublicKey;
+    validator: PublicKey;
     rpcOptions?: RpcOptions;
 }
 /**
@@ -139,9 +159,8 @@ export interface DelegateDepositParams {
 export interface DelegateUsernameDepositParams {
     username: string;
     tokenMint: PublicKey;
-    session: PublicKey;
     payer: PublicKey;
-    validator?: PublicKey;
+    validator: PublicKey;
     rpcOptions?: RpcOptions;
 }
 /**
@@ -191,6 +210,35 @@ export interface TransferToUsernameDepositParams {
     payer: PublicKey;
     sessionToken?: PublicKey | null;
     rpcOptions?: RpcOptions;
+}
+/**
+ * Delegation record from MagicBlock router
+ */
+export interface DelegationRecord {
+    authority: string;
+    owner: string;
+    delegationSlot: number;
+    lamports: number;
+}
+/**
+ * Response from MagicBlock getDelegationStatus RPC call
+ */
+export interface DelegationStatusResult {
+    isDelegated: boolean;
+    fqdn?: string;
+    delegationRecord: DelegationRecord;
+}
+/**
+ * Full JSON-RPC response for getDelegationStatus
+ */
+export interface DelegationStatusResponse {
+    jsonrpc: "2.0";
+    id: number | string;
+    result?: DelegationStatusResult;
+    error?: {
+        code: number;
+        message: string;
+    } | null;
 }
 /**
  * Check if signer is a raw Keypair

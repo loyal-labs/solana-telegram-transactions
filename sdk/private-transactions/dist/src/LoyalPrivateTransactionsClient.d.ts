@@ -1,7 +1,11 @@
-import { Connection, PublicKey, Keypair } from "@solana/web3.js";
-import { AnchorProvider, Program } from "@coral-xyz/anchor";
-import { type TelegramPrivateTransfer } from "./idl";
-import type { WalletSigner, WalletLike, EphemeralClientConfig, DepositData, UsernameDepositData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, DepositForUsernameParams, ClaimUsernameDepositParams, CreatePermissionParams, CreateUsernamePermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams, TransferDepositParams, TransferToUsernameDepositParams } from "./types";
+import { Connection, PublicKey } from "@solana/web3.js";
+import { Program } from "@coral-xyz/anchor";
+import type { TelegramPrivateTransfer } from "./idl/telegram_private_transfer.ts";
+import type { WalletLike, ClientConfig, DepositData, UsernameDepositData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, DepositForUsernameParams, ClaimUsernameDepositParams, CreatePermissionParams, CreateUsernamePermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams, TransferDepositParams, TransferToUsernameDepositParams, InitializeUsernameDepositParams, ClaimUsernameDepositToDepositParams } from "./types";
+export declare function waitForAccountOwnerChange(connection: Connection, account: PublicKey, expectedOwner: PublicKey, timeoutMs?: number, intervalMs?: number): {
+    wait: () => Promise<void>;
+    cancel: () => Promise<void>;
+};
 /**
  * LoyalPrivateTransactionsClient - SDK for interacting with the Telegram Private Transfer program
  * with MagicBlock PER (Private Ephemeral Rollups) support
@@ -30,34 +34,20 @@ import type { WalletSigner, WalletLike, EphemeralClientConfig, DepositData, User
  * await ephemeralClient.undelegateDeposit({ user, tokenMint, ... });
  */
 export declare class LoyalPrivateTransactionsClient {
-    private readonly program;
-    private readonly wallet;
+    readonly baseProgram: Program<TelegramPrivateTransfer>;
+    readonly ephemeralProgram: Program<TelegramPrivateTransfer>;
+    readonly wallet: WalletLike;
     private constructor();
     /**
-     * Create client from an AnchorProvider (for existing Anchor projects)
+     * Create client connected to an ephemeral rollup endpoint with PER auth token.
+     * Verifies TEE RPC integrity and obtains an auth token automatically.
      */
-    static fromProvider(provider: AnchorProvider): LoyalPrivateTransactionsClient;
-    /**
-     * Create client from any supported signer type
-     */
-    static from(connection: Connection, signer: WalletSigner): LoyalPrivateTransactionsClient;
-    /**
-     * Create client from a Connection and wallet adapter (for browser dApps)
-     */
-    static fromWallet(connection: Connection, wallet: WalletLike): LoyalPrivateTransactionsClient;
-    /**
-     * Create client from a Connection and Keypair (for server-side scripts)
-     */
-    static fromKeypair(connection: Connection, keypair: Keypair): LoyalPrivateTransactionsClient;
-    /**
-     * Create client connected to an ephemeral rollup endpoint
-     * Use this for executing transactions on the Private Ephemeral Rollup
-     */
-    static fromEphemeral(config: EphemeralClientConfig): Promise<LoyalPrivateTransactionsClient>;
+    static fromConfig(config: ClientConfig): Promise<LoyalPrivateTransactionsClient>;
     /**
      * Initialize a deposit account for a user and token mint
      */
     initializeDeposit(params: InitializeDepositParams): Promise<string>;
+    initializeUsernameDeposit(params: InitializeUsernameDepositParams): Promise<string>;
     /**
      * Modify the balance of a user's deposit account
      */
@@ -70,14 +60,15 @@ export declare class LoyalPrivateTransactionsClient {
      * Claim tokens from a username-based deposit
      */
     claimUsernameDeposit(params: ClaimUsernameDepositParams): Promise<string>;
+    claimUsernameDepositToDeposit(params: ClaimUsernameDepositToDepositParams): Promise<string>;
     /**
      * Create a permission for a deposit account (required for PER)
      */
-    createPermission(params: CreatePermissionParams): Promise<string>;
+    createPermission(params: CreatePermissionParams): Promise<string | null>;
     /**
      * Create a permission for a username-based deposit account
      */
-    createUsernamePermission(params: CreateUsernamePermissionParams): Promise<string>;
+    createUsernamePermission(params: CreateUsernamePermissionParams): Promise<string | null>;
     /**
      * Delegate a deposit account to the ephemeral rollup
      */
@@ -87,7 +78,9 @@ export declare class LoyalPrivateTransactionsClient {
      */
     delegateUsernameDeposit(params: DelegateUsernameDepositParams): Promise<string>;
     /**
-     * Undelegate a deposit account from the ephemeral rollup
+     * Undelegate a deposit account from the ephemeral rollup.
+     * Waits for both base and ephemeral connections to confirm the deposit
+     * is owned by PROGRAM_ID before returning.
      */
     undelegateDeposit(params: UndelegateDepositParams): Promise<string>;
     /**
@@ -105,11 +98,13 @@ export declare class LoyalPrivateTransactionsClient {
     /**
      * Get deposit data for a user and token mint
      */
-    getDeposit(user: PublicKey, tokenMint: PublicKey): Promise<DepositData | null>;
+    getBaseDeposit(user: PublicKey, tokenMint: PublicKey): Promise<DepositData | null>;
+    getEphemeralDeposit(user: PublicKey, tokenMint: PublicKey): Promise<DepositData | null>;
     /**
      * Get username deposit data
      */
-    getUsernameDeposit(username: string, tokenMint: PublicKey): Promise<UsernameDepositData | null>;
+    getBaseUsernameDeposit(username: string, tokenMint: PublicKey): Promise<UsernameDepositData | null>;
+    getEphemeralUsernameDeposit(username: string, tokenMint: PublicKey): Promise<UsernameDepositData | null>;
     /**
      * Find the deposit PDA for a user and token mint
      */
@@ -129,13 +124,16 @@ export declare class LoyalPrivateTransactionsClient {
     /**
      * Get the underlying Anchor program instance
      */
-    getProgram(): Program<TelegramPrivateTransfer>;
+    getBaseProgram(): Program<TelegramPrivateTransfer>;
+    getEphemeralProgram(): Program<TelegramPrivateTransfer>;
     /**
      * Get the program ID
      */
     getProgramId(): PublicKey;
     private validateUsername;
-    private buildRpcOptions;
     private permissionAccountExists;
     private isAccountAlreadyInUse;
+    private ensureNotDelegated;
+    private ensureDelegated;
+    private getDelegationStatus;
 }

@@ -36,14 +36,17 @@
  */
 
 // Main SDK class
-export { LoyalPrivateTransactionsClient } from "./src/LoyalPrivateTransactionsClient";
+export {
+  LoyalPrivateTransactionsClient,
+  waitForAccountOwnerChange,
+} from "./src/LoyalPrivateTransactionsClient";
 
 // Types
 export type {
   WalletSigner,
   WalletLike,
   RpcOptions,
-  EphemeralClientConfig,
+  ClientConfig,
   DepositData,
   UsernameDepositData,
   InitializeDepositParams,
@@ -59,6 +62,9 @@ export type {
   UndelegateUsernameDepositParams,
   TransferDepositParams,
   TransferToUsernameDepositParams,
+  DelegationRecord,
+  DelegationStatusResult,
+  DelegationStatusResponse,
 } from "./src/types";
 
 // Type guards
@@ -66,6 +72,7 @@ export { isKeypair, isAnchorProvider, isWalletLike } from "./src/types";
 
 // Constants
 export {
+  ER_VALIDATOR,
   PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
@@ -96,5 +103,6 @@ export {
 } from "./src/pda";
 
 // IDL (for advanced users)
-export { IDL } from "./src/idl";
-export type { TelegramPrivateTransfer } from "./src/idl";
+import idl from "./src/idl/telegram_private_transfer.json";
+export const IDL = idl;
+export type { TelegramPrivateTransfer } from "./src/idl/telegram_private_transfer.ts";
