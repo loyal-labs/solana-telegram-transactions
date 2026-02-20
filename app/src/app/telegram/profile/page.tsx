@@ -15,6 +15,7 @@ import {
   ChevronRight,
   CircleHelp,
   CirclePlus,
+  Copy,
   Fingerprint,
   Globe,
   Network,
@@ -222,6 +223,7 @@ export default function ProfilePage() {
       verifyTapCount.current = 0;
     }, VERIFY_TAP_TIMEOUT);
   }, [router]);
+  const [usernameCopied, setUsernameCopied] = useState(false);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [isImageError, setIsImageError] = useState(false);
   const [networkEnv, setNetworkEnv] = useState<SolanaEnv>(getSolanaEnv);
@@ -427,9 +429,31 @@ export default function ProfilePage() {
               {fullName}
             </p>
             {displayUsername && (
-              <p className="text-[17px] leading-[22px] text-[rgba(60,60,67,0.6)]">
-                {displayUsername}
-              </p>
+              <button
+                onClick={() => {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
+                  if (userData?.username && navigator?.clipboard?.writeText) {
+                    navigator.clipboard.writeText(userData.username);
+                    setUsernameCopied(true);
+                    setTimeout(() => setUsernameCopied(false), 2000);
+                    if (hapticFeedback.notificationOccurred.isAvailable()) {
+                      hapticFeedback.notificationOccurred("success");
+                    }
+                  }
+                }}
+                className="flex items-center gap-1 active:opacity-70 transition-opacity"
+              >
+                <Copy
+                  className="w-[18px] h-[18px]"
+                  strokeWidth={1.5}
+                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                />
+                <span className="text-[17px] leading-[22px] text-[rgba(60,60,67,0.6)]">
+                  {usernameCopied ? "Copied!" : displayUsername}
+                </span>
+              </button>
             )}
           </div>
         </div>
