@@ -237,7 +237,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!rawInitData) return;
     const endpoint = resolveEndpoint(
-      `api/telegram/settings?initData=${encodeURIComponent(rawInitData)}`,
+      `/api/telegram/settings?initData=${encodeURIComponent(rawInitData)}`,
     );
     fetch(endpoint)
       .then((res) => (res.ok ? res.json() : null))
@@ -453,7 +453,7 @@ export default function ProfilePage() {
                 onChange: (checked) => {
                   setBotNotifications(checked);
                   if (!rawInitData) return;
-                  const endpoint = resolveEndpoint("api/telegram/settings");
+                  const endpoint = resolveEndpoint("/api/telegram/settings");
                   fetch(endpoint, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },

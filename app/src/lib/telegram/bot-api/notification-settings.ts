@@ -12,6 +12,7 @@ import {
 } from "@/lib/core/schema";
 
 import { isMessageNotModifiedError } from "./callback-query-utils";
+import { replyWithAutoCleanup } from "./helper-message-cleanup";
 
 export const NOTIFICATION_SETTINGS_CALLBACK_PREFIX = "notif";
 export const NOTIFICATION_SETTINGS_CONTEXT = "settings";
@@ -125,7 +126,10 @@ export function buildNotificationSettingsKeyboard(
 ): InlineKeyboard {
   return new InlineKeyboard()
     .text(
-      renderButtonLabel("⏱ Off", community.summaryNotificationTimeHours === null),
+      renderButtonLabel(
+        "⏱ Off",
+        community.summaryNotificationTimeHours === null
+      ),
       encodeNotificationSettingsCallbackData({
         communityId: community.id,
         dimension: "time",
@@ -199,7 +203,7 @@ export async function sendNotificationSettingsMessage(
   ctx: CommandContext<Context>,
   community: NotificationSettingsState
 ): Promise<void> {
-  await ctx.reply(buildNotificationSettingsMessageText(), {
+  await replyWithAutoCleanup(ctx, buildNotificationSettingsMessageText(), {
     parse_mode: "HTML",
     reply_markup: buildNotificationSettingsKeyboard(community),
   });
@@ -208,7 +212,9 @@ export async function sendNotificationSettingsMessage(
 export async function handleNotificationSettingsCallback(
   ctx: CallbackQueryContext<Context>
 ): Promise<void> {
-  const callbackData = parseNotificationSettingsCallbackData(ctx.callbackQuery.data);
+  const callbackData = parseNotificationSettingsCallbackData(
+    ctx.callbackQuery.data
+  );
   if (!callbackData) {
     await ctx.answerCallbackQuery();
     return;

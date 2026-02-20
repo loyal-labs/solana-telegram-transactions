@@ -5,10 +5,7 @@ import {
   hapticFeedback,
   openTelegramLink,
   swipeBehavior,
-  useSignal,
-  viewport,
 } from "@telegram-apps/sdk-react";
-import type { Signal } from "@telegram-apps/signals";
 import { CheckCheck, MessageCircleWarning } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -20,6 +17,7 @@ import {
   useState,
 } from "react";
 
+import { useDeviceSafeAreaTop } from "@/hooks/useTelegramSafeArea";
 import {
   hideMainButton,
   showMainButton,
@@ -261,9 +259,7 @@ const EASE_OUT = "cubic-bezier(0.0, 0.0, 0.2, 1)";
 
 function DirectFeedContent() {
   const router = useRouter();
-  const safeAreaInsetTop = useSignal(
-    viewport.safeAreaInsetTop as Signal<number>
-  );
+  const safeAreaInsetTop = useDeviceSafeAreaTop();
   const headerHeight = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
 
   const searchParams = useSearchParams();
@@ -637,6 +633,7 @@ function DirectFeedContent() {
               {/* Avatar */}
               <div className="pr-3 py-1.5">
                 {nextChat.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={nextChat.avatarUrl}
                     alt={nextChat.title}
@@ -717,6 +714,7 @@ function DirectFeedContent() {
             {/* Avatar */}
             <div className="pr-3 py-1.5">
               {currentChat.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={currentChat.avatarUrl}
                   alt={currentChat.title}

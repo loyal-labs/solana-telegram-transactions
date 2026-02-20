@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  issues: write
   id-token: write
 
 jobs:
@@ -19,12 +20,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - uses: anthropics/claude-code-action@v1
+        id: doctor
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
@@ -53,4 +56,14 @@ jobs:
           claude_args: >-
             --model claude-sonnet-4-6
             --max-turns 5
-            --allowedTools Bash(npx*)
+            --allowedTools "Bash(npx*)"
+
+      - name: Post score to PR
+        if: always() && steps.doctor.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          jq -r '.[] | select(.type == "result") | .result // empty' /home/runner/work/_temp/claude-execution-output.json > /tmp/comment-body.md
+          if [ -s /tmp/comment-body.md ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/comment-body.md
+          fi

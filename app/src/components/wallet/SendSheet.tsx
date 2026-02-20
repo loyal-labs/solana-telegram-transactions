@@ -175,6 +175,14 @@ type LastAmount = {
   usd: number;
 };
 
+const getLastAmount = async (): Promise<LastAmount | null> => {
+  try {
+    const stored = await getCloudValue(LAST_AMOUNT_KEY);
+    if (stored && typeof stored === "string") return JSON.parse(stored);
+  } catch {}
+  return null;
+};
+
 const saveLastAmount = async (
   solAmount: number,
   solPriceUsd: number | null
@@ -351,6 +359,7 @@ export default function SendSheet({
   const [amountStr, setAmountStr] = useState("");
   const [recipient, setRecipient] = useState("");
   const [currency, setCurrency] = useState<"SOL" | "USD">("SOL");
+  const [, setLastAmount] = useState<LastAmount | null>(null);
   const [recentRecipients, setRecentRecipients] = useState<RecentRecipient[]>(
     []
   );
@@ -445,6 +454,7 @@ export default function SendSheet({
       setCurrency("SOL");
       setTokenSearchQuery("");
       setSelectedToken(null);
+      void getLastAmount().then(setLastAmount);
       void getRecentRecipients().then(setRecentRecipients);
     }
   }, [open, initialRecipient]);
@@ -1354,7 +1364,12 @@ export default function SendSheet({
                     const isSecured = selectedToken?.isSecured === true;
                     if (currency === "SOL") {
                       const maxVal = truncateDecimals(
-                        Math.max(0, isSecured ? balanceInSol : balanceInSol - SOLANA_FEE_SOL),
+                        Math.max(
+                          0,
+                          isSecured
+                            ? balanceInSol
+                            : balanceInSol - SOLANA_FEE_SOL
+                        ),
                         4
                       ).replace(/\.?0+$/, "");
                       handlePresetAmount(maxVal || "0");
@@ -1365,7 +1380,10 @@ export default function SendSheet({
                       const maxVal =
                         balanceInUsd !== null
                           ? truncateDecimals(
-                              Math.max(0, isSecured ? balanceInUsd : balanceInUsd - feeUsd),
+                              Math.max(
+                                0,
+                                isSecured ? balanceInUsd : balanceInUsd - feeUsd
+                              ),
                               2
                             ).replace(/\.?0+$/, "")
                           : "0";

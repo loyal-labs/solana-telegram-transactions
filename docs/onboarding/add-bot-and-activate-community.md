@@ -62,7 +62,8 @@ The webhook handles this by creating or updating the community row as:
 - `isActive = false`
 - `isPublic = false`
 
-The bot also sends a short onboarding message in chat with next steps.
+The bot also sends a short onboarding message in chat with next steps.  
+In community chats, this onboarding helper message is auto-cleaned after a short delay (typically within 1-2 minutes).
 
 ## Activate Community
 
@@ -140,5 +141,6 @@ After successful activation:
 ## Notes
 
 - Summary generation/delivery is scheduled via `/api/cron/summaries`, not immediate at activation time.
+- Helper message cleanup is handled by `/api/cron/telegram-helper-cleanup` (every minute) and uses the same `CRON_SECRET` bearer auth pattern.
 - Activation only enables tracking and eligibility for subsequent summary runs.
 - `/summary` and scheduled summary notifications both respect the community notification master switch.

@@ -119,3 +119,4 @@ export type InsertUser = typeof users.$inferInsert;
 | `businessConnections` | Telegram Business bot connections to user accounts                                     |
 | `botThreads`          | Bot conversation sessions (supports Telegram threaded messages)                        |
 | `botMessages`         | Individual encrypted messages within bot threads                                       |
+| `telegramHelperMessageCleanup` | Queue of helper/community bot messages scheduled for delayed deletion (idempotent by chat + message id) |

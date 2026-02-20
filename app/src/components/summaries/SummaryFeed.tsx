@@ -4,10 +4,7 @@ import {
   backButton,
   hapticFeedback,
   swipeBehavior,
-  useSignal,
-  viewport,
 } from "@telegram-apps/sdk-react";
-import type { Signal } from "@telegram-apps/signals";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -17,6 +14,7 @@ import {
   SUMMARY_SELECTION_SOURCES,
   type SummarySelectionSource,
 } from "@/app/telegram/summaries/summaries-analytics";
+import { useDeviceSafeAreaTop } from "@/hooks/useTelegramSafeArea";
 import { track } from "@/lib/core/analytics";
 
 import { getAvatarColor, getFirstLetter } from "./avatar-utils";
@@ -67,6 +65,7 @@ function SourceAvatars({ sources }: { sources: string[] }) {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center px-8 py-16">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/dogs/dog-green.png"
         alt=""
@@ -168,9 +167,7 @@ export default function SummaryFeed({
   groupTitle: initialGroupTitle,
 }: SummaryFeedProps) {
   const router = useRouter();
-  const safeAreaInsetTop = useSignal(
-    viewport.safeAreaInsetTop as Signal<number>
-  );
+  const safeAreaInsetTop = useDeviceSafeAreaTop();
   const topOffset = Math.max(safeAreaInsetTop || 0, 12) + 10 + 27 + 16;
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -658,6 +655,7 @@ export default function SummaryFeed({
         >
           {/* Avatar */}
           {groupPhoto ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={`data:${groupPhoto.mimeType};base64,${groupPhoto.base64}`}
               alt={groupTitle}

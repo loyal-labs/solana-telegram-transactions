@@ -1,5 +1,3 @@
-"use server";
-
 import { NextResponse } from "next/server";
 
 import { checkChatParticipation } from "@/lib/telegram/bot-api/check-chat-participation";

@@ -28,6 +28,14 @@ const eslintConfig = [
     rules: {
       "simple-import-sort/imports": "error",
       "simple-import-sort/exports": "error",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
     },
   },
   {
@@ -108,6 +116,12 @@ const eslintConfig = [
           ],
         },
       ],
+    },
+  },
+  {
+    files: ["src/app/api/og/**/*.tsx"],
+    rules: {
+      "@next/next/no-img-element": "off",
     },
   },
 ];

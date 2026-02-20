@@ -1,14 +1,12 @@
 "use client";
 
-import { useSignal, viewport } from "@telegram-apps/sdk-react";
-import type { Signal } from "@telegram-apps/signals";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+import { useDeviceSafeAreaTop } from "@/hooks/useTelegramSafeArea";
+
 export default function Header() {
-  const safeAreaInsetTop = useSignal(
-    viewport.safeAreaInsetTop as Signal<number>
-  );
+  const safeAreaInsetTop = useDeviceSafeAreaTop();
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {

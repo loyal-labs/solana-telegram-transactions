@@ -277,7 +277,9 @@ export const summaries = pgTable(
     oneliner: text("oneliner").notNull(),
     triggerType: text("trigger_type"),
     triggerKey: text("trigger_key"),
-    notificationSentAt: timestamp("notification_sent_at", { withTimezone: true }),
+    notificationSentAt: timestamp("notification_sent_at", {
+      withTimezone: true,
+    }),
     notificationClaimedAt: timestamp("notification_claimed_at", {
       withTimezone: true,
     }),
@@ -333,6 +335,32 @@ export const summaryVotes = pgTable(
     check(
       "summary_votes_action_check",
       sql`${table.action} IN ('LIKE', 'DISLIKE')`
+    ),
+  ]
+);
+
+/**
+ * Queue of helper bot messages scheduled for delayed deletion.
+ * Entries are consumed by a minutely cron worker.
+ */
+export const telegramHelperMessageCleanup = pgTable(
+  "telegram_helper_message_cleanup",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    chatId: bigint("chat_id", { mode: "bigint" }).notNull(),
+    messageId: integer("message_id").notNull(),
+    deleteAfter: timestamp("delete_after", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("telegram_helper_message_cleanup_delete_after_idx").on(
+      table.deleteAfter
+    ),
+    uniqueIndex("telegram_helper_message_cleanup_chat_message_uidx").on(
+      table.chatId,
+      table.messageId
     ),
   ]
 );
@@ -425,7 +453,10 @@ export const botMessages = pgTable(
   },
   (table) => [
     // Primary query: get thread messages in chronological order
-    index("bot_messages_thread_created_idx").on(table.threadId, table.createdAt),
+    index("bot_messages_thread_created_idx").on(
+      table.threadId,
+      table.createdAt
+    ),
     // Lookup by telegram message ID (for deduplication)
     index("bot_messages_telegram_id_idx").on(table.telegramMessageId),
   ]
@@ -553,6 +584,11 @@ export type InsertSummary = typeof summaries.$inferInsert;
 
 export type SummaryVote = typeof summaryVotes.$inferSelect;
 export type InsertSummaryVote = typeof summaryVotes.$inferInsert;
+
+export type TelegramHelperMessageCleanup =
+  typeof telegramHelperMessageCleanup.$inferSelect;
+export type InsertTelegramHelperMessageCleanup =
+  typeof telegramHelperMessageCleanup.$inferInsert;
 
 export type BusinessConnection = typeof businessConnections.$inferSelect;
 export type InsertBusinessConnection = typeof businessConnections.$inferInsert;

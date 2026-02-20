@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { getDatabase } from "@/lib/core/database";
-import { users } from "@/lib/core/schema";
+import { users, userSettings } from "@/lib/core/schema";
 import { captureTelegramProfilePhotoToCdn } from "@/lib/telegram/profile-photo-service";
 
 type KnownUser = {
@@ -56,6 +56,11 @@ async function backfillUserAvatar(
   return backfillPromise;
 }
 
+async function ensureUserSettingsForUserId(userId: string): Promise<void> {
+  const db = getDatabase();
+  await db.insert(userSettings).values({ userId }).onConflictDoNothing();
+}
+
 async function resolveOrCreateUser(
   telegramId: bigint,
   userData: {
@@ -74,6 +79,8 @@ async function resolveOrCreateUser(
   });
 
   if (existingUser) {
+    await ensureUserSettingsForUserId(existingUser.id);
+
     const hasAvatar = Boolean(existingUser.avatarUrl);
     knownUsers.set(telegramIdStr, {
       id: existingUser.id,
@@ -113,6 +120,8 @@ async function resolveOrCreateUser(
   if (!userRecord) {
     throw new Error(`Failed to resolve user ${telegramIdStr} after conflict`);
   }
+
+  await ensureUserSettingsForUserId(userRecord.id);
 
   const hasAvatar = Boolean(userRecord.avatarUrl);
   knownUsers.set(telegramIdStr, {

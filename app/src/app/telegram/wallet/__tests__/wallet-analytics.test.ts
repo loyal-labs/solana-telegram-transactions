@@ -23,6 +23,8 @@ describe("wallet analytics constants", () => {
       swapTokens: "Swap tokens",
       swapTokensFailed: "Swap tokens Failed",
       claimFunds: "Claim funds",
+      pressWalletBanner: 'Press "Wallet banner"',
+      closeWalletBanner: 'Close "Wallet banner"',
     });
   });
 

@@ -1,5 +1,3 @@
-"use server";
-
 import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
 import {
   createAssociatedTokenAccountInstruction,
@@ -332,7 +330,7 @@ const verifyInitDataGasless = async (
   return verifyResult.ok;
 };
 
-const claimDepositGasless = async (
+const _claimDepositGasless = async (
   provider: AnchorProvider,
   payerWallet: Wallet,
   verificationProgram: Program<TelegramVerification>,
@@ -375,7 +373,7 @@ const verifyAndClaimDeposit = async (
   processedInitDataBytes: Uint8Array,
   telegramSignatureBytes: Uint8Array,
   telegramPublicKeyBytes: Uint8Array,
-  perAuthToken?: string
+  _perAuthToken?: string
 ) => {
   if (amount <= 0) {
     throw new Error("Amount must be greater than 0");

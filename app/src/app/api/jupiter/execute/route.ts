@@ -1,5 +1,3 @@
-"use server";
-
 import { NextResponse } from "next/server";
 
 import { SWAP_ERRORS } from "@/lib/jupiter/constants";

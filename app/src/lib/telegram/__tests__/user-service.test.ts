@@ -97,6 +97,16 @@ describe("getOrCreateUser", () => {
     expect(userId).toBe("user-conflict");
     expect(findFirstCalls).toHaveLength(2);
     expect(insertReturningCallCount).toBe(1);
+    expect(insertCalls).toEqual([
+      {
+        telegramId: BigInt("2001"),
+        username: "user-conflict",
+        displayName: "User Conflict",
+      },
+      {
+        userId: "user-conflict",
+      },
+    ]);
   });
 
   test("backfills avatar URL for newly inserted user", async () => {
@@ -115,6 +125,16 @@ describe("getOrCreateUser", () => {
     expect(updateCalls[0]).toMatchObject({
       avatarUrl: "https://cdn.example.com/avatar.jpg",
     });
+    expect(insertCalls).toEqual([
+      {
+        telegramId: BigInt("2002"),
+        username: "user-new",
+        displayName: "User New",
+      },
+      {
+        userId: "user-new",
+      },
+    ]);
   });
 
   test("skips avatar capture for existing user with avatar URL", async () => {
@@ -136,6 +156,11 @@ describe("getOrCreateUser", () => {
     expect(second).toBe("user-has-avatar");
     expect(findFirstCalls).toHaveLength(1);
     expect(captureCalls).toHaveLength(0);
+    expect(insertCalls).toEqual([
+      {
+        userId: "user-has-avatar",
+      },
+    ]);
   });
 
   test("deduplicates concurrent get/create requests for the same user", async () => {
@@ -159,6 +184,15 @@ describe("getOrCreateUser", () => {
     expect(first).toBe("user-inflight");
     expect(second).toBe("user-inflight");
     expect(insertReturningCallCount).toBe(1);
+    expect(insertCalls).toEqual([
+      {
+        telegramId: BigInt("2004"),
+        username: "inflight",
+        displayName: "Inflight",
+      },
+      {
+        userId: "user-inflight",
+      },
+    ]);
   });
 });
-

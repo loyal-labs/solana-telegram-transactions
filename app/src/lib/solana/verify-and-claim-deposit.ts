@@ -13,6 +13,7 @@ import {
   waitForAccountOwnerChange,
 } from "@vladarbatov/private-transactions-test";
 
+// import { TelegramVerification } from "../../../../target/types/telegram_verification";
 import { resolveEndpoint } from "../core/api";
 import { claimDeposit } from "./deposits/claim-deposit";
 import { prettyStringify, waitForAccount } from "./deposits/loyal-deposits";
@@ -40,14 +41,14 @@ export const verifyAndClaimDeposit = async (
   }
   const verificationProgram = getTelegramVerificationProgram(provider);
 
-  await storeInitData(
+  const _sessionData = await storeInitData(
     provider,
     verificationProgram,
     recipient,
     processedInitDataBytes
   );
 
-  await verifyInitData(
+  const _verified = await verifyInitData(
     provider,
     wallet,
     recipient,

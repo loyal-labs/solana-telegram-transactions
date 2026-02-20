@@ -70,7 +70,7 @@ export default function DatePicker({
   onDateSelect,
 }: DatePickerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const availableDateSet = new Set(availableDates);
+  const availableDateSet = useMemo(() => new Set(availableDates), [availableDates]);
   const todayKey = getTodayKey();
 
   const latestDateWithData = useMemo(() => {
