@@ -250,22 +250,20 @@ describe("private-transactions SDK (PER)", () => {
             otherUserKp,
         );
 
-        ephemeralClientUser =
-            await LoyalPrivateTransactionsClient.fromEphemeral({
-                signer: userKp,
-                rpcEndpoint: privateEndpoint,
+        ephemeralClientUser = LoyalPrivateTransactionsClient.from(
+            new anchor.web3.Connection(privateEndpoint, {
                 wsEndpoint: privateWsEndpoint,
                 commitment,
-                useAuth: false,
-            });
-        ephemeralClientOther =
-            await LoyalPrivateTransactionsClient.fromEphemeral({
-                signer: otherUserKp,
-                rpcEndpoint: privateEndpoint,
+            }),
+            userKp,
+        );
+        ephemeralClientOther = LoyalPrivateTransactionsClient.from(
+            new anchor.web3.Connection(privateEndpoint, {
                 wsEndpoint: privateWsEndpoint,
                 commitment,
-                useAuth: false,
-            });
+            }),
+            otherUserKp,
+        );
         console.log(
             "[sdk-test] ephemeral user RPC",
             ephemeralClientUser.getProgram().provider.connection.rpcEndpoint,

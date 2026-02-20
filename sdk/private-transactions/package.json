@@ -1,6 +1,6 @@
 {
-  "name": "@vladarbatov/private-transactions-test",
-  "version": "0.1.1",
+  "name": "@loyal-labs/private-transactions",
+  "version": "0.2.0",
   "description": "SDK for Telegram-based private Solana deposits",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,7 +18,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "bun run build:js && bun run build:types",
-    "build:js": "bun build ./index.ts --outdir ./dist --target node --format esm --external @coral-xyz/anchor --external @solana/web3.js --external @solana/spl-token --external @magicblock-labs/ephemeral-rollups-sdk --external bn.js",
+    "build:js": "bun build ./index.ts --outdir ./dist --target browser --format esm --external @coral-xyz/anchor --external @solana/web3.js --external @solana/spl-token --external @magicblock-labs/ephemeral-rollups-sdk --external bn.js",
     "build:types": "tsc -p tsconfig.build.json",
     "prepublishOnly": "bun run build",
     "clean": "rm -rf dist",
@@ -38,13 +38,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/loyal/solana-telegram-transactions.git",
+    "url": "https://github.com/loyal/loyal-app.git",
     "directory": "sdk/private-transactions"
   },
   "bugs": {
-    "url": "https://github.com/loyal/solana-telegram-transactions/issues"
+    "url": "https://github.com/loyal/loyal-app/issues"
   },
-  "homepage": "https://github.com/loyal/solana-telegram-transactions/tree/main/sdk/private-transactions#readme",
+  "homepage": "https://github.com/loyal/loyal-app/tree/main/sdk/private-transactions#readme",
   "peerDependencies": {
     "@coral-xyz/anchor": "^0.32.0",
     "@magicblock-labs/ephemeral-rollups-sdk": "^0.8.5",
