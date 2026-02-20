@@ -136,7 +136,7 @@ export default function Home() {
   const [isTokensSheetOpen, setTokensSheetOpen] = useState(false);
   const [isTransactionDetailsSheetOpen, setTransactionDetailsSheetOpen] =
     useState(false);
-  const { walletAddress, setWalletAddress, isLoading } = useWalletInit();
+  const { walletAddress, setWalletAddress, isLoading, walletError, retryWalletInit } = useWalletInit();
   const { solBalanceLamports, setSolBalanceLamports, refreshBalance } = useWalletBalance(walletAddress);
   const { tokenHoldings, isHoldingsLoading, refreshTokenHoldings } = useTokenHoldings(walletAddress);
   const { walletTransactions, setWalletTransactions, isFetchingTransactions, loadWalletTransactions } = useWalletTransactions(walletAddress);
@@ -919,6 +919,8 @@ export default function Home() {
             balanceRef={balanceRef}
             walletAddress={walletAddress}
             isLoading={isLoading}
+            walletError={walletError}
+            onRetry={retryWalletInit}
             balanceBg={balanceBg}
             bgLoaded={bgLoaded}
             displayCurrency={displayCurrency}
