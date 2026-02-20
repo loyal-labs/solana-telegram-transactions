@@ -50,12 +50,17 @@ export function useWalletInit(): {
           setIsLoading(false);
           void getWalletBalance().then((freshBalance) => {
             setCachedWalletBalance(publicKeyBase58, freshBalance);
-            walletBalanceListeners.forEach((listener) => listener(freshBalance));
+            walletBalanceListeners.forEach((listener) =>
+              listener(freshBalance)
+            );
           });
         } else {
           // First load - need to fetch balance
           const balanceLamports = await getWalletBalance();
           setCachedWalletBalance(publicKeyBase58, balanceLamports);
+          walletBalanceListeners.forEach((listener) =>
+            listener(balanceLamports)
+          );
           setIsLoading(false);
         }
       } catch (error) {
