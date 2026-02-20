@@ -59,6 +59,7 @@ export function useWalletInit(): {
       } else {
         const balanceLamports = await getWalletBalance();
         setCachedWalletBalance(publicKeyBase58, balanceLamports);
+        walletBalanceListeners.forEach((listener) => listener(balanceLamports));
         setIsLoading(false);
       }
     } catch (error) {
