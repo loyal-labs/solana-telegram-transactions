@@ -5,6 +5,15 @@ import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  trackWalletBannerClose,
+  trackWalletBannerPress,
+} from "@/components/wallet/banner-analytics";
+import {
+  getCachedDismissedBannerIds,
+  loadDismissedBannerIds,
+  saveDismissedBannerIds,
+} from "@/components/wallet/banner-dismissals";
 import { setLoyalEmojiStatus } from "@/lib/telegram/mini-app/emoji-status";
 
 type Banner = {
@@ -18,6 +27,34 @@ type Banner = {
 const SWIPE_THRESHOLD = 50;
 const SLIDE_DURATION = 180;
 const AUTO_ROTATE_INTERVAL = 3000;
+
+type TrackedBannerConfig = {
+  id: string;
+  title: string;
+  cta: string;
+  image: string;
+  action: () => void;
+};
+
+const createTrackedBanner = ({
+  id,
+  title,
+  cta,
+  image,
+  action,
+}: TrackedBannerConfig): Banner => ({
+  id,
+  title,
+  cta,
+  image,
+  onPress: () => {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred("light");
+    }
+    trackWalletBannerPress(id);
+    action();
+  },
+});
 
 function BannerCard({
   banner,
@@ -89,55 +126,66 @@ export default function BannerCarousel({
   isMobilePlatform,
 }: BannerCarouselProps) {
   const router = useRouter();
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(
+    () => getCachedDismissedBannerIds() ?? new Set()
+  );
+
+  useEffect(() => {
+    if (getCachedDismissedBannerIds()) return;
+
+    let isCancelled = false;
+
+    const loadDismissed = async () => {
+      const ids = await loadDismissedBannerIds();
+      if (isCancelled) return;
+      setDismissedIds(ids);
+    };
+
+    void loadDismissed();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
 
   const allBanners = useMemo(() => {
     const list: Banner[] = [];
 
     if (isMobilePlatform) {
-      list.push({
+      list.push(createTrackedBanner({
         id: "home-screen",
         title: "Add App to Home Screen",
         cta: "Add",
         image: "/banners/banner1.png",
-        onPress: () => {
-          if (hapticFeedback.impactOccurred.isAvailable()) {
-            hapticFeedback.impactOccurred("light");
-          }
+        action: () => {
           if (addToHomeScreen.isAvailable()) {
             addToHomeScreen();
           } else {
             postEvent("web_app_add_to_home_screen");
           }
         },
-      });
+      }));
     }
 
-    list.push({
+    list.push(createTrackedBanner({
       id: "emoji-status",
       title: "Set Emoji Status",
       cta: "Set",
       image: "/banners/banner2.png",
-      onPress: () => {
-        if (hapticFeedback.impactOccurred.isAvailable()) {
-          hapticFeedback.impactOccurred("light");
-        }
+      action: () => {
         void setLoyalEmojiStatus();
       },
-    });
+    }));
 
-    list.push({
+    list.push(createTrackedBanner({
       id: "community-summary",
       title: "View Community Summary",
       cta: "View",
       image: "/banners/banner3.png",
-      onPress: () => {
-        if (hapticFeedback.impactOccurred.isAvailable()) {
-          hapticFeedback.impactOccurred("light");
-        }
+      action: () => {
         router.push("/telegram/summaries");
       },
-    });
+    }));
 
     return list;
   }, [isMobilePlatform]); // eslint-disable-line react-hooks/exhaustive-deps -- router is intentionally omitted: it's unstable (new ref each render) and callbacks only use router.push on click, which works from stale closures
@@ -284,7 +332,13 @@ export default function BannerCarousel({
       if (hapticFeedback.impactOccurred.isAvailable()) {
         hapticFeedback.impactOccurred("light");
       }
-      setDismissedIds((prev) => new Set(prev).add(id));
+      trackWalletBannerClose(id);
+      setDismissedIds((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        void saveDismissedBannerIds(next);
+        return next;
+      });
       setAutoRotate(false);
       // Adjust active index so we don't show an out-of-bounds slide
       setActiveIndex((prev) => {
@@ -293,7 +347,7 @@ export default function BannerCarousel({
         return prev >= remaining ? remaining - 1 : prev;
       });
     },
-    [banners],
+    [banners]
   );
 
   const banner = banners[activeIndex];
