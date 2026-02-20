@@ -12,8 +12,18 @@ import {
   setCloudValue,
 } from "../../telegram/mini-app/cloud-storage";
 
+export class CloudStorageUnavailableError extends Error {
+  constructor(message = "Cloud storage is unavailable. Please try again.") {
+    super(message);
+    this.name = "CloudStorageUnavailableError";
+  }
+}
+
 const PERSIST_RETRY_ATTEMPTS = 3;
 const PERSIST_RETRY_DELAY_MS = 120;
+
+const READ_RETRY_ATTEMPTS = 3;
+const READ_RETRY_DELAY_MS = 200;
 
 const serializeSecretKey = (secretKey: Uint8Array): string =>
   JSON.stringify(Array.from(secretKey));
@@ -36,22 +46,51 @@ const deserializeSecretKey = (storedSecretKey: string): Uint8Array | null => {
   }
 };
 
-const fetchStoredKeypairStrings =
-  async (): Promise<StoredKeypairStrings | null> => {
-    const stored = await getCloudValue([
-      PUBLIC_KEY_STORAGE_KEY,
-      SECRET_KEY_STORAGE_KEY,
-    ]);
+const fetchStoredKeypairStrings = async (): Promise<
+  StoredKeypairStrings | "not_found" | "unavailable"
+> => {
+  const stored = await getCloudValue([
+    PUBLIC_KEY_STORAGE_KEY,
+    SECRET_KEY_STORAGE_KEY,
+  ]);
 
-    if (!stored || typeof stored === "string") return null;
+  // null or wrong type = cloud storage didn't respond properly
+  if (!stored || typeof stored === "string") return "unavailable";
 
-    const publicKey = stored[PUBLIC_KEY_STORAGE_KEY];
-    const secretKey = stored[SECRET_KEY_STORAGE_KEY];
+  const publicKey = stored[PUBLIC_KEY_STORAGE_KEY];
+  const secretKey = stored[SECRET_KEY_STORAGE_KEY];
 
-    if (!publicKey || !secretKey) return null;
+  // Empty strings = keys genuinely don't exist (new user)
+  if (!publicKey || !secretKey) return "not_found";
 
-    return { publicKey, secretKey };
-  };
+  return { publicKey, secretKey };
+};
+
+const fetchStoredKeypairWithRetry = async (): Promise<
+  StoredKeypairStrings | "not_found"
+> => {
+  for (let attempt = 1; attempt <= READ_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      const result = await fetchStoredKeypairStrings();
+
+      // Definitive answers — no need to retry
+      if (result === "not_found") return "not_found";
+      if (result !== "unavailable") return result;
+
+      // "unavailable" — retry after delay
+      if (attempt < READ_RETRY_ATTEMPTS) {
+        await wait(READ_RETRY_DELAY_MS * attempt);
+      }
+    } catch {
+      // getCloudValue threw — retry
+      if (attempt < READ_RETRY_ATTEMPTS) {
+        await wait(READ_RETRY_DELAY_MS * attempt);
+      }
+    }
+  }
+
+  throw new CloudStorageUnavailableError();
+};
 
 const persistKeypair = async (keypair: Keypair): Promise<boolean> => {
   const publicKey = keypair.publicKey.toBase58();
@@ -109,13 +148,14 @@ const instantiateKeypair = (stored: StoredKeypairStrings): Keypair | null => {
 };
 
 export const ensureWalletKeypair = async (): Promise<WalletKeypairResult> => {
-  const storedStrings = await fetchStoredKeypairStrings();
+  const storedResult = await fetchStoredKeypairWithRetry();
 
-  if (storedStrings) {
-    const existing = instantiateKeypair(storedStrings);
+  if (storedResult !== "not_found") {
+    const existing = instantiateKeypair(storedResult);
     if (existing) {
       return { keypair: existing, isNew: false };
     }
+    // Keys exist but are corrupted — fall through to generate new
   }
 
   const generatedKeypair = Keypair.generate();

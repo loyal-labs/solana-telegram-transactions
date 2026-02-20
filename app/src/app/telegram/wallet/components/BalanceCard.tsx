@@ -2,7 +2,7 @@
 
 import NumberFlow from "@number-flow/react";
 import { hapticFeedback } from "@telegram-apps/sdk-react";
-import { Brush, Copy } from "lucide-react";
+import { Brush, Copy, RefreshCcw } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 
@@ -12,6 +12,8 @@ interface BalanceCardProps {
   balanceRef: React.RefObject<HTMLDivElement | null>;
   walletAddress: string | null;
   isLoading: boolean;
+  walletError: string | null;
+  onRetry: () => void;
   balanceBg: string | null;
   bgLoaded: boolean;
   displayCurrency: "USD" | "SOL";
@@ -27,6 +29,8 @@ export function BalanceCard({
   balanceRef,
   walletAddress,
   isLoading,
+  walletError,
+  onRetry,
   balanceBg,
   bgLoaded,
   displayCurrency,
@@ -79,8 +83,42 @@ export function BalanceCard({
 
         {/* Card content */}
         <div className="relative flex flex-col justify-between h-full p-4">
-          {/* Top: Wallet address */}
-          {isLoading || !walletAddress ? (
+          {walletError ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 py-2">
+              <p
+                className="text-[15px] leading-[20px] text-center px-4"
+                style={{ color: balanceBg ? "white" : "#1c1c1e" }}
+              >
+                {walletError}
+              </p>
+              <button
+                onClick={onRetry}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full active:scale-95 transition-transform"
+                style={{
+                  background: balanceBg
+                    ? "rgba(255, 255, 255, 0.2)"
+                    : "rgba(0, 0, 0, 0.06)",
+                }}
+              >
+                <RefreshCcw
+                  size={16}
+                  strokeWidth={2}
+                  style={{
+                    color: balanceBg ? "white" : "#1c1c1e",
+                  }}
+                />
+                <span
+                  className="text-[15px] font-medium"
+                  style={{ color: balanceBg ? "white" : "#1c1c1e" }}
+                >
+                  Retry
+                </span>
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Top: Wallet address */}
+              {isLoading || !walletAddress ? (
             <div className="flex items-center gap-1">
               <div className="w-4 h-4 bg-white/20 animate-pulse rounded" />
               <div className="w-24 h-5 bg-white/20 animate-pulse rounded" />
@@ -243,6 +281,8 @@ export function BalanceCard({
                 }}
               />
             </button>
+          )}
+            </>
           )}
         </div>
       </div>
