@@ -15,6 +15,8 @@ export const WALLET_ANALYTICS_EVENTS = {
   swapTokens: "Swap tokens",
   swapTokensFailed: "Swap tokens Failed",
   claimFunds: "Claim funds",
+  pressWalletBanner: 'Press "Wallet banner"',
+  closeWalletBanner: 'Close "Wallet banner"',
 } as const;
 
 export const SEND_METHODS = {
