@@ -3,6 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 import { NATIVE_SOL_DECIMALS, NATIVE_SOL_MINT } from "@/lib/constants";
 
 import { fetchJson } from "../../core/http";
+import { fetchLoyalDeposits } from "../deposits/loyal-deposits";
 import { getSolanaEnv } from "../rpc/connection";
 import {
   SECURE_DEVNET_RPC_URL,
@@ -142,6 +143,48 @@ async function fetchHoldingsFromHelius(
   return holdings;
 }
 
+// Fetch holdings from Helius and from Magic Block PER (Secure deposits)
+async function fetchCombinedHoldings(
+  rpcUrl: string,
+  publicKey: string
+): Promise<TokenHolding[]> {
+  const userPubkey = new PublicKey(publicKey);
+  const solMint = new PublicKey(NATIVE_SOL_MINT);
+
+  // Fetch token holdings and Secure SOL
+  const [holdingsFromHelius, loyalNativeDeposits] = await Promise.all([
+    fetchHoldingsFromHelius(rpcUrl, publicKey),
+    fetchLoyalDeposits(userPubkey, [solMint]),
+  ]);
+
+  // Fetch other Secure token deposits based on tokens in base chain
+  const tokenMints = holdingsFromHelius
+    .map((h) => new PublicKey(h.mint))
+    .filter((mint) => !mint.equals(solMint));
+  const loyalTokenDeposits = await fetchLoyalDeposits(userPubkey, tokenMints);
+
+  // FIXME: show Secure token holdings even if user don't have tokens on base chain
+  const securedHoldings: TokenHolding[] = [];
+  for (const [mint, amount] of [
+    ...loyalNativeDeposits,
+    ...loyalTokenDeposits,
+  ]) {
+    const mintStr = mint.toString();
+    const original = holdingsFromHelius.find((h) => h.mint === mintStr);
+    if (original) {
+      const securedBalance = amount / Math.pow(10, original.decimals);
+      securedHoldings.push({
+        ...original,
+        balance: securedBalance,
+        valueUsd: original.priceUsd ? securedBalance * original.priceUsd : null,
+        isSecured: true,
+      });
+    }
+  }
+
+  return [...holdingsFromHelius, ...securedHoldings];
+}
+
 export async function fetchTokenHoldings(
   publicKey: string,
   forceRefresh = false
@@ -183,7 +226,7 @@ export async function fetchTokenHoldings(
     return [];
   }
 
-  const loader = fetchHoldingsFromHelius(rpcUrl, publicKey).then((holdings) => {
+  const loader = fetchCombinedHoldings(rpcUrl, publicKey).then((holdings) => {
     holdingsCache.set(publicKey, { holdings, fetchedAt: Date.now() });
     return holdings;
   });

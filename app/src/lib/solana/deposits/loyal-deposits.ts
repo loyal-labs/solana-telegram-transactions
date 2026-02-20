@@ -112,17 +112,16 @@ export const subscribeToSecureBalance = async (
  */
 export async function fetchLoyalDeposits(
   userPublicKey: PublicKey,
-  tokenMints: string[]
-): Promise<Map<string, number>> {
+  tokenMints: PublicKey[]
+): Promise<Map<PublicKey, number>> {
   const privateClient = await getPrivateClient();
-  const deposits = new Map<string, number>();
+  const deposits = new Map<PublicKey, number>();
 
   const results = await Promise.allSettled(
     tokenMints.map(async (mint) => {
-      const mintPubkey = new PublicKey(mint);
       const deposit = await privateClient.getEphemeralDeposit(
         userPublicKey,
-        mintPubkey
+        mint
       );
       if (deposit && deposit.amount > 0) {
         deposits.set(mint, Number(deposit.amount));

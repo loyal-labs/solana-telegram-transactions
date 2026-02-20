@@ -7,6 +7,7 @@ import { track } from "@/lib/core/analytics";
 import { subscribeToDepositsWithUsername } from "@/lib/solana/deposits";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import {
+  prepareCloseWsolTxn,
   prepareStoreInitDataTxn,
   sendStoreInitDataTxn,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -121,6 +122,12 @@ export function useIncomingDeposits(params: {
           wallet
         );
 
+        const closeTx = await prepareCloseWsolTxn(
+          provider,
+          payerPublicKey,
+          wallet
+        );
+
         await sendStoreInitDataTxn(
           preparedStoreInitDataTxn,
           recipientPublicKey,
@@ -128,7 +135,8 @@ export function useIncomingDeposits(params: {
           amountLamports,
           validationBytes,
           signatureBytes,
-          TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
+          TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
+          closeTx ?? undefined
         );
 
         setIncomingTransactions((prev) =>

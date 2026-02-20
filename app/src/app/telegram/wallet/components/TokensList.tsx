@@ -3,7 +3,10 @@
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import Image from "next/image";
 
-import { resolveTokenIcon, type TokenHolding } from "@/lib/solana/token-holdings";
+import {
+  resolveTokenIcon,
+  type TokenHolding,
+} from "@/lib/solana/token-holdings";
 
 interface TokensListProps {
   tokenHoldings: TokenHolding[];
@@ -45,7 +48,7 @@ export function TokensList({
 
           return (
             <div
-              key={token.mint}
+              key={`${token.mint}${token.isSecured ? "-secure" : ""}`}
               className="flex items-center w-full overflow-hidden rounded-[20px] px-4 py-1"
               style={{ border: "2px solid #f2f2f7" }}
             >

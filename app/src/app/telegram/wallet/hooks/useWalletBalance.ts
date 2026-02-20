@@ -10,10 +10,7 @@ import {
   setCachedWalletBalance,
   walletBalanceListeners,
 } from "../wallet-cache";
-import {
-  MOCK_BALANCE_LAMPORTS,
-  USE_MOCK_DATA,
-} from "../wallet-mock-data";
+import { MOCK_BALANCE_LAMPORTS, USE_MOCK_DATA } from "../wallet-mock-data";
 
 export function useWalletBalance(walletAddress: string | null): {
   solBalanceLamports: number | null;
