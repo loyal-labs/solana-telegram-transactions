@@ -1,17 +1,17 @@
 import {
-  getAssociatedTokenAddressSync,
-  NATIVE_MINT,
-  TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
-import { PublicKey } from "@solana/web3.js";
-import {
   DELEGATION_PROGRAM_ID,
   ER_VALIDATOR,
   findDepositPda,
   LoyalPrivateTransactionsClient,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
-} from "@vladarbatov/private-transactions-test";
+} from "@loyal-labs/private-transactions";
+import {
+  getAssociatedTokenAddressSync,
+  NATIVE_MINT,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
 
 import { getWebsocketConnection } from "../rpc/connection";
 import { getWalletKeypair } from "../wallet/wallet-details";

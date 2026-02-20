@@ -1,19 +1,18 @@
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import {
-  createCloseAccountInstruction,
-  getAssociatedTokenAddress,
-  NATIVE_MINT,
-} from "@solana/spl-token";
-import { PublicKey, Transaction } from "@solana/web3.js";
-import {
   DELEGATION_PROGRAM_ID,
   ER_VALIDATOR,
   findDepositPda,
   findUsernameDepositPda,
   waitForAccountOwnerChange,
-} from "@vladarbatov/private-transactions-test";
+} from "@loyal-labs/private-transactions";
+import {
+  createCloseAccountInstruction,
+  getAssociatedTokenAddress,
+  NATIVE_MINT,
+} from "@solana/spl-token";
+import { PublicKey, Transaction } from "@solana/web3.js";
 
-// import { TelegramVerification } from "../../../../target/types/telegram_verification";
 import { resolveEndpoint } from "../core/api";
 import { claimDeposit } from "./deposits/claim-deposit";
 import { prettyStringify, waitForAccount } from "./deposits/loyal-deposits";

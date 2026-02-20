@@ -1,9 +1,9 @@
-import { PublicKey } from "@solana/web3.js";
 import {
   DELEGATION_PROGRAM_ID,
   ER_VALIDATOR,
   findDepositPda,
-} from "@vladarbatov/private-transactions-test";
+} from "@loyal-labs/private-transactions";
+import { PublicKey } from "@solana/web3.js";
 
 import { getWalletKeypair } from "../wallet/wallet-details";
 import { prettyStringify, waitForAccount } from "./loyal-deposits";

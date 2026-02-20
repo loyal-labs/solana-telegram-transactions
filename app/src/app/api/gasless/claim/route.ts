@@ -1,4 +1,5 @@
 import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
+import { LoyalPrivateTransactionsClient } from "@loyal-labs/private-transactions";
 import {
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddress,
@@ -11,7 +12,6 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { SYSVAR_INSTRUCTIONS_PUBKEY } from "@solana/web3.js";
-import { LoyalPrivateTransactionsClient } from "@vladarbatov/private-transactions-test";
 import { NextResponse } from "next/server";
 
 import { rpcEndpoint, websocketEndpoint } from "@/lib/solana/rpc/connection";

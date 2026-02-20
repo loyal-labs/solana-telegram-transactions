@@ -1,9 +1,9 @@
-import { NATIVE_MINT } from "@solana/spl-token";
-import { PublicKey } from "@solana/web3.js";
 import {
   findUsernameDepositPda,
   type UsernameDepositData,
-} from "@vladarbatov/private-transactions-test";
+} from "@loyal-labs/private-transactions";
+import { NATIVE_MINT } from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
 
 import type { TelegramDeposit } from "../../../types/deposits";
 import { getPrivateClient } from "./private-client";

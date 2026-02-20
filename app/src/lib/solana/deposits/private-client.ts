@@ -1,4 +1,4 @@
-import { LoyalPrivateTransactionsClient } from "@vladarbatov/private-transactions-test";
+import { LoyalPrivateTransactionsClient } from "@loyal-labs/private-transactions";
 
 import { getEndpoints, getSolanaEnv } from "../rpc/connection";
 import { PER_RPC_ENDPOINT, PER_WS_ENDPOINT } from "../rpc/constants";

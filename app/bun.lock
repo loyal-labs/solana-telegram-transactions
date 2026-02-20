@@ -10,6 +10,7 @@
         "@datadog/browser-logs": "^6.27.1",
         "@datadog/browser-rum": "^6.27.1",
         "@datadog/browser-rum-react": "^6.27.1",
+        "@loyal-labs/private-transactions": "^0.2.0",
         "@magicblock-labs/ephemeral-rollups-sdk": "^0.8.5",
         "@neondatabase/serverless": "^1.0.2",
         "@noble/ed25519": "^3.0.0",
@@ -20,7 +21,6 @@
         "@telegram-apps/sdk": "^3.11.8",
         "@telegram-apps/sdk-react": "^3.3.9",
         "@telegram-apps/telegram-ui": "^2.1.13",
-        "@vladarbatov/private-transactions-test": "^0.2.0",
         "@xelene/vaul-with-scroll-fix": "^0.1.4",
         "bs58": "^6.0.0",
         "class-variance-authority": "^0.7.1",
@@ -315,6 +315,8 @@
     "@kwsites/file-exists": ["@kwsites/file-exists@1.1.1", "", { "dependencies": { "debug": "^4.1.1" } }, "sha512-m9/5YGR18lIwxSFDwfE3oA7bWuq9kdau6ugN4H2rJeyhFQZcG9AgSHkQtSD15a8WvTgfz9aikZMrKPHvbpqFiw=="],
 
     "@kwsites/promise-deferred": ["@kwsites/promise-deferred@1.1.1", "", {}, "sha512-GaHYm+c0O9MjZRu0ongGBRbinu8gVAMd2UZjji6jVmqKtZluZnptXGWhz1E8j8D2HJ3f/yMxKAUC0b+57wncIw=="],
+
+    "@loyal-labs/private-transactions": ["@loyal-labs/private-transactions@0.2.0", "", { "dependencies": { "tweetnacl": "^1.0.3" }, "peerDependencies": { "@coral-xyz/anchor": "^0.32.0", "@magicblock-labs/ephemeral-rollups-sdk": "^0.8.5", "@solana/spl-token": "^0.4.14", "@solana/web3.js": "^1.95.0" } }, "sha512-8eQhvXuw3an2ffNac0nk0lRHxEC7tNXACkEz7HXm0CVnGjmsMMfephJ6uYREQkuRYpetIVop1A/2qT86kCqf3w=="],
 
     "@magicblock-labs/ephemeral-rollups-sdk": ["@magicblock-labs/ephemeral-rollups-sdk@0.8.5", "", { "dependencies": { "@phala/dcap-qvl-web": "^0.2.7", "@solana/spl-token": "^0.4.9", "@solana/web3.js": "^1.98.0", "bs58": "^6.0.0", "rpc-websockets": "^9.0.4", "typescript": "^5.3.0" } }, "sha512-W+k38iQ6XSllc4xV0kehTyWSx+j4juozfTxcA3tmZQD61lWzYm9n0m2iyclSxF/KEi3phUwF73Z0+ZE2aIpy1Q=="],
 
@@ -677,8 +679,6 @@
     "@unrs/resolver-binding-darwin-arm64": ["@unrs/resolver-binding-darwin-arm64@1.11.1", "", { "os": "darwin", "cpu": "arm64" }, ""],
 
     "@urql/core": ["@urql/core@6.0.1", "", { "dependencies": { "@0no-co/graphql.web": "^1.0.13", "wonka": "^6.3.2" } }, ""],
-
-    "@vladarbatov/private-transactions-test": ["@vladarbatov/private-transactions-test@0.2.0", "", { "dependencies": { "tweetnacl": "^1.0.3" }, "peerDependencies": { "@coral-xyz/anchor": "^0.32.0", "@magicblock-labs/ephemeral-rollups-sdk": "^0.8.5", "@solana/spl-token": "^0.4.14", "@solana/web3.js": "^1.95.0" } }, "sha512-s070IrDU/vloCCxuuAPcqIIAypO7SnK2FJWBc5HpvTzWhtcYMYpjSe6/NyudWG84aErDthcazCFFbOprswFWNA=="],
 
     "@wallet-standard/app": ["@wallet-standard/app@1.1.0", "", { "dependencies": { "@wallet-standard/base": "^1.1.0" } }, ""],
 
@@ -1606,7 +1606,7 @@
 
     "tween-functions": ["tween-functions@1.2.0", "", {}, "sha512-PZBtLYcCLtEcjL14Fzb1gSxPBeL7nWvGhO5ZFPGqziCcr8uvHp0NDmdjBchp6KHL+tExcg0m3NISmKxhU394dA=="],
 
-    "tweetnacl": ["tweetnacl@1.0.3", "", {}, ""],
+    "tweetnacl": ["tweetnacl@1.0.3", "", {}, "sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw=="],
 
     "typanion": ["typanion@3.14.0", "", {}, "sha512-ZW/lVMRabETuYCd9O9ZvMhAh8GslSqaUjxmK/JLPCh6l73CvLBiuXswj/+7LdnWOgYsQ130FqLzFz5aGT4I3Ug=="],
 
@@ -1820,8 +1820,6 @@
 
     "inquirer/chalk": ["chalk@4.1.2", "", { "dependencies": { "ansi-styles": "^4.1.0", "supports-color": "^7.1.0" } }, ""],
 
-    "is-bun-module/semver": ["semver@7.7.3", "", { "bin": "bin/semver.js" }, ""],
-
     "jayson/@types/node": ["@types/node@12.20.55", "", {}, ""],
 
     "jayson/@types/ws": ["@types/ws@7.4.7", "", { "dependencies": { "@types/node": "*" } }, ""],
@@ -1867,8 +1865,6 @@
     "safe-array-concat/isarray": ["isarray@2.0.5", "", {}, ""],
 
     "safe-push-apply/isarray": ["isarray@2.0.5", "", {}, ""],
-
-    "sharp/semver": ["semver@7.7.3", "", { "bin": "bin/semver.js" }, ""],
 
     "string-width/emoji-regex": ["emoji-regex@8.0.0", "", {}, ""],
 
