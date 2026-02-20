@@ -107,7 +107,7 @@ describe("ensureWalletKeypair", () => {
   test("throws CloudStorageUnavailableError after all retries return null", async () => {
     getCloudValueImpl = async () => null;
 
-    expect(ensureWalletKeypair()).rejects.toThrow(CloudStorageUnavailableError);
+    await expect(ensureWalletKeypair()).rejects.toThrow(CloudStorageUnavailableError);
   });
 
   test("retries when cloud storage throws, then succeeds", async () => {
@@ -132,7 +132,7 @@ describe("ensureWalletKeypair", () => {
       throw new Error("SDK not ready");
     };
 
-    expect(ensureWalletKeypair()).rejects.toThrow(CloudStorageUnavailableError);
+    await expect(ensureWalletKeypair()).rejects.toThrow(CloudStorageUnavailableError);
   });
 
   test("generates new keypair only when cloud storage returns empty strings on first attempt", async () => {
