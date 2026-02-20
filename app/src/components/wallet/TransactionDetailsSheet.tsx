@@ -154,6 +154,30 @@ export default function TransactionDetailsSheet({
   const isUnshieldTransaction = transaction?.transferType === "unshield";
   const isSecureOrUnshield = isSecureTransaction || isUnshieldTransaction;
 
+  // Resolve secure/unshield display data from tokenMint when explicit props are absent
+  const secureResolvedInfo =
+    isSecureOrUnshield && !secureTokenSymbol && transaction?.tokenMint
+      ? resolveTokenInfo(transaction.tokenMint, tokenHoldings)
+      : null;
+  const resolvedSecureSymbol =
+    secureTokenSymbol || secureResolvedInfo?.symbol || "?";
+  const resolvedSecureAmount =
+    secureAmount ??
+    (isSecureOrUnshield && transaction?.tokenAmount
+      ? parseFloat(transaction.tokenAmount)
+      : undefined);
+  const resolvedSecureAmountUsd =
+    secureAmountUsd ??
+    (() => {
+      if (resolvedSecureAmount == null || !transaction?.tokenMint) return undefined;
+      const holding = tokenHoldings.find(
+        (h) => h.mint === transaction.tokenMint
+      );
+      return holding?.priceUsd != null
+        ? resolvedSecureAmount * holding.priceUsd
+        : undefined;
+    })();
+
   // Deposit state for deposit_for_username transactions
   const [depositAmount, setDepositAmount] = useState<number | null>(null);
   const [isLoadingDeposit, setIsLoadingDeposit] = useState(false);
@@ -532,7 +556,7 @@ export default function TransactionDetailsSheet({
           ) : isSecureOrUnshield ? (
             <span className="text-[17px] font-semibold text-black leading-[22px]">
               {isSecureTransaction ? "Secure" : "Unshield"}{" "}
-              {secureTokenSymbol || "?"}
+              {resolvedSecureSymbol}
             </span>
           ) : (
             /* Header Pill for non-swap transactions */
@@ -823,13 +847,13 @@ export default function TransactionDetailsSheet({
                 <div className="flex flex-col items-center gap-1">
                   <div className="flex items-baseline gap-2">
                     <p className="text-[40px] font-semibold leading-[48px] text-black">
-                      {secureAmount?.toFixed(4).replace(/\.?0+$/, "") || "0"}
+                      {resolvedSecureAmount?.toFixed(4).replace(/\.?0+$/, "") || "0"}
                     </p>
                     <p
                       className="text-[28px] font-semibold leading-8 tracking-[0.4px]"
                       style={{ color: "rgba(60, 60, 67, 0.4)" }}
                     >
-                      {secureTokenSymbol || "?"}
+                      {resolvedSecureSymbol}
                     </p>
                   </div>
                   {/* USD Value */}
@@ -838,8 +862,8 @@ export default function TransactionDetailsSheet({
                     style={{ color: "rgba(60, 60, 67, 0.6)" }}
                   >
                     ≈
-                    {secureAmountUsd !== undefined
-                      ? `$${secureAmountUsd.toLocaleString("en-US", {
+                    {resolvedSecureAmountUsd !== undefined
+                      ? `$${resolvedSecureAmountUsd.toLocaleString("en-US", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}`

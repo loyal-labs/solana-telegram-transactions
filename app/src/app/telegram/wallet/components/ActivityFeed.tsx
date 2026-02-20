@@ -374,6 +374,28 @@ export function ActivityFeed({
 
               // Secure/Unshield transaction view
               if (isSecureOrUnshield) {
+                const secureHolding = transaction.tokenMint
+                  ? tokenHoldings.find(
+                      (h) => h.mint === transaction.tokenMint,
+                    )
+                  : undefined;
+                const secureIcon = transaction.secureTokenIcon
+                  || (transaction.tokenMint
+                    ? resolveTokenIcon({
+                        mint: transaction.tokenMint,
+                        imageUrl: secureHolding?.imageUrl,
+                      })
+                    : "/tokens/solana-sol-logo.png");
+                const secureSymbol =
+                  transaction.secureTokenSymbol ||
+                  secureHolding?.symbol ||
+                  "Token";
+                const secureAmount =
+                  transaction.secureAmount ??
+                  (transaction.tokenAmount
+                    ? parseFloat(transaction.tokenAmount)
+                    : null);
+
                 return (
                   <motion.button
                     key={transaction.id}
@@ -405,13 +427,8 @@ export function ActivityFeed({
                       <div className="w-12 h-12 relative">
                         <div className="absolute left-0 top-0 w-8 h-8 rounded-full overflow-hidden bg-[#f2f2f7]">
                           <Image
-                            src={
-                              transaction.secureTokenIcon ||
-                              "/tokens/solana-sol-logo.png"
-                            }
-                            alt={
-                              transaction.secureTokenSymbol || "Token"
-                            }
+                            src={secureIcon}
+                            alt={secureSymbol}
                             fill
                             className="object-cover"
                           />
@@ -446,18 +463,18 @@ export function ActivityFeed({
                         className="text-[13px] leading-4"
                         style={{ color: "rgba(60, 60, 67, 0.6)" }}
                       >
-                        {transaction.secureTokenSymbol || "Token"}
+                        {secureSymbol}
                       </p>
                     </div>
 
                     {/* Right - Value */}
                     <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
                       <p className="text-base leading-5 text-black">
-                        {transaction.secureAmount
-                          ? `${transaction.secureAmount.toLocaleString(
+                        {secureAmount != null
+                          ? `${secureAmount.toLocaleString(
                               "en-US",
                               { maximumFractionDigits: 4 },
-                            )} ${transaction.secureTokenSymbol || ""}`
+                            )} ${secureSymbol}`
                           : `${formatTransactionAmount(
                               transaction.amountLamports,
                             )} SOL`}
