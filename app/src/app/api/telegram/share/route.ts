@@ -11,7 +11,8 @@ const getPhotoUrl = (
   senderUsername: string,
   receiverUsername: string,
   solAmount: number,
-  usdAmount: number
+  usdAmount: number,
+  isSecure?: boolean
 ) => {
   const endpoint = resolveEndpoint("/api/og/share");
   const url = new URL(endpoint, requestUrl);
@@ -19,6 +20,7 @@ const getPhotoUrl = (
   url.searchParams.set("receiver", receiverUsername);
   url.searchParams.set("solAmount", solAmount.toString());
   url.searchParams.set("usdAmount", usdAmount.toString());
+  if (isSecure) url.searchParams.set("secure", "1");
   return url.toString();
 };
 
@@ -34,7 +36,8 @@ export async function POST(req: Request) {
 
     const bodyString = new TextDecoder().decode(body);
     const bodyJson = JSON.parse(bodyString);
-    const { rawInitData, receiverUsername, solAmount, usdAmount } = bodyJson;
+    const { rawInitData, receiverUsername, solAmount, usdAmount, isSecure } =
+      bodyJson;
     if (!rawInitData || !receiverUsername || !solAmount || !usdAmount) {
       return NextResponse.json(
         { error: "Invalid request body" },
@@ -82,7 +85,8 @@ export async function POST(req: Request) {
       senderUsername,
       receiverUsername,
       solAmount,
-      usdAmount
+      usdAmount,
+      isSecure
     );
 
     const preparedInlineMessage = await prepareInlineMessage(
@@ -90,7 +94,8 @@ export async function POST(req: Request) {
       photoUrl,
       senderUsername,
       receiverUsername,
-      solAmount
+      solAmount,
+      isSecure
     );
 
     return NextResponse.json({ msgId: preparedInlineMessage.id });
