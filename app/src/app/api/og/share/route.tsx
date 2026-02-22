@@ -32,6 +32,12 @@ const formatUsd = (value: string | null) => {
   })}`;
 };
 
+const truncateAddress = (value: string, maxLength = 12) => {
+  if (value.length <= maxLength) return value;
+  const side = Math.floor((maxLength - 1) / 2);
+  return `${value.slice(0, side)}…${value.slice(-side)}`;
+};
+
 const formatSol = (value: string | null) => {
   if (!value) return null;
   const parsed = Number(value);
@@ -45,8 +51,12 @@ const formatSol = (value: string | null) => {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const sender = searchParams.get("sender") || "@username";
-    const receiver = searchParams.get("receiver") || "2fKB…Nhtj";
+    const sender = truncateAddress(
+      searchParams.get("sender") || "@username"
+    );
+    const receiver = truncateAddress(
+      searchParams.get("receiver") || "2fKB…Nhtj"
+    );
     const solAmount = searchParams.get("solAmount");
     const usdAmount = searchParams.get("usdAmount");
 
