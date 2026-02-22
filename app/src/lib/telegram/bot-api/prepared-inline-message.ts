@@ -10,11 +10,13 @@ export const prepareInlineMessage = async (
   photoUrl: string,
   senderUsername: string,
   receiverUsername: string,
-  solAmount: number
+  solAmount: number,
+  isSecure?: boolean
 ): Promise<PreparedInlineMessage> => {
   const bot = await getBot();
   const invisibleUnicodeSymbol = String.fromCharCode(0x200b);
-  const text = `Hi ${receiverUsername}!\n\nYou received <b>${solAmount} SOL</b> from <b>${senderUsername}</b>.\n\nTap the button below the image to get your money!<a href="${photoUrl}">${invisibleUnicodeSymbol}</a>`;
+  const tokenLabel = isSecure ? "Secure SOL" : "SOL";
+  const text = `Hi ${receiverUsername}!\n\nYou received <b>${solAmount} ${tokenLabel}</b> from <b>${senderUsername}</b>.\n\nTap the button below the image to get your money!<a href="${photoUrl}">${invisibleUnicodeSymbol}</a>`;
   const buttonText = "CLICK HERE TO CLAIM";
 
   const keyboard = new InlineKeyboard()

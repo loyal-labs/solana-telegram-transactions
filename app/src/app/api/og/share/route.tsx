@@ -40,12 +40,13 @@ const truncateAddress = (value: string, maxLength = 12) => {
 
 const formatSol = (value: string | null) => {
   if (!value) return null;
+  const label = secure ? "Secure SOL" : "SOL";
   const parsed = Number(value);
-  if (Number.isNaN(parsed)) return `${value} SOL`;
+  if (Number.isNaN(parsed)) return `${value} ${label}`;
   return `+${parsed.toLocaleString("en-US", {
     minimumFractionDigits: 4,
     maximumFractionDigits: 4,
-  })} SOL`;
+  })} ${label}`;
 };
 
 export async function GET(request: Request) {
@@ -59,8 +60,9 @@ export async function GET(request: Request) {
     );
     const solAmount = searchParams.get("solAmount");
     const usdAmount = searchParams.get("usdAmount");
+    const secure = searchParams.get("secure") === "1";
 
-    const solText = formatSol(solAmount) || "+15.0988 SOL";
+    const solText = formatSol(solAmount, secure) || "+15.0988 SOL";
     const usdText = formatUsd(usdAmount) || "≈$2,869.77";
 
     const allText = `You receivedLoyal${solText}${usdText}FromTo${sender}${receiver}`;
