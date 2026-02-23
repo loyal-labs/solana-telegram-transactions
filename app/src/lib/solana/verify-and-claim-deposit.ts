@@ -17,13 +17,10 @@ import { resolveEndpoint } from "../core/api";
 import { claimDeposit } from "./deposits/claim-deposit";
 import { prettyStringify, waitForAccount } from "./deposits/loyal-deposits";
 import { getPrivateClient } from "./deposits/private-client";
-import {
-  getSessionPda,
-  getTelegramVerificationProgram,
-} from "./solana-helpers";
+import { getTelegramVerificationProgram } from "./solana-helpers";
 import { storeInitData, verifyInitData } from "./verification";
 import { storeInitDataGasless } from "./verification/store-init-data";
-import { getWalletKeypair, getWalletProvider } from "./wallet/wallet-details";
+import { getWalletKeypair } from "./wallet/wallet-details";
 
 export const verifyAndClaimDeposit = async (
   provider: AnchorProvider,
@@ -328,17 +325,40 @@ export const sendStoreInitDataTxn = async (
     );
   }
 
-  const provider = await getWalletProvider();
-  const verificationProgram = getTelegramVerificationProgram(provider);
-  const sessionPda = getSessionPda(recipientPubKey, verificationProgram);
-  // Claim tokens on client side
-  await claimTokens({
-    tokenMint: NATIVE_MINT,
-    amount,
-    username,
-    destination: recipientPubKey,
-    session: sessionPda,
-  });
+  const parsedResponse = (await response.json()) as {
+    success?: unknown;
+    claimTx?: unknown;
+    claimRpcEndpoint?: unknown;
+    closeTx?: unknown;
+    storeSignature?: unknown;
+    verifySignature?: unknown;
+  };
 
-  return response.json();
+  if (typeof parsedResponse.claimTx !== "string" || !parsedResponse.claimTx) {
+    throw new Error("Gasless claim transaction is missing in API response");
+  }
+  if (
+    typeof parsedResponse.claimRpcEndpoint !== "string" ||
+    !parsedResponse.claimRpcEndpoint
+  ) {
+    throw new Error("Gasless claim RPC endpoint is missing in API response");
+  }
+
+  return {
+    success: parsedResponse.success === true,
+    claimTx: parsedResponse.claimTx,
+    claimRpcEndpoint: parsedResponse.claimRpcEndpoint,
+    closeTx:
+      typeof parsedResponse.closeTx === "string"
+        ? parsedResponse.closeTx
+        : undefined,
+    storeSignature:
+      typeof parsedResponse.storeSignature === "string"
+        ? parsedResponse.storeSignature
+        : undefined,
+    verifySignature:
+      typeof parsedResponse.verifySignature === "string"
+        ? parsedResponse.verifySignature
+        : undefined,
+  };
 };

@@ -1,3 +1,8 @@
+import {
+  Connection,
+  Transaction,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -10,8 +15,6 @@ import {
   prepareCloseWsolTxn,
   prepareStoreInitDataTxn,
   sendStoreInitDataTxn,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  verifyAndClaimDeposit,
 } from "@/lib/solana/verify-and-claim-deposit";
 import {
   getGaslessPublicKey,
@@ -39,6 +42,42 @@ import {
   setCachedIncomingTransactions,
 } from "../wallet-cache";
 import { USE_MOCK_DATA } from "../wallet-mock-data";
+
+const deserializeTransaction = (
+  serializedTx: string
+): Transaction | VersionedTransaction => {
+  const buffer = Buffer.from(serializedTx, "base64");
+  try {
+    return VersionedTransaction.deserialize(buffer);
+  } catch {
+    return Transaction.from(buffer);
+  }
+};
+
+const connectionCache = new Map<string, Connection>();
+
+const getConnectionForEndpoint = (rpcEndpoint: string): Connection => {
+  const cached = connectionCache.get(rpcEndpoint);
+  if (cached) {
+    return cached;
+  }
+  const connection = new Connection(rpcEndpoint, { commitment: "confirmed" });
+  connectionCache.set(rpcEndpoint, connection);
+  return connection;
+};
+
+const sendSerializedTransaction = async (
+  rpcEndpoint: string,
+  serializedTx: string
+) => {
+  const connection = getConnectionForEndpoint(rpcEndpoint);
+  const transaction = deserializeTransaction(serializedTx);
+  const signature = await connection.sendRawTransaction(transaction.serialize(), {
+    skipPreflight: false,
+  });
+  await connection.confirmTransaction(signature, "confirmed");
+  return signature;
+};
 
 export function useIncomingDeposits(params: {
   rawInitData: string | undefined;
@@ -128,7 +167,7 @@ export function useIncomingDeposits(params: {
           wallet
         );
 
-        await sendStoreInitDataTxn(
+        const gaslessClaimResponse = await sendStoreInitDataTxn(
           preparedStoreInitDataTxn,
           recipientPublicKey,
           username,
@@ -138,6 +177,22 @@ export function useIncomingDeposits(params: {
           TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
           closeTx ?? undefined
         );
+
+        await sendSerializedTransaction(
+          gaslessClaimResponse.claimRpcEndpoint,
+          gaslessClaimResponse.claimTx
+        );
+
+        if (gaslessClaimResponse.closeTx) {
+          try {
+            await sendSerializedTransaction(
+              provider.connection.rpcEndpoint,
+              gaslessClaimResponse.closeTx
+            );
+          } catch (closeError) {
+            console.warn("Failed to close WSOL ATA after claim", closeError);
+          }
+        }
 
         setIncomingTransactions((prev) =>
           prev.filter((tx) => tx.id !== transactionId)

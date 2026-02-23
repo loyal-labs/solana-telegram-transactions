@@ -1,9 +1,13 @@
-import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
-import { LoyalPrivateTransactionsClient } from "@loyal-labs/private-transactions";
+import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
 import {
-  createAssociatedTokenAccountInstruction,
-  getAssociatedTokenAddress,
+  DELEGATION_PROGRAM_ID,
+  findDepositPda,
+  findUsernameDepositPda,
+  LoyalPrivateTransactionsClient,
+} from "@loyal-labs/private-transactions";
+import {
   NATIVE_MINT,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import {
   Ed25519Program,
@@ -243,51 +247,6 @@ const sendSignedTransaction = async (
   }
 };
 
-const ensureRecipientTokenAccount = async (
-  provider: AnchorProvider,
-  payerWallet: Wallet,
-  recipientPubKey: PublicKey
-): Promise<PublicKey> => {
-  const recipientTokenAccount = await getAssociatedTokenAddress(
-    NATIVE_MINT,
-    recipientPubKey
-  );
-
-  const ataInfo = await provider.connection.getAccountInfo(
-    recipientTokenAccount
-  );
-  if (ataInfo) {
-    return recipientTokenAccount;
-  }
-
-  const createAtaTx = new Transaction().add(
-    createAssociatedTokenAccountInstruction(
-      payerWallet.publicKey,
-      recipientTokenAccount,
-      recipientPubKey,
-      NATIVE_MINT
-    )
-  );
-  const { blockhash, lastValidBlockHeight } =
-    await provider.connection.getLatestBlockhash();
-  createAtaTx.feePayer = payerWallet.publicKey;
-  createAtaTx.recentBlockhash = blockhash;
-  createAtaTx.lastValidBlockHeight = lastValidBlockHeight;
-
-  const created = await sendSignedTransaction(
-    provider,
-    createAtaTx,
-    payerWallet
-  );
-  if (!created.ok) {
-    throw new Error(
-      `Failed to create recipient token account: ${created.message}`
-    );
-  }
-
-  return recipientTokenAccount;
-};
-
 const verifyInitDataGasless = async (
   provider: AnchorProvider,
   verificationProgram: Program<TelegramVerification>,
@@ -296,7 +255,7 @@ const verifyInitDataGasless = async (
   telegramPublicKeyBytes: Uint8Array,
   telegramSignatureBytes: Uint8Array,
   processedInitDataBytes: Uint8Array
-): Promise<boolean> => {
+): Promise<TransactionSendResult> => {
   const sessionPda = getSessionPda(recipientPubKey, verificationProgram);
   const payerPubKey = payerWallet.publicKey;
   const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
@@ -322,15 +281,43 @@ const verifyInitDataGasless = async (
   verifyTx.recentBlockhash = blockhash;
   verifyTx.lastValidBlockHeight = lastValidBlockHeight;
 
-  const verifyResult = await sendSignedTransaction(
-    provider,
-    verifyTx,
-    payerWallet
-  );
-  return verifyResult.ok;
+  return sendSignedTransaction(provider, verifyTx, payerWallet);
 };
 
-const _claimDepositGasless = async (
+class ClaimPreconditionError extends Error {}
+
+const ensureDelegatedAccount = async (
+  provider: AnchorProvider,
+  account: PublicKey,
+  name: string
+) => {
+  const info = await provider.connection.getAccountInfo(account);
+  if (!info) {
+    throw new ClaimPreconditionError(
+      `${name} account does not exist: ${account.toBase58()}`
+    );
+  }
+  if (!info.owner.equals(DELEGATION_PROGRAM_ID)) {
+    throw new ClaimPreconditionError(
+      `${name} account is not delegated: ${account.toBase58()}`
+    );
+  }
+};
+
+const ensureAccountExists = async (
+  provider: AnchorProvider,
+  account: PublicKey,
+  name: string
+) => {
+  const info = await provider.connection.getAccountInfo(account);
+  if (!info) {
+    throw new ClaimPreconditionError(
+      `${name} account does not exist: ${account.toBase58()}`
+    );
+  }
+};
+
+const buildClaimDepositToDepositTxGasless = async (
   provider: AnchorProvider,
   payerWallet: Wallet,
   verificationProgram: Program<TelegramVerification>,
@@ -338,33 +325,56 @@ const _claimDepositGasless = async (
   amount: number,
   username: string,
   perAuthToken?: string
-): Promise<boolean> => {
-  try {
-    const privateClient = await getPrivateClient(perAuthToken);
-    const sessionPda = getSessionPda(recipientPubKey, verificationProgram);
-    const recipientTokenAccount = await ensureRecipientTokenAccount(
+): Promise<{ claimTransaction: Transaction; claimRpcEndpoint: string }> => {
+  const privateClient = await getPrivateClient(perAuthToken);
+  const ephemeralConnection =
+    privateClient.getEphemeralProgram().provider.connection;
+  const sessionPda = getSessionPda(recipientPubKey, verificationProgram);
+  const [sourceUsernameDeposit] = findUsernameDepositPda(username, NATIVE_MINT);
+  const [destinationDeposit] = findDepositPda(recipientPubKey, NATIVE_MINT);
+
+  await Promise.all([
+    ensureDelegatedAccount(
       provider,
-      payerWallet,
-      recipientPubKey
-    );
+      sourceUsernameDeposit,
+      "Source username deposit"
+    ),
+    ensureDelegatedAccount(
+      provider,
+      destinationDeposit,
+      "Destination deposit"
+    ),
+    ensureAccountExists(provider, sessionPda, "Telegram session"),
+  ]);
 
-    await privateClient.claimUsernameDeposit({
-      username,
+  const claimTx = await privateClient
+    .getEphemeralProgram()
+    .methods.claimUsernameDepositToDeposit(new BN(amount.toString()))
+    .accountsPartial({
+      user: recipientPubKey,
+      sourceUsernameDeposit,
+      destinationDeposit,
       tokenMint: NATIVE_MINT,
-      amount,
-      recipient: recipientPubKey,
-      recipientTokenAccount,
       session: sessionPda,
-    });
-  } catch (error) {
-    console.error("Error:", error);
-    return false;
-  }
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+    .transaction();
 
-  return true;
+  const { blockhash, lastValidBlockHeight } =
+    await ephemeralConnection.getLatestBlockhash();
+  claimTx.feePayer = payerWallet.publicKey;
+  claimTx.recentBlockhash = blockhash;
+  claimTx.lastValidBlockHeight = lastValidBlockHeight;
+
+  await payerWallet.signTransaction(claimTx);
+
+  return {
+    claimTransaction: claimTx,
+    claimRpcEndpoint: ephemeralConnection.rpcEndpoint,
+  };
 };
 
-const verifyAndClaimDeposit = async (
+const verifyAndBuildClaimTransaction = async (
   provider: AnchorProvider,
   payerWallet: Wallet,
   recipient: PublicKey,
@@ -373,7 +383,7 @@ const verifyAndClaimDeposit = async (
   processedInitDataBytes: Uint8Array,
   telegramSignatureBytes: Uint8Array,
   telegramPublicKeyBytes: Uint8Array,
-  _perAuthToken?: string
+  perAuthToken?: string
 ) => {
   if (amount <= 0) {
     throw new Error("Amount must be greater than 0");
@@ -381,7 +391,7 @@ const verifyAndClaimDeposit = async (
 
   const verificationProgram = getTelegramVerificationProgram(provider);
 
-  const verified = await verifyInitDataGasless(
+  const verifyResult = await verifyInitDataGasless(
     provider,
     verificationProgram,
     payerWallet,
@@ -390,24 +400,43 @@ const verifyAndClaimDeposit = async (
     telegramSignatureBytes,
     processedInitDataBytes
   );
-  if (!verified) {
-    return false;
+  if (!verifyResult.ok) {
+    throw new Error(`Failed to verify init data: ${verifyResult.message}`);
   }
 
-  // FIXME: `claimUsernameDeposit` is not working with PER, create gasless claim for PER
-  // NOTE: we do send this transaction from other keypair and get 403 Auth error from MagicBlock
-  // const claimed = await claimDepositGasless(
-  //   provider,
-  //   payerWallet,
-  //   verificationProgram,
-  //   recipient,
-  //   amount,
-  //   username,
-  //   perAuthToken
-  // );
-  const claimed = true;
+  const claimBuildResult = await buildClaimDepositToDepositTxGasless(
+    provider,
+    payerWallet,
+    verificationProgram,
+    recipient,
+    amount,
+    username,
+    perAuthToken
+  );
 
-  return claimed;
+  return {
+    verifySignature: verifyResult.signature,
+    claimTransaction: claimBuildResult.claimTransaction,
+    claimRpcEndpoint: claimBuildResult.claimRpcEndpoint,
+  };
+};
+
+const serializeTransactionBase64 = (
+  transaction: Transaction | VersionedTransaction
+): string => {
+  if (transaction instanceof VersionedTransaction) {
+    return Buffer.from(transaction.serialize()).toString("base64");
+  }
+  return transaction
+    .serialize({ requireAllSignatures: false })
+    .toString("base64");
+};
+
+const signTransactionWithoutSending = async (
+  transaction: Transaction | VersionedTransaction,
+  payerWallet: Wallet
+) => {
+  await payerWallet.signTransaction(transaction);
 };
 
 export async function POST(req: Request) {
@@ -536,44 +565,61 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await verifyAndClaimDeposit(
-      provider,
-      payerWallet,
-      parsedRecipient,
-      username,
-      parsedAmount,
-      processedInitData,
-      telegramSignature,
-      telegramPublicKey,
-      typeof bodyJson.perAuthToken === "string"
-        ? bodyJson.perAuthToken
-        : undefined
-    );
-    if (!result) {
-      return NextResponse.json(
-        { error: "Failed to claim deposit" },
-        { status: 500 }
+    let verifyAndClaimResult: {
+      verifySignature: string;
+      claimTransaction: Transaction;
+      claimRpcEndpoint: string;
+    };
+    try {
+      verifyAndClaimResult = await verifyAndBuildClaimTransaction(
+        provider,
+        payerWallet,
+        parsedRecipient,
+        username,
+        parsedAmount,
+        processedInitData,
+        telegramSignature,
+        telegramPublicKey,
+        typeof bodyJson.perAuthToken === "string"
+          ? bodyJson.perAuthToken
+          : undefined
       );
+    } catch (error) {
+      if (error instanceof ClaimPreconditionError) {
+        return NextResponse.json(
+          { error: "Claim precondition failed", details: error.message },
+          { status: 409 }
+        );
+      }
+      throw error;
     }
 
+    let serializedCloseTx: string | undefined;
     if (parsedCloseTx) {
-      const closeResult = await sendSignedTransaction(
-        provider,
-        parsedCloseTx,
-        payerWallet
-      );
-      if (!closeResult.ok) {
+      try {
+        await signTransactionWithoutSending(parsedCloseTx, payerWallet);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to sign close tx";
         return NextResponse.json(
           {
-            error: "Failed to unwrap SOL",
-            details: closeResult.message,
+            error: "Failed to sign close tx",
+            details: message,
           },
           { status: 500 }
         );
       }
+      serializedCloseTx = serializeTransactionBase64(parsedCloseTx);
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      claimTx: serializeTransactionBase64(verifyAndClaimResult.claimTransaction),
+      claimRpcEndpoint: verifyAndClaimResult.claimRpcEndpoint,
+      closeTx: serializedCloseTx,
+      storeSignature: storeResult.signature,
+      verifySignature: verifyAndClaimResult.verifySignature,
+    });
   } catch (error) {
     console.error("[gasless][claim] failed to claim deposit", error);
     return NextResponse.json(
