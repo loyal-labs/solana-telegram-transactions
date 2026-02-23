@@ -1,9 +1,22 @@
 import { datadogLogs } from "@datadog/browser-logs";
+import type { RumErrorEvent } from "@datadog/browser-rum";
 import { datadogRum } from "@datadog/browser-rum";
 import { reactPlugin } from "@datadog/browser-rum-react";
 
 import { publicEnv } from "@/lib/core/config/public";
 import type { TelegramIdentity } from "@/lib/telegram/mini-app/init-data-transform";
+
+declare global {
+  interface Window {
+    __dd_early_errors?: {
+      message: string;
+      source?: string;
+      lineno?: number;
+      colno?: number;
+      timestamp: number;
+    }[];
+  }
+}
 
 function getDatadogEnv(): string {
   const branch = publicEnv.gitBranch;
@@ -22,6 +35,48 @@ const sharedConfig = {
   version: publicEnv.gitCommitHash,
 } as const;
 
+/**
+ * Drop opaque "Script error." events that carry no actionable info.
+ * These are produced by cross-origin script failures (Same-Origin Policy)
+ * and are especially common in Telegram WebViews on Android.
+ */
+function isOpaqueScriptError(event: RumErrorEvent): boolean {
+  const msg = event.error.message;
+  return msg === "Script error." || msg === "Script error";
+}
+
+/**
+ * Install a global error handler BEFORE Datadog SDK loads so we can
+ * capture real error details that the browser would otherwise mask as
+ * "Script error." for cross-origin scripts.
+ */
+function installEarlyErrorCatcher() {
+  if (typeof window === "undefined") return;
+  if (window.__dd_early_errors) return;
+
+  const earlyErrors: NonNullable<typeof window.__dd_early_errors> = [];
+  window.__dd_early_errors = earlyErrors;
+
+  const originalOnError = window.onerror;
+  window.onerror = (message, source, lineno, colno, error) => {
+    const msg = typeof message === "string" ? message : String(message);
+    // Only capture non-opaque errors (ones with real info)
+    if (msg !== "Script error." && msg !== "Script error") {
+      earlyErrors.push({
+        message: error?.stack ?? msg,
+        source: source ?? undefined,
+        lineno: lineno ?? undefined,
+        colno: colno ?? undefined,
+        timestamp: Date.now(),
+      });
+    }
+    if (originalOnError) {
+      return originalOnError.call(window, message, source, lineno, colno, error);
+    }
+    return false;
+  };
+}
+
 let initialized = false;
 
 export function initDatadog() {
@@ -31,6 +86,8 @@ export function initDatadog() {
     const { hostname } = window.location;
     if (hostname === "localhost" || hostname === "127.0.0.1") return;
   }
+
+  installEarlyErrorCatcher();
 
   initialized = true;
 
@@ -44,6 +101,12 @@ export function initDatadog() {
     trackLongTasks: true,
     defaultPrivacyLevel: "mask-user-input",
     plugins: [reactPlugin({ router: false })],
+    beforeSend(event) {
+      if (event.type === "error" && isOpaqueScriptError(event as RumErrorEvent)) {
+        return false;
+      }
+      return true;
+    },
   });
 
   datadogLogs.init({
@@ -52,7 +115,27 @@ export function initDatadog() {
     forwardErrorsToLogs: true,
     forwardConsoleLogs: ["warn", "error"],
     forwardReports: "all",
+    beforeSend(event) {
+      if (event.message === "Script error." || event.message === "Script error") {
+        return false;
+      }
+      return true;
+    },
   });
+
+  // Forward any real errors captured before DD SDK initialized
+  if (window.__dd_early_errors?.length) {
+    for (const err of window.__dd_early_errors) {
+      datadogLogs.logger.error("Early boot error", {
+        message: err.message,
+        source: err.source,
+        lineno: err.lineno,
+        colno: err.colno,
+        capturedAt: err.timestamp,
+      });
+    }
+    window.__dd_early_errors = [];
+  }
 }
 
 export function identifyDatadogUser(identity: TelegramIdentity): void {
