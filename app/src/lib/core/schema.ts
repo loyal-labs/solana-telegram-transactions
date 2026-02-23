@@ -462,6 +462,30 @@ export const botMessages = pgTable(
   ]
 );
 
+/**
+ * Push notification tokens for mobile app users.
+ * Stores Expo push tokens linked to Telegram user IDs.
+ */
+export const pushTokens = pgTable(
+  "push_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    token: text("token").notNull(),
+    telegramUserId: bigint("telegram_user_id", { mode: "bigint" }).notNull(),
+    platform: text("platform").notNull(), // "ios" | "android"
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("push_tokens_token_unique").on(table.token),
+    index("push_tokens_telegram_user_id_idx").on(table.telegramUserId),
+  ]
+);
+
 // ============================================================================
 // RELATIONS (for type-safe queries with Drizzle)
 // ============================================================================
@@ -598,5 +622,8 @@ export type InsertBotThread = typeof botThreads.$inferInsert;
 
 export type BotMessage = typeof botMessages.$inferSelect;
 export type InsertBotMessage = typeof botMessages.$inferInsert;
+
+export type PushToken = typeof pushTokens.$inferSelect;
+export type InsertPushToken = typeof pushTokens.$inferInsert;
 
 export type Topic = { title: string; content: string; sources: string[] };
