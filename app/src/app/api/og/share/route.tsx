@@ -38,7 +38,7 @@ const truncateAddress = (value: string, maxLength = 12) => {
   return `${value.slice(0, side)}…${value.slice(-side)}`;
 };
 
-const formatSol = (value: string | null) => {
+const formatSol = (value: string | null, secure?: boolean) => {
   if (!value) return null;
   const label = secure ? "Secure SOL" : "SOL";
   const parsed = Number(value);
