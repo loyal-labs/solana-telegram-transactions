@@ -9,6 +9,7 @@ import {
   getAvatarColor,
   getFirstLetter,
 } from "@/components/summaries/avatar-utils";
+import { DatePicker } from "@/components/summaries/DatePicker";
 import {
   getAvailableDates,
   getMessageCountForDate,
@@ -87,16 +88,9 @@ export default function SummaryFeedScreen() {
     [summariesByDate, selectedDate],
   );
 
-  const handleDateSelect = useCallback(
-    (date: string) => {
-      if (date === selectedDate) return;
-      if (process.env.EXPO_OS === "ios") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-      setSelectedDate(date);
-    },
-    [selectedDate],
-  );
+  const handleDateSelect = useCallback((date: string) => {
+    setSelectedDate(date);
+  }, []);
 
   const handleTodayPress = useCallback(() => {
     if (process.env.EXPO_OS === "ios") {
@@ -185,42 +179,12 @@ export default function SummaryFeedScreen() {
           </Pressable>
         </View>
 
-        {/* Date selector -- simple horizontal scroll of available dates */}
-        {/* DatePicker component will be built in Task 7 -- inline fallback for now */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="px-4 py-2"
-          contentContainerClassName="gap-2"
-        >
-          {availableDates.map((date) => {
-            const isSelected = date === selectedDate;
-            const day = new Date(date + "T12:00:00").getDate();
-            return (
-              <Pressable
-                key={date}
-                className="items-center justify-center rounded-full active:opacity-70"
-                style={{
-                  width: 40,
-                  height: 40,
-                  backgroundColor: isSelected
-                    ? "rgba(249,54,60,0.14)"
-                    : "transparent",
-                }}
-                onPress={() => handleDateSelect(date)}
-              >
-                <Text
-                  className="text-[17px] font-medium"
-                  style={{
-                    color: isSelected ? "#000" : "rgba(60,60,67,0.6)",
-                  }}
-                >
-                  {day}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        {/* Horizontal date picker with snap scrolling */}
+        <DatePicker
+          availableDates={availableDates}
+          selectedDate={selectedDate}
+          onDateSelect={handleDateSelect}
+        />
 
         {/* Topic cards */}
         <View className="px-4 gap-3 pb-8">
