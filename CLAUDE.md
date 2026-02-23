@@ -224,7 +224,7 @@ Service layer patterns:
 - `app/src/lib/solana/wallet/wallet-keypair-logic.ts`
 - Manual smoke check after SDK/cloud-storage changes: open wallet in Telegram mini-app and confirm keypair persistence succeeds without `Failed to persist generated wallet keypair`.
 
-## Git Worktree Workflow
+## Git Workflow
 
 ### Branch Naming Convention
 
@@ -233,48 +233,6 @@ All branches MUST follow the Linear format: `<issue-number-title>`
 Example: `ask-328-fix-wrong-token-history-processing`
 
 To find the correct branch name for a Linear issue, use the issue identifier (e.g., ASK-123).
-
-### Creating a Worktree
-
-When asked to work on a new issue/branch:
-
-1. Create the worktree from the repo root:
-
-```bash
-git worktree add ../loyal-app-ASK-123 -b ASK-123-short-description main
-```
-
-   - Worktrees live as sibling directories to the main repo
-   - Always branch from `main` (or ask if unclear)
-
-2. `cd` into the new worktree directory before doing any work
-
-### Listing Worktrees
-
-```bash
-git worktree list
-```
-
-### Removing a Worktree
-
-When done with a branch:
-
-```bash
-git worktree remove ../loyal-app-ASK-123
-```
-
-Or if already deleted the directory:
-
-```bash
-git worktree prune
-```
-
-### Important Rules
-
-- NEVER switch branches in the main worktree to work on issues — always create a new worktree
-- Each tmux session / Claude Code instance should operate in its own worktree
-- Run `git worktree list` if unsure which worktrees exist
-- After merging a PR, clean up the worktree
 
 ## Commit Conventions
 
