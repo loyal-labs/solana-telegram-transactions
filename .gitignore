@@ -78,3 +78,9 @@ docs/plans
 docs/scopes
 
 .entire/
+
+# Mobile
+/mobile/.expo/
+/mobile/node_modules/
+/mobile/ios/
+/mobile/android/
