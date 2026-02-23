@@ -3,8 +3,14 @@ import { CloudKeyInput } from "@/types/telegram";
 const normalizeKeys = (input: CloudKeyInput): string[] =>
   Array.isArray(input) ? input : [input];
 
-type TelegramCloudStorage = (typeof import("@telegram-apps/sdk"))["cloudStorage"];
+type TelegramCloudStorage =
+  (typeof import("@telegram-apps/sdk"))["cloudStorage"];
 type TelegramSdkModule = typeof import("@telegram-apps/sdk");
+
+const CLOUD_STORAGE_KEY_PATTERN = /^[A-Za-z0-9_-]+$/;
+const CLOUD_STORAGE_KEY_MIN_LENGTH = 1;
+const CLOUD_STORAGE_KEY_MAX_LENGTH = 128;
+const CLOUD_STORAGE_VALUE_MAX_LENGTH = 4096;
 
 let sdkInitialized = false;
 
@@ -44,23 +50,56 @@ const canUseCloudStorage = (cloudStorage: TelegramCloudStorage): boolean => {
   }
 };
 
-const hasKeys = (keys: string[]): boolean => {
+const isValidCloudStorageKey = (key: string): boolean => {
+  if (
+    key.length < CLOUD_STORAGE_KEY_MIN_LENGTH ||
+    key.length > CLOUD_STORAGE_KEY_MAX_LENGTH
+  ) {
+    console.error("Invalid cloud storage key length", key.length);
+    return false;
+  }
+
+  if (!CLOUD_STORAGE_KEY_PATTERN.test(key)) {
+    console.error("Invalid cloud storage key format", key);
+    return false;
+  }
+
+  return true;
+};
+
+const hasValidKeys = (keys: string[]): boolean => {
   if (keys.length > 0) return true;
 
   console.error("Cloud storage operation requires at least one key");
   return false;
 };
 
+const isValidCloudStorageValue = (value: string): boolean => {
+  const valueLength = Array.from(value).length;
+  if (valueLength > CLOUD_STORAGE_VALUE_MAX_LENGTH) {
+    console.error("Invalid cloud storage value length", valueLength);
+    return false;
+  }
+
+  return true;
+};
+
+const validateKeys = (keys: string[]): boolean => {
+  if (!hasValidKeys(keys)) return false;
+  return keys.every((key) => isValidCloudStorageKey(key));
+};
+
 export async function setCloudValue(
   key: string,
-  value: string
+  value: string,
 ): Promise<boolean> {
   const cloudStorage = await getCloudStorage();
   if (!cloudStorage) return false;
   if (!canUseCloudStorage(cloudStorage)) return false;
   if (!cloudStorage.setItem.isAvailable()) return false;
 
-  if (!hasKeys([key])) return false;
+  if (!validateKeys([key])) return false;
+  if (!isValidCloudStorageValue(value)) return false;
 
   try {
     await cloudStorage.setItem(key, value);
@@ -72,7 +111,7 @@ export async function setCloudValue(
 }
 
 export async function getCloudValue(
-  keyOrKeys: CloudKeyInput
+  keyOrKeys: CloudKeyInput,
 ): Promise<string | Record<string, string> | null> {
   const cloudStorage = await getCloudStorage();
   if (!cloudStorage) return null;
@@ -80,7 +119,7 @@ export async function getCloudValue(
   if (!cloudStorage.getItem.isAvailable()) return null;
 
   const keys = normalizeKeys(keyOrKeys);
-  if (!hasKeys(keys)) return null;
+  if (!validateKeys(keys)) return null;
 
   try {
     if (typeof keyOrKeys === "string") {
@@ -95,7 +134,7 @@ export async function getCloudValue(
 }
 
 export async function deleteCloudValue(
-  keyOrKeys: CloudKeyInput
+  keyOrKeys: CloudKeyInput,
 ): Promise<boolean> {
   const cloudStorage = await getCloudStorage();
   if (!cloudStorage) return false;
@@ -103,7 +142,7 @@ export async function deleteCloudValue(
   if (!cloudStorage.deleteItem.isAvailable()) return false;
 
   const keys = normalizeKeys(keyOrKeys);
-  if (!hasKeys(keys)) return false;
+  if (!validateKeys(keys)) return false;
 
   try {
     await cloudStorage.deleteItem(keyOrKeys);
