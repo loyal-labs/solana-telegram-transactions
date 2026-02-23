@@ -6,15 +6,17 @@ import { reactPlugin } from "@datadog/browser-rum-react";
 import { publicEnv } from "@/lib/core/config/public";
 import type { TelegramIdentity } from "@/lib/telegram/mini-app/init-data-transform";
 
+interface EarlyError {
+  message: string;
+  source?: string;
+  lineno?: number;
+  colno?: number;
+  timestamp: number;
+}
+
 declare global {
   interface Window {
-    __dd_early_errors?: {
-      message: string;
-      source?: string;
-      lineno?: number;
-      colno?: number;
-      timestamp: number;
-    }[];
+    __dd_early_errors?: EarlyError[];
   }
 }
 
@@ -54,7 +56,7 @@ function installEarlyErrorCatcher() {
   if (typeof window === "undefined") return;
   if (window.__dd_early_errors) return;
 
-  const earlyErrors: NonNullable<typeof window.__dd_early_errors> = [];
+  const earlyErrors: EarlyError[] = [];
   window.__dd_early_errors = earlyErrors;
 
   const originalOnError = window.onerror;
