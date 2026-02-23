@@ -13,10 +13,7 @@ import {
 } from 'react';
 
 import { useDidMount } from '@/hooks/useDidMount';
-import {
-  getCloudValue,
-  setCloudValue,
-} from '@/lib/telegram/mini-app/cloud-storage';
+import { setCloudValue } from '@/lib/telegram/mini-app/cloud-storage';
 import {
   parseUserFromInitData,
   type UserData,
@@ -111,22 +108,21 @@ function TelegramProviderInner({ children }: PropsWithChildren) {
     [rawInitData]
   );
 
-  // Load avatar from cloud storage immediately
+  // Load avatar from localStorage immediately (synchronous, no size limit)
   useEffect(() => {
-    async function initCache() {
-      try {
-        const stored = await getCloudValue(USER_AVATAR_CACHE_KEY);
-        if (stored && typeof stored === 'string') {
-          setCachedAvatar(stored);
-        }
-      } finally {
-        setIsAvatarLoading(false);
+    try {
+      const stored = localStorage.getItem(USER_AVATAR_CACHE_KEY);
+      if (stored) {
+        setCachedAvatar(stored);
       }
+    } catch {
+      // localStorage may be unavailable in some contexts
+    } finally {
+      setIsAvatarLoading(false);
     }
-    initCache();
   }, []);
 
-  // Sync avatar with cloud storage
+  // Sync avatar to localStorage (cloud storage has 4096 char limit, base64 images exceed it)
   useEffect(() => {
     if (!userData?.photoUrl) return;
 
@@ -147,9 +143,13 @@ function TelegramProviderInner({ children }: PropsWithChildren) {
           reader.readAsDataURL(blob);
         });
 
-        const stored = await getCloudValue(USER_AVATAR_CACHE_KEY);
-        if (stored !== base64) {
-          await setCloudValue(USER_AVATAR_CACHE_KEY, base64);
+        try {
+          const stored = localStorage.getItem(USER_AVATAR_CACHE_KEY);
+          if (stored !== base64) {
+            localStorage.setItem(USER_AVATAR_CACHE_KEY, base64);
+            setCachedAvatar(base64);
+          }
+        } catch {
           setCachedAvatar(base64);
         }
       } catch (e) {

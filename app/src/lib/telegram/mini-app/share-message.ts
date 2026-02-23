@@ -13,7 +13,8 @@ export const createShareMessage = async (
   rawInitData: string,
   receiverUsername: string,
   solAmount: number,
-  usdAmount: number
+  usdAmount: number,
+  isSecure?: boolean
 ): Promise<string> => {
   const endpoint = resolveEndpoint("/api/telegram/share");
   const body = JSON.stringify({
@@ -21,6 +22,7 @@ export const createShareMessage = async (
     receiverUsername,
     solAmount,
     usdAmount,
+    isSecure,
   });
 
   const response = await fetch(endpoint, {

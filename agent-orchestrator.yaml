@@ -1,0 +1,19 @@
+dataDir: ~/.agent-orchestrator
+worktreeDir: ~/.worktrees
+port: 3000
+defaults:
+  runtime: tmux
+  agent: claude-code
+  workspace: worktree
+  notifiers:
+    - desktop
+projects:
+  loyal-app:
+    repo: loyal-labs/loyal-app
+    path: /Users/vladvarbatov/Projects/solana-telegram-transactions
+    defaultBranch: main
+    agentConfig:
+      permissions: skip
+    tracker:
+      plugin: linear
+      teamId: c4bc9539-7bc9-4d8d-b34e-661f03d06165

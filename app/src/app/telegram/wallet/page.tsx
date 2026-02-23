@@ -797,12 +797,15 @@ export default function Home() {
     try {
       const amountSol = selectedTransaction.amountLamports / LAMPORTS_PER_SOL;
       const amountUsd = amountSol * solPriceUsd;
+      const isSecure = selectedTransaction.transferType === "secure" ||
+        !!selectedTransaction.secureTokenSymbol;
 
       const msgId = await createShareMessage(
         rawInitData,
         recipientUsername,
         amountSol,
-        amountUsd
+        amountUsd,
+        isSecure
       );
 
       if (msgId) {
