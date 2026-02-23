@@ -26,6 +26,12 @@ let initialized = false;
 
 export function initDatadog() {
   if (initialized) return;
+
+  if (typeof window !== "undefined") {
+    const { hostname } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1") return;
+  }
+
   initialized = true;
 
   datadogRum.init({
