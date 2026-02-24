@@ -93,13 +93,28 @@ export default function TelegramLayoutClient({
 
   // Check cloud storage for onboarding completion
   useEffect(() => {
-    getCloudValue(ONBOARDING_DONE_KEY).then((value) => {
-      const shouldShow = value !== "1";
-      setShowOnboarding(shouldShow);
-      if (shouldShow) {
-        track(ONBOARDING_ANALYTICS_EVENTS.onboardingStarted);
-      }
-    });
+    const timeout = setTimeout(() => {
+      // Fallback: if cloud storage never responds (e.g. SDK init failed),
+      // assume onboarding is done so the app doesn't stay blank.
+      setShowOnboarding((prev) => (prev === null ? false : prev));
+    }, 2000);
+
+    getCloudValue(ONBOARDING_DONE_KEY)
+      .then((value) => {
+        clearTimeout(timeout);
+        const shouldShow = value !== "1";
+        setShowOnboarding(shouldShow);
+        if (shouldShow) {
+          track(ONBOARDING_ANALYTICS_EVENTS.onboardingStarted);
+        }
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        // Cloud storage unavailable — skip onboarding to unblock the app.
+        setShowOnboarding(false);
+      });
+
+    return () => clearTimeout(timeout);
   }, []);
 
   const handleOnboardingDone = (method: OnboardingCompletionMethod) => {
