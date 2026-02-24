@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --clear",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
@@ -11,6 +11,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@expo-google-fonts/geist": "^0.4.1",
     "@expo/vector-icons": "^15.0.3",
     "@loyal-labs/shared": "file:../packages/shared",
     "@react-navigation/bottom-tabs": "^7.4.0",

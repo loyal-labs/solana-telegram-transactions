@@ -1,8 +1,12 @@
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { FlatList, useWindowDimensions } from "react-native";
-
-import { Pressable, Text, View } from "@/tw";
+import {
+  FlatList,
+  Pressable,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 
 type DatePickerProps = {
   availableDates: string[];
@@ -11,6 +15,15 @@ type DatePickerProps = {
 };
 
 const ITEM_WIDTH = 56;
+
+function getMonthAbbr(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  return d.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+}
+
+function getMonthKey(dateStr: string): string {
+  return dateStr.substring(0, 7);
+}
 
 function getDayNumber(dateStr: string): number {
   return new Date(dateStr + "T12:00:00").getDate();
@@ -47,24 +60,59 @@ export function DatePicker({
 }: DatePickerProps) {
   const { width: screenWidth } = useWindowDimensions();
   const flatListRef = useRef<FlatList>(null);
+  const layoutReady = useRef(false);
+
   const availableDateSet = useMemo(
     () => new Set(availableDates),
     [availableDates],
   );
   const todayKey = useMemo(() => new Date().toISOString().split("T")[0], []);
-
   const dates = useMemo(() => generateDateRange(), []);
 
-  // Scroll to selected date
+  const selectedMonthKey = getMonthKey(selectedDate);
+
+  // Month labels: selected month travels with selected date,
+  // earlier months on their last date, later months on their first
+  const monthLabelDates = useMemo(() => {
+    const labels = new Map<string, string>();
+    const monthGroups = new Map<string, string[]>();
+
+    for (const date of dates) {
+      const mk = getMonthKey(date);
+      if (!monthGroups.has(mk)) monthGroups.set(mk, []);
+      monthGroups.get(mk)!.push(date);
+    }
+
+    for (const [mk, monthDates] of monthGroups) {
+      if (mk === selectedMonthKey) {
+        labels.set(selectedDate, getMonthAbbr(selectedDate));
+      } else if (mk < selectedMonthKey) {
+        const last = monthDates[monthDates.length - 1];
+        labels.set(last, getMonthAbbr(last));
+      } else {
+        labels.set(monthDates[0], getMonthAbbr(monthDates[0]));
+      }
+    }
+
+    return labels;
+  }, [dates, selectedDate, selectedMonthKey]);
+
+  // Scroll to center the selected date
   useEffect(() => {
     const index = dates.indexOf(selectedDate);
-    if (index !== -1) {
-      flatListRef.current?.scrollToIndex({
-        index,
-        animated: true,
-        viewPosition: 0.5,
-      });
-    }
+    if (index === -1) return;
+
+    const timer = setTimeout(
+      () => {
+        flatListRef.current?.scrollToOffset({
+          offset: index * ITEM_WIDTH,
+          animated: layoutReady.current,
+        });
+        layoutReady.current = true;
+      },
+      layoutReady.current ? 10 : 50,
+    );
+    return () => clearTimeout(timer);
   }, [selectedDate, dates]);
 
   const handleDatePress = useCallback(
@@ -74,7 +122,7 @@ export function DatePicker({
       const isFuture = isFutureDate(date);
 
       if (isFuture || (!hasData && !isToday)) {
-        if (process.env.EXPO_OS === "ios") {
+        if (process.env.EXPO_OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
         return;
@@ -82,7 +130,7 @@ export function DatePicker({
 
       if (date === selectedDate) return;
 
-      if (process.env.EXPO_OS === "ios") {
+      if (process.env.EXPO_OS !== "web") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
       onDateSelect(date);
@@ -97,24 +145,72 @@ export function DatePicker({
       const isFuture = isFutureDate(date);
       const isToday = date === todayKey;
       const isSelectable = !isFuture && (hasData || isToday);
+      const monthLabel = monthLabelDates.get(date);
+      const isActiveMonth = getMonthKey(date) === selectedMonthKey;
 
       return (
         <Pressable
-          className="items-center justify-center"
-          style={{ width: ITEM_WIDTH, height: 40 }}
           onPress={() => handleDatePress(date)}
+          style={{
+            width: ITEM_WIDTH,
+            height: 70,
+            alignItems: "center",
+          }}
         >
+          {/* Month label row */}
+          <View style={{ height: 20, justifyContent: "flex-start" }}>
+            {monthLabel ? (
+              <Text
+                style={{
+                  fontFamily: "Geist_600SemiBold",
+                  fontSize: 13,
+                  color: isActiveMonth ? "#000" : "rgba(60,60,67,0.6)",
+                }}
+              >
+                {monthLabel}
+              </Text>
+            ) : null}
+          </View>
+
+          {/* Red dot (6px) */}
           <View
-            className="w-10 h-10 rounded-full items-center justify-center"
             style={{
+              height: 6,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {hasData && !isFuture ? (
+              <View
+                style={{
+                  width: 4,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: "#f9363c",
+                }}
+              />
+            ) : null}
+          </View>
+
+          {/* Date circle (40px) — using overflow hidden with borderRadius */}
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              overflow: "hidden",
+              alignItems: "center",
+              justifyContent: "center",
               backgroundColor: isSelected
                 ? "rgba(249,54,60,0.14)"
                 : "transparent",
             }}
           >
             <Text
-              className="text-[17px] font-medium text-center"
               style={{
+                fontFamily: "Geist_500Medium",
+                fontSize: 17,
+                textAlign: "center",
                 color: isSelected
                   ? "#000"
                   : isSelectable
@@ -125,31 +221,29 @@ export function DatePicker({
               {getDayNumber(date)}
             </Text>
           </View>
-
-          {/* Red dot for dates with data */}
-          {hasData && !isFuture && (
-            <View
-              className="absolute top-0 items-center justify-center"
-              style={{ width: 16, height: 16 }}
-            >
-              <View className="w-1 h-1 rounded-full bg-[#f9363c]" />
-            </View>
-          )}
         </Pressable>
       );
     },
-    [selectedDate, availableDateSet, todayKey, handleDatePress],
+    [
+      selectedDate,
+      availableDateSet,
+      todayKey,
+      handleDatePress,
+      monthLabelDates,
+      selectedMonthKey,
+    ],
   );
 
   const sideInset = (screenWidth - ITEM_WIDTH) / 2;
 
   return (
-    <View className="py-2">
+    <View style={{ paddingBottom: 4 }}>
       <FlatList
         ref={flatListRef}
         data={dates}
         renderItem={renderItem}
         keyExtractor={(item) => item}
+        extraData={selectedDate}
         horizontal
         showsHorizontalScrollIndicator={false}
         snapToInterval={ITEM_WIDTH}
@@ -162,9 +256,8 @@ export function DatePicker({
           offset: ITEM_WIDTH * index,
           index,
         })}
-        onScrollToIndexFailed={() => {
-          // Silently ignore -- happens when list isn't laid out yet
-        }}
+        initialScrollIndex={dates.indexOf(selectedDate)}
+        onScrollToIndexFailed={() => {}}
       />
     </View>
   );

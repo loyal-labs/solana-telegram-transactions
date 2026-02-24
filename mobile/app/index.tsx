@@ -45,7 +45,7 @@ export default function SummariesListScreen() {
 
   const handleGroupPress = useCallback(
     (group: GroupChat) => {
-      if (process.env.EXPO_OS === "ios") {
+      if (process.env.EXPO_OS !== "web") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
       router.push(`/summaries/${group.id}`);

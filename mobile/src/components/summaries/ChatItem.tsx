@@ -46,14 +46,27 @@ export function ChatItem({
       )}
 
       {/* Text content */}
-      <View className="flex-1 ml-3 py-2.5">
-        <Text className="text-base font-medium text-black" numberOfLines={1}>
+      <View className="flex-1 ml-3 py-2.5 overflow-visible">
+        <Text
+          numberOfLines={1}
+          style={{
+            fontFamily: "Geist_500Medium",
+            fontSize: 16,
+            lineHeight: 22,
+            color: "#000",
+          }}
+        >
           {title}
         </Text>
         {subtitle ? (
           <Text
-            className="text-[13px] text-black/50 mt-0.5"
             numberOfLines={1}
+            style={{
+              fontFamily: "Geist_400Regular",
+              fontSize: 13,
+              color: "rgba(0,0,0,0.5)",
+              marginTop: 2,
+            }}
           >
             {subtitle}
           </Text>
