@@ -7,7 +7,10 @@
       "android": {
         "buildType": "apk"
       },
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://solana-telegram-transactions.vercel.app"
+      }
     },
     "development": {
       "developmentClient": true,

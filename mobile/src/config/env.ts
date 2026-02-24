@@ -2,7 +2,8 @@
 // In development, use your local network IP or tunnel URL
 // In production, use the deployed Vercel URL
 const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://your-app.vercel.app";
+  process.env.EXPO_PUBLIC_API_BASE_URL ??
+  "https://solana-telegram-transactions.vercel.app";
 
 // Hardcoded identity for MVP (auth deferred)
 const TELEGRAM_USER_ID = "2131567542";
