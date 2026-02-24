@@ -9,6 +9,16 @@ type CommunityPhotoSettings = {
   photoMimeType?: string;
 };
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
+}
+
 export async function GET(req: Request): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(req.url);
@@ -49,12 +59,15 @@ export async function GET(req: Request): Promise<NextResponse> {
       };
     });
 
-    return NextResponse.json({ summaries: transformedSummaries });
+    return NextResponse.json(
+      { summaries: transformedSummaries },
+      { headers: corsHeaders }
+    );
   } catch (error) {
     console.error("[api/summaries] Failed to fetch summaries:", error);
     return NextResponse.json(
       { error: "Failed to fetch summaries" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
