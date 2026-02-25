@@ -179,6 +179,7 @@ export default function Home() {
     rawInitData,
     walletAddress,
     refreshBalance,
+    refreshTokenHoldings,
     loadWalletTransactions,
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -454,6 +455,7 @@ export default function Home() {
         amount: secureFormValues.amount,
       });
       void refreshBalance(true);
+      void refreshTokenHoldings(true);
     } catch (error) {
       console.error("[secure] Error:", error);
       setSwapError(error instanceof Error ? error.message : "Operation failed");
@@ -473,6 +475,7 @@ export default function Home() {
     isSwapFormValid,
     isSwapping,
     refreshBalance,
+    refreshTokenHoldings,
   ]);
 
   const handleRefresh = useCallback(async () => {

@@ -22,7 +22,6 @@ import {
   getTelegramVerificationProgram,
 } from "./solana-helpers";
 import { storeInitData, verifyInitData } from "./verification";
-import { storeInitDataGasless } from "./verification/store-init-data";
 import { getWalletKeypair, getWalletProvider } from "./wallet/wallet-details";
 
 export const verifyAndClaimDeposit = async (
@@ -33,7 +32,7 @@ export const verifyAndClaimDeposit = async (
   amount: number,
   processedInitDataBytes: Uint8Array,
   telegramSignatureBytes: Uint8Array,
-  telegramPublicKeyBytes: Uint8Array
+  telegramPublicKeyBytes: Uint8Array,
 ) => {
   if (amount <= 0) {
     throw new Error("Amount must be greater than 0");
@@ -44,7 +43,7 @@ export const verifyAndClaimDeposit = async (
     provider,
     verificationProgram,
     recipient,
-    processedInitDataBytes
+    processedInitDataBytes,
   );
 
   const _verified = await verifyInitData(
@@ -54,7 +53,7 @@ export const verifyAndClaimDeposit = async (
     verificationProgram,
     processedInitDataBytes,
     telegramSignatureBytes,
-    telegramPublicKeyBytes
+    telegramPublicKeyBytes,
   );
 
   const claimed = await claimDeposit(
@@ -62,41 +61,24 @@ export const verifyAndClaimDeposit = async (
     verificationProgram,
     recipient,
     amount,
-    username
+    username,
   );
 
   return claimed;
 };
 
-export const prepareStoreInitDataTxn = async (
-  provider: AnchorProvider,
-  payer: PublicKey,
-  initData: Uint8Array,
-  userWallet: Wallet
-) => {
-  const verificationProgram = getTelegramVerificationProgram(provider);
-  const storeTx = await storeInitDataGasless(
-    provider,
-    verificationProgram,
-    payer,
-    initData,
-    userWallet
-  );
-  return storeTx;
-};
-
 export const prepareCloseWsolTxn = async (
   provider: AnchorProvider,
   payer: PublicKey,
-  userWallet: Wallet
+  userWallet: Wallet,
 ): Promise<Transaction | null> => {
   const userPublicKey = userWallet.publicKey;
   const recipientTokenAccount = await getAssociatedTokenAddress(
     NATIVE_MINT,
-    userPublicKey
+    userPublicKey,
   );
   const existingAta = await provider.connection.getAccountInfo(
-    recipientTokenAccount
+    recipientTokenAccount,
   );
   if (!existingAta) {
     return null;
@@ -106,8 +88,8 @@ export const prepareCloseWsolTxn = async (
     createCloseAccountInstruction(
       recipientTokenAccount,
       userPublicKey,
-      userPublicKey
-    )
+      userPublicKey,
+    ),
   );
 
   const { blockhash, lastValidBlockHeight } =
@@ -136,23 +118,23 @@ export async function claimTokens(params: {
   const [usernameDepositPda] = findUsernameDepositPda(username, tokenMint);
   const baseUsernameDepositPda =
     await client.baseProgram.provider.connection.getAccountInfo(
-      usernameDepositPda
+      usernameDepositPda,
     );
   const ephemeralUsernameDepositPda =
     await client.ephemeralProgram.provider.connection.getAccountInfo(
-      usernameDepositPda
+      usernameDepositPda,
     );
   console.log(
     "claimTokens baseUsernameDepositPda",
-    prettyStringify(baseUsernameDepositPda)
+    prettyStringify(baseUsernameDepositPda),
   );
   console.log(
     "claimTokens ephemeralUsernameDepositPda",
-    prettyStringify(ephemeralUsernameDepositPda)
+    prettyStringify(ephemeralUsernameDepositPda),
   );
 
   const isUsernameDepositDelegated = baseUsernameDepositPda?.owner.equals(
-    DELEGATION_PROGRAM_ID
+    DELEGATION_PROGRAM_ID,
   );
 
   const keypair = await getWalletKeypair();
@@ -162,7 +144,7 @@ export async function claimTokens(params: {
     const delegationWatcher = waitForAccountOwnerChange(
       client.baseProgram.provider.connection,
       usernameDepositPda,
-      DELEGATION_PROGRAM_ID
+      DELEGATION_PROGRAM_ID,
     );
     try {
       const delegateUsernameDepositSig = await client.delegateUsernameDeposit({
@@ -185,7 +167,7 @@ export async function claimTokens(params: {
   const [depositPda] = findDepositPda(destination, tokenMint);
   const existingBaseDeposit = await client.getBaseDeposit(
     destination,
-    tokenMint
+    tokenMint,
   );
   console.log("existingBaseDeposit", prettyStringify(existingBaseDeposit));
 
@@ -205,16 +187,16 @@ export async function claimTokens(params: {
     await client.baseProgram.provider.connection.getAccountInfo(depositPda);
   const ephemeralDepositPda =
     await client.ephemeralProgram.provider.connection.getAccountInfo(
-      depositPda
+      depositPda,
     );
   console.log("claimTokens baseDepositPda", prettyStringify(baseDepositPda));
   console.log(
     "claimTokens ephemeralDepositPda",
-    prettyStringify(ephemeralDepositPda)
+    prettyStringify(ephemeralDepositPda),
   );
 
   const isDepositDelegated = baseDepositPda?.owner.equals(
-    DELEGATION_PROGRAM_ID
+    DELEGATION_PROGRAM_ID,
   );
 
   if (!isDepositDelegated) {
@@ -222,7 +204,7 @@ export async function claimTokens(params: {
     const delegationWatcher = waitForAccountOwnerChange(
       client.baseProgram.provider.connection,
       depositPda,
-      DELEGATION_PROGRAM_ID
+      DELEGATION_PROGRAM_ID,
     );
     try {
       const delegateDepositSig = await client.delegateDeposit({
@@ -253,7 +235,7 @@ export async function claimTokens(params: {
     });
   console.log(
     "claimUsernameDepositToDeposit sig",
-    claimUsernameDepositToDepositSig
+    claimUsernameDepositToDepositSig,
   );
 
   console.log(`< claimTokens (${Date.now() - startTime}ms)`);
@@ -269,15 +251,10 @@ export const sendStoreInitDataTxn = async (
   processedInitDataBytes: Uint8Array,
   telegramSignatureBytes: Uint8Array,
   telegramPublicKeyBytes: Uint8Array,
-  closeTx?: Transaction,
-  perAuthToken?: string
 ) => {
   const serializedStoreTx = storeTx
     .serialize({ requireAllSignatures: false })
     .toString("base64");
-  const serializedCloseTx = closeTx
-    ? closeTx.serialize({ requireAllSignatures: false }).toString("base64")
-    : null;
   const encodeBytes = (bytes: Uint8Array) =>
     Buffer.from(bytes).toString("base64");
 
@@ -292,8 +269,7 @@ export const sendStoreInitDataTxn = async (
       processedInitDataBytes: encodeBytes(processedInitDataBytes),
       telegramSignatureBytes: encodeBytes(telegramSignatureBytes),
       telegramPublicKeyBytes: encodeBytes(telegramPublicKeyBytes),
-      closeTx: serializedCloseTx,
-      perAuthToken: perAuthToken ?? null,
+      closeTx: null,
     }),
   });
   if (!response.ok) {
@@ -324,7 +300,7 @@ export const sendStoreInitDataTxn = async (
     }
 
     throw new Error(
-      `Failed to send store init data transaction: ${errorDetails}`
+      `Failed to send store init data transaction: ${errorDetails}`,
     );
   }
 
@@ -332,6 +308,11 @@ export const sendStoreInitDataTxn = async (
   const verificationProgram = getTelegramVerificationProgram(provider);
   const sessionPda = getSessionPda(recipientPubKey, verificationProgram);
   // Claim tokens on client side
+  const privateClient = await getPrivateClient();
+  const balanceBefore =
+    await privateClient.ephemeralProgram.provider.connection.getBalance(
+      recipientPubKey,
+    );
   await claimTokens({
     tokenMint: NATIVE_MINT,
     amount,
@@ -339,6 +320,13 @@ export const sendStoreInitDataTxn = async (
     destination: recipientPubKey,
     session: sessionPda,
   });
+  const balanceAfter =
+    await privateClient.ephemeralProgram.provider.connection.getBalance(
+      recipientPubKey,
+    );
+  console.log(
+    `[claimTokens] recipient=${recipientPubKey.toBase58()} before=${balanceBefore} after=${balanceAfter} diff=${balanceAfter - balanceBefore}`,
+  );
 
   return response.json();
 };
