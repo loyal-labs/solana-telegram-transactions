@@ -1,23 +1,24 @@
 import "@/global.css";
 
-import { useFonts } from "expo-font";
-import * as SplashScreen from "expo-splash-screen";
-import { Stack, useRouter } from "expo-router";
-import { useEffect } from "react";
-import { ActivityIndicator } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-
+import { SplashAnimation } from "@/components/SplashAnimation";
 import {
   addNotificationResponseListener,
   registerForPushNotifications,
   registerPushToken,
   setupNotificationHandler,
 } from "@/services/notifications";
+import { useFonts } from "expo-font";
+import { Stack, useRouter } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { useCallback, useEffect, useState } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const router = useRouter();
+  const [showSplash, setShowSplash] = useState(true);
 
   const [fontsLoaded] = useFonts({
     Geist_400Regular: require("@expo-google-fonts/geist/400Regular/Geist_400Regular.ttf"),
@@ -26,6 +27,7 @@ export default function RootLayout() {
     Geist_700Bold: require("@expo-google-fonts/geist/700Bold/Geist_700Bold.ttf"),
   });
 
+  // Hide native splash once fonts are ready — Lottie takes over
   useEffect(() => {
     if (fontsLoaded) {
       SplashScreen.hideAsync();
@@ -58,18 +60,17 @@ export default function RootLayout() {
     return () => cleanup?.();
   }, [router]);
 
+  const handleSplashFinish = useCallback(() => {
+    setShowSplash(false);
+  }, []);
+
   if (!fontsLoaded) {
-    return (
-      <GestureHandlerRootView
-        style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-      >
-        <ActivityIndicator />
-      </GestureHandlerRootView>
-    );
+    return null;
   }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar style="auto" />
       <Stack
         screenOptions={{
           headerBackButtonDisplayMode: "minimal",
@@ -77,10 +78,11 @@ export default function RootLayout() {
       >
         <Stack.Screen
           name="index"
-          options={{ title: "Chat Highlights", headerLargeTitle: true }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen name="summaries/[groupChatId]" />
       </Stack>
+      {showSplash && <SplashAnimation onFinish={handleSplashFinish} />}
     </GestureHandlerRootView>
   );
 }

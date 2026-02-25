@@ -1,3 +1,5 @@
+import { StyleSheet } from "react-native";
+
 import { Image } from "@/tw/image";
 import { Pressable, Text, View } from "@/tw";
 
@@ -46,7 +48,10 @@ export function ChatItem({
       )}
 
       {/* Text content */}
-      <View className="flex-1 ml-3 py-2.5 overflow-visible">
+      <View
+        className="flex-1 ml-3 py-2.5 overflow-visible"
+        style={styles.textContainer}
+      >
         <Text
           numberOfLines={1}
           style={{
@@ -75,3 +80,10 @@ export function ChatItem({
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  textContainer: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(0,0,0,0.12)",
+  },
+});

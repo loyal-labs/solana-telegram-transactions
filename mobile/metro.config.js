@@ -14,6 +14,15 @@ config.resolver.nodeModulesPaths = [
   path.resolve(__dirname, ".."),
 ];
 
+// SVG transformer
+config.transformer.babelTransformerPath = require.resolve(
+  "react-native-svg-transformer",
+);
+config.resolver.assetExts = config.resolver.assetExts.filter(
+  (ext) => ext !== "svg",
+);
+config.resolver.sourceExts = [...config.resolver.sourceExts, "svg"];
+
 module.exports = withNativewind(config, {
   inlineVariables: false,
   globalClassNamePolyfill: false,

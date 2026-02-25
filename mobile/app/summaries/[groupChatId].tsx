@@ -2,6 +2,7 @@ import type { ChatSummary, Topic } from "@loyal-labs/shared";
 
 import * as Haptics from "expo-haptics";
 import { Stack, useLocalSearchParams } from "expo-router";
+import Logo from "../../assets/images/logo.svg";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -264,7 +265,7 @@ export default function SummaryFeedScreen() {
   if (isLoading) {
     return (
       <>
-        <Stack.Screen options={{ title: "" }} />
+        <Stack.Screen options={{ headerTitle: () => <Logo width={78} height={23} /> }} />
         <View className="flex-1 items-center justify-center bg-white">
           <ActivityIndicator />
         </View>
@@ -275,7 +276,7 @@ export default function SummaryFeedScreen() {
   if (error) {
     return (
       <>
-        <Stack.Screen options={{ title: "Error" }} />
+        <Stack.Screen options={{ headerTitle: () => <Logo width={78} height={23} /> }} />
         <View className="flex-1 items-center justify-center bg-white">
           <Text className="text-black/50">{error}</Text>
         </View>
@@ -294,7 +295,7 @@ export default function SummaryFeedScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: groupTitle }} />
+      <Stack.Screen options={{ headerTitle: () => <Logo width={78} height={23} /> }} />
       <Animated.ScrollView
         style={{ flex: 1, backgroundColor: "#fff" }}
         contentInsetAdjustmentBehavior="automatic"
