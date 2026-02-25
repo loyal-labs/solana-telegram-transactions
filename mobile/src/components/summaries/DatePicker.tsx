@@ -2,6 +2,8 @@ import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   FlatList,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Pressable,
   Text,
   View,
@@ -61,6 +63,7 @@ export function DatePicker({
   const { width: screenWidth } = useWindowDimensions();
   const flatListRef = useRef<FlatList>(null);
   const layoutReady = useRef(false);
+  const isUserScrolling = useRef(false);
 
   const availableDateSet = useMemo(
     () => new Set(availableDates),
@@ -136,6 +139,57 @@ export function DatePicker({
       onDateSelect(date);
     },
     [availableDateSet, selectedDate, onDateSelect, todayKey],
+  );
+
+  // When scroll settles, select the centered date (or snap back from future)
+  const handleScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!isUserScrolling.current) return;
+      isUserScrolling.current = false;
+
+      const offset = e.nativeEvent.contentOffset.x;
+      const index = Math.round(offset / ITEM_WIDTH);
+      const clamped = Math.max(0, Math.min(index, dates.length - 1));
+      const date = dates[clamped];
+      if (!date || date === selectedDate) return;
+
+      const isFuture = isFutureDate(date);
+      const hasData = availableDateSet.has(date);
+      const isToday = date === todayKey;
+      const isSelectable = !isFuture && (hasData || isToday);
+
+      if (isSelectable) {
+        if (process.env.EXPO_OS !== "web") {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+        onDateSelect(date);
+      } else {
+        // Scrolled to a non-selectable date — find the closest selectable one
+        // searching backwards (towards today/past)
+        let fallbackDate: string | null = null;
+        for (let i = clamped; i >= 0; i--) {
+          const d = dates[i];
+          const dFuture = isFutureDate(d);
+          if (!dFuture && (availableDateSet.has(d) || d === todayKey)) {
+            fallbackDate = d;
+            break;
+          }
+        }
+        if (fallbackDate && fallbackDate !== selectedDate) {
+          onDateSelect(fallbackDate);
+        } else {
+          // Snap back to current selection
+          const selIdx = dates.indexOf(selectedDate);
+          if (selIdx !== -1) {
+            flatListRef.current?.scrollToOffset({
+              offset: selIdx * ITEM_WIDTH,
+              animated: true,
+            });
+          }
+        }
+      }
+    },
+    [dates, availableDateSet, selectedDate, onDateSelect, todayKey],
   );
 
   const renderItem = useCallback(
@@ -248,6 +302,10 @@ export function DatePicker({
         showsHorizontalScrollIndicator={false}
         snapToInterval={ITEM_WIDTH}
         decelerationRate="fast"
+        onScrollBeginDrag={() => {
+          isUserScrolling.current = true;
+        }}
+        onMomentumScrollEnd={handleScrollEnd}
         contentContainerStyle={{
           paddingHorizontal: sideInset,
         }}

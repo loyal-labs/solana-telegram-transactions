@@ -301,7 +301,7 @@ export default function SummaryFeedScreen() {
         contentInsetAdjustmentBehavior="automatic"
       >
         {/* Group info header */}
-        <View className="px-4 py-2 flex-row items-center gap-3">
+        <View className="px-4 pt-4 pb-2 flex-row items-center gap-3">
           {groupPhoto ? (
             <Image
               source={{
