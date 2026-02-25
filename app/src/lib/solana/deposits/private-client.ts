@@ -80,7 +80,13 @@ const fetchAndCacheAuthToken = async (
   keypair: Keypair,
 ): Promise<{ token: string; expiresAt: number } | null> => {
   try {
+    const t0 = performance.now();
     const isVerified = await verifyTeeRpcIntegrity(PER_RPC_ENDPOINT);
+    console.log(
+      `[private-client] verifyTeeRpcIntegrity: ${(
+        performance.now() - t0
+      ).toFixed(1)}ms`,
+    );
     if (!isVerified) {
       console.error("TEE RPC integrity verification failed");
       return null;
@@ -89,10 +95,14 @@ const fetchAndCacheAuthToken = async (
     const signMessage = (message: Uint8Array): Promise<Uint8Array> =>
       Promise.resolve(sign.detached(message, keypair.secretKey));
 
+    const t1 = performance.now();
     const authToken = await getAuthToken(
       PER_RPC_ENDPOINT,
       keypair.publicKey,
       signMessage,
+    );
+    console.log(
+      `[private-client] getAuthToken: ${(performance.now() - t1).toFixed(1)}ms`,
     );
 
     const storageKey = getPrivateAuthTokenStorageKey(
