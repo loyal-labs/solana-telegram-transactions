@@ -276,6 +276,12 @@ git worktree prune
 - Run `git worktree list` if unsure which worktrees exist
 - After merging a PR, clean up the worktree
 
+## Linear MCP Defaults
+
+- When creating Linear issues via MCP, set status to `Todo` by default unless the user explicitly requests another status.
+- Assess task impact/scope and set an explicit priority during issue creation (`Urgent`, `High`, `Normal`, `Low`).
+- Choose appropriate labels and assignees based on ownership and domain before finalizing the issue.
+
 ## Commit Conventions
 
 This project enforces [Conventional Commits](https://www.conventionalcommits.org/) via `commitlint` with `@commitlint/config-conventional`. A CI workflow (`.github/workflows/commit-style.yml`) validates all commit messages in a PR and the PR title itself.
