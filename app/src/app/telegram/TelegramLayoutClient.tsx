@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Toaster } from "sileo";
 
 import { AnalyticsBootstrapClient } from "@/components/analytics/AnalyticsBootstrapClient";
@@ -12,6 +12,10 @@ import { TelegramAppRootClient } from "@/components/telegram/TelegramAppRootClie
 
 const Onboarding = dynamic(
   () => import("@/components/telegram/Onboarding"),
+  { ssr: false }
+);
+const WalletCreationScreen = dynamic(
+  () => import("@/components/telegram/WalletCreationScreen"),
   { ssr: false }
 );
 import { TelegramProvider } from "@/components/telegram/TelegramProvider";
@@ -32,6 +36,10 @@ import { ONBOARDING_ANALYTICS_EVENTS } from "./onboarding-analytics";
 
 const ONBOARDING_DONE_KEY = "onboarding_done";
 
+// Set to true to force the onboarding + wallet creation flow for testing,
+// even if you already have a wallet and completed onboarding.
+export const DEBUG_FORCE_ONBOARDING = false;
+
 export default function TelegramLayoutClient({
   children,
 }: {
@@ -42,6 +50,8 @@ export default function TelegramLayoutClient({
   const pathname = usePathname();
   // null = loading, true = show, false = don't show
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+  // Intermediate state: wallet is being created after onboarding
+  const [creatingWallet, setCreatingWallet] = useState(false);
   // Gate layout visibility until safe area value is known (prevents content jump)
   const [safeAreaReady, setSafeAreaReady] = useState(false);
 
@@ -93,6 +103,11 @@ export default function TelegramLayoutClient({
 
   // Check cloud storage for onboarding completion
   useEffect(() => {
+    if (DEBUG_FORCE_ONBOARDING) {
+      setShowOnboarding(true);
+      track(ONBOARDING_ANALYTICS_EVENTS.onboardingStarted);
+      return;
+    }
     getCloudValue(ONBOARDING_DONE_KEY).then((value) => {
       const shouldShow = value !== "1";
       setShowOnboarding(shouldShow);
@@ -105,8 +120,13 @@ export default function TelegramLayoutClient({
   const handleOnboardingDone = (method: OnboardingCompletionMethod) => {
     track(ONBOARDING_ANALYTICS_EVENTS.onboardingEnded, { method });
     setShowOnboarding(false);
+    setCreatingWallet(true);
     void setCloudValue(ONBOARDING_DONE_KEY, "1");
   };
+
+  const handleWalletReady = useCallback(() => {
+    setCreatingWallet(false);
+  }, []);
 
   // Reset scroll position when navigating between pages
   useEffect(() => {
@@ -153,6 +173,11 @@ export default function TelegramLayoutClient({
             <Onboarding
               headerHeight={headerHeight}
               onDone={handleOnboardingDone}
+            />
+          ) : creatingWallet ? (
+            <WalletCreationScreen
+              headerHeight={headerHeight}
+              onWalletReady={handleWalletReady}
             />
           ) : showOnboarding === false ? (
             <>
