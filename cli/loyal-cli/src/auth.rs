@@ -1,0 +1,174 @@
+use anyhow::{anyhow, bail, Context, Result};
+use base64::Engine;
+use log::debug;
+use rand::RngCore;
+use reqwest::blocking::Client as HttpClient;
+use serde_json::{json, Value};
+use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
+
+use crate::types::{
+    AuthChallengeResponse, AuthLoginResponse, DelegationStatusResponse, DelegationStatusResult,
+};
+
+pub(crate) fn verify_tee_rpc_integrity(http: &HttpClient, rpc_url: &str) -> Result<bool> {
+    let mut random = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut random);
+    let challenge = base64::engine::general_purpose::STANDARD.encode(random);
+    let endpoint = format!(
+        "{}/quote?challenge={}",
+        rpc_url.trim_end_matches('/'),
+        urlencoding::encode(&challenge)
+    );
+    debug!("tee integrity probe request: GET {endpoint}");
+
+    let response = http.get(endpoint).send()?;
+    let status = response.status();
+    let body = response.json::<Value>()?;
+    let quote_len = body
+        .get("quote")
+        .and_then(Value::as_str)
+        .map(|quote| quote.len())
+        .unwrap_or(0);
+    debug!(
+        "tee integrity probe response: status={}, quote_present={}, quote_len={}",
+        status,
+        quote_len > 0,
+        quote_len
+    );
+
+    if !status.is_success() {
+        return Ok(false);
+    }
+
+    Ok(body
+        .get("quote")
+        .and_then(Value::as_str)
+        .map(|s| !s.is_empty())
+        .unwrap_or(false))
+}
+
+pub(crate) fn get_auth_token(http: &HttpClient, rpc_url: &str, signer: &Keypair) -> Result<String> {
+    let challenge_url = format!(
+        "{}/auth/challenge?pubkey={}",
+        rpc_url.trim_end_matches('/'),
+        signer.pubkey()
+    );
+
+    let challenge_resp = http
+        .get(challenge_url)
+        .send()
+        .context("auth challenge request failed")?;
+    debug!("auth challenge response status={}", challenge_resp.status());
+    let challenge_json = challenge_resp
+        .json::<AuthChallengeResponse>()
+        .context("invalid auth challenge response")?;
+    debug!("auth challenge payload={}", serde_json::to_string(&challenge_json)?);
+
+    if let Some(err) = challenge_json.error {
+        bail!("failed to get auth challenge: {err}");
+    }
+
+    let challenge = challenge_json
+        .challenge
+        .filter(|c| !c.is_empty())
+        .ok_or_else(|| anyhow!("no auth challenge received"))?;
+
+    let signature = signer.sign_message(challenge.as_bytes());
+    let signature_b58 = bs58::encode(signature.as_ref()).into_string();
+
+    let login_url = format!("{}/auth/login", rpc_url.trim_end_matches('/'));
+    let login_resp = http
+        .post(login_url)
+        .json(&json!({
+            "pubkey": signer.pubkey().to_string(),
+            "challenge": challenge,
+            "signature": signature_b58,
+        }))
+        .send()
+        .context("auth login request failed")?;
+
+    let status = login_resp.status();
+    debug!("auth login response status={status}");
+    let login_json = login_resp
+        .json::<AuthLoginResponse>()
+        .context("invalid auth login response")?;
+    debug!(
+        "auth login payload={}",
+        serde_json::to_string(&json!({
+            "token_present": login_json.token.as_ref().map(|t| !t.is_empty()).unwrap_or(false),
+            "expires_at": login_json.expires_at,
+            "error": login_json.error.as_deref(),
+        }))?
+    );
+
+    if !status.is_success() {
+        if let Some(err) = login_json.error {
+            bail!("failed to authenticate with PER: {err}");
+        }
+        bail!("failed to authenticate with PER (status {status})");
+    }
+
+    let token = login_json
+        .token
+        .filter(|t| !t.is_empty())
+        .ok_or_else(|| anyhow!("auth login did not return a token"))?;
+
+    let _ = login_json.expires_at;
+    Ok(token)
+}
+
+pub(crate) fn get_delegation_status(
+    http: &HttpClient,
+    router_url: &str,
+    account: &Pubkey,
+) -> Result<Option<DelegationStatusResult>> {
+    let endpoint = if router_url.ends_with("/getDelegationStatus") {
+        router_url.to_string()
+    } else {
+        format!("{}/getDelegationStatus", router_url.trim_end_matches('/'))
+    };
+
+    let payload = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getDelegationStatus",
+        "params": [account.to_string()],
+    });
+    debug!(
+        "router delegation request: endpoint={}, payload={}",
+        endpoint,
+        serde_json::to_string(&payload)?
+    );
+
+    let response = http
+        .post(&endpoint)
+        .json(&payload)
+        .send()
+        .context("delegation status request failed")?;
+
+    let status = response.status();
+    let body = response
+        .text()
+        .context("failed to read delegation status response body")?;
+    debug!("router delegation response: status={}, body={}", status, body);
+
+    if !status.is_success() {
+        bail!(
+            "delegation status request failed: status={}, endpoint={}, body={}",
+            status,
+            endpoint,
+            body
+        );
+    }
+
+    let parsed = serde_json::from_str::<DelegationStatusResponse>(&body).with_context(|| {
+        format!("invalid delegation status response: endpoint={endpoint}, body={body}")
+    })?;
+
+    if let Some(error) = parsed.error {
+        debug!("router returned JSON-RPC error for {}: {}", account, error);
+        return Ok(None);
+    }
+
+    Ok(parsed.result)
+}
