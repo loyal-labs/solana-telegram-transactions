@@ -127,7 +127,12 @@ export default function SummariesListScreen() {
       }
     >
       <LogoHeader />
-      <Text style={styles.title}>Chat Highlights</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.titleInRow}>Chat Highlights</Text>
+        <Pressable onPress={() => router.push("/login")}>
+          <Text style={styles.devLink}>Login flow →</Text>
+        </Pressable>
+      </View>
       <GroupsTab count={groups.length} />
       {groups.map((group) => (
         <ChatItem
@@ -151,6 +156,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 12,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  titleInRow: {
+    fontFamily: "Geist_700Bold",
+    fontSize: 28,
+    color: "#000",
+  },
+  devLink: {
+    fontFamily: "Geist_500Medium",
+    fontSize: 13,
+    color: "rgba(0,0,0,0.35)",
   },
   tabContainer: {
     paddingHorizontal: 16,
