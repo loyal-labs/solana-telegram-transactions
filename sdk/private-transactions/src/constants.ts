@@ -61,6 +61,12 @@ export const VAULT_SEED = "vault";
 export const VAULT_SEED_BYTES = Buffer.from(VAULT_SEED);
 
 /**
+ * PDA seed for treasury fee account
+ */
+export const TREASURY_SEED = "treasury";
+export const TREASURY_SEED_BYTES = Buffer.from(TREASURY_SEED);
+
+/**
  * PDA seed for permission accounts
  */
 export const PERMISSION_SEED = "permission:";

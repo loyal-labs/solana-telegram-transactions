@@ -49,8 +49,8 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
 });
 
 // node:buffer
-var exports_buffer = {};
-__export(exports_buffer, {
+var exports_buffer2 = {};
+__export(exports_buffer2, {
   transcode: () => transcode,
   resolveObjectURL: () => resolveObjectURL,
   kStringMaxLength: () => kStringMaxLength,
@@ -266,7 +266,7 @@ function fromObject(obj) {
     return obj.copy(buf, 0, 0, len2), buf;
   }
   if (obj.length !== undefined) {
-    if (typeof obj.length !== "number" || Number.isNaN(obj.length))
+    if (typeof obj.length !== "number" || numberIsNaN(obj.length))
       return createBuffer(0);
     return fromArrayLike(obj);
   }
@@ -453,7 +453,7 @@ function hexWrite(buf, string, offset, length) {
   let i2;
   for (i2 = 0;i2 < length; ++i2) {
     let parsed = parseInt(string.substr(i2 * 2, 2), 16);
-    if (Number.isNaN(parsed))
+    if (numberIsNaN(parsed))
       return i2;
     buf[offset + i2] = parsed;
   }
@@ -910,7 +910,7 @@ var init_buffer = __esm(() => {
     return Buffer2.compare(this, b) === 0;
   };
   Buffer2.prototype.inspect = function inspect() {
-    let str = "", max = INSPECT_MAX_BYTES;
+    let str = "", max = exports_buffer.INSPECT_MAX_BYTES;
     if (str = this.toString("hex", 0, max).replace(/(.{2})/g, "$1 ").trim(), this.length > max)
       str += " ... ";
     return "<Buffer " + str + ">";
@@ -2828,7 +2828,7 @@ var require_stream = __commonJS((exports, module) => {
     module2.exports.AbortSignal = AbortSignal;
   });
   var require_util = __commonJS2((exports2, module2) => {
-    var bufferModule = (init_buffer(), __toCommonJS(exports_buffer)), { format: format2, inspect: inspect3 } = require_inspect(), { codes: { ERR_INVALID_ARG_TYPE: ERR_INVALID_ARG_TYPE3 } } = require_errors(), { kResistStopPropagation, AggregateError, SymbolDispose } = require_primordials(), AbortSignal = globalThis.AbortSignal || require_abort_controller().AbortSignal, AbortController = globalThis.AbortController || require_abort_controller().AbortController, AsyncFunction = Object.getPrototypeOf(async function() {}).constructor, Blob2 = globalThis.Blob || bufferModule.Blob, isBlob = typeof Blob2 !== "undefined" ? function isBlob(b) {
+    var bufferModule = (init_buffer(), __toCommonJS(exports_buffer2)), { format: format2, inspect: inspect3 } = require_inspect(), { codes: { ERR_INVALID_ARG_TYPE: ERR_INVALID_ARG_TYPE3 } } = require_errors(), { kResistStopPropagation, AggregateError, SymbolDispose } = require_primordials(), AbortSignal = globalThis.AbortSignal || require_abort_controller().AbortSignal, AbortController = globalThis.AbortController || require_abort_controller().AbortController, AsyncFunction = Object.getPrototypeOf(async function() {}).constructor, Blob2 = globalThis.Blob || bufferModule.Blob, isBlob = typeof Blob2 !== "undefined" ? function isBlob(b) {
       return b instanceof Blob2;
     } : function isBlob(b) {
       return false;
@@ -3634,7 +3634,7 @@ var require_stream = __commonJS((exports, module) => {
     };
   });
   var require_buffer_list = __commonJS2((exports2, module2) => {
-    var { StringPrototypeSlice, SymbolIterator, TypedArrayPrototypeSet, Uint8Array: Uint8Array2 } = require_primordials(), { Buffer: Buffer3 } = (init_buffer(), __toCommonJS(exports_buffer)), { inspect: inspect3 } = require_util();
+    var { StringPrototypeSlice, SymbolIterator, TypedArrayPrototypeSet, Uint8Array: Uint8Array2 } = require_primordials(), { Buffer: Buffer3 } = (init_buffer(), __toCommonJS(exports_buffer2)), { inspect: inspect3 } = require_util();
     module2.exports = class BufferList {
       constructor() {
         this.head = null, this.tail = null, this.length = 0;
@@ -3773,7 +3773,7 @@ var require_stream = __commonJS((exports, module) => {
   });
   var require_safe_buffer = __commonJS2((exports2, module2) => {
     /*! safe-buffer. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> */
-    var buffer = (init_buffer(), __toCommonJS(exports_buffer)), Buffer3 = buffer.Buffer;
+    var buffer = (init_buffer(), __toCommonJS(exports_buffer2)), Buffer3 = buffer.Buffer;
     function copyProps(src, dst) {
       for (var key in src)
         dst[key] = src[key];
@@ -4027,7 +4027,7 @@ var require_stream = __commonJS((exports, module) => {
     }
   });
   var require_from = __commonJS2((exports2, module2) => {
-    var process2 = require_process(), { PromisePrototypeThen, SymbolAsyncIterator, SymbolIterator } = require_primordials(), { Buffer: Buffer3 } = (init_buffer(), __toCommonJS(exports_buffer)), { ERR_INVALID_ARG_TYPE: ERR_INVALID_ARG_TYPE3, ERR_STREAM_NULL_VALUES } = require_errors().codes;
+    var process2 = require_process(), { PromisePrototypeThen, SymbolAsyncIterator, SymbolIterator } = require_primordials(), { Buffer: Buffer3 } = (init_buffer(), __toCommonJS(exports_buffer2)), { ERR_INVALID_ARG_TYPE: ERR_INVALID_ARG_TYPE3, ERR_STREAM_NULL_VALUES } = require_errors().codes;
     function from2(Readable, iterable, opts) {
       let iterator;
       if (typeof iterable === "string" || iterable instanceof Buffer3)
@@ -4089,7 +4089,7 @@ var require_stream = __commonJS((exports, module) => {
     var process2 = require_process(), { ArrayPrototypeIndexOf, NumberIsInteger, NumberIsNaN, NumberParseInt, ObjectDefineProperties, ObjectKeys, ObjectSetPrototypeOf, Promise: Promise2, SafeSet, SymbolAsyncDispose, SymbolAsyncIterator, Symbol: Symbol2 } = require_primordials();
     module2.exports = Readable;
     Readable.ReadableState = ReadableState;
-    var { EventEmitter: EE } = (init_events(), __toCommonJS(exports_events)), { Stream, prependListener: prependListener2 } = require_legacy(), { Buffer: Buffer3 } = (init_buffer(), __toCommonJS(exports_buffer)), { addAbortSignal } = require_add_abort_signal(), eos = require_end_of_stream(), debug = require_util().debuglog("stream", (fn) => {
+    var { EventEmitter: EE } = (init_events(), __toCommonJS(exports_events)), { Stream, prependListener: prependListener2 } = require_legacy(), { Buffer: Buffer3 } = (init_buffer(), __toCommonJS(exports_buffer2)), { addAbortSignal } = require_add_abort_signal(), eos = require_end_of_stream(), debug = require_util().debuglog("stream", (fn) => {
       debug = fn;
     }), BufferList = require_buffer_list(), destroyImpl = require_destroy(), { getHighWaterMark, getDefaultHighWaterMark } = require_state(), { aggregateTwoErrors, codes: { ERR_INVALID_ARG_TYPE: ERR_INVALID_ARG_TYPE3, ERR_METHOD_NOT_IMPLEMENTED, ERR_OUT_OF_RANGE: ERR_OUT_OF_RANGE3, ERR_STREAM_PUSH_AFTER_EOF, ERR_STREAM_UNSHIFT_AFTER_END_EVENT }, AbortError: AbortError2 } = require_errors(), { validateObject } = require_validators(), kPaused = Symbol2("kPaused"), { StringDecoder } = require_string_decoder(), from2 = require_from();
     ObjectSetPrototypeOf(Readable.prototype, Stream.prototype);
@@ -4707,7 +4707,7 @@ var require_stream = __commonJS((exports, module) => {
     var process2 = require_process(), { ArrayPrototypeSlice: ArrayPrototypeSlice2, Error: Error2, FunctionPrototypeSymbolHasInstance, ObjectDefineProperty, ObjectDefineProperties, ObjectSetPrototypeOf, StringPrototypeToLowerCase, Symbol: Symbol2, SymbolHasInstance } = require_primordials();
     module2.exports = Writable;
     Writable.WritableState = WritableState;
-    var { EventEmitter: EE } = (init_events(), __toCommonJS(exports_events)), Stream = require_legacy().Stream, { Buffer: Buffer3 } = (init_buffer(), __toCommonJS(exports_buffer)), destroyImpl = require_destroy(), { addAbortSignal } = require_add_abort_signal(), { getHighWaterMark, getDefaultHighWaterMark } = require_state(), { ERR_INVALID_ARG_TYPE: ERR_INVALID_ARG_TYPE3, ERR_METHOD_NOT_IMPLEMENTED, ERR_MULTIPLE_CALLBACK, ERR_STREAM_CANNOT_PIPE, ERR_STREAM_DESTROYED, ERR_STREAM_ALREADY_FINISHED, ERR_STREAM_NULL_VALUES, ERR_STREAM_WRITE_AFTER_END, ERR_UNKNOWN_ENCODING } = require_errors().codes, { errorOrDestroy } = destroyImpl;
+    var { EventEmitter: EE } = (init_events(), __toCommonJS(exports_events)), Stream = require_legacy().Stream, { Buffer: Buffer3 } = (init_buffer(), __toCommonJS(exports_buffer2)), destroyImpl = require_destroy(), { addAbortSignal } = require_add_abort_signal(), { getHighWaterMark, getDefaultHighWaterMark } = require_state(), { ERR_INVALID_ARG_TYPE: ERR_INVALID_ARG_TYPE3, ERR_METHOD_NOT_IMPLEMENTED, ERR_MULTIPLE_CALLBACK, ERR_STREAM_CANNOT_PIPE, ERR_STREAM_DESTROYED, ERR_STREAM_ALREADY_FINISHED, ERR_STREAM_NULL_VALUES, ERR_STREAM_WRITE_AFTER_END, ERR_UNKNOWN_ENCODING } = require_errors().codes, { errorOrDestroy } = destroyImpl;
     ObjectSetPrototypeOf(Writable.prototype, Stream.prototype);
     ObjectSetPrototypeOf(Writable, Stream);
     function nop() {}
@@ -5089,7 +5089,7 @@ var require_stream = __commonJS((exports, module) => {
     };
   });
   var require_duplexify = __commonJS2((exports2, module2) => {
-    var process2 = require_process(), bufferModule = (init_buffer(), __toCommonJS(exports_buffer)), { isReadable, isWritable, isIterable, isNodeStream, isReadableNodeStream, isWritableNodeStream, isDuplexNodeStream, isReadableStream, isWritableStream } = require_utils(), eos = require_end_of_stream(), { AbortError: AbortError2, codes: { ERR_INVALID_ARG_TYPE: ERR_INVALID_ARG_TYPE3, ERR_INVALID_RETURN_VALUE } } = require_errors(), { destroyer } = require_destroy(), Duplex = require_duplex(), Readable = require_readable(), Writable = require_writable(), { createDeferredPromise } = require_util(), from2 = require_from(), Blob2 = globalThis.Blob || bufferModule.Blob, isBlob = typeof Blob2 !== "undefined" ? function isBlob(b) {
+    var process2 = require_process(), bufferModule = (init_buffer(), __toCommonJS(exports_buffer2)), { isReadable, isWritable, isIterable, isNodeStream, isReadableNodeStream, isWritableNodeStream, isDuplexNodeStream, isReadableStream, isWritableStream } = require_utils(), eos = require_end_of_stream(), { AbortError: AbortError2, codes: { ERR_INVALID_ARG_TYPE: ERR_INVALID_ARG_TYPE3, ERR_INVALID_RETURN_VALUE } } = require_errors(), { destroyer } = require_destroy(), Duplex = require_duplex(), Readable = require_readable(), Writable = require_writable(), { createDeferredPromise } = require_util(), from2 = require_from(), Blob2 = globalThis.Blob || bufferModule.Blob, isBlob = typeof Blob2 !== "undefined" ? function isBlob(b) {
       return b instanceof Blob2;
     } : function isBlob(b) {
       return false;
@@ -6024,7 +6024,7 @@ var require_stream = __commonJS((exports, module) => {
     module2.exports = { finished, pipeline };
   });
   var require_stream2 = __commonJS2((exports2, module2) => {
-    var { Buffer: Buffer3 } = (init_buffer(), __toCommonJS(exports_buffer)), { ObjectDefineProperty, ObjectKeys, ReflectApply } = require_primordials(), { promisify: { custom: customPromisify } } = require_util(), { streamReturningOperators, promiseReturningOperators } = require_operators(), { codes: { ERR_ILLEGAL_CONSTRUCTOR } } = require_errors(), compose = require_compose(), { setDefaultHighWaterMark, getDefaultHighWaterMark } = require_state(), { pipeline } = require_pipeline(), { destroyer } = require_destroy(), eos = require_end_of_stream(), promises = require_promises(), utils = require_utils(), Stream = module2.exports = require_legacy().Stream;
+    var { Buffer: Buffer3 } = (init_buffer(), __toCommonJS(exports_buffer2)), { ObjectDefineProperty, ObjectKeys, ReflectApply } = require_primordials(), { promisify: { custom: customPromisify } } = require_util(), { streamReturningOperators, promiseReturningOperators } = require_operators(), { codes: { ERR_ILLEGAL_CONSTRUCTOR } } = require_errors(), compose = require_compose(), { setDefaultHighWaterMark, getDefaultHighWaterMark } = require_state(), { pipeline } = require_pipeline(), { destroyer } = require_destroy(), eos = require_end_of_stream(), promises = require_promises(), utils = require_utils(), Stream = module2.exports = require_legacy().Stream;
     Stream.isDestroyed = utils.isDestroyed;
     Stream.isDisturbed = utils.isDisturbed;
     Stream.isErrored = utils.isErrored;
@@ -6195,7 +6195,7 @@ var init_crypto = __esm(() => {
   });
   require_safe_buffer = __commonJS2((exports, module) => {
     /*! safe-buffer. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> */
-    var buffer = (init_buffer(), __toCommonJS(exports_buffer)), Buffer22 = buffer.Buffer;
+    var buffer = (init_buffer(), __toCommonJS(exports_buffer2)), Buffer22 = buffer.Buffer;
     function copyProps(src, dst) {
       for (var key in src)
         dst[key] = src[key];
@@ -6420,7 +6420,7 @@ var init_crypto = __esm(() => {
         if (typeof window !== "undefined" && typeof window.Buffer !== "undefined")
           Buffer22 = window.Buffer;
         else
-          Buffer22 = (init_buffer(), __toCommonJS(exports_buffer)).Buffer;
+          Buffer22 = (init_buffer(), __toCommonJS(exports_buffer2)).Buffer;
       } catch (e) {}
       BN.isBN = function isBN(num) {
         if (num instanceof BN)
@@ -10095,7 +10095,7 @@ var init_crypto = __esm(() => {
         if (typeof window !== "undefined" && typeof window.Buffer !== "undefined")
           Buffer22 = window.Buffer;
         else
-          Buffer22 = (init_buffer(), __toCommonJS(exports_buffer)).Buffer;
+          Buffer22 = (init_buffer(), __toCommonJS(exports_buffer2)).Buffer;
       } catch (e) {}
       BN.isBN = function isBN(num) {
         if (num instanceof BN)
@@ -11558,7 +11558,7 @@ var init_crypto = __esm(() => {
         if (typeof window !== "undefined" && typeof window.Buffer !== "undefined")
           Buffer22 = window.Buffer;
         else
-          Buffer22 = (init_buffer(), __toCommonJS(exports_buffer)).Buffer;
+          Buffer22 = (init_buffer(), __toCommonJS(exports_buffer2)).Buffer;
       } catch (e) {}
       BN.isBN = function isBN(num) {
         if (num instanceof BN)
@@ -13042,7 +13042,7 @@ var init_crypto = __esm(() => {
     };
   });
   require_buffer = __commonJS2((exports) => {
-    var inherits2 = require_inherits(), Reporter = require_base2().Reporter, Buffer22 = (init_buffer(), __toCommonJS(exports_buffer)).Buffer;
+    var inherits2 = require_inherits(), Reporter = require_base2().Reporter, Buffer22 = (init_buffer(), __toCommonJS(exports_buffer2)).Buffer;
     function DecoderBuffer(base, options) {
       if (Reporter.call(this, options), !Buffer22.isBuffer(base)) {
         this.error("Input not Buffer");
@@ -13698,7 +13698,7 @@ var init_crypto = __esm(() => {
     }
   });
   require_pem = __commonJS2((exports, module) => {
-    var inherits2 = require_inherits(), Buffer22 = (init_buffer(), __toCommonJS(exports_buffer)).Buffer, DERDecoder = require_der2();
+    var inherits2 = require_inherits(), Buffer22 = (init_buffer(), __toCommonJS(exports_buffer2)).Buffer, DERDecoder = require_der2();
     function PEMDecoder(entity) {
       DERDecoder.call(this, entity), this.enc = "pem";
     }
@@ -13737,7 +13737,7 @@ var init_crypto = __esm(() => {
     decoders.pem = require_pem();
   });
   require_der3 = __commonJS2((exports, module) => {
-    var inherits2 = require_inherits(), Buffer22 = (init_buffer(), __toCommonJS(exports_buffer)).Buffer, asn1 = require_asn1(), base = asn1.base, der = asn1.constants.der;
+    var inherits2 = require_inherits(), Buffer22 = (init_buffer(), __toCommonJS(exports_buffer2)).Buffer, asn1 = require_asn1(), base = asn1.base, der = asn1.constants.der;
     function DEREncoder(entity) {
       this.enc = "der", this.name = entity.name, this.entity = entity, this.tree = new DERNode, this.tree._init(entity.body);
     }
@@ -14299,7 +14299,7 @@ var init_crypto = __esm(() => {
         if (typeof window !== "undefined" && typeof window.Buffer !== "undefined")
           Buffer22 = window.Buffer;
         else
-          Buffer22 = (init_buffer(), __toCommonJS(exports_buffer)).Buffer;
+          Buffer22 = (init_buffer(), __toCommonJS(exports_buffer2)).Buffer;
       } catch (e) {}
       BN.isBN = function isBN(num) {
         if (num instanceof BN)
@@ -15703,7 +15703,7 @@ var init_crypto = __esm(() => {
         if (typeof window !== "undefined" && typeof window.Buffer !== "undefined")
           Buffer22 = window.Buffer;
         else
-          Buffer22 = (init_buffer(), __toCommonJS(exports_buffer)).Buffer;
+          Buffer22 = (init_buffer(), __toCommonJS(exports_buffer2)).Buffer;
       } catch (e) {}
       BN.isBN = function isBN(num) {
         if (num instanceof BN)
@@ -17458,7 +17458,7 @@ https://github.com/browserify/crypto-browserify`);
   crypto_default = crypto;
 });
 
-// ../../../../../../node_modules/tweetnacl/nacl-fast.js
+// node_modules/tweetnacl/nacl-fast.js
 var require_nacl_fast = __commonJS((exports, module) => {
   (function(nacl) {
     var gf = function(init) {
@@ -19352,7 +19352,7 @@ var require_nacl_fast = __commonJS((exports, module) => {
         carry = 0;
         for (j = i2 - 32, k = i2 - 12;j < k; ++j) {
           x[j] += carry - 16 * x[i2] * L[j - (i2 - 32)];
-          carry = x[j] + 128 >> 8;
+          carry = Math.floor((x[j] + 128) / 256);
           x[j] -= carry * 256;
         }
         x[j] += carry;
@@ -19444,10 +19444,9 @@ var require_nacl_fast = __commonJS((exports, module) => {
       return 0;
     }
     function crypto_sign_open(m, sm, n, pk) {
-      var i2, mlen;
+      var i2;
       var t = new Uint8Array(32), h = new Uint8Array(64);
       var p = [gf(), gf(), gf(), gf()], q = [gf(), gf(), gf(), gf()];
-      mlen = -1;
       if (n < 64)
         return -1;
       if (unpackneg(q, pk))
@@ -19470,8 +19469,7 @@ var require_nacl_fast = __commonJS((exports, module) => {
       }
       for (i2 = 0;i2 < n; i2++)
         m[i2] = sm[i2 + 64];
-      mlen = n;
-      return mlen;
+      return n;
     }
     var crypto_secretbox_KEYBYTES = 32, crypto_secretbox_NONCEBYTES = 24, crypto_secretbox_ZEROBYTES = 32, crypto_secretbox_BOXZEROBYTES = 16, crypto_scalarmult_BYTES = 32, crypto_scalarmult_SCALARBYTES = 32, crypto_box_PUBLICKEYBYTES = 32, crypto_box_SECRETKEYBYTES = 32, crypto_box_BEFORENMBYTES = 32, crypto_box_NONCEBYTES = crypto_secretbox_NONCEBYTES, crypto_box_ZEROBYTES = crypto_secretbox_ZEROBYTES, crypto_box_BOXZEROBYTES = crypto_secretbox_BOXZEROBYTES, crypto_sign_BYTES = 64, crypto_sign_PUBLICKEYBYTES = 32, crypto_sign_SECRETKEYBYTES = 64, crypto_sign_SEEDBYTES = 32, crypto_hash_BYTES = 64;
     nacl.lowlevel = {
@@ -19513,7 +19511,22 @@ var require_nacl_fast = __commonJS((exports, module) => {
       crypto_sign_PUBLICKEYBYTES,
       crypto_sign_SECRETKEYBYTES,
       crypto_sign_SEEDBYTES,
-      crypto_hash_BYTES
+      crypto_hash_BYTES,
+      gf,
+      D,
+      L,
+      pack25519,
+      unpack25519,
+      M,
+      A,
+      S,
+      Z,
+      pow2523,
+      add,
+      set25519,
+      modL,
+      scalarmult,
+      scalarbase
     };
     function checkLengths(k, n) {
       if (k.length !== crypto_secretbox_KEYBYTES)
@@ -19528,21 +19541,14 @@ var require_nacl_fast = __commonJS((exports, module) => {
         throw new Error("bad secret key size");
     }
     function checkArrayTypes() {
-      var t, i2;
-      for (i2 = 0;i2 < arguments.length; i2++) {
-        if ((t = Object.prototype.toString.call(arguments[i2])) !== "[object Uint8Array]")
-          throw new TypeError("unexpected type " + t + ", use Uint8Array");
+      for (var i2 = 0;i2 < arguments.length; i2++) {
+        if (!(arguments[i2] instanceof Uint8Array))
+          throw new TypeError("unexpected type, use Uint8Array");
       }
     }
     function cleanup(arr) {
       for (var i2 = 0;i2 < arr.length; i2++)
         arr[i2] = 0;
-    }
-    if (!nacl.util) {
-      nacl.util = {};
-      nacl.util.decodeUTF8 = nacl.util.encodeUTF8 = nacl.util.encodeBase64 = nacl.util.decodeBase64 = function() {
-        throw new Error("nacl.util moved into separate package: https://github.com/dchest/tweetnacl-util-js");
-      };
     }
     nacl.randomBytes = function(n) {
       var b = new Uint8Array(n);
@@ -19567,9 +19573,9 @@ var require_nacl_fast = __commonJS((exports, module) => {
       for (var i2 = 0;i2 < box.length; i2++)
         c[i2 + crypto_secretbox_BOXZEROBYTES] = box[i2];
       if (c.length < 32)
-        return false;
+        return null;
       if (crypto_secretbox_open(m, c, c.length, nonce, key) !== 0)
-        return false;
+        return null;
       return m.subarray(crypto_secretbox_ZEROBYTES);
     };
     nacl.secretbox.keyLength = crypto_secretbox_KEYBYTES;
@@ -19640,8 +19646,6 @@ var require_nacl_fast = __commonJS((exports, module) => {
       return signedMsg;
     };
     nacl.sign.open = function(signedMsg, publicKey) {
-      if (arguments.length !== 2)
-        throw new Error("nacl.sign.open accepts 2 arguments; did you mean to use nacl.sign.detached.verify?");
       checkArrayTypes(signedMsg, publicKey);
       if (publicKey.length !== crypto_sign_PUBLICKEYBYTES)
         throw new Error("bad public key size");
@@ -20151,6 +20155,73 @@ var telegram_private_transfer_default = {
       args: []
     },
     {
+      name: "create_treasury_permission",
+      docs: [
+        "Creates a permission for the treasury account."
+      ],
+      discriminator: [
+        175,
+        4,
+        167,
+        154,
+        92,
+        228,
+        204,
+        69
+      ],
+      accounts: [
+        {
+          name: "payer",
+          writable: true,
+          signer: true
+        },
+        {
+          name: "admin",
+          signer: true,
+          relations: [
+            "treasury"
+          ]
+        },
+        {
+          name: "treasury",
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                kind: "account",
+                path: "treasury.token_mint",
+                account: "Treasury"
+              }
+            ]
+          }
+        },
+        {
+          name: "permission",
+          writable: true
+        },
+        {
+          name: "permission_program"
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111"
+        }
+      ],
+      args: []
+    },
+    {
       name: "create_username_permission",
       docs: [
         "Creates a permission for a username-based deposit account."
@@ -20434,6 +20505,211 @@ var telegram_private_transfer_default = {
           name: "user",
           type: "pubkey"
         },
+        {
+          name: "token_mint",
+          type: "pubkey"
+        }
+      ]
+    },
+    {
+      name: "delegate_treasury",
+      docs: [
+        "Delegates the treasury account to the ephemeral rollups delegate program."
+      ],
+      discriminator: [
+        220,
+        230,
+        45,
+        56,
+        92,
+        223,
+        162,
+        169
+      ],
+      accounts: [
+        {
+          name: "payer",
+          writable: true,
+          signer: true
+        },
+        {
+          name: "admin",
+          signer: true
+        },
+        {
+          name: "validator",
+          optional: true
+        },
+        {
+          name: "buffer_treasury",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                kind: "account",
+                path: "treasury"
+              }
+            ],
+            program: {
+              kind: "const",
+              value: [
+                120,
+                119,
+                237,
+                228,
+                109,
+                110,
+                60,
+                47,
+                140,
+                61,
+                153,
+                86,
+                183,
+                54,
+                59,
+                48,
+                46,
+                44,
+                189,
+                35,
+                126,
+                97,
+                173,
+                95,
+                156,
+                209,
+                177,
+                123,
+                98,
+                164,
+                128,
+                252
+              ]
+            }
+          }
+        },
+        {
+          name: "delegation_record_treasury",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                kind: "account",
+                path: "treasury"
+              }
+            ],
+            program: {
+              kind: "account",
+              path: "delegation_program"
+            }
+          }
+        },
+        {
+          name: "delegation_metadata_treasury",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                kind: "account",
+                path: "treasury"
+              }
+            ],
+            program: {
+              kind: "account",
+              path: "delegation_program"
+            }
+          }
+        },
+        {
+          name: "treasury",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                kind: "arg",
+                path: "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          name: "owner_program",
+          address: "97FzQdWi26mFNR21AbQNg4KqofiCLqQydQfAvRQMcXhV"
+        },
+        {
+          name: "delegation_program",
+          address: "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111"
+        }
+      ],
+      args: [
         {
           name: "token_mint",
           type: "pubkey"
@@ -20926,6 +21202,66 @@ var telegram_private_transfer_default = {
         {
           name: "token_program",
           address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111"
+        }
+      ],
+      args: []
+    },
+    {
+      name: "initialize_treasury",
+      docs: [
+        "Initializes treasury account for a token mint."
+      ],
+      discriminator: [
+        124,
+        186,
+        211,
+        195,
+        85,
+        165,
+        129,
+        166
+      ],
+      accounts: [
+        {
+          name: "payer",
+          writable: true,
+          signer: true
+        },
+        {
+          name: "admin",
+          signer: true
+        },
+        {
+          name: "treasury",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                kind: "account",
+                path: "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          name: "token_mint"
         },
         {
           name: "system_program",
@@ -21433,10 +21769,36 @@ var telegram_private_transfer_default = {
           }
         },
         {
+          name: "treasury",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                kind: "account",
+                path: "token_mint"
+              }
+            ]
+          }
+        },
+        {
           name: "token_mint",
           relations: [
             "source_deposit",
-            "destination_deposit"
+            "destination_deposit",
+            "treasury"
           ]
         },
         {
@@ -21554,10 +21916,36 @@ var telegram_private_transfer_default = {
           }
         },
         {
+          name: "treasury",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                kind: "account",
+                path: "token_mint"
+              }
+            ]
+          }
+        },
+        {
           name: "token_mint",
           relations: [
             "source_deposit",
-            "destination_deposit"
+            "destination_deposit",
+            "treasury"
           ]
         },
         {
@@ -21627,6 +22015,72 @@ var telegram_private_transfer_default = {
                 kind: "account",
                 path: "deposit.token_mint",
                 account: "Deposit"
+              }
+            ]
+          }
+        },
+        {
+          name: "magic_program",
+          address: "Magic11111111111111111111111111111111111111"
+        },
+        {
+          name: "magic_context",
+          writable: true,
+          address: "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      args: []
+    },
+    {
+      name: "undelegate_treasury",
+      docs: [
+        "Commits and undelegates the treasury account from the ephemeral rollups program."
+      ],
+      discriminator: [
+        203,
+        188,
+        100,
+        72,
+        202,
+        136,
+        195,
+        42
+      ],
+      accounts: [
+        {
+          name: "payer",
+          writable: true,
+          signer: true
+        },
+        {
+          name: "admin",
+          signer: true,
+          relations: [
+            "treasury"
+          ]
+        },
+        {
+          name: "treasury",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                kind: "account",
+                path: "treasury.token_mint",
+                account: "Treasury"
               }
             ]
           }
@@ -21724,6 +22178,283 @@ var telegram_private_transfer_default = {
           type: "pubkey"
         }
       ]
+    },
+    {
+      name: "withdraw_treasury_fees",
+      docs: [
+        "Withdraws accrued transfer fees from vault to treasury admin token account."
+      ],
+      discriminator: [
+        43,
+        110,
+        110,
+        113,
+        177,
+        16,
+        201,
+        250
+      ],
+      accounts: [
+        {
+          name: "admin",
+          writable: true,
+          signer: true,
+          relations: [
+            "treasury"
+          ]
+        },
+        {
+          name: "treasury",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                kind: "account",
+                path: "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          name: "vault",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "const",
+                value: [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                kind: "account",
+                path: "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          name: "vault_token_account",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "account",
+                path: "vault"
+              },
+              {
+                kind: "const",
+                value: [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                kind: "account",
+                path: "token_mint"
+              }
+            ],
+            program: {
+              kind: "const",
+              value: [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          name: "admin_token_account",
+          writable: true,
+          pda: {
+            seeds: [
+              {
+                kind: "account",
+                path: "admin"
+              },
+              {
+                kind: "const",
+                value: [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                kind: "account",
+                path: "token_mint"
+              }
+            ],
+            program: {
+              kind: "const",
+              value: [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          name: "token_mint",
+          relations: [
+            "treasury"
+          ]
+        },
+        {
+          name: "token_program",
+          address: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          name: "associated_token_program",
+          address: "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          name: "system_program",
+          address: "11111111111111111111111111111111"
+        }
+      ],
+      args: [
+        {
+          name: "amount",
+          type: "u64"
+        }
+      ]
     }
   ],
   accounts: [
@@ -21764,6 +22495,19 @@ var telegram_private_transfer_default = {
         253,
         72,
         138
+      ]
+    },
+    {
+      name: "Treasury",
+      discriminator: [
+        238,
+        239,
+        123,
+        238,
+        89,
+        1,
+        168,
+        253
       ]
     },
     {
@@ -21853,6 +22597,11 @@ var telegram_private_transfer_default = {
       code: 6011,
       name: "InvalidDepositor",
       msg: "Invalid Depositor"
+    },
+    {
+      code: 6012,
+      name: "InsufficientTreasuryFees",
+      msg: "Insufficient Treasury Fees"
     }
   ],
   types: [
@@ -21954,6 +22703,29 @@ var telegram_private_transfer_default = {
       }
     },
     {
+      name: "Treasury",
+      docs: [
+        "Treasury fee ledger by token mint."
+      ],
+      type: {
+        kind: "struct",
+        fields: [
+          {
+            name: "admin",
+            type: "pubkey"
+          },
+          {
+            name: "token_mint",
+            type: "pubkey"
+          },
+          {
+            name: "amount",
+            type: "u64"
+          }
+        ]
+      }
+    },
+    {
       name: "UsernameDeposit",
       docs: [
         "A deposit account for a telegram username and token mint."
@@ -22009,6 +22781,8 @@ var USERNAME_DEPOSIT_SEED = "username_deposit";
 var USERNAME_DEPOSIT_SEED_BYTES = Buffer.from(USERNAME_DEPOSIT_SEED);
 var VAULT_SEED = "vault";
 var VAULT_SEED_BYTES = Buffer.from(VAULT_SEED);
+var TREASURY_SEED = "treasury";
+var TREASURY_SEED_BYTES = Buffer.from(TREASURY_SEED);
 var PERMISSION_SEED = "permission:";
 var PERMISSION_SEED_BYTES = Buffer.from(PERMISSION_SEED);
 function solToLamports(sol) {
@@ -22028,6 +22802,9 @@ function findUsernameDepositPda(username, tokenMint, programId = PROGRAM_ID) {
 }
 function findVaultPda(tokenMint, programId = PROGRAM_ID) {
   return PublicKey2.findProgramAddressSync([VAULT_SEED_BYTES, tokenMint.toBuffer()], programId);
+}
+function findTreasuryPda(tokenMint, programId = PROGRAM_ID) {
+  return PublicKey2.findProgramAddressSync([TREASURY_SEED_BYTES, tokenMint.toBuffer()], programId);
 }
 function findPermissionPda(account, permissionProgramId = PERMISSION_PROGRAM_ID) {
   return PublicKey2.findProgramAddressSync([PERMISSION_SEED_BYTES, account.toBuffer()], permissionProgramId);
@@ -22259,6 +23036,18 @@ class LoyalPrivateTransactionsClient {
     }).rpc(rpcOptions);
     return signature;
   }
+  async initializeTreasury(params) {
+    const { admin, tokenMint, payer, rpcOptions } = params;
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+    await this.ensureNotDelegated(treasuryPda, "initializeTreasury-treasury", true);
+    return this.baseProgram.methods.initializeTreasury().accountsPartial({
+      payer,
+      admin,
+      treasury: treasuryPda,
+      tokenMint,
+      systemProgram: SystemProgram.programId
+    }).rpc(rpcOptions);
+  }
   async modifyBalance(params) {
     const {
       user,
@@ -22469,6 +23258,30 @@ class LoyalPrivateTransactionsClient {
       throw err;
     }
   }
+  async createTreasuryPermission(params) {
+    const { admin, tokenMint, payer, rpcOptions } = params;
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+    const [permissionPda] = findPermissionPda(treasuryPda);
+    await this.ensureNotDelegated(treasuryPda, "createTreasuryPermission-treasury");
+    if (await this.permissionAccountExists(permissionPda)) {
+      return null;
+    }
+    try {
+      return await this.baseProgram.methods.createTreasuryPermission().accountsPartial({
+        payer,
+        admin,
+        treasury: treasuryPda,
+        permission: permissionPda,
+        permissionProgram: PERMISSION_PROGRAM_ID,
+        systemProgram: SystemProgram.programId
+      }).rpc(rpcOptions);
+    } catch (err) {
+      if (this.isAccountAlreadyInUse(err)) {
+        return "permission-exists";
+      }
+      throw err;
+    }
+  }
   async delegateDeposit(params) {
     const { user, tokenMint, payer, validator, rpcOptions } = params;
     const [depositPda] = findDepositPda(user, tokenMint);
@@ -22517,6 +23330,27 @@ class LoyalPrivateTransactionsClient {
     accounts.validator = validator ?? null;
     const signature = await this.baseProgram.methods.delegateUsernameDeposit(username, tokenMint).accountsPartial(accounts).rpc(rpcOptions);
     return signature;
+  }
+  async delegateTreasury(params) {
+    const { admin, tokenMint, payer, validator, rpcOptions } = params;
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+    const [bufferPda] = findBufferPda(treasuryPda);
+    const [delegationRecordPda] = findDelegationRecordPda(treasuryPda);
+    const [delegationMetadataPda] = findDelegationMetadataPda(treasuryPda);
+    await this.ensureNotDelegated(treasuryPda, "delegateTreasury-treasury");
+    const accounts = {
+      payer,
+      admin,
+      bufferTreasury: bufferPda,
+      delegationRecordTreasury: delegationRecordPda,
+      delegationMetadataTreasury: delegationMetadataPda,
+      treasury: treasuryPda,
+      ownerProgram: PROGRAM_ID,
+      delegationProgram: DELEGATION_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      validator: validator ?? null
+    };
+    return this.baseProgram.methods.delegateTreasury(tokenMint).accountsPartial(accounts).rpc(rpcOptions);
   }
   async undelegateDeposit(params) {
     const {
@@ -22573,6 +23407,46 @@ class LoyalPrivateTransactionsClient {
     }).rpc(rpcOptions);
     return signature;
   }
+  async undelegateTreasury(params) {
+    const { admin, tokenMint, payer, magicProgram, magicContext, rpcOptions } = params;
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+    await this.ensureDelegated(treasuryPda, "undelegateTreasury-treasury", true);
+    const delegationWatcher = waitForAccountOwnerChange(this.baseProgram.provider.connection, treasuryPda, PROGRAM_ID);
+    let signature;
+    try {
+      signature = await this.ephemeralProgram.methods.undelegateTreasury().accountsPartial({
+        payer,
+        admin,
+        treasury: treasuryPda,
+        magicProgram,
+        magicContext
+      }).rpc(rpcOptions);
+      await delegationWatcher.wait();
+    } catch (e) {
+      await delegationWatcher.cancel();
+      throw e;
+    }
+    return signature;
+  }
+  async withdrawTreasuryFees(params) {
+    const { admin, tokenMint, amount, rpcOptions } = params;
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+    const [vaultPda] = findVaultPda(tokenMint);
+    const vaultTokenAccount = getAssociatedTokenAddressSync(tokenMint, vaultPda, true, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+    const adminTokenAccount = getAssociatedTokenAddressSync(tokenMint, admin, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+    await this.ensureNotDelegated(treasuryPda, "withdrawTreasuryFees-treasury");
+    return this.baseProgram.methods.withdrawTreasuryFees(new BN(amount.toString())).accountsPartial({
+      admin,
+      treasury: treasuryPda,
+      vault: vaultPda,
+      vaultTokenAccount,
+      adminTokenAccount,
+      tokenMint,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId
+    }).rpc(rpcOptions);
+  }
   async transferDeposit(params) {
     const {
       user,
@@ -22585,6 +23459,7 @@ class LoyalPrivateTransactionsClient {
     } = params;
     const [sourceDepositPda] = findDepositPda(user, tokenMint);
     const [destinationDepositPda] = findDepositPda(destinationUser, tokenMint);
+    const treasuryPda = await this.ensureTreasuryPrepared(tokenMint, payer, rpcOptions);
     await this.ensureDelegated(sourceDepositPda, "transferDeposit-sourceDepositPda");
     await this.ensureDelegated(destinationDepositPda, "transferDeposit-destinationDepositPda");
     const accounts = {
@@ -22592,6 +23467,7 @@ class LoyalPrivateTransactionsClient {
       payer,
       sourceDeposit: sourceDepositPda,
       destinationDeposit: destinationDepositPda,
+      treasury: treasuryPda,
       tokenMint,
       systemProgram: SystemProgram.programId
     };
@@ -22617,6 +23493,7 @@ class LoyalPrivateTransactionsClient {
     this.validateUsername(username);
     const [sourceDepositPda] = findDepositPda(user, tokenMint);
     const [destinationDepositPda] = findUsernameDepositPda(username, tokenMint);
+    const treasuryPda = await this.ensureTreasuryPrepared(tokenMint, payer, rpcOptions);
     await this.ensureDelegated(sourceDepositPda, "transferToUsernameDeposit-sourceDepositPda");
     await this.ensureDelegated(destinationDepositPda, "transferToUsernameDeposit-destinationDepositPda");
     const accounts = {
@@ -22624,6 +23501,7 @@ class LoyalPrivateTransactionsClient {
       payer,
       sourceDeposit: sourceDepositPda,
       destinationDeposit: destinationDepositPda,
+      treasury: treasuryPda,
       tokenMint,
       systemProgram: SystemProgram.programId
     };
@@ -22687,6 +23565,34 @@ class LoyalPrivateTransactionsClient {
       return null;
     }
   }
+  async getBaseTreasury(tokenMint) {
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+    try {
+      const account = await this.baseProgram.account.treasury.fetch(treasuryPda);
+      return {
+        admin: account.admin,
+        tokenMint: account.tokenMint,
+        amount: BigInt(account.amount.toString()),
+        address: treasuryPda
+      };
+    } catch {
+      return null;
+    }
+  }
+  async getEphemeralTreasury(tokenMint) {
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+    try {
+      const account = await this.ephemeralProgram.account.treasury.fetch(treasuryPda);
+      return {
+        admin: account.admin,
+        tokenMint: account.tokenMint,
+        amount: BigInt(account.amount.toString()),
+        address: treasuryPda
+      };
+    } catch {
+      return null;
+    }
+  }
   findDepositPda(user, tokenMint) {
     return findDepositPda(user, tokenMint, PROGRAM_ID);
   }
@@ -22695,6 +23601,9 @@ class LoyalPrivateTransactionsClient {
   }
   findVaultPda(tokenMint) {
     return findVaultPda(tokenMint, PROGRAM_ID);
+  }
+  findTreasuryPda(tokenMint) {
+    return findTreasuryPda(tokenMint, PROGRAM_ID);
   }
   get publicKey() {
     return this.wallet.publicKey;
@@ -22707,6 +23616,19 @@ class LoyalPrivateTransactionsClient {
   }
   getProgramId() {
     return PROGRAM_ID;
+  }
+  async ensureTreasuryPrepared(tokenMint, payer, rpcOptions) {
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+    const treasuryInfo = await this.baseProgram.provider.connection.getAccountInfo(treasuryPda);
+    if (!treasuryInfo) {
+      throw new Error("Treasury is not initialized for this mint. Admin must run initializeTreasury, createTreasuryPermission, and delegateTreasury first.");
+    }
+    const isDelegated = treasuryInfo.owner.equals(DELEGATION_PROGRAM_ID);
+    if (!isDelegated) {
+      throw new Error("Treasury is not delegated for this mint. Admin must call delegateTreasury before transfers.");
+    }
+    await this.ensureDelegated(treasuryPda, "ensureTreasuryPrepared-treasury");
+    return treasuryPda;
   }
   validateUsername(username) {
     if (!username || username.length < 5 || username.length > 32) {
@@ -22805,6 +23727,7 @@ export {
   isAnchorProvider,
   findVaultPda,
   findUsernameDepositPda,
+  findTreasuryPda,
   findPermissionPda,
   findDepositPda,
   findDelegationRecordPda,
@@ -22814,6 +23737,8 @@ export {
   VAULT_SEED,
   USERNAME_DEPOSIT_SEED_BYTES,
   USERNAME_DEPOSIT_SEED,
+  TREASURY_SEED_BYTES,
+  TREASURY_SEED,
   PROGRAM_ID,
   PERMISSION_SEED_BYTES,
   PERMISSION_SEED,

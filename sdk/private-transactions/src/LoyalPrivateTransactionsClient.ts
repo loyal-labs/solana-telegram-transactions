@@ -33,6 +33,7 @@ import {
   findDepositPda,
   findUsernameDepositPda,
   findVaultPda,
+  findTreasuryPda,
   findPermissionPda,
   findDelegationRecordPda,
   findDelegationMetadataPda,
@@ -43,9 +44,11 @@ import { isKeypair, isAnchorProvider } from "./types";
 import type {
   WalletSigner,
   WalletLike,
+  RpcOptions,
   ClientConfig,
   DepositData,
   UsernameDepositData,
+  TreasuryData,
   InitializeDepositParams,
   ModifyBalanceParams,
   ModifyBalanceResult,
@@ -53,10 +56,15 @@ import type {
   ClaimUsernameDepositParams,
   CreatePermissionParams,
   CreateUsernamePermissionParams,
+  InitializeTreasuryParams,
+  CreateTreasuryPermissionParams,
   DelegateDepositParams,
   DelegateUsernameDepositParams,
+  DelegateTreasuryParams,
   UndelegateDepositParams,
   UndelegateUsernameDepositParams,
+  UndelegateTreasuryParams,
+  WithdrawTreasuryFeesParams,
   TransferDepositParams,
   TransferToUsernameDepositParams,
   InitializeUsernameDepositParams,
@@ -386,6 +394,24 @@ export class LoyalPrivateTransactionsClient {
       .rpc(rpcOptions);
 
     return signature;
+  }
+
+  async initializeTreasury(params: InitializeTreasuryParams): Promise<string> {
+    const { admin, tokenMint, payer, rpcOptions } = params;
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+
+    await this.ensureNotDelegated(treasuryPda, "initializeTreasury-treasury", true);
+
+    return this.baseProgram.methods
+      .initializeTreasury()
+      .accountsPartial({
+        payer,
+        admin,
+        treasury: treasuryPda,
+        tokenMint,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc(rpcOptions);
   }
 
   /**
@@ -751,6 +777,46 @@ export class LoyalPrivateTransactionsClient {
     }
   }
 
+  /**
+   * Create a permission for the treasury account
+   */
+  async createTreasuryPermission(
+    params: CreateTreasuryPermissionParams
+  ): Promise<string | null> {
+    const { admin, tokenMint, payer, rpcOptions } = params;
+
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+    const [permissionPda] = findPermissionPda(treasuryPda);
+
+    await this.ensureNotDelegated(
+      treasuryPda,
+      "createTreasuryPermission-treasury"
+    );
+
+    if (await this.permissionAccountExists(permissionPda)) {
+      return null;
+    }
+
+    try {
+      return await this.baseProgram.methods
+        .createTreasuryPermission()
+        .accountsPartial({
+          payer,
+          admin,
+          treasury: treasuryPda,
+          permission: permissionPda,
+          permissionProgram: PERMISSION_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc(rpcOptions);
+    } catch (err) {
+      if (this.isAccountAlreadyInUse(err)) {
+        return "permission-exists";
+      }
+      throw err;
+    }
+  }
+
   // ============================================================
   // Delegation Operations
   // ============================================================
@@ -835,6 +901,37 @@ export class LoyalPrivateTransactionsClient {
       .rpc(rpcOptions);
 
     return signature;
+  }
+
+  /**
+   * Delegate treasury account to the ephemeral rollup
+   */
+  async delegateTreasury(params: DelegateTreasuryParams): Promise<string> {
+    const { admin, tokenMint, payer, validator, rpcOptions } = params;
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+    const [bufferPda] = findBufferPda(treasuryPda);
+    const [delegationRecordPda] = findDelegationRecordPda(treasuryPda);
+    const [delegationMetadataPda] = findDelegationMetadataPda(treasuryPda);
+
+    await this.ensureNotDelegated(treasuryPda, "delegateTreasury-treasury");
+
+    const accounts: Record<string, PublicKey | null> = {
+      payer,
+      admin,
+      bufferTreasury: bufferPda,
+      delegationRecordTreasury: delegationRecordPda,
+      delegationMetadataTreasury: delegationMetadataPda,
+      treasury: treasuryPda,
+      ownerProgram: PROGRAM_ID,
+      delegationProgram: DELEGATION_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      validator: validator ?? null,
+    };
+
+    return this.baseProgram.methods
+      .delegateTreasury(tokenMint)
+      .accountsPartial(accounts)
+      .rpc(rpcOptions);
   }
 
   /**
@@ -934,6 +1031,86 @@ export class LoyalPrivateTransactionsClient {
     return signature;
   }
 
+  /**
+   * Undelegate treasury account from the ephemeral rollup
+   */
+  async undelegateTreasury(params: UndelegateTreasuryParams): Promise<string> {
+    const { admin, tokenMint, payer, magicProgram, magicContext, rpcOptions } =
+      params;
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+
+    await this.ensureDelegated(treasuryPda, "undelegateTreasury-treasury", true);
+
+    const delegationWatcher = waitForAccountOwnerChange(
+      this.baseProgram.provider.connection,
+      treasuryPda,
+      PROGRAM_ID
+    );
+
+    let signature: string;
+    try {
+      signature = await this.ephemeralProgram.methods
+        .undelegateTreasury()
+        .accountsPartial({
+          payer,
+          admin,
+          treasury: treasuryPda,
+          magicProgram,
+          magicContext,
+        })
+        .rpc(rpcOptions);
+      await delegationWatcher.wait();
+    } catch (e) {
+      await delegationWatcher.cancel();
+      throw e;
+    }
+
+    return signature;
+  }
+
+  /**
+   * Withdraw accrued transfer fees from treasury.
+   */
+  async withdrawTreasuryFees(params: WithdrawTreasuryFeesParams): Promise<string> {
+    const { admin, tokenMint, amount, rpcOptions } = params;
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+    const [vaultPda] = findVaultPda(tokenMint);
+    const vaultTokenAccount = getAssociatedTokenAddressSync(
+      tokenMint,
+      vaultPda,
+      true,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    const adminTokenAccount = getAssociatedTokenAddressSync(
+      tokenMint,
+      admin,
+      false,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    await this.ensureNotDelegated(
+      treasuryPda,
+      "withdrawTreasuryFees-treasury"
+    );
+
+    return this.baseProgram.methods
+      .withdrawTreasuryFees(new BN(amount.toString()))
+      .accountsPartial({
+        admin,
+        treasury: treasuryPda,
+        vault: vaultPda,
+        vaultTokenAccount,
+        adminTokenAccount,
+        tokenMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc(rpcOptions);
+  }
+
   // ============================================================
   // Transfer Operations
   // ============================================================
@@ -954,6 +1131,11 @@ export class LoyalPrivateTransactionsClient {
 
     const [sourceDepositPda] = findDepositPda(user, tokenMint);
     const [destinationDepositPda] = findDepositPda(destinationUser, tokenMint);
+    const treasuryPda = await this.ensureTreasuryPrepared(
+      tokenMint,
+      payer,
+      rpcOptions
+    );
 
     await this.ensureDelegated(
       sourceDepositPda,
@@ -969,6 +1151,7 @@ export class LoyalPrivateTransactionsClient {
       payer,
       sourceDeposit: sourceDepositPda,
       destinationDeposit: destinationDepositPda,
+      treasury: treasuryPda,
       tokenMint,
       systemProgram: SystemProgram.programId,
     };
@@ -1008,6 +1191,11 @@ export class LoyalPrivateTransactionsClient {
 
     const [sourceDepositPda] = findDepositPda(user, tokenMint);
     const [destinationDepositPda] = findUsernameDepositPda(username, tokenMint);
+    const treasuryPda = await this.ensureTreasuryPrepared(
+      tokenMint,
+      payer,
+      rpcOptions
+    );
 
     await this.ensureDelegated(
       sourceDepositPda,
@@ -1023,6 +1211,7 @@ export class LoyalPrivateTransactionsClient {
       payer,
       sourceDeposit: sourceDepositPda,
       destinationDeposit: destinationDepositPda,
+      treasury: treasuryPda,
       tokenMint,
       systemProgram: SystemProgram.programId,
     };
@@ -1128,6 +1317,40 @@ export class LoyalPrivateTransactionsClient {
     }
   }
 
+  async getBaseTreasury(tokenMint: PublicKey): Promise<TreasuryData | null> {
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+
+    try {
+      const account = await this.baseProgram.account.treasury.fetch(treasuryPda);
+      return {
+        admin: account.admin,
+        tokenMint: account.tokenMint,
+        amount: BigInt(account.amount.toString()),
+        address: treasuryPda,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async getEphemeralTreasury(tokenMint: PublicKey): Promise<TreasuryData | null> {
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+
+    try {
+      const account = await this.ephemeralProgram.account.treasury.fetch(
+        treasuryPda
+      );
+      return {
+        admin: account.admin,
+        tokenMint: account.tokenMint,
+        amount: BigInt(account.amount.toString()),
+        address: treasuryPda,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   // ============================================================
   // PDA Helpers
   // ============================================================
@@ -1154,6 +1377,13 @@ export class LoyalPrivateTransactionsClient {
    */
   findVaultPda(tokenMint: PublicKey): [PublicKey, number] {
     return findVaultPda(tokenMint, PROGRAM_ID);
+  }
+
+  /**
+   * Find the treasury PDA
+   */
+  findTreasuryPda(tokenMint: PublicKey): [PublicKey, number] {
+    return findTreasuryPda(tokenMint, PROGRAM_ID);
   }
 
   // ============================================================
@@ -1188,6 +1418,33 @@ export class LoyalPrivateTransactionsClient {
   // ============================================================
   // Private Helpers
   // ============================================================
+
+  private async ensureTreasuryPrepared(
+    tokenMint: PublicKey,
+    payer: PublicKey,
+    rpcOptions?: RpcOptions
+  ): Promise<PublicKey> {
+    const [treasuryPda] = findTreasuryPda(tokenMint);
+    const treasuryInfo =
+      await this.baseProgram.provider.connection.getAccountInfo(treasuryPda);
+
+    if (!treasuryInfo) {
+      throw new Error(
+        "Treasury is not initialized for this mint. Admin must run initializeTreasury, createTreasuryPermission, and delegateTreasury first."
+      );
+    }
+
+    const isDelegated = treasuryInfo.owner.equals(DELEGATION_PROGRAM_ID);
+
+    if (!isDelegated) {
+      throw new Error(
+        "Treasury is not delegated for this mint. Admin must call delegateTreasury before transfers."
+      );
+    }
+
+    await this.ensureDelegated(treasuryPda, "ensureTreasuryPrepared-treasury");
+    return treasuryPda;
+  }
 
   private validateUsername(username: string): void {
     if (!username || username.length < 5 || username.length > 32) {

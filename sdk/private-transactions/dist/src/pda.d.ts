@@ -26,6 +26,14 @@ export declare function findUsernameDepositPda(username: string, tokenMint: Publ
  */
 export declare function findVaultPda(tokenMint: PublicKey, programId?: PublicKey): [PublicKey, number];
 /**
+ * Derive the treasury PDA
+ *
+ * @param tokenMint - The SPL token mint
+ * @param programId - Optional program ID (defaults to PROGRAM_ID)
+ * @returns [PDA address, bump seed]
+ */
+export declare function findTreasuryPda(tokenMint: PublicKey, programId?: PublicKey): [PublicKey, number];
+/**
  * Derive the permission PDA for an account
  *
  * @param account - The account to derive permission for

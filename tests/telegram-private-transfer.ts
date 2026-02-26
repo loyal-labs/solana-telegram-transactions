@@ -35,6 +35,7 @@ import bs58 from "bs58";
 const DEPOSIT_PDA_SEED = Buffer.from("deposit");
 const USERNAME_DEPOSIT_PDA_SEED = Buffer.from("username_deposit");
 const VAULT_PDA_SEED = Buffer.from("vault");
+const TREASURY_PDA_SEED = Buffer.from("treasury");
 
 const VALIDATION_BYTES: Uint8Array = new Uint8Array([
   56, 48, 54, 53, 49, 52, 48, 52, 57, 57, 58, 87, 101, 98, 65, 112, 112, 68, 97,
@@ -249,7 +250,8 @@ describe("telegram-private-transfer", () => {
   const initialAmount = 1000000;
   let depositPda: PublicKey,
     otherDepositPda: PublicKey,
-    usernameDepositPda: PublicKey;
+    usernameDepositPda: PublicKey,
+    treasuryPda: PublicKey;
   let sessionPda: PublicKey;
   let usernameTransferSig: string | null = null;
   let privateTransferSig: string | null = null;
@@ -458,6 +460,10 @@ describe("telegram-private-transfer", () => {
       [Buffer.from(VAULT_PDA_SEED), tokenMint.toBuffer()],
       program.programId
     )[0];
+    treasuryPda = PublicKey.findProgramAddressSync(
+      [Buffer.from(TREASURY_PDA_SEED), tokenMint.toBuffer()],
+      program.programId
+    )[0];
     vaultTokenAccount = getAssociatedTokenAddressSync(
       tokenMint,
       vaultPda,
@@ -528,6 +534,7 @@ describe("telegram-private-transfer", () => {
     log("Deposit PDA", depositPda.toBase58());
     log("Other deposit PDA", otherDepositPda.toBase58());
     log("Username deposit PDA", usernameDepositPda.toBase58());
+    log("Treasury PDA", treasuryPda.toBase58());
     log("User", user.toBase58());
     log("Other user", otherUser.toBase58());
     log("Third user", thirdUser.toBase58());
@@ -692,6 +699,35 @@ describe("telegram-private-transfer", () => {
   //   );
   // });
 
+  it("Initialize treasury", async () => {
+    const tx = await awaitWithLog(
+      "initializeTreasury",
+      program.methods
+        .initializeTreasury()
+        .accountsPartial({
+          payer: user,
+          admin: user,
+          treasury: treasuryPda,
+          tokenMint,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([userKp])
+        .rpc({ skipPreflight: true })
+    );
+    log("Initialize treasury tx", tx);
+    await awaitWithLog(
+      "confirmTransaction (initialize treasury)",
+      provider.connection.confirmTransaction(tx)
+    );
+
+    const treasury = await awaitWithLog(
+      "fetch treasury",
+      program.account.treasury.fetch(treasuryPda)
+    );
+    assert.equal(treasury.admin.toBase58(), user.toBase58());
+    assert.equal(treasury.amount.toNumber(), 0);
+  });
+
   it("Create permission", async () => {
     for (const { deposit, kp } of [
       { deposit: depositPda, kp: userKp },
@@ -719,6 +755,28 @@ describe("telegram-private-transfer", () => {
         provider.connection.confirmTransaction(tx)
       );
     }
+
+    const treasuryPermission = permissionPdaFromAccount(treasuryPda);
+    const treasuryPermissionTx = await awaitWithLog(
+      "createTreasuryPermission",
+      program.methods
+        .createTreasuryPermission()
+        .accountsPartial({
+          payer: user,
+          admin: user,
+          treasury: treasuryPda,
+          permission: treasuryPermission,
+          permissionProgram: PERMISSION_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([userKp])
+        .rpc({ skipPreflight: true })
+    );
+    log("Create treasury permission tx", treasuryPermissionTx);
+    await awaitWithLog(
+      "confirmTransaction (create treasury permission)",
+      provider.connection.confirmTransaction(treasuryPermissionTx)
+    );
   });
 
   it("Delegate", async () => {
@@ -744,9 +802,30 @@ describe("telegram-private-transfer", () => {
         provider.connection.confirmTransaction(tx)
       );
     }
+
+    const treasuryDelegateTx = await awaitWithLog(
+      "delegateTreasury",
+      program.methods
+        .delegateTreasury(tokenMint)
+        .accountsPartial({
+          payer: user,
+          admin: user,
+          treasury: treasuryPda,
+          validator: erValidator,
+        })
+        .signers([userKp])
+        .rpc({ skipPreflight: true })
+    );
+    log("Delegate treasury tx", treasuryDelegateTx);
+    await awaitWithLog(
+      "confirmTransaction (delegate treasury)",
+      provider.connection.confirmTransaction(treasuryDelegateTx)
+    );
   });
 
   it("Transfer", async () => {
+    const transferAmount = initialAmount / 2;
+    const expectedFee = Math.floor((transferAmount * 20) / 10_000);
     const maxAttempts = Number(process.env.TRANSFER_RETRIES ?? "30");
     const retryDelayMs = Number(process.env.TRANSFER_RETRY_DELAY_MS ?? "1000");
     log(
@@ -760,11 +839,12 @@ describe("telegram-private-transfer", () => {
         tx = await awaitWithLog(
           `transferDeposit attempt ${attempt}`,
           ephemeralProgramUser.methods
-            .transferDeposit(new anchor.BN(initialAmount / 2))
+            .transferDeposit(new anchor.BN(transferAmount))
             .accountsPartial({
               user,
               sourceDeposit: depositPda,
               destinationDeposit: otherDepositPda,
+              treasury: treasuryPda,
               sessionToken: null,
               tokenMint,
             })
@@ -808,13 +888,19 @@ describe("telegram-private-transfer", () => {
       "fetch deposit (user, after transfer)",
       ephemeralProgramUser.account.deposit.fetch(depositPda)
     );
-    assert.equal(deposit.amount.toNumber(), initialAmount / 2);
+    assert.equal(deposit.amount.toNumber(), initialAmount - transferAmount);
 
     deposit = await awaitWithLog(
       "fetch deposit (other, after transfer)",
       ephemeralProgramOtherUser.account.deposit.fetch(otherDepositPda)
     );
-    assert.equal(deposit.amount.toNumber(), initialAmount / 2);
+    assert.equal(deposit.amount.toNumber(), transferAmount - expectedFee);
+
+    const treasury = await awaitWithLog(
+      "fetch treasury (after transfer)",
+      ephemeralProgramUser.account.treasury.fetch(treasuryPda)
+    );
+    assert.equal(treasury.amount.toNumber(), expectedFee);
   });
 
   const runTransfers = async (
@@ -847,6 +933,7 @@ describe("telegram-private-transfer", () => {
                 user: userKey,
                 sourceDeposit: source,
                 destinationDeposit: destination,
+                treasury: treasuryPda,
                 sessionToken: null,
                 tokenMint,
               })
@@ -1059,6 +1146,8 @@ describe("telegram-private-transfer", () => {
   });
 
   it("Private transfer to username deposit (ER)", async () => {
+    const transferAmount = initialAmount / 10;
+    const transferFee = Math.floor((transferAmount * 20) / 10_000);
     const maxAttempts = Number(process.env.TRANSFER_RETRIES ?? "30");
     const retryDelayMs = Number(process.env.TRANSFER_RETRY_DELAY_MS ?? "1000");
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -1066,12 +1155,13 @@ describe("telegram-private-transfer", () => {
         usernameTransferSig = await awaitWithLog(
           `transferToUsernameDeposit attempt ${attempt}`,
           ephemeralProgramUser.methods
-            .transferToUsernameDeposit(new anchor.BN(initialAmount / 10))
+            .transferToUsernameDeposit(new anchor.BN(transferAmount))
             .accountsPartial({
               user,
               payer: user,
               sourceDeposit: depositPda,
               destinationDeposit: usernameDepositPda,
+              treasury: treasuryPda,
               sessionToken: null,
               tokenMint,
             })
@@ -1114,7 +1204,10 @@ describe("telegram-private-transfer", () => {
         usernameDepositPda
       )
     );
-    assert.equal(usernameDeposit.amount.toNumber(), initialAmount / 5);
+    assert.equal(
+      usernameDeposit.amount.toNumber(),
+      initialAmount / 5 - transferFee
+    );
   });
 
   it("Third user cannot observe transfers in PER", async () => {
@@ -1230,7 +1323,7 @@ describe("telegram-private-transfer", () => {
   });
 
   it("Commit check: base chain sees username bucket update only after undelegation", async () => {
-    const expected = initialAmount / 5;
+    const expected = initialAmount / 5 - Math.floor(((initialAmount / 10) * 20) / 10_000);
     for (let i = 0; i < COMMIT_MAX_POLLS; i += 1) {
       const d = await program.account.usernameDeposit.fetch(usernameDepositPda);
       if (d.amount.toNumber() === expected) {

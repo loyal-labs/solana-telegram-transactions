@@ -8,6 +8,7 @@ import {
   PROGRAM_ID,
   ER_VALIDATOR,
   findUsernameDepositPda,
+  findTreasuryPda,
   DELEGATION_PROGRAM_ID,
 } from "../index";
 import {
@@ -419,6 +420,12 @@ export async function transferTokensToUsername(params: {
   const client = await getLoyalClient();
   const { tokenMint, amount, destinationUsername } = params;
 
+  await ensureTreasuryDelegated({
+    client,
+    admin: keypair.publicKey,
+    tokenMint,
+  });
+
   const existingBaseUsernameDeposit = await client.getBaseUsernameDeposit(
     destinationUsername,
     tokenMint
@@ -471,6 +478,52 @@ export async function transferTokensToUsername(params: {
   return transferToUsernameDepositSig;
 }
 
+async function ensureTreasuryDelegated(params: {
+  client: LoyalPrivateTransactionsClient;
+  admin: PublicKey;
+  tokenMint: PublicKey;
+}): Promise<void> {
+  const { client, admin, tokenMint } = params;
+  const [treasuryPda] = findTreasuryPda(tokenMint);
+  const treasuryAccountInfo =
+    await client.baseProgram.provider.connection.getAccountInfo(treasuryPda);
+
+  if (!treasuryAccountInfo) {
+    console.log("initializeTreasury");
+    const initializeTreasurySig = await client.initializeTreasury({
+      admin,
+      tokenMint,
+      payer: admin,
+    });
+    console.log("initializeTreasury sig", initializeTreasurySig);
+
+    console.log("createTreasuryPermission");
+    const createTreasuryPermissionSig = await client.createTreasuryPermission({
+      admin,
+      tokenMint,
+      payer: admin,
+    });
+    console.log("createTreasuryPermission sig", createTreasuryPermissionSig);
+  }
+
+  const treasuryAccountInfoAfterInit =
+    await client.baseProgram.provider.connection.getAccountInfo(treasuryPda);
+  const isDelegated = treasuryAccountInfoAfterInit?.owner.equals(
+    DELEGATION_PROGRAM_ID
+  );
+
+  if (!isDelegated) {
+    console.log("delegateTreasury");
+    const delegateTreasurySig = await client.delegateTreasury({
+      admin,
+      tokenMint,
+      payer: admin,
+      validator: ER_VALIDATOR,
+    });
+    console.log("delegateTreasury sig", delegateTreasurySig);
+  }
+}
+
 export async function transferTokens(params: {
   tokenMint: PublicKey;
   amount: number;
@@ -481,6 +534,12 @@ export async function transferTokens(params: {
   const keypair = await getWalletKeypair();
   const client = await getLoyalClient();
   const { tokenMint, amount, destination } = params;
+
+  await ensureTreasuryDelegated({
+    client,
+    admin: keypair.publicKey,
+    tokenMint,
+  });
 
   const existingBaseDeposit = await client.getBaseDeposit(
     destination,
