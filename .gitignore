@@ -78,3 +78,8 @@ docs/plans
 docs/scopes
 
 .entire/
+
+# userbot worker local storage overrides
+/.data/userbot/
+/workers/userbot/.data/
+/workers/userbot/node_modules/
