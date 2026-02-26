@@ -1,0 +1,20 @@
+{
+  "name": "@loyal-labs/userbot-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/worker.ts",
+    "auth:bootstrap": "bun run src/commands/auth-bootstrap.ts",
+    "auth:status": "bun run src/commands/auth-status.ts",
+    "auth:clear": "bun run src/commands/auth-clear.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@mtcute/bun": "^0.28.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20.19.0",
+    "typescript": "^5.7.3"
+  }
+}
