@@ -1,7 +1,7 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Program } from "@coral-xyz/anchor";
 import type { TelegramPrivateTransfer } from "./idl/telegram_private_transfer.ts";
-import type { WalletLike, ClientConfig, DepositData, UsernameDepositData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, DepositForUsernameParams, ClaimUsernameDepositParams, CreatePermissionParams, CreateUsernamePermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams, TransferDepositParams, TransferToUsernameDepositParams, InitializeUsernameDepositParams, ClaimUsernameDepositToDepositParams } from "./types";
+import type { WalletLike, ClientConfig, DepositData, UsernameDepositData, TreasuryData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, DepositForUsernameParams, ClaimUsernameDepositParams, CreatePermissionParams, CreateUsernamePermissionParams, InitializeTreasuryParams, CreateTreasuryPermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, DelegateTreasuryParams, UndelegateDepositParams, UndelegateUsernameDepositParams, UndelegateTreasuryParams, WithdrawTreasuryFeesParams, TransferDepositParams, TransferToUsernameDepositParams, InitializeUsernameDepositParams, ClaimUsernameDepositToDepositParams } from "./types";
 export declare function waitForAccountOwnerChange(connection: Connection, account: PublicKey, expectedOwner: PublicKey, timeoutMs?: number, intervalMs?: number): {
     wait: () => Promise<void>;
     cancel: () => Promise<void>;
@@ -48,6 +48,7 @@ export declare class LoyalPrivateTransactionsClient {
      */
     initializeDeposit(params: InitializeDepositParams): Promise<string>;
     initializeUsernameDeposit(params: InitializeUsernameDepositParams): Promise<string>;
+    initializeTreasury(params: InitializeTreasuryParams): Promise<string>;
     /**
      * Modify the balance of a user's deposit account
      */
@@ -70,6 +71,10 @@ export declare class LoyalPrivateTransactionsClient {
      */
     createUsernamePermission(params: CreateUsernamePermissionParams): Promise<string | null>;
     /**
+     * Create a permission for the treasury account
+     */
+    createTreasuryPermission(params: CreateTreasuryPermissionParams): Promise<string | null>;
+    /**
      * Delegate a deposit account to the ephemeral rollup
      */
     delegateDeposit(params: DelegateDepositParams): Promise<string>;
@@ -77,6 +82,10 @@ export declare class LoyalPrivateTransactionsClient {
      * Delegate a username-based deposit account to the ephemeral rollup
      */
     delegateUsernameDeposit(params: DelegateUsernameDepositParams): Promise<string>;
+    /**
+     * Delegate treasury account to the ephemeral rollup
+     */
+    delegateTreasury(params: DelegateTreasuryParams): Promise<string>;
     /**
      * Undelegate a deposit account from the ephemeral rollup.
      * Waits for both base and ephemeral connections to confirm the deposit
@@ -87,6 +96,14 @@ export declare class LoyalPrivateTransactionsClient {
      * Undelegate a username-based deposit account from the ephemeral rollup
      */
     undelegateUsernameDeposit(params: UndelegateUsernameDepositParams): Promise<string>;
+    /**
+     * Undelegate treasury account from the ephemeral rollup
+     */
+    undelegateTreasury(params: UndelegateTreasuryParams): Promise<string>;
+    /**
+     * Withdraw accrued transfer fees from treasury.
+     */
+    withdrawTreasuryFees(params: WithdrawTreasuryFeesParams): Promise<string>;
     /**
      * Transfer between two user deposits
      */
@@ -105,6 +122,8 @@ export declare class LoyalPrivateTransactionsClient {
      */
     getBaseUsernameDeposit(username: string, tokenMint: PublicKey): Promise<UsernameDepositData | null>;
     getEphemeralUsernameDeposit(username: string, tokenMint: PublicKey): Promise<UsernameDepositData | null>;
+    getBaseTreasury(tokenMint: PublicKey): Promise<TreasuryData | null>;
+    getEphemeralTreasury(tokenMint: PublicKey): Promise<TreasuryData | null>;
     /**
      * Find the deposit PDA for a user and token mint
      */
@@ -118,6 +137,10 @@ export declare class LoyalPrivateTransactionsClient {
      */
     findVaultPda(tokenMint: PublicKey): [PublicKey, number];
     /**
+     * Find the treasury PDA
+     */
+    findTreasuryPda(tokenMint: PublicKey): [PublicKey, number];
+    /**
      * Get the connected wallet's public key
      */
     get publicKey(): PublicKey;
@@ -130,6 +153,7 @@ export declare class LoyalPrivateTransactionsClient {
      * Get the program ID
      */
     getProgramId(): PublicKey;
+    private ensureTreasuryPrepared;
     private validateUsername;
     private permissionAccountExists;
     private isAccountAlreadyInUse;

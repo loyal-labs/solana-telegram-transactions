@@ -3,6 +3,7 @@ import {
   DEPOSIT_SEED_BYTES,
   USERNAME_DEPOSIT_SEED_BYTES,
   VAULT_SEED_BYTES,
+  TREASURY_SEED_BYTES,
   PERMISSION_SEED_BYTES,
   PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
@@ -60,6 +61,23 @@ export function findVaultPda(
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [VAULT_SEED_BYTES, tokenMint.toBuffer()],
+    programId
+  );
+}
+
+/**
+ * Derive the treasury PDA
+ *
+ * @param tokenMint - The SPL token mint
+ * @param programId - Optional program ID (defaults to PROGRAM_ID)
+ * @returns [PDA address, bump seed]
+ */
+export function findTreasuryPda(
+  tokenMint: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [TREASURY_SEED_BYTES, tokenMint.toBuffer()],
     programId
   );
 }

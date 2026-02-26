@@ -8,7 +8,10 @@ import {
   PROGRAM_ID,
   ER_VALIDATOR,
   findUsernameDepositPda,
+  findTreasuryPda,
+  findPermissionPda,
   DELEGATION_PROGRAM_ID,
+  PERMISSION_PROGRAM_ID,
 } from "../index";
 import {
   Connection,
@@ -70,12 +73,12 @@ async function getOrCacheAuthToken(
 ): Promise<{ token: string; expiresAt: number }> {
   const cacheKey = `${ephemeralRpcEndpoint}:${keypair.publicKey.toBase58()}`;
   const cache = await loadTokenCache();
-  const cached = cache[cacheKey];
+  // const cached = cache[cacheKey];
 
-  if (cached && cached.expiresAt > Date.now() / 1000 + 60) {
-    console.log(`Using cached auth token for ${keypair.publicKey.toBase58()}`);
-    return cached;
-  }
+  // if (cached && cached.expiresAt > Date.now() / 1000 + 60) {
+  //   console.log(`Using cached auth token for ${keypair.publicKey.toBase58()}`);
+  //   return cached;
+  // }
 
   const isVerified = await verifyTeeRpcIntegrity(ephemeralRpcEndpoint);
   if (!isVerified) {
@@ -419,6 +422,57 @@ export async function transferTokensToUsername(params: {
   const client = await getLoyalClient();
   const { tokenMint, amount, destinationUsername } = params;
 
+  // Unlock treasury permission before undelegating
+  const [treasuryPda] = findTreasuryPda(tokenMint);
+  const [permissionPda] = findPermissionPda(treasuryPda);
+
+  console.log(
+    "updateTreasuryPermission",
+    prettyStringify({
+      admin: keypair.publicKey,
+      treasury: treasuryPda,
+      permission: permissionPda,
+      permissionProgram: PERMISSION_PROGRAM_ID,
+    })
+  );
+  const updateTreasuryPermissionSig = await client.ephemeralProgram.methods
+    .updateTreasuryPermission()
+    .accountsPartial({
+      admin: keypair.publicKey,
+      treasury: treasuryPda,
+      permission: permissionPda,
+      permissionProgram: PERMISSION_PROGRAM_ID,
+    })
+    .rpc();
+  console.log("updateTreasuryPermission sig", updateTreasuryPermissionSig);
+
+  // TODO: remove
+  console.log(
+    "undelegateTreasury",
+    prettyStringify({
+      admin: keypair.publicKey,
+      tokenMint,
+      payer: keypair.publicKey,
+      magicProgram: MAGIC_PROGRAM_ID,
+      magicContext: MAGIC_CONTEXT_ID,
+    })
+  );
+  const undelegateTreasurySig = await client.undelegateTreasury({
+    admin: keypair.publicKey,
+    tokenMint,
+    payer: keypair.publicKey,
+    magicProgram: MAGIC_PROGRAM_ID,
+    magicContext: MAGIC_CONTEXT_ID,
+  });
+  console.log("undelegateTreasury sig", undelegateTreasurySig);
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+
+  await ensureTreasuryDelegated({
+    client,
+    admin: keypair.publicKey,
+    tokenMint,
+  });
+
   const existingBaseUsernameDeposit = await client.getBaseUsernameDeposit(
     destinationUsername,
     tokenMint
@@ -471,6 +525,68 @@ export async function transferTokensToUsername(params: {
   return transferToUsernameDepositSig;
 }
 
+async function ensureTreasuryDelegated(params: {
+  client: LoyalPrivateTransactionsClient;
+  admin: PublicKey;
+  tokenMint: PublicKey;
+}): Promise<void> {
+  const { client, admin, tokenMint } = params;
+  const [treasuryPda] = findTreasuryPda(tokenMint);
+  const treasuryAccountInfo =
+    await client.baseProgram.provider.connection.getAccountInfo(treasuryPda);
+  const treasuryData = await client.baseProgram.account.treasury.fetch(
+    treasuryPda
+  );
+  const treasuryEphemeralAccountInfo =
+    await client.ephemeralProgram.provider.connection.getAccountInfo(
+      treasuryPda
+    );
+  const treasuryEphemeralData =
+    await client.ephemeralProgram.account.treasury.fetch(treasuryPda);
+  console.log("treasuryAccountInfo", prettyStringify(treasuryAccountInfo));
+  console.log(
+    "treasuryEphemeralAccountInfo",
+    prettyStringify(treasuryEphemeralAccountInfo)
+  );
+  console.log("treasuryData", prettyStringify(treasuryData));
+  console.log("treasuryEphemeralData", prettyStringify(treasuryEphemeralData));
+
+  if (!treasuryAccountInfo) {
+    console.log("initializeTreasury");
+    const initializeTreasurySig = await client.initializeTreasury({
+      admin,
+      tokenMint,
+      payer: admin,
+    });
+    console.log("initializeTreasury sig", initializeTreasurySig);
+
+    console.log("createTreasuryPermission");
+    const createTreasuryPermissionSig = await client.createTreasuryPermission({
+      admin,
+      tokenMint,
+      payer: admin,
+    });
+    console.log("createTreasuryPermission sig", createTreasuryPermissionSig);
+  }
+
+  const treasuryAccountInfoAfterInit =
+    await client.baseProgram.provider.connection.getAccountInfo(treasuryPda);
+  const isDelegated = treasuryAccountInfoAfterInit?.owner.equals(
+    DELEGATION_PROGRAM_ID
+  );
+
+  if (!isDelegated) {
+    console.log("delegateTreasury");
+    const delegateTreasurySig = await client.delegateTreasury({
+      admin,
+      tokenMint,
+      payer: admin,
+      validator: ER_VALIDATOR,
+    });
+    console.log("delegateTreasury sig", delegateTreasurySig);
+  }
+}
+
 export async function transferTokens(params: {
   tokenMint: PublicKey;
   amount: number;
@@ -481,6 +597,12 @@ export async function transferTokens(params: {
   const keypair = await getWalletKeypair();
   const client = await getLoyalClient();
   const { tokenMint, amount, destination } = params;
+
+  await ensureTreasuryDelegated({
+    client,
+    admin: keypair.publicKey,
+    tokenMint,
+  });
 
   const existingBaseDeposit = await client.getBaseDeposit(
     destination,

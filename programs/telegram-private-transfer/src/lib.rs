@@ -14,6 +14,11 @@ declare_id!("97FzQdWi26mFNR21AbQNg4KqofiCLqQydQfAvRQMcXhV");
 pub const DEPOSIT_PDA_SEED: &[u8] = b"deposit";
 pub const USERNAME_DEPOSIT_PDA_SEED: &[u8] = b"username_deposit";
 pub const VAULT_PDA_SEED: &[u8] = b"vault";
+pub const TREASURY_PDA_SEED: &[u8] = b"treasury";
+
+const TRANSFER_FEE_BPS: u64 = 20; // 0.2%
+const BPS_DENOMINATOR: u64 = 10_000;
+const TREASURY_COMMIT_FREQUENCY_MS: u32 = 30_000;
 
 const MIN_USERNAME_LEN: usize = 5;
 const MAX_USERNAME_LEN: usize = 32;
@@ -22,9 +27,12 @@ const MAX_USERNAME_LEN: usize = 32;
 #[program]
 pub mod telegram_private_transfer {
     use anchor_spl::token::{transfer_checked, TransferChecked};
-    use ephemeral_rollups_sdk::access_control::structs::{
-        Member, MembersArgs, ACCOUNT_SIGNATURES_FLAG, AUTHORITY_FLAG, TX_BALANCES_FLAG,
-        TX_LOGS_FLAG, TX_MESSAGE_FLAG,
+    use ephemeral_rollups_sdk::access_control::{
+        instructions::UpdatePermissionCpiBuilder,
+        structs::{
+            Member, MembersArgs, ACCOUNT_SIGNATURES_FLAG, AUTHORITY_FLAG, TX_BALANCES_FLAG,
+            TX_LOGS_FLAG, TX_MESSAGE_FLAG,
+        },
     };
 
     use super::*;
@@ -61,6 +69,32 @@ pub mod telegram_private_transfer {
             deposit.token_mint = ctx.accounts.token_mint.key();
             deposit.username = username.clone();
             deposit.amount = 0;
+        }
+
+        Ok(())
+    }
+
+    /// Initializes treasury account for a token mint.
+    pub fn initialize_treasury(ctx: Context<InitializeTreasury>) -> Result<()> {
+        let treasury = &mut ctx.accounts.treasury;
+
+        if treasury.token_mint == Pubkey::default() {
+            treasury.set_inner(Treasury {
+                admin: ctx.accounts.admin.key(),
+                token_mint: ctx.accounts.token_mint.key(),
+                amount: 0,
+            });
+        } else {
+            require_keys_eq!(
+                treasury.token_mint,
+                ctx.accounts.token_mint.key(),
+                ErrorCode::InvalidMint
+            );
+            require_keys_eq!(
+                treasury.admin,
+                ctx.accounts.admin.key(),
+                ErrorCode::Unauthorized
+            );
         }
 
         Ok(())
@@ -248,6 +282,11 @@ pub mod telegram_private_transfer {
     pub fn transfer_deposit(ctx: Context<TransferDeposit>, amount: u64) -> Result<()> {
         let source_deposit = &mut ctx.accounts.source_deposit;
         let destination_deposit = &mut ctx.accounts.destination_deposit;
+        let treasury = &mut ctx.accounts.treasury;
+        let fee = calculate_transfer_fee(amount)?;
+        let net_amount = amount
+            .checked_sub(fee)
+            .ok_or(ErrorCode::InsufficientDeposit)?;
 
         source_deposit.amount = source_deposit
             .amount
@@ -255,7 +294,11 @@ pub mod telegram_private_transfer {
             .ok_or(ErrorCode::InsufficientDeposit)?;
         destination_deposit.amount = destination_deposit
             .amount
-            .checked_add(amount)
+            .checked_add(net_amount)
+            .ok_or(ErrorCode::Overflow)?;
+        treasury.amount = treasury
+            .amount
+            .checked_add(fee)
             .ok_or(ErrorCode::Overflow)?;
 
         Ok(())
@@ -274,6 +317,11 @@ pub mod telegram_private_transfer {
     ) -> Result<()> {
         let source_deposit = &mut ctx.accounts.source_deposit;
         let destination_deposit = &mut ctx.accounts.destination_deposit;
+        let treasury = &mut ctx.accounts.treasury;
+        let fee = calculate_transfer_fee(amount)?;
+        let net_amount = amount
+            .checked_sub(fee)
+            .ok_or(ErrorCode::InsufficientDeposit)?;
 
         source_deposit.amount = source_deposit
             .amount
@@ -281,7 +329,11 @@ pub mod telegram_private_transfer {
             .ok_or(ErrorCode::InsufficientDeposit)?;
         destination_deposit.amount = destination_deposit
             .amount
-            .checked_add(amount)
+            .checked_add(net_amount)
+            .ok_or(ErrorCode::Overflow)?;
+        treasury.amount = treasury
+            .amount
+            .checked_add(fee)
             .ok_or(ErrorCode::Overflow)?;
 
         Ok(())
@@ -379,6 +431,52 @@ pub mod telegram_private_transfer {
         Ok(())
     }
 
+    /// Creates a permission for the treasury account.
+    pub fn create_treasury_permission(ctx: Context<CreateTreasuryPermission>) -> Result<()> {
+        let CreateTreasuryPermission {
+            payer,
+            permission,
+            permission_program,
+            treasury,
+            system_program,
+            ..
+        } = ctx.accounts;
+
+        CreatePermissionCpiBuilder::new(&permission_program)
+            .permission(&permission)
+            .permissioned_account(&treasury.to_account_info())
+            .payer(&payer)
+            .system_program(system_program)
+            .args(MembersArgs { members: None })
+            .invoke_signed(&[&[
+                TREASURY_PDA_SEED,
+                treasury.token_mint.as_ref(),
+                &[ctx.bumps.treasury],
+            ]])?;
+
+        Ok(())
+    }
+
+    /// Updates the treasury permission to unlock (set members to None).
+    pub fn update_treasury_permission(ctx: Context<UpdateTreasuryPermission>) -> Result<()> {
+        let UpdateTreasuryPermission {
+            admin,
+            permission,
+            permission_program,
+            treasury,
+            ..
+        } = ctx.accounts;
+
+        UpdatePermissionCpiBuilder::new(&permission_program)
+            .authority(&admin, true)
+            .permissioned_account(&treasury.to_account_info(), false)
+            .permission(&permission)
+            .args(MembersArgs { members: None })
+            .invoke()?;
+
+        Ok(())
+    }
+
     /// Delegates the deposit account to the ephemeral rollups delegate program.
     ///
     /// Uses the ephemeral rollups delegate CPI to delegate the deposit account.
@@ -390,6 +488,31 @@ pub mod telegram_private_transfer {
             DelegateConfig {
                 validator,
                 commit_frequency_ms: 0,
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Delegates the treasury account to the ephemeral rollups delegate program.
+    pub fn delegate_treasury(ctx: Context<DelegateTreasury>, token_mint: Pubkey) -> Result<()> {
+        {
+            let treasury_data = ctx.accounts.treasury.data.borrow();
+            let mut treasury_data_slice: &[u8] = &treasury_data;
+            let treasury = Treasury::try_deserialize(&mut treasury_data_slice)?;
+            require_keys_eq!(
+                treasury.admin,
+                ctx.accounts.admin.key(),
+                ErrorCode::Unauthorized
+            );
+        }
+
+        let validator = ctx.accounts.validator.as_ref().map(|v| v.key());
+        ctx.accounts.delegate_treasury(
+            &ctx.accounts.payer,
+            &[TREASURY_PDA_SEED, token_mint.as_ref()],
+            DelegateConfig {
+                validator,
+                commit_frequency_ms: TREASURY_COMMIT_FREQUENCY_MS,
             },
         )?;
         Ok(())
@@ -484,6 +607,54 @@ pub mod telegram_private_transfer {
         )?;
         Ok(())
     }
+
+    /// Commits and undelegates the treasury account from the ephemeral rollups program.
+    pub fn undelegate_treasury(ctx: Context<UndelegateTreasury>) -> Result<()> {
+        commit_and_undelegate_accounts(
+            &ctx.accounts.payer,
+            vec![&ctx.accounts.treasury.to_account_info()],
+            &ctx.accounts.magic_context,
+            &ctx.accounts.magic_program,
+        )?;
+        Ok(())
+    }
+
+    /// Withdraws accrued transfer fees from vault to treasury admin token account.
+    pub fn withdraw_treasury_fees(ctx: Context<WithdrawTreasuryFees>, amount: u64) -> Result<()> {
+        let treasury = &mut ctx.accounts.treasury;
+        require!(
+            treasury.amount >= amount,
+            ErrorCode::InsufficientTreasuryFees
+        );
+
+        let seeds = [
+            VAULT_PDA_SEED,
+            &ctx.accounts.token_mint.key().to_bytes(),
+            &[ctx.bumps.vault],
+        ];
+        let signer_seeds = &[&seeds[..]];
+        transfer_checked(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                TransferChecked {
+                    from: ctx.accounts.vault_token_account.to_account_info(),
+                    mint: ctx.accounts.token_mint.to_account_info(),
+                    to: ctx.accounts.admin_token_account.to_account_info(),
+                    authority: ctx.accounts.vault.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            amount,
+            ctx.accounts.token_mint.decimals,
+        )?;
+
+        treasury.amount = treasury
+            .amount
+            .checked_sub(amount)
+            .ok_or(ErrorCode::InsufficientTreasuryFees)?;
+
+        Ok(())
+    }
 }
 
 // ---------------- Accounts ----------------
@@ -525,6 +696,23 @@ pub struct InitializeUsernameDeposit<'info> {
     pub deposit: Account<'info, UsernameDeposit>,
     pub token_mint: Account<'info, Mint>,
     pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeTreasury<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub admin: Signer<'info>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + Treasury::INIT_SPACE,
+        seeds = [TREASURY_PDA_SEED, token_mint.key().as_ref()],
+        bump
+    )]
+    pub treasury: Account<'info, Treasury>,
+    pub token_mint: Account<'info, Mint>,
     pub system_program: Program<'info, System>,
 }
 
@@ -721,6 +909,13 @@ pub struct TransferDeposit<'info> {
         has_one = token_mint,
     )]
     pub destination_deposit: Account<'info, Deposit>,
+    #[account(
+        mut,
+        seeds = [TREASURY_PDA_SEED, token_mint.key().as_ref()],
+        bump,
+        has_one = token_mint,
+    )]
+    pub treasury: Account<'info, Treasury>,
     pub token_mint: Account<'info, Mint>,
     pub system_program: Program<'info, System>,
 }
@@ -759,6 +954,13 @@ pub struct TransferToUsernameDeposit<'info> {
         has_one = token_mint,
     )]
     pub destination_deposit: Account<'info, UsernameDeposit>,
+    #[account(
+        mut,
+        seeds = [TREASURY_PDA_SEED, token_mint.key().as_ref()],
+        bump,
+        has_one = token_mint,
+    )]
+    pub treasury: Account<'info, Treasury>,
     pub token_mint: Account<'info, Mint>,
     pub system_program: Program<'info, System>,
 }
@@ -809,6 +1011,41 @@ pub struct CreateUsernamePermission<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+pub struct CreateTreasuryPermission<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub admin: Signer<'info>,
+    #[account(
+        seeds = [TREASURY_PDA_SEED, treasury.token_mint.as_ref()],
+        bump,
+        has_one = admin,
+    )]
+    pub treasury: Account<'info, Treasury>,
+    /// CHECK: Checked by the permission program
+    #[account(mut)]
+    pub permission: UncheckedAccount<'info>,
+    /// CHECK: Checked by the permission program
+    pub permission_program: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateTreasuryPermission<'info> {
+    pub admin: Signer<'info>,
+    #[account(
+        seeds = [TREASURY_PDA_SEED, treasury.token_mint.as_ref()],
+        bump,
+        has_one = admin,
+    )]
+    pub treasury: Account<'info, Treasury>,
+    /// CHECK: Checked by the permission program
+    #[account(mut)]
+    pub permission: UncheckedAccount<'info>,
+    /// CHECK: Checked by the permission program
+    pub permission_program: UncheckedAccount<'info>,
+}
+
 #[delegate]
 #[derive(Accounts)]
 #[instruction(user: Pubkey, token_mint: Pubkey)]
@@ -849,6 +1086,25 @@ pub struct DelegateUsernameDeposit<'info> {
         bump,
     )]
     pub deposit: AccountInfo<'info>,
+}
+
+#[delegate]
+#[derive(Accounts)]
+#[instruction(token_mint: Pubkey)]
+pub struct DelegateTreasury<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub admin: Signer<'info>,
+    /// CHECK: Checked by the delegate program
+    pub validator: Option<AccountInfo<'info>>,
+    /// CHECK: Checked by the delegate program
+    #[account(
+        mut,
+        del,
+        seeds = [TREASURY_PDA_SEED, token_mint.as_ref()],
+        bump,
+    )]
+    pub treasury: AccountInfo<'info>,
 }
 
 #[commit]
@@ -896,6 +1152,58 @@ pub struct UndelegateUsernameDeposit<'info> {
     pub deposit: AccountInfo<'info>,
 }
 
+#[commit]
+#[derive(Accounts)]
+pub struct UndelegateTreasury<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub admin: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [TREASURY_PDA_SEED, treasury.token_mint.as_ref()],
+        bump,
+        has_one = admin,
+    )]
+    pub treasury: Account<'info, Treasury>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawTreasuryFees<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [TREASURY_PDA_SEED, token_mint.key().as_ref()],
+        bump,
+        has_one = admin,
+        has_one = token_mint,
+    )]
+    pub treasury: Account<'info, Treasury>,
+    #[account(
+        mut,
+        seeds = [VAULT_PDA_SEED, token_mint.key().as_ref()],
+        bump,
+    )]
+    pub vault: Account<'info, Vault>,
+    #[account(
+        mut,
+        associated_token::mint = token_mint,
+        associated_token::authority = vault,
+    )]
+    pub vault_token_account: Account<'info, TokenAccount>,
+    #[account(
+        init_if_needed,
+        payer = admin,
+        associated_token::mint = token_mint,
+        associated_token::authority = admin,
+    )]
+    pub admin_token_account: Account<'info, TokenAccount>,
+    pub token_mint: Account<'info, Mint>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
 // ---------------- State ----------------
 
 /// A deposit account for a user and token mint.
@@ -925,6 +1233,15 @@ pub struct Vault {
     _dummy: u8,
 }
 
+/// Treasury fee ledger by token mint.
+#[account]
+#[derive(InitSpace)]
+pub struct Treasury {
+    pub admin: Pubkey,
+    pub token_mint: Pubkey,
+    pub amount: u64,
+}
+
 // ---------------- Error Codes ----------------
 #[error_code]
 pub enum ErrorCode {
@@ -952,6 +1269,18 @@ pub enum ErrorCode {
     InvalidRecipient,
     #[msg("Invalid Depositor")]
     InvalidDepositor,
+    #[msg("Insufficient Treasury Fees")]
+    InsufficientTreasuryFees,
+}
+
+fn calculate_transfer_fee(amount: u64) -> Result<u64> {
+    let scaled = amount
+        .checked_mul(TRANSFER_FEE_BPS)
+        .ok_or(ErrorCode::Overflow)?;
+    let fee = scaled
+        .checked_div(BPS_DENOMINATOR)
+        .ok_or(ErrorCode::Overflow)?;
+    Ok(fee)
 }
 
 fn validate_username(username: &str) -> Result<()> {

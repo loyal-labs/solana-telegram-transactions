@@ -385,6 +385,73 @@ export type TelegramPrivateTransfer = {
             "args": [];
         },
         {
+            "name": "createTreasuryPermission";
+            "docs": [
+                "Creates a permission for the treasury account."
+            ];
+            "discriminator": [
+                175,
+                4,
+                167,
+                154,
+                92,
+                228,
+                204,
+                69
+            ];
+            "accounts": [
+                {
+                    "name": "payer";
+                    "writable": true;
+                    "signer": true;
+                },
+                {
+                    "name": "admin";
+                    "signer": true;
+                    "relations": [
+                        "treasury"
+                    ];
+                },
+                {
+                    "name": "treasury";
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const";
+                                "value": [
+                                    116,
+                                    114,
+                                    101,
+                                    97,
+                                    115,
+                                    117,
+                                    114,
+                                    121
+                                ];
+                            },
+                            {
+                                "kind": "account";
+                                "path": "treasury.token_mint";
+                                "account": "treasury";
+                            }
+                        ];
+                    };
+                },
+                {
+                    "name": "permission";
+                    "writable": true;
+                },
+                {
+                    "name": "permissionProgram";
+                },
+                {
+                    "name": "systemProgram";
+                    "address": "11111111111111111111111111111111";
+                }
+            ];
+            "args": [];
+        },
+        {
             "name": "createUsernamePermission";
             "docs": [
                 "Creates a permission for a username-based deposit account."
@@ -668,6 +735,211 @@ export type TelegramPrivateTransfer = {
                     "name": "user";
                     "type": "pubkey";
                 },
+                {
+                    "name": "tokenMint";
+                    "type": "pubkey";
+                }
+            ];
+        },
+        {
+            "name": "delegateTreasury";
+            "docs": [
+                "Delegates the treasury account to the ephemeral rollups delegate program."
+            ];
+            "discriminator": [
+                220,
+                230,
+                45,
+                56,
+                92,
+                223,
+                162,
+                169
+            ];
+            "accounts": [
+                {
+                    "name": "payer";
+                    "writable": true;
+                    "signer": true;
+                },
+                {
+                    "name": "admin";
+                    "signer": true;
+                },
+                {
+                    "name": "validator";
+                    "optional": true;
+                },
+                {
+                    "name": "bufferTreasury";
+                    "writable": true;
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const";
+                                "value": [
+                                    98,
+                                    117,
+                                    102,
+                                    102,
+                                    101,
+                                    114
+                                ];
+                            },
+                            {
+                                "kind": "account";
+                                "path": "treasury";
+                            }
+                        ];
+                        "program": {
+                            "kind": "const";
+                            "value": [
+                                120,
+                                119,
+                                237,
+                                228,
+                                109,
+                                110,
+                                60,
+                                47,
+                                140,
+                                61,
+                                153,
+                                86,
+                                183,
+                                54,
+                                59,
+                                48,
+                                46,
+                                44,
+                                189,
+                                35,
+                                126,
+                                97,
+                                173,
+                                95,
+                                156,
+                                209,
+                                177,
+                                123,
+                                98,
+                                164,
+                                128,
+                                252
+                            ];
+                        };
+                    };
+                },
+                {
+                    "name": "delegationRecordTreasury";
+                    "writable": true;
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const";
+                                "value": [
+                                    100,
+                                    101,
+                                    108,
+                                    101,
+                                    103,
+                                    97,
+                                    116,
+                                    105,
+                                    111,
+                                    110
+                                ];
+                            },
+                            {
+                                "kind": "account";
+                                "path": "treasury";
+                            }
+                        ];
+                        "program": {
+                            "kind": "account";
+                            "path": "delegationProgram";
+                        };
+                    };
+                },
+                {
+                    "name": "delegationMetadataTreasury";
+                    "writable": true;
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const";
+                                "value": [
+                                    100,
+                                    101,
+                                    108,
+                                    101,
+                                    103,
+                                    97,
+                                    116,
+                                    105,
+                                    111,
+                                    110,
+                                    45,
+                                    109,
+                                    101,
+                                    116,
+                                    97,
+                                    100,
+                                    97,
+                                    116,
+                                    97
+                                ];
+                            },
+                            {
+                                "kind": "account";
+                                "path": "treasury";
+                            }
+                        ];
+                        "program": {
+                            "kind": "account";
+                            "path": "delegationProgram";
+                        };
+                    };
+                },
+                {
+                    "name": "treasury";
+                    "writable": true;
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const";
+                                "value": [
+                                    116,
+                                    114,
+                                    101,
+                                    97,
+                                    115,
+                                    117,
+                                    114,
+                                    121
+                                ];
+                            },
+                            {
+                                "kind": "arg";
+                                "path": "tokenMint";
+                            }
+                        ];
+                    };
+                },
+                {
+                    "name": "ownerProgram";
+                    "address": "97FzQdWi26mFNR21AbQNg4KqofiCLqQydQfAvRQMcXhV";
+                },
+                {
+                    "name": "delegationProgram";
+                    "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh";
+                },
+                {
+                    "name": "systemProgram";
+                    "address": "11111111111111111111111111111111";
+                }
+            ];
+            "args": [
                 {
                     "name": "tokenMint";
                     "type": "pubkey";
@@ -1160,6 +1432,66 @@ export type TelegramPrivateTransfer = {
                 {
                     "name": "tokenProgram";
                     "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+                },
+                {
+                    "name": "systemProgram";
+                    "address": "11111111111111111111111111111111";
+                }
+            ];
+            "args": [];
+        },
+        {
+            "name": "initializeTreasury";
+            "docs": [
+                "Initializes treasury account for a token mint."
+            ];
+            "discriminator": [
+                124,
+                186,
+                211,
+                195,
+                85,
+                165,
+                129,
+                166
+            ];
+            "accounts": [
+                {
+                    "name": "payer";
+                    "writable": true;
+                    "signer": true;
+                },
+                {
+                    "name": "admin";
+                    "signer": true;
+                },
+                {
+                    "name": "treasury";
+                    "writable": true;
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const";
+                                "value": [
+                                    116,
+                                    114,
+                                    101,
+                                    97,
+                                    115,
+                                    117,
+                                    114,
+                                    121
+                                ];
+                            },
+                            {
+                                "kind": "account";
+                                "path": "tokenMint";
+                            }
+                        ];
+                    };
+                },
+                {
+                    "name": "tokenMint";
                 },
                 {
                     "name": "systemProgram";
@@ -1667,10 +1999,36 @@ export type TelegramPrivateTransfer = {
                     };
                 },
                 {
+                    "name": "treasury";
+                    "writable": true;
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const";
+                                "value": [
+                                    116,
+                                    114,
+                                    101,
+                                    97,
+                                    115,
+                                    117,
+                                    114,
+                                    121
+                                ];
+                            },
+                            {
+                                "kind": "account";
+                                "path": "tokenMint";
+                            }
+                        ];
+                    };
+                },
+                {
                     "name": "tokenMint";
                     "relations": [
                         "sourceDeposit",
-                        "destinationDeposit"
+                        "destinationDeposit",
+                        "treasury"
                     ];
                 },
                 {
@@ -1788,10 +2146,36 @@ export type TelegramPrivateTransfer = {
                     };
                 },
                 {
+                    "name": "treasury";
+                    "writable": true;
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const";
+                                "value": [
+                                    116,
+                                    114,
+                                    101,
+                                    97,
+                                    115,
+                                    117,
+                                    114,
+                                    121
+                                ];
+                            },
+                            {
+                                "kind": "account";
+                                "path": "tokenMint";
+                            }
+                        ];
+                    };
+                },
+                {
                     "name": "tokenMint";
                     "relations": [
                         "sourceDeposit",
-                        "destinationDeposit"
+                        "destinationDeposit",
+                        "treasury"
                     ];
                 },
                 {
@@ -1861,6 +2245,72 @@ export type TelegramPrivateTransfer = {
                                 "kind": "account";
                                 "path": "deposit.token_mint";
                                 "account": "deposit";
+                            }
+                        ];
+                    };
+                },
+                {
+                    "name": "magicProgram";
+                    "address": "Magic11111111111111111111111111111111111111";
+                },
+                {
+                    "name": "magicContext";
+                    "writable": true;
+                    "address": "MagicContext1111111111111111111111111111111";
+                }
+            ];
+            "args": [];
+        },
+        {
+            "name": "undelegateTreasury";
+            "docs": [
+                "Commits and undelegates the treasury account from the ephemeral rollups program."
+            ];
+            "discriminator": [
+                203,
+                188,
+                100,
+                72,
+                202,
+                136,
+                195,
+                42
+            ];
+            "accounts": [
+                {
+                    "name": "payer";
+                    "writable": true;
+                    "signer": true;
+                },
+                {
+                    "name": "admin";
+                    "signer": true;
+                    "relations": [
+                        "treasury"
+                    ];
+                },
+                {
+                    "name": "treasury";
+                    "writable": true;
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const";
+                                "value": [
+                                    116,
+                                    114,
+                                    101,
+                                    97,
+                                    115,
+                                    117,
+                                    114,
+                                    121
+                                ];
+                            },
+                            {
+                                "kind": "account";
+                                "path": "treasury.token_mint";
+                                "account": "treasury";
                             }
                         ];
                     };
@@ -1958,6 +2408,283 @@ export type TelegramPrivateTransfer = {
                     "type": "pubkey";
                 }
             ];
+        },
+        {
+            "name": "withdrawTreasuryFees";
+            "docs": [
+                "Withdraws accrued transfer fees from vault to treasury admin token account."
+            ];
+            "discriminator": [
+                43,
+                110,
+                110,
+                113,
+                177,
+                16,
+                201,
+                250
+            ];
+            "accounts": [
+                {
+                    "name": "admin";
+                    "writable": true;
+                    "signer": true;
+                    "relations": [
+                        "treasury"
+                    ];
+                },
+                {
+                    "name": "treasury";
+                    "writable": true;
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const";
+                                "value": [
+                                    116,
+                                    114,
+                                    101,
+                                    97,
+                                    115,
+                                    117,
+                                    114,
+                                    121
+                                ];
+                            },
+                            {
+                                "kind": "account";
+                                "path": "tokenMint";
+                            }
+                        ];
+                    };
+                },
+                {
+                    "name": "vault";
+                    "writable": true;
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const";
+                                "value": [
+                                    118,
+                                    97,
+                                    117,
+                                    108,
+                                    116
+                                ];
+                            },
+                            {
+                                "kind": "account";
+                                "path": "tokenMint";
+                            }
+                        ];
+                    };
+                },
+                {
+                    "name": "vaultTokenAccount";
+                    "writable": true;
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "account";
+                                "path": "vault";
+                            },
+                            {
+                                "kind": "const";
+                                "value": [
+                                    6,
+                                    221,
+                                    246,
+                                    225,
+                                    215,
+                                    101,
+                                    161,
+                                    147,
+                                    217,
+                                    203,
+                                    225,
+                                    70,
+                                    206,
+                                    235,
+                                    121,
+                                    172,
+                                    28,
+                                    180,
+                                    133,
+                                    237,
+                                    95,
+                                    91,
+                                    55,
+                                    145,
+                                    58,
+                                    140,
+                                    245,
+                                    133,
+                                    126,
+                                    255,
+                                    0,
+                                    169
+                                ];
+                            },
+                            {
+                                "kind": "account";
+                                "path": "tokenMint";
+                            }
+                        ];
+                        "program": {
+                            "kind": "const";
+                            "value": [
+                                140,
+                                151,
+                                37,
+                                143,
+                                78,
+                                36,
+                                137,
+                                241,
+                                187,
+                                61,
+                                16,
+                                41,
+                                20,
+                                142,
+                                13,
+                                131,
+                                11,
+                                90,
+                                19,
+                                153,
+                                218,
+                                255,
+                                16,
+                                132,
+                                4,
+                                142,
+                                123,
+                                216,
+                                219,
+                                233,
+                                248,
+                                89
+                            ];
+                        };
+                    };
+                },
+                {
+                    "name": "adminTokenAccount";
+                    "writable": true;
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "account";
+                                "path": "admin";
+                            },
+                            {
+                                "kind": "const";
+                                "value": [
+                                    6,
+                                    221,
+                                    246,
+                                    225,
+                                    215,
+                                    101,
+                                    161,
+                                    147,
+                                    217,
+                                    203,
+                                    225,
+                                    70,
+                                    206,
+                                    235,
+                                    121,
+                                    172,
+                                    28,
+                                    180,
+                                    133,
+                                    237,
+                                    95,
+                                    91,
+                                    55,
+                                    145,
+                                    58,
+                                    140,
+                                    245,
+                                    133,
+                                    126,
+                                    255,
+                                    0,
+                                    169
+                                ];
+                            },
+                            {
+                                "kind": "account";
+                                "path": "tokenMint";
+                            }
+                        ];
+                        "program": {
+                            "kind": "const";
+                            "value": [
+                                140,
+                                151,
+                                37,
+                                143,
+                                78,
+                                36,
+                                137,
+                                241,
+                                187,
+                                61,
+                                16,
+                                41,
+                                20,
+                                142,
+                                13,
+                                131,
+                                11,
+                                90,
+                                19,
+                                153,
+                                218,
+                                255,
+                                16,
+                                132,
+                                4,
+                                142,
+                                123,
+                                216,
+                                219,
+                                233,
+                                248,
+                                89
+                            ];
+                        };
+                    };
+                },
+                {
+                    "name": "tokenMint";
+                    "relations": [
+                        "treasury"
+                    ];
+                },
+                {
+                    "name": "tokenProgram";
+                    "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+                },
+                {
+                    "name": "associatedTokenProgram";
+                    "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
+                },
+                {
+                    "name": "systemProgram";
+                    "address": "11111111111111111111111111111111";
+                }
+            ];
+            "args": [
+                {
+                    "name": "amount";
+                    "type": "u64";
+                }
+            ];
         }
     ];
     "accounts": [
@@ -1998,6 +2725,19 @@ export type TelegramPrivateTransfer = {
                 253,
                 72,
                 138
+            ];
+        },
+        {
+            "name": "treasury";
+            "discriminator": [
+                238,
+                239,
+                123,
+                238,
+                89,
+                1,
+                168,
+                253
             ];
         },
         {
@@ -2087,6 +2827,11 @@ export type TelegramPrivateTransfer = {
             "code": 6011;
             "name": "invalidDepositor";
             "msg": "Invalid Depositor";
+        },
+        {
+            "code": 6012;
+            "name": "insufficientTreasuryFees";
+            "msg": "Insufficient Treasury Fees";
         }
     ];
     "types": [
@@ -2183,6 +2928,29 @@ export type TelegramPrivateTransfer = {
                         "type": {
                             "option": "u64";
                         };
+                    }
+                ];
+            };
+        },
+        {
+            "name": "treasury";
+            "docs": [
+                "Treasury fee ledger by token mint."
+            ];
+            "type": {
+                "kind": "struct";
+                "fields": [
+                    {
+                        "name": "admin";
+                        "type": "pubkey";
+                    },
+                    {
+                        "name": "tokenMint";
+                        "type": "pubkey";
+                    },
+                    {
+                        "name": "amount";
+                        "type": "u64";
                     }
                 ];
             };

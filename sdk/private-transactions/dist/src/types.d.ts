@@ -58,6 +58,15 @@ export interface UsernameDepositData {
     address: PublicKey;
 }
 /**
+ * Data structure for treasury account
+ */
+export interface TreasuryData {
+    admin: PublicKey;
+    tokenMint: PublicKey;
+    amount: bigint;
+    address: PublicKey;
+}
+/**
  * Parameters for initializing a deposit account
  */
 export interface InitializeDepositParams {
@@ -144,6 +153,24 @@ export interface CreateUsernamePermissionParams {
     rpcOptions?: RpcOptions;
 }
 /**
+ * Parameters for initializing treasury account
+ */
+export interface InitializeTreasuryParams {
+    admin: PublicKey;
+    tokenMint: PublicKey;
+    payer: PublicKey;
+    rpcOptions?: RpcOptions;
+}
+/**
+ * Parameters for creating treasury permission
+ */
+export interface CreateTreasuryPermissionParams {
+    admin: PublicKey;
+    tokenMint: PublicKey;
+    payer: PublicKey;
+    rpcOptions?: RpcOptions;
+}
+/**
  * Parameters for delegating a deposit to an ephemeral rollup
  */
 export interface DelegateDepositParams {
@@ -161,6 +188,16 @@ export interface DelegateUsernameDepositParams {
     tokenMint: PublicKey;
     payer: PublicKey;
     validator: PublicKey;
+    rpcOptions?: RpcOptions;
+}
+/**
+ * Parameters for delegating treasury to an ephemeral rollup
+ */
+export interface DelegateTreasuryParams {
+    admin: PublicKey;
+    tokenMint: PublicKey;
+    payer: PublicKey;
+    validator?: PublicKey | null;
     rpcOptions?: RpcOptions;
 }
 /**
@@ -185,6 +222,26 @@ export interface UndelegateUsernameDepositParams {
     payer: PublicKey;
     magicProgram: PublicKey;
     magicContext: PublicKey;
+    rpcOptions?: RpcOptions;
+}
+/**
+ * Parameters for undelegating treasury from an ephemeral rollup
+ */
+export interface UndelegateTreasuryParams {
+    admin: PublicKey;
+    tokenMint: PublicKey;
+    payer: PublicKey;
+    magicProgram: PublicKey;
+    magicContext: PublicKey;
+    rpcOptions?: RpcOptions;
+}
+/**
+ * Parameters for withdrawing treasury fees
+ */
+export interface WithdrawTreasuryFeesParams {
+    admin: PublicKey;
+    tokenMint: PublicKey;
+    amount: number | bigint;
     rpcOptions?: RpcOptions;
 }
 /**
