@@ -1,25 +1,25 @@
-import { useEffect, useState } from "react";
-import { Keyboard, Platform } from "react-native";
+import { useState } from "react";
+import {
+  runOnJS,
+  useAnimatedKeyboard,
+  useAnimatedReaction,
+} from "react-native-reanimated";
 
 export function useKeyboardHeight() {
+  const keyboard = useAnimatedKeyboard({
+    isStatusBarTranslucentAndroid: true,
+    isNavigationBarTranslucentAndroid: true,
+  });
   const [height, setHeight] = useState(0);
 
-  useEffect(() => {
-    const showEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-
-    const showSub = Keyboard.addListener(showEvent, (e) =>
-      setHeight(e.endCoordinates.height),
-    );
-    const hideSub = Keyboard.addListener(hideEvent, () => setHeight(0));
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
+  useAnimatedReaction(
+    () => keyboard.height.value,
+    (current, previous) => {
+      if (current !== previous) {
+        runOnJS(setHeight)(current);
+      }
+    },
+  );
 
   return height;
 }

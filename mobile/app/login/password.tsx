@@ -4,20 +4,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { Eye, EyeOff } from "lucide-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Keyboard, Platform, StyleSheet, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const VALID_PASSWORD = "qwerty";
-const REVEAL_DURATION = 800;
-
-function maskWithReveal(password: string, revealIndex: number): string {
-  if (!password) return "";
-  return password
-    .split("")
-    .map((char, i) => (i === revealIndex ? char : "\u2022"))
-    .join("");
-}
 
 export default function PasswordScreen() {
   const router = useRouter();
@@ -27,33 +18,13 @@ export default function PasswordScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(false);
-  const [revealIndex, setRevealIndex] = useState(-1);
-  const revealTimerRef = useRef<ReturnType<typeof setTimeout>>();
-
-  useEffect(() => {
-    return () => clearTimeout(revealTimerRef.current);
-  }, []);
 
   const handleChangeText = useCallback(
     (text: string) => {
       if (error) setError(false);
-
-      if (!showPassword && text.length > password.length) {
-        const newIndex = text.length - 1;
-        setRevealIndex(newIndex);
-        clearTimeout(revealTimerRef.current);
-        revealTimerRef.current = setTimeout(
-          () => setRevealIndex(-1),
-          REVEAL_DURATION,
-        );
-      } else {
-        setRevealIndex(-1);
-        clearTimeout(revealTimerRef.current);
-      }
-
       setPassword(text);
     },
-    [error, password.length, showPassword],
+    [error],
   );
 
   const handleContinue = useCallback(() => {
@@ -79,19 +50,11 @@ export default function PasswordScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     setShowPassword((prev) => !prev);
-    setRevealIndex(-1);
-    clearTimeout(revealTimerRef.current);
   }, []);
 
-  const hasValue = password.length > 0;
+  const hasValue = password.length >= 4;
   const EyeIcon = showPassword ? Eye : EyeOff;
   const keyboardUp = kbHeight > 0;
-
-  const displayValue = showPassword
-    ? password
-    : revealIndex >= 0
-      ? maskWithReveal(password, revealIndex)
-      : "\u2022".repeat(password.length);
 
   return (
     <View className="flex-1 bg-white">
@@ -114,27 +77,19 @@ export default function PasswordScreen() {
               error && styles.inputContainerError,
             ]}
           >
-            <View style={styles.inputField}>
-              {/* Transparent real TextInput — tappable, focusable */}
-              <TextInput
-                ref={inputRef}
-                style={styles.realInput}
-                value={password}
-                onChangeText={handleChangeText}
-                autoFocus
-                autoCapitalize="none"
-                autoCorrect={false}
-                selectionColor="transparent"
-              />
-              {/* Visible masked/revealed text overlay */}
-              <View style={styles.displayOverlay} pointerEvents="none">
-                {hasValue ? (
-                  <Text style={styles.inputText}>{displayValue}</Text>
-                ) : (
-                  <Text style={styles.placeholder}>Password</Text>
-                )}
-              </View>
-            </View>
+            <TextInput
+              ref={inputRef}
+              style={styles.input}
+              value={password}
+              onChangeText={handleChangeText}
+              placeholder="Password"
+              placeholderTextColor="rgba(60,60,67,0.6)"
+              secureTextEntry={!showPassword}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+              selectionColor="#000"
+            />
             <Pressable style={styles.eyeIcon} onPress={handleToggleShow}>
               <EyeIcon
                 size={24}
@@ -223,33 +178,13 @@ const styles = StyleSheet.create({
   inputContainerError: {
     borderColor: "#F9363C",
   },
-  inputField: {
+  input: {
     flex: 1,
-    position: "relative",
-    justifyContent: "center",
-  },
-  realInput: {
-    fontFamily: "Geist_400Regular",
-    fontSize: 17,
-    lineHeight: 22,
-    color: "transparent",
-    paddingVertical: 15,
-  },
-  displayOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-  },
-  inputText: {
     fontFamily: "Geist_400Regular",
     fontSize: 17,
     lineHeight: 22,
     color: "#000",
-  },
-  placeholder: {
-    fontFamily: "Geist_400Regular",
-    fontSize: 17,
-    lineHeight: 22,
-    color: "rgba(60,60,67,0.6)",
+    paddingVertical: 15,
   },
   eyeIcon: {
     paddingLeft: 12,
