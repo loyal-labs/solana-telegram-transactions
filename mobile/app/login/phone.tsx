@@ -1,3 +1,4 @@
+import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import { Pressable, Text, View } from "@/tw";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -5,13 +6,7 @@ import { useRouter } from "expo-router";
 import { AsYouType, isValidPhoneNumber } from "libphonenumber-js";
 import { Globe, X } from "lucide-react-native";
 import { useCallback, useMemo, useRef, useState } from "react";
-import {
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  TextInput,
-} from "react-native";
+import { Keyboard, Platform, StyleSheet, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function countryCodeToFlag(code: string): string {
@@ -23,6 +18,7 @@ function countryCodeToFlag(code: string): string {
 export default function PhoneScreen() {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
+  const kbHeight = useKeyboardHeight();
   const inputRef = useRef<TextInput>(null);
   const [rawValue, setRawValue] = useState("+");
 
@@ -76,13 +72,10 @@ export default function PhoneScreen() {
   }, [isValid, formatted, router]);
 
   const showClear = rawValue.length > 1;
+  const keyboardUp = kbHeight > 0;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-    >
+    <View className="flex-1 bg-white">
       <Pressable
         style={styles.content}
         onPress={() => inputRef.current?.focus()}
@@ -113,12 +106,22 @@ export default function PhoneScreen() {
         </View>
       </Pressable>
 
-      <View style={styles.buttonBody}>
+      <View
+        style={[
+          styles.buttonBody,
+          { bottom: keyboardUp ? kbHeight : 0 },
+        ]}
+      >
         <LinearGradient
           colors={["rgba(255,255,255,0)", "#fff"]}
           style={styles.gradient}
         />
-        <View style={[styles.buttonWrap, { paddingBottom: bottom + 24 }]}>
+        <View
+          style={[
+            styles.buttonWrap,
+            { paddingBottom: keyboardUp ? 24 : bottom + 24 },
+          ]}
+        >
           <Pressable
             style={[styles.button, !isValid && styles.buttonDisabled]}
             onPress={handleContinue}
@@ -128,15 +131,11 @@ export default function PhoneScreen() {
           </Pressable>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
   content: {
     flex: 1,
     paddingHorizontal: 32,
@@ -194,7 +193,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  buttonBody: {},
+  buttonBody: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+  },
   gradient: {
     height: 16,
   },

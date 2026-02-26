@@ -1,25 +1,17 @@
+import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import { Pressable, Text, View } from "@/tw";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { Eye, EyeOff } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  TextInput,
-} from "react-native";
+import { Keyboard, Platform, StyleSheet, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const VALID_PASSWORD = "qwerty";
 const REVEAL_DURATION = 800;
 
-function maskWithReveal(
-  password: string,
-  revealIndex: number,
-): string {
+function maskWithReveal(password: string, revealIndex: number): string {
   if (!password) return "";
   return password
     .split("")
@@ -30,6 +22,7 @@ function maskWithReveal(
 export default function PasswordScreen() {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
+  const kbHeight = useKeyboardHeight();
   const inputRef = useRef<TextInput>(null);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -45,7 +38,6 @@ export default function PasswordScreen() {
     (text: string) => {
       if (error) setError(false);
 
-      // Detect new character appended
       if (!showPassword && text.length > password.length) {
         const newIndex = text.length - 1;
         setRevealIndex(newIndex);
@@ -93,8 +85,8 @@ export default function PasswordScreen() {
 
   const hasValue = password.length > 0;
   const EyeIcon = showPassword ? Eye : EyeOff;
+  const keyboardUp = kbHeight > 0;
 
-  // Display value: show mode = real text, hide mode = masked with brief reveal
   const displayValue = showPassword
     ? password
     : revealIndex >= 0
@@ -102,11 +94,7 @@ export default function PasswordScreen() {
       : "\u2022".repeat(password.length);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-    >
+    <View className="flex-1 bg-white">
       <Pressable
         style={styles.content}
         onPress={() => inputRef.current?.focus()}
@@ -126,28 +114,27 @@ export default function PasswordScreen() {
               error && styles.inputContainerError,
             ]}
           >
-            {/* Hidden input captures real typing */}
-            <TextInput
-              ref={inputRef}
-              style={styles.hiddenInput}
-              value={password}
-              onChangeText={handleChangeText}
-              autoFocus
-              autoCapitalize="none"
-              autoCorrect={false}
-              selectionColor="#000"
-            />
-            {/* Visible display with custom masking */}
-            <Pressable
-              style={styles.visibleInput}
-              onPress={() => inputRef.current?.focus()}
-            >
-              {hasValue ? (
-                <Text style={styles.inputText}>{displayValue}</Text>
-              ) : (
-                <Text style={styles.placeholder}>Password</Text>
-              )}
-            </Pressable>
+            <View style={styles.inputField}>
+              {/* Transparent real TextInput — tappable, focusable */}
+              <TextInput
+                ref={inputRef}
+                style={styles.realInput}
+                value={password}
+                onChangeText={handleChangeText}
+                autoFocus
+                autoCapitalize="none"
+                autoCorrect={false}
+                selectionColor="transparent"
+              />
+              {/* Visible masked/revealed text overlay */}
+              <View style={styles.displayOverlay} pointerEvents="none">
+                {hasValue ? (
+                  <Text style={styles.inputText}>{displayValue}</Text>
+                ) : (
+                  <Text style={styles.placeholder}>Password</Text>
+                )}
+              </View>
+            </View>
             <Pressable style={styles.eyeIcon} onPress={handleToggleShow}>
               <EyeIcon
                 size={24}
@@ -166,12 +153,22 @@ export default function PasswordScreen() {
         </View>
       </Pressable>
 
-      <View style={styles.buttonBody}>
+      <View
+        style={[
+          styles.buttonBody,
+          { bottom: keyboardUp ? kbHeight : 0 },
+        ]}
+      >
         <LinearGradient
           colors={["rgba(255,255,255,0)", "#fff"]}
           style={styles.gradient}
         />
-        <View style={[styles.buttonWrap, { paddingBottom: bottom + 24 }]}>
+        <View
+          style={[
+            styles.buttonWrap,
+            { paddingBottom: keyboardUp ? 24 : bottom + 24 },
+          ]}
+        >
           <Pressable
             style={[styles.button, !hasValue && styles.buttonDisabled]}
             onPress={handleContinue}
@@ -181,15 +178,11 @@ export default function PasswordScreen() {
           </Pressable>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
   content: {
     flex: 1,
     paddingHorizontal: 32,
@@ -230,15 +223,20 @@ const styles = StyleSheet.create({
   inputContainerError: {
     borderColor: "#F9363C",
   },
-  hiddenInput: {
-    position: "absolute",
-    opacity: 0,
-    width: 1,
-    height: 1,
-  },
-  visibleInput: {
+  inputField: {
     flex: 1,
+    position: "relative",
+    justifyContent: "center",
+  },
+  realInput: {
+    fontFamily: "Geist_400Regular",
+    fontSize: 17,
+    lineHeight: 22,
+    color: "transparent",
     paddingVertical: 15,
+  },
+  displayOverlay: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
   },
   inputText: {
@@ -270,7 +268,11 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     color: "#F9363C",
   },
-  buttonBody: {},
+  buttonBody: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+  },
   gradient: {
     height: 16,
   },

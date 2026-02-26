@@ -29,7 +29,6 @@ export default function CodeScreen() {
       setCode(digits);
 
       if (digits.length === CODE_LENGTH) {
-        // Mock validation: all same digits = success, otherwise error
         setTimeout(() => {
           if (isAllSameDigits(digits)) {
             if (Platform.OS !== "web") {
@@ -85,23 +84,25 @@ export default function CodeScreen() {
         </View>
 
         <View style={styles.codeSection}>
-          <View style={styles.codeRow}>{dots}</View>
+          <View style={styles.codeRow}>
+            {dots}
+            {/* Transparent TextInput overlays the dots so tapping them refocuses */}
+            <TextInput
+              ref={inputRef}
+              style={styles.overlayInput}
+              value={code}
+              onChangeText={handleChangeText}
+              keyboardType="number-pad"
+              maxLength={CODE_LENGTH}
+              autoFocus
+              caretHidden
+            />
+          </View>
           {error && (
             <Text style={styles.errorText}>Invalid code</Text>
           )}
         </View>
       </View>
-
-      <TextInput
-        ref={inputRef}
-        style={styles.hiddenInput}
-        value={code}
-        onChangeText={handleChangeText}
-        keyboardType="number-pad"
-        maxLength={CODE_LENGTH}
-        autoFocus
-        caretHidden
-      />
     </Pressable>
   );
 }
@@ -148,6 +149,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
+    position: "relative",
   },
   dotCell: {
     width: 36,
@@ -175,10 +177,8 @@ const styles = StyleSheet.create({
     color: "#F9363C",
     textAlign: "center",
   },
-  hiddenInput: {
-    position: "absolute",
+  overlayInput: {
+    ...StyleSheet.absoluteFillObject,
     opacity: 0,
-    height: 0,
-    width: 0,
   },
 });
