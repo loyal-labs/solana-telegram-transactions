@@ -1,7 +1,8 @@
 import { Pressable, Text, View } from "@/tw";
+import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StyleSheet, TextInput } from "react-native";
+import { Platform, StyleSheet, TextInput } from "react-native";
 
 const CODE_LENGTH = 5;
 
@@ -31,8 +32,18 @@ export default function CodeScreen() {
         // Mock validation: all same digits = success, otherwise error
         setTimeout(() => {
           if (isAllSameDigits(digits)) {
+            if (Platform.OS !== "web") {
+              Haptics.notificationAsync(
+                Haptics.NotificationFeedbackType.Success,
+              );
+            }
             router.push("/login/password");
           } else {
+            if (Platform.OS !== "web") {
+              Haptics.notificationAsync(
+                Haptics.NotificationFeedbackType.Error,
+              );
+            }
             setError(true);
             setCode("");
             inputRef.current?.focus();

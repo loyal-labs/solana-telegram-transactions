@@ -1,7 +1,9 @@
 import { Pressable, Text, View } from "@/tw";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import { StyleSheet } from "react-native";
+import { useCallback } from "react";
+import { Platform, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Logo from "../../assets/images/logo.svg";
@@ -10,6 +12,13 @@ import TelegramIcon from "../../assets/images/Telegram.svg";
 export default function LoginScreen() {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
+
+  const handlePress = useCallback(() => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    router.push("/login/phone");
+  }, [router]);
 
   return (
     <View className="flex-1 bg-white">
@@ -22,11 +31,8 @@ export default function LoginScreen() {
           colors={["rgba(255,255,255,0)", "#fff"]}
           style={styles.gradient}
         />
-        <View style={[styles.buttonWrap, { paddingBottom: Math.max(bottom, 24) }]}>
-          <Pressable
-            style={styles.button}
-            onPress={() => router.push("/login/phone")}
-          >
+        <View style={[styles.buttonWrap, { paddingBottom: bottom + 24 }]}>
+          <Pressable style={styles.button} onPress={handlePress}>
             <TelegramIcon width={28} height={28} />
             <Text style={styles.buttonText}>Continue with Telegram</Text>
           </Pressable>

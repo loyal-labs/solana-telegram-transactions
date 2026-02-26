@@ -1,10 +1,17 @@
 import { Pressable, Text, View } from "@/tw";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { AsYouType, isValidPhoneNumber } from "libphonenumber-js";
 import { Globe, X } from "lucide-react-native";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Keyboard, StyleSheet, TextInput } from "react-native";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  TextInput,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function countryCodeToFlag(code: string): string {
@@ -42,7 +49,6 @@ export default function PhoneScreen() {
   );
 
   const handleChangeText = useCallback((text: string) => {
-    // Always keep the + prefix
     if (!text.startsWith("+")) {
       text = "+" + text.replace(/\+/g, "");
     }
@@ -50,14 +56,19 @@ export default function PhoneScreen() {
   }, []);
 
   const handleClear = useCallback(() => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     setRawValue("+");
     inputRef.current?.focus();
   }, []);
 
   const handleContinue = useCallback(() => {
     if (!isValid) return;
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
     Keyboard.dismiss();
-    // TODO: wire to verification screen
     router.push({
       pathname: "/login/code",
       params: { phone: formatted },
@@ -65,11 +76,17 @@ export default function PhoneScreen() {
   }, [isValid, formatted, router]);
 
   const showClear = rawValue.length > 1;
-  const placeholder = "000 000 000 000";
 
   return (
-    <View className="flex-1 bg-white">
-      <Pressable style={styles.content} onPress={() => inputRef.current?.focus()}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+    >
+      <Pressable
+        style={styles.content}
+        onPress={() => inputRef.current?.focus()}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Log In</Text>
           <Text style={styles.subtitle}>Enter your phone number</Text>
@@ -83,7 +100,7 @@ export default function PhoneScreen() {
             value={formatted}
             onChangeText={handleChangeText}
             keyboardType="phone-pad"
-            placeholder={`+${placeholder}`}
+            placeholder="+000 000 000 000"
             placeholderTextColor="rgba(60,60,67,0.6)"
             autoFocus
             selectionColor="#000"
@@ -101,7 +118,7 @@ export default function PhoneScreen() {
           colors={["rgba(255,255,255,0)", "#fff"]}
           style={styles.gradient}
         />
-        <View style={[styles.buttonWrap, { paddingBottom: Math.max(bottom, 24) }]}>
+        <View style={[styles.buttonWrap, { paddingBottom: bottom + 24 }]}>
           <Pressable
             style={[styles.button, !isValid && styles.buttonDisabled]}
             onPress={handleContinue}
@@ -111,11 +128,15 @@ export default function PhoneScreen() {
           </Pressable>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
   content: {
     flex: 1,
     paddingHorizontal: 32,
@@ -173,12 +194,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  buttonBody: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
+  buttonBody: {},
   gradient: {
     height: 16,
   },
