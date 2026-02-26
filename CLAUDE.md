@@ -236,9 +236,13 @@ To find the correct branch name for a Linear issue, use the issue identifier (e.
 
 ## Linear MCP Defaults
 
-- When creating Linear issues via MCP, set status to `Todo` by default unless the user explicitly requests another status.
-- Assess task impact/scope and set an explicit priority during issue creation (`Urgent`, `High`, `Normal`, `Low`).
-- Choose appropriate labels and assignees based on ownership and domain before finalizing the issue.
+- For every **new** Linear issue created via MCP, always set status to `Todo`.
+- Always set an explicit priority (`Urgent`, `High`, `Normal`, `Low`).
+- Always assign the issue to a concrete owner (never leave assignee empty).
+- Always attach the issue to the **current cycle** for the team.
+- Always attach the issue to the most appropriate project.
+- Keep descriptions concise but actionable so work can start immediately.
+- Each description must include: goal/context, key implementation ideas, key files/paths, and links/references (docs/PRs/issues) needed for follow-up queries.
 
 ## Commit Conventions
 
