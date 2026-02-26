@@ -400,7 +400,11 @@ export class LoyalPrivateTransactionsClient {
     const { admin, tokenMint, payer, rpcOptions } = params;
     const [treasuryPda] = findTreasuryPda(tokenMint);
 
-    await this.ensureNotDelegated(treasuryPda, "initializeTreasury-treasury", true);
+    await this.ensureNotDelegated(
+      treasuryPda,
+      "initializeTreasury-treasury",
+      true
+    );
 
     return this.baseProgram.methods
       .initializeTreasury()
@@ -925,7 +929,7 @@ export class LoyalPrivateTransactionsClient {
       ownerProgram: PROGRAM_ID,
       delegationProgram: DELEGATION_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
-      validator: validator ?? null,
+      validator,
     };
 
     return this.baseProgram.methods
@@ -1039,7 +1043,11 @@ export class LoyalPrivateTransactionsClient {
       params;
     const [treasuryPda] = findTreasuryPda(tokenMint);
 
-    await this.ensureDelegated(treasuryPda, "undelegateTreasury-treasury", true);
+    await this.ensureDelegated(
+      treasuryPda,
+      "undelegateTreasury-treasury",
+      true
+    );
 
     const delegationWatcher = waitForAccountOwnerChange(
       this.baseProgram.provider.connection,
@@ -1071,7 +1079,9 @@ export class LoyalPrivateTransactionsClient {
   /**
    * Withdraw accrued transfer fees from treasury.
    */
-  async withdrawTreasuryFees(params: WithdrawTreasuryFeesParams): Promise<string> {
+  async withdrawTreasuryFees(
+    params: WithdrawTreasuryFeesParams
+  ): Promise<string> {
     const { admin, tokenMint, amount, rpcOptions } = params;
     const [treasuryPda] = findTreasuryPda(tokenMint);
     const [vaultPda] = findVaultPda(tokenMint);
@@ -1090,10 +1100,7 @@ export class LoyalPrivateTransactionsClient {
       ASSOCIATED_TOKEN_PROGRAM_ID
     );
 
-    await this.ensureNotDelegated(
-      treasuryPda,
-      "withdrawTreasuryFees-treasury"
-    );
+    await this.ensureNotDelegated(treasuryPda, "withdrawTreasuryFees-treasury");
 
     return this.baseProgram.methods
       .withdrawTreasuryFees(new BN(amount.toString()))
@@ -1205,6 +1212,10 @@ export class LoyalPrivateTransactionsClient {
       destinationDepositPda,
       "transferToUsernameDeposit-destinationDepositPda"
     );
+    await this.ensureDelegated(
+      treasuryPda,
+      "transferToUsernameDeposit-treasuryPda"
+    );
 
     const accounts: Record<string, PublicKey | null> = {
       user,
@@ -1216,6 +1227,37 @@ export class LoyalPrivateTransactionsClient {
       systemProgram: SystemProgram.programId,
     };
     accounts.sessionToken = sessionToken ?? null;
+
+    console.error("accounts", prettyStringify(accounts));
+
+    try {
+      const sim = await this.ephemeralProgram.methods
+        .transferToUsernameDeposit(new BN(amount.toString()))
+        .accountsPartial(accounts)
+        .simulate();
+      console.log("transferToUsernameDeposit simulation logs:", sim.raw);
+    } catch (simErr: unknown) {
+      const simResponse = (
+        simErr as {
+          simulationResponse?: {
+            logs?: string[];
+            err?: unknown;
+            unitsConsumed?: number;
+          };
+        }
+      ).simulationResponse;
+      console.error("transferToUsernameDeposit simulate FAILED");
+      console.error(
+        "  error message:",
+        simErr instanceof Error ? simErr.message : String(simErr)
+      );
+      if (simResponse) {
+        console.error("  simulation err:", prettyStringify(simResponse.err));
+        console.error("  simulation logs:", prettyStringify(simResponse.logs));
+        console.error("  unitsConsumed:", simResponse.unitsConsumed);
+      }
+      throw simErr;
+    }
 
     const signature = await this.ephemeralProgram.methods
       .transferToUsernameDeposit(new BN(amount.toString()))
@@ -1321,7 +1363,9 @@ export class LoyalPrivateTransactionsClient {
     const [treasuryPda] = findTreasuryPda(tokenMint);
 
     try {
-      const account = await this.baseProgram.account.treasury.fetch(treasuryPda);
+      const account = await this.baseProgram.account.treasury.fetch(
+        treasuryPda
+      );
       return {
         admin: account.admin,
         tokenMint: account.tokenMint,
@@ -1333,7 +1377,9 @@ export class LoyalPrivateTransactionsClient {
     }
   }
 
-  async getEphemeralTreasury(tokenMint: PublicKey): Promise<TreasuryData | null> {
+  async getEphemeralTreasury(
+    tokenMint: PublicKey
+  ): Promise<TreasuryData | null> {
     const [treasuryPda] = findTreasuryPda(tokenMint);
 
     try {
@@ -1617,6 +1663,32 @@ export class LoyalPrivateTransactionsClient {
       "https://devnet-router.magicblock.app/getDelegationStatus",
       options
     );
-    return (await res.json()) as DelegationStatusResponse;
+    const response = (await res.json()) as DelegationStatusResponse;
+
+    // Handle TEE/PER validators not in the router's registry.
+    // The router returns an error like "account has been delegated to unknown ER node: <validator>"
+    // but the delegation is still valid — extract the validator address from the error.
+    if (response.error && !response.result) {
+      const match = response.error.message?.match(
+        /delegated to unknown ER node:\s*(\w+)/
+      );
+      if (match) {
+        return {
+          jsonrpc: "2.0",
+          id: response.id,
+          result: {
+            isDelegated: true,
+            delegationRecord: {
+              authority: match[1],
+              owner: account.toString(),
+              delegationSlot: 0,
+              lamports: 0,
+            },
+          },
+        };
+      }
+    }
+
+    return response;
   }
 }

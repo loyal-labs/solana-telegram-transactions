@@ -207,7 +207,7 @@ export interface DelegateDepositParams {
   user: PublicKey;
   tokenMint: PublicKey;
   payer: PublicKey;
-  validator: PublicKey;
+  validator: PublicKey; // IMPORTANT: validator always should be present in parameters, no default validators
   rpcOptions?: RpcOptions;
 }
 
@@ -219,7 +219,7 @@ export interface DelegateUsernameDepositParams {
   tokenMint: PublicKey;
   // session: PublicKey;
   payer: PublicKey;
-  validator: PublicKey;
+  validator: PublicKey; // IMPORTANT: validator always should be present in parameters, no default validators
   rpcOptions?: RpcOptions;
 }
 
@@ -230,7 +230,7 @@ export interface DelegateTreasuryParams {
   admin: PublicKey;
   tokenMint: PublicKey;
   payer: PublicKey;
-  validator?: PublicKey | null;
+  validator: PublicKey; // IMPORTANT: validator always should be present in parameters, no default validators
   rpcOptions?: RpcOptions;
 }
 

@@ -2404,6 +2404,64 @@
       ]
     },
     {
+      "name": "update_treasury_permission",
+      "docs": [
+        "Updates the treasury permission to unlock (set members to None)."
+      ],
+      "discriminator": [
+        173,
+        223,
+        115,
+        114,
+        0,
+        153,
+        11,
+        121
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "treasury"
+          ]
+        },
+        {
+          "name": "treasury",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "treasury.token_mint",
+                "account": "Treasury"
+              }
+            ]
+          }
+        },
+        {
+          "name": "permission",
+          "writable": true
+        },
+        {
+          "name": "permission_program"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "withdraw_treasury_fees",
       "docs": [
         "Withdraws accrued transfer fees from vault to treasury admin token account."

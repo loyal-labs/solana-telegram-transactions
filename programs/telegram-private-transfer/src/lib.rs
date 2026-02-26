@@ -27,9 +27,12 @@ const MAX_USERNAME_LEN: usize = 32;
 #[program]
 pub mod telegram_private_transfer {
     use anchor_spl::token::{transfer_checked, TransferChecked};
-    use ephemeral_rollups_sdk::access_control::structs::{
-        Member, MembersArgs, ACCOUNT_SIGNATURES_FLAG, AUTHORITY_FLAG, TX_BALANCES_FLAG,
-        TX_LOGS_FLAG, TX_MESSAGE_FLAG,
+    use ephemeral_rollups_sdk::access_control::{
+        instructions::UpdatePermissionCpiBuilder,
+        structs::{
+            Member, MembersArgs, ACCOUNT_SIGNATURES_FLAG, AUTHORITY_FLAG, TX_BALANCES_FLAG,
+            TX_LOGS_FLAG, TX_MESSAGE_FLAG,
+        },
     };
 
     use super::*;
@@ -432,7 +435,6 @@ pub mod telegram_private_transfer {
     pub fn create_treasury_permission(ctx: Context<CreateTreasuryPermission>) -> Result<()> {
         let CreateTreasuryPermission {
             payer,
-            admin,
             permission,
             permission_program,
             treasury,
@@ -440,28 +442,37 @@ pub mod telegram_private_transfer {
             ..
         } = ctx.accounts;
 
-        let flags = AUTHORITY_FLAG
-            | TX_LOGS_FLAG
-            | TX_BALANCES_FLAG
-            | TX_MESSAGE_FLAG
-            | ACCOUNT_SIGNATURES_FLAG;
-        let members = vec![Member {
-            pubkey: admin.key(),
-            flags,
-        }];
         CreatePermissionCpiBuilder::new(&permission_program)
             .permission(&permission)
             .permissioned_account(&treasury.to_account_info())
             .payer(&payer)
             .system_program(system_program)
-            .args(MembersArgs {
-                members: Some(members),
-            })
+            .args(MembersArgs { members: None })
             .invoke_signed(&[&[
                 TREASURY_PDA_SEED,
                 treasury.token_mint.as_ref(),
                 &[ctx.bumps.treasury],
             ]])?;
+
+        Ok(())
+    }
+
+    /// Updates the treasury permission to unlock (set members to None).
+    pub fn update_treasury_permission(ctx: Context<UpdateTreasuryPermission>) -> Result<()> {
+        let UpdateTreasuryPermission {
+            admin,
+            permission,
+            permission_program,
+            treasury,
+            ..
+        } = ctx.accounts;
+
+        UpdatePermissionCpiBuilder::new(&permission_program)
+            .authority(&admin, true)
+            .permissioned_account(&treasury.to_account_info(), false)
+            .permission(&permission)
+            .args(MembersArgs { members: None })
+            .invoke()?;
 
         Ok(())
     }
@@ -1017,6 +1028,22 @@ pub struct CreateTreasuryPermission<'info> {
     /// CHECK: Checked by the permission program
     pub permission_program: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateTreasuryPermission<'info> {
+    pub admin: Signer<'info>,
+    #[account(
+        seeds = [TREASURY_PDA_SEED, treasury.token_mint.as_ref()],
+        bump,
+        has_one = admin,
+    )]
+    pub treasury: Account<'info, Treasury>,
+    /// CHECK: Checked by the permission program
+    #[account(mut)]
+    pub permission: UncheckedAccount<'info>,
+    /// CHECK: Checked by the permission program
+    pub permission_program: UncheckedAccount<'info>,
 }
 
 #[delegate]

@@ -2410,6 +2410,64 @@ export type TelegramPrivateTransfer = {
       ]
     },
     {
+      "name": "updateTreasuryPermission",
+      "docs": [
+        "Updates the treasury permission to unlock (set members to None)."
+      ],
+      "discriminator": [
+        173,
+        223,
+        115,
+        114,
+        0,
+        153,
+        11,
+        121
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "treasury"
+          ]
+        },
+        {
+          "name": "treasury",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "treasury.token_mint",
+                "account": "treasury"
+              }
+            ]
+          }
+        },
+        {
+          "name": "permission",
+          "writable": true
+        },
+        {
+          "name": "permissionProgram"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "withdrawTreasuryFees",
       "docs": [
         "Withdraws accrued transfer fees from vault to treasury admin token account."
