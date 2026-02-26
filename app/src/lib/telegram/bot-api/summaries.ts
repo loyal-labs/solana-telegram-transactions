@@ -29,6 +29,12 @@ import type {
 
 export const MIN_MESSAGES_FOR_SUMMARY = 3;
 const MAX_SUMMARY_INPUT_CHARS = 12_000;
+const MAX_SUMMARY_BULLET_COUNT = 5;
+const MAX_SUMMARY_BULLET_CONTENT_CHARS = 450;
+const MAX_SUMMARY_OG_TEXT_CHARS = 110;
+const SUMMARY_BULLET_FALLBACK_CONTENT = "No detailed points available today.";
+const SUMMARY_BULLET_CUSTOM_EMOJI_ID = "5255883309841422076";
+const SUMMARY_BULLET_TAG = `<tg-emoji emoji-id="${SUMMARY_BULLET_CUSTOM_EMOJI_ID}">🔹</tg-emoji>`;
 
 export const SYSTEM_PROMPT = `You summarize group chat conversations into topics. Output JSON:
 {"topics":[{"title":"Topic Name","content":"Summary paragraph","sources":["Name1","Name2"]}]}
@@ -227,6 +233,7 @@ export async function sendLatestSummary(
       createdAt: latestSummary.createdAt,
       id: latestSummary.id,
       oneliner: latestSummary.oneliner,
+      topics: latestSummary.topics,
     },
     {
       destinationChatId,
@@ -262,6 +269,7 @@ export async function sendSummaryById(
       createdAt: summary.createdAt,
       id: summary.id,
       oneliner: summary.oneliner,
+      topics: summary.topics,
     },
     {
       destinationChatId: options?.destinationChatId ?? summary.community.chatId,
@@ -354,18 +362,19 @@ function buildSummaryInput(
 
 async function sendSummaryToChat(
   bot: Bot,
-  summary: Pick<Summary, "createdAt" | "id" | "oneliner">,
+  summary: Pick<Summary, "createdAt" | "id" | "oneliner" | "topics">,
   options: {
     destinationChatId: bigint;
     sourceCommunityChatId: bigint;
     replyToMessageId?: number;
   }
 ): Promise<SummaryDeliveredMessage> {
-  const messageBody = buildSummaryMessageBody(summary.oneliner);
+  const { firstBulletContent, messageBody } = buildSummaryMessageBody(summary.topics);
+  const ogText = buildSummaryOgText(summary.oneliner, firstBulletContent);
 
   const messageWithPreview = buildSummaryMessageWithPreview(
     messageBody,
-    summary.oneliner,
+    ogText,
     summary.createdAt
   );
 
@@ -397,8 +406,74 @@ async function sendSummaryToChat(
   };
 }
 
-function buildSummaryMessageBody(oneliner: string): string {
-  return escapeTelegramHtml(oneliner);
+function buildSummaryMessageBody(topics: Topic[]): {
+  firstBulletContent: string;
+  messageBody: string;
+} {
+  const normalizedBullets = topics
+    .slice(0, MAX_SUMMARY_BULLET_COUNT)
+    .map((topic) => {
+      const firstSentence = extractFirstSentence(topic.content);
+      if (firstSentence.length === 0) {
+        return null;
+      }
+
+      return {
+        content: truncateForBullet(firstSentence),
+      };
+    })
+    .filter((bullet): bullet is { content: string } =>
+      Boolean(bullet)
+    );
+
+  if (normalizedBullets.length === 0) {
+    return {
+      firstBulletContent: SUMMARY_BULLET_FALLBACK_CONTENT,
+      messageBody: `${SUMMARY_BULLET_TAG} ${escapeTelegramHtml(
+        SUMMARY_BULLET_FALLBACK_CONTENT
+      )}`,
+    };
+  }
+
+  const bulletLines = normalizedBullets.map(
+    (bullet) => `${SUMMARY_BULLET_TAG} ${escapeTelegramHtml(bullet.content)}`
+  );
+
+  return {
+    firstBulletContent: normalizedBullets[0].content,
+    messageBody: bulletLines.join("\n\n"),
+  };
+}
+
+function buildSummaryOgText(oneliner: string, firstBulletContent: string): string {
+  const normalizedOneliner = normalizeWhitespace(oneliner);
+  if (normalizedOneliner.length > 0) {
+    return normalizedOneliner.slice(0, MAX_SUMMARY_OG_TEXT_CHARS);
+  }
+
+  return firstBulletContent.slice(0, MAX_SUMMARY_OG_TEXT_CHARS);
+}
+
+function truncateForBullet(content: string): string {
+  if (content.length <= MAX_SUMMARY_BULLET_CONTENT_CHARS) {
+    return content;
+  }
+
+  return `${content.slice(0, MAX_SUMMARY_BULLET_CONTENT_CHARS - 1).trimEnd()}…`;
+}
+
+function normalizeWhitespace(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function extractFirstSentence(text: string): string {
+  const normalized = normalizeWhitespace(text);
+  if (!normalized) {
+    return "";
+  }
+
+  const match = normalized.match(/^.*?[.!?](?=\s|$)/);
+  return match ? match[0] : normalized;
 }
 
 async function sendSummaryMessage(
