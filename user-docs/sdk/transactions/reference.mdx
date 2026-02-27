@@ -1,0 +1,177 @@
+---
+title: "API Reference"
+description: "API reference for Loyal's Telegram Transactions SDK"
+---
+
+### LoyalTransactionsClient
+
+The main SDK class for interacting with the Telegram Transfer program.
+
+#### Factory Methods
+
+| Method                             | Description                             |
+| ---------------------------------- | --------------------------------------- |
+| `fromProvider(provider)`           | Create from an AnchorProvider           |
+| `fromWallet(connection, wallet)`   | Create from Connection + wallet adapter |
+| `fromKeypair(connection, keypair)` | Create from Connection + Keypair        |
+| `from(connection, signer)`         | Auto-detect signer type                 |
+
+#### Instance Methods
+
+##### `deposit(params): Promise<DepositResult>`
+
+Deposit SOL for a Telegram username.
+
+```typescript
+interface DepositParams {
+  username: string;           // Telegram username (5-32 chars, without @)
+  amountLamports: number | bigint;  // Amount in lamports
+  commitment?: Commitment;    // Optional, defaults to 'confirmed'
+}
+
+interface DepositResult {
+  signature: string;          // Transaction signature
+  deposit: DepositData;       // Updated deposit account data
+}
+```
+
+##### `refund(params): Promise<RefundResult>`
+
+Refund SOL from a deposit back to the depositor's wallet.
+
+```typescript
+interface RefundParams {
+  username: string;           // Telegram username (5-32 chars, without @)
+  amountLamports: number | bigint;  // Amount in lamports to refund
+  commitment?: Commitment;    // Optional, defaults to 'confirmed'
+}
+
+interface RefundResult {
+  signature: string;          // Transaction signature
+  deposit: DepositData;       // Updated deposit account data
+}
+```
+
+Example:
+
+```typescript
+const result = await client.refund({
+  username: "alice",
+  amountLamports: solToLamports(0.05),
+});
+
+console.log("Refunded:", result.signature);
+console.log("Remaining balance:", result.deposit.amount);
+```
+
+##### `getDeposit(depositor, username): Promise<DepositData | null>`
+
+Fetch deposit data for a specific depositor and username.
+
+```typescript
+const deposit = await client.getDeposit(depositorPubkey, "alice");
+if (deposit) {
+  console.log("Amount:", deposit.amount);
+  console.log("Address:", deposit.address.toBase58());
+}
+```
+
+##### `findDepositPda(depositor, username): [PublicKey, number]`
+
+Derive the deposit PDA address.
+
+```typescript
+const [pda, bump] = client.findDepositPda(depositorPubkey, "alice");
+```
+
+##### `findVaultPda(): [PublicKey, number]`
+
+Derive the vault PDA address.
+
+#### Properties
+
+| Property    | Type        | Description                   |
+| ----------- | ----------- | ----------------------------- |
+| `publicKey` | `PublicKey` | Connected wallet's public key |
+
+### Types
+
+```typescript
+// Deposit account data
+interface DepositData {
+  user: PublicKey; // Depositor's wallet
+  username: string; // Telegram username
+  amount: number; // Deposited lamports
+  lastNonce: number; // Replay protection nonce
+  address: PublicKey; // PDA address
+}
+
+// Supported wallet/signer types
+type WalletSigner = WalletLike | Keypair | AnchorProvider;
+
+// Wallet adapter interface
+interface WalletLike {
+  publicKey: PublicKey;
+  signTransaction<T extends Transaction | VersionedTransaction>(
+    tx: T,
+  ): Promise<T>;
+  signAllTransactions<T extends Transaction | VersionedTransaction>(
+    txs: T[],
+  ): Promise<T[]>;
+}
+```
+
+### Utility Functions
+
+```typescript
+import {
+  solToLamports,
+  lamportsToSol,
+  findDepositPda,
+  findVaultPda,
+  PROGRAM_ID,
+  LAMPORTS_PER_SOL,
+} from "@loyal-labs/transactions";
+
+// Convert SOL to lamports
+const lamports = solToLamports(1.5); // 1_500_000_000
+
+// Convert lamports to SOL
+const sol = lamportsToSol(1_500_000_000); // 1.5
+
+// Derive PDAs directly (without client instance)
+const [depositPda] = findDepositPda(userPubkey, "alice");
+const [vaultPda] = findVaultPda();
+```
+
+### Constants
+
+```typescript
+import {
+  PROGRAM_ID,
+  DEPOSIT_SEED,
+  VAULT_SEED,
+  LAMPORTS_PER_SOL,
+} from "@loyal-labs/transactions";
+
+// Program ID: 4ewpzEPF5xrVAHeRkoe7XS1yKFGQBekD7PgFwEz9SaxY
+console.log(PROGRAM_ID.toBase58());
+```
+
+### Type Guards
+
+```typescript
+import {
+  isKeypair,
+  isAnchorProvider,
+  isWalletLike,
+} from "@loyal-labs/transactions";
+
+if (isKeypair(signer)) {
+  console.log("Using Keypair");
+} else if (isAnchorProvider(signer)) {
+  console.log("Using AnchorProvider");
+} else if (isWalletLike(signer)) {
+  console.log("Using wallet adapter");
+}
+```

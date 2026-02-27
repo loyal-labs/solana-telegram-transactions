@@ -95,7 +95,8 @@ bun run admin:build        # build admin workspace from repo root
 - **`/sdk/transactions`** - Publishable `@loyal-labs/transactions` NPM package
 - **`/workers`** - Runtime services/workers
 - **`/tests`** - Anchor test suite (Mocha/Chai)
-- **`/docs`** - Project documentation
+- **`/docs`** - Internal repository/engineering documentation
+- **`/user-docs`** - Mintlify-hosted public/user-facing documentation
 
 ### Program Addresses
 

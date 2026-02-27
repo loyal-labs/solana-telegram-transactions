@@ -31,6 +31,21 @@ GitHub pull requests also enforce commit messages and PR titles with the same ru
 
 For Vercel admin deploys from this monorepo, set project Root Directory to `admin`.
 
+## Documentation Structure
+- `/docs`: Internal repository and engineering documentation for contributors/operators.
+- `/user-docs`: Mintlify-hosted public/user-facing documentation.
+
+Mintlify local preview:
+```bash
+cd user-docs
+mint dev
+```
+
+Future subtree sync from `loyal-docs`:
+```bash
+git subtree pull --prefix=user-docs loyal-docs main --squash
+```
+
 ## Local Development
 1. Run Solana validator
 ```bash
