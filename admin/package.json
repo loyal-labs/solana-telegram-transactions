@@ -3,15 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "bun run --cwd .. build:db-packages",
     "dev": "next dev --turbopack",
+    "prebuild": "bun run --cwd .. build:db-packages",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "shadcn:init": "bunx shadcn@latest init",
-    "shadcn:add": "bunx shadcn@latest add",
-    "db:schema:pull": "bunx drizzle-kit pull --config=drizzle.config.ts"
+    "shadcn:add": "bunx shadcn@latest add"
   },
   "dependencies": {
+    "@loyal-labs/db-adapter-neon": "workspace:*",
+    "@loyal-labs/db-core": "workspace:*",
     "@neondatabase/serverless": "^1.0.2",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-separator": "^1.1.8",
@@ -35,7 +38,6 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "drizzle-kit": "^0.31.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -3,9 +3,9 @@ import Link from "next/link";
 import { count, desc, inArray } from "drizzle-orm";
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
 
-import { db } from "@/lib/db";
+import { getDatabase } from "@/lib/core/database";
 import { CACHE_TAGS, DATA_CACHE_TTL_SECONDS } from "@/lib/data-cache";
-import { communities, summaries } from "@/lib/generated/schema";
+import { communities, summaries } from "@loyal-labs/db-core/schema";
 import { PageContainer } from "@/components/layout/page-container";
 import { SectionHeader } from "@/components/layout/section-header";
 import {
@@ -38,7 +38,7 @@ type PaginationToken = number | "start-ellipsis" | "end-ellipsis";
 type HomeCommunityRow = {
   id: string;
   chatTitle: string;
-  chatId: number;
+  chatId: string;
   isActive: boolean;
   summaryNotificationsEnabled: boolean;
   isPublic: boolean;
@@ -94,6 +94,7 @@ function getPageHref(page: number) {
 }
 
 async function loadHomePageData(requestedPage: number): Promise<HomePageData> {
+  const db = getDatabase();
   const [totals] = await db
     .select({
       count: count(),
@@ -119,7 +120,12 @@ async function loadHomePageData(requestedPage: number): Promise<HomePageData> {
     .limit(COMMUNITY_PAGE_SIZE)
     .offset(offset);
 
-  const communityIds = rows.map((row) => row.id);
+  const serializedRows: HomeCommunityRow[] = rows.map((row) => ({
+    ...row,
+    chatId: row.chatId.toString(),
+  }));
+
+  const communityIds = serializedRows.map((row) => row.id);
 
   const summaryCounts =
     communityIds.length > 0
@@ -138,7 +144,7 @@ async function loadHomePageData(requestedPage: number): Promise<HomePageData> {
   );
 
   return {
-    rows,
+    rows: serializedRows,
     summaryCountByCommunityId,
     currentPage,
     totalPages,

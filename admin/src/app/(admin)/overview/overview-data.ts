@@ -3,9 +3,9 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { and, count, gte, lt, sql } from "drizzle-orm";
 
-import { db } from "@/lib/db";
+import { getDatabase } from "@/lib/core/database";
 import { CACHE_TAGS, DATA_CACHE_TTL_SECONDS } from "@/lib/data-cache";
-import { communities, messages, summaries, users } from "@/lib/generated/schema";
+import { communities, messages, summaries, users } from "@loyal-labs/db-core/schema";
 
 export type OverviewChartPoint = {
   date: string;
@@ -58,6 +58,7 @@ function getDayKeys(startInclusive: Date, numberOfDays: number) {
 }
 
 async function loadOverviewData(): Promise<OverviewData> {
+  const db = getDatabase();
   const { startInclusive, endExclusive } = getWindowBoundsUtc();
   const dayKeys = getDayKeys(startInclusive, 30);
 
@@ -83,8 +84,8 @@ async function loadOverviewData(): Promise<OverviewData> {
       .from(summaries)
       .where(
         and(
-          gte(summaries.createdAt, startInclusive.toISOString()),
-          lt(summaries.createdAt, endExclusive.toISOString()),
+          gte(summaries.createdAt, startInclusive),
+          lt(summaries.createdAt, endExclusive),
         ),
       )
       .groupBy(summariesDayExpression),
@@ -96,8 +97,8 @@ async function loadOverviewData(): Promise<OverviewData> {
       .from(messages)
       .where(
         and(
-          gte(messages.createdAt, startInclusive.toISOString()),
-          lt(messages.createdAt, endExclusive.toISOString()),
+          gte(messages.createdAt, startInclusive),
+          lt(messages.createdAt, endExclusive),
         ),
       )
       .groupBy(messagesDayExpression),
@@ -109,8 +110,8 @@ async function loadOverviewData(): Promise<OverviewData> {
       .from(communities)
       .where(
         and(
-          gte(communities.updatedAt, startInclusive.toISOString()),
-          lt(communities.updatedAt, endExclusive.toISOString()),
+          gte(communities.updatedAt, startInclusive),
+          lt(communities.updatedAt, endExclusive),
         ),
       )
       .groupBy(communitiesDayExpression),
@@ -122,8 +123,8 @@ async function loadOverviewData(): Promise<OverviewData> {
       .from(users)
       .where(
         and(
-          gte(users.createdAt, startInclusive.toISOString()),
-          lt(users.createdAt, endExclusive.toISOString()),
+          gte(users.createdAt, startInclusive),
+          lt(users.createdAt, endExclusive),
         ),
       )
       .groupBy(usersDayExpression),

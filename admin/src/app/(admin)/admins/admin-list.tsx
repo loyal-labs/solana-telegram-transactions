@@ -18,7 +18,7 @@ import { addAdmin, deleteAdmin, updateAdmin } from "./actions";
 
 type AdminRow = {
   id: string;
-  telegramId: number;
+  telegramId: string;
   username: string | null;
   displayName: string;
   addedAt: string;

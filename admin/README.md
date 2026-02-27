@@ -8,24 +8,24 @@ Auth credentials are stored in 1Password (`loyal-admin`).
 
 ## Local Development
 
-1. `bun i`
-2. Set `DATABASE_URL` in `.env.local` (use 1Password or Vercel env values for `solana-telegram-transactions`)
-3. `bun dev`
+1. From repo root: `bun i`
+2. Set `DATABASE_URL`, `ADMIN_USER`, and `ADMIN_PASSWORD` in `admin/.env.local`
+3. Start admin:
+   - from root: `bun run admin:dev`
+   - or from `admin/`: `bun dev`
 
-## Sync DB Schema
+## Database Schema
 
-Use Drizzle pull to generate an up-to-date schema snapshot from the live database.
+This workspace uses shared monorepo schema and Neon DB adapter packages:
+- `@loyal-labs/db-core/schema`
+- `@loyal-labs/db-adapter-neon`
 
-Prerequisite:
-- `DATABASE_URL` must be set in your environment (typically `.env.local`)
+Do not add local generated schema files under `admin/src/lib/generated`.
+There is no admin `/schema` UI route; schema is sourced directly from shared packages.
 
-Commands:
-- `bun run db:schema:pull`
-- `bunx drizzle-kit pull --config=drizzle.config.ts`
+## Vercel Deploy
 
-Generated output:
-- `src/lib/generated/*`
-
-Note:
-- `bun run db:schema:pull` regenerates the authoritative runtime schema in `src/lib/generated/schema.ts`.
-- `src/lib/generated/schema.ts` is the source of truth for DB shape and should be used by app code.
+For monorepo deploys:
+- Repository: `loyal-labs/loyal-app`
+- Root Directory: `admin`
+- Config: `admin/vercel.json`

@@ -3,8 +3,20 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { db } from "@/lib/db";
-import { admins } from "@/lib/generated/schema";
+import { getDatabase } from "@/lib/core/database";
+import { admins } from "@loyal-labs/db-core/schema";
+
+function parseTelegramId(value: string): bigint | null {
+  if (!/^\d+$/.test(value)) {
+    return null;
+  }
+
+  try {
+    return BigInt(value);
+  } catch {
+    return null;
+  }
+}
 
 export async function addAdmin(formData: FormData) {
   const telegramId = formData.get("telegramId") as string;
@@ -17,9 +29,16 @@ export async function addAdmin(formData: FormData) {
     return { error: "Telegram ID and Display Name are required" };
   }
 
+  const parsedTelegramId = parseTelegramId(telegramId);
+  if (parsedTelegramId === null) {
+    return { error: "Telegram ID must be a valid integer" };
+  }
+
+  const db = getDatabase();
+
   try {
     await db.insert(admins).values({
-      telegramId: Number(telegramId),
+      telegramId: parsedTelegramId,
       displayName,
       username,
       addedBy,
@@ -47,11 +66,18 @@ export async function updateAdmin(id: string, formData: FormData) {
     return { error: "Telegram ID and Display Name are required" };
   }
 
+  const parsedTelegramId = parseTelegramId(telegramId);
+  if (parsedTelegramId === null) {
+    return { error: "Telegram ID must be a valid integer" };
+  }
+
+  const db = getDatabase();
+
   try {
     await db
       .update(admins)
       .set({
-        telegramId: Number(telegramId),
+        telegramId: parsedTelegramId,
         displayName,
         username,
         addedBy,
@@ -70,6 +96,7 @@ export async function updateAdmin(id: string, formData: FormData) {
 }
 
 export async function deleteAdmin(id: string) {
+  const db = getDatabase();
   await db.delete(admins).where(eq(admins.id, id));
   revalidatePath("/admins");
   return { success: true };

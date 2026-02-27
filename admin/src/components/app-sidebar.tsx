@@ -27,7 +27,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/overview", label: "Overview" },
   { href: "/communities", label: "Communities" },
   { href: "/admins", label: "Admins" },
-  { href: "/schema", label: "Schemas" },
 ];
 
 export function AppSidebar() {

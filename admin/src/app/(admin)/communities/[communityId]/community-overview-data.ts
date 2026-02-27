@@ -3,9 +3,9 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { and, asc, count, desc, eq, gte, lt, sql } from "drizzle-orm";
 
-import { db } from "@/lib/db";
+import { getDatabase } from "@/lib/core/database";
 import { DATA_CACHE_TTL_SECONDS, communityTag } from "@/lib/data-cache";
-import { communities, messages, summaries, users } from "@/lib/generated/schema";
+import { communities, messages, summaries, users } from "@loyal-labs/db-core/schema";
 
 export type CommunityOverviewChartPoint = {
   date: string;
@@ -46,12 +46,12 @@ export type CommunityOverviewData = {
   community: {
     id: string;
     chatTitle: string;
-    chatId: number;
+    chatId: string;
     isActive: boolean;
     isPublic: boolean;
     summaryNotificationsEnabled: boolean;
-    summaryNotificationTimeHours: number | null;
-    summaryNotificationMessageCount: number | null;
+    summaryNotificationTimeHours: 24 | 48 | null;
+    summaryNotificationMessageCount: 500 | 1000 | null;
   };
   chartPoints: CommunityOverviewChartPoint[];
   messagesChartPoints: CommunityMessagesChartPoint[];
@@ -94,6 +94,7 @@ function getDayKeys(startInclusive: Date, numberOfDays: number) {
 async function loadCommunityOverviewData(
   communityId: string,
 ): Promise<CommunityOverviewData | null> {
+  const db = getDatabase();
   const [community] = await db
     .select({
       id: communities.id,
@@ -135,8 +136,8 @@ async function loadCommunityOverviewData(
       .where(
         and(
           eq(summaries.communityId, communityId),
-          gte(summaries.createdAt, startInclusive.toISOString()),
-          lt(summaries.createdAt, endExclusive.toISOString()),
+          gte(summaries.createdAt, startInclusive),
+          lt(summaries.createdAt, endExclusive),
         ),
       )
       .groupBy(summariesDayExpression),
@@ -149,8 +150,8 @@ async function loadCommunityOverviewData(
       .where(
         and(
           eq(messages.communityId, communityId),
-          gte(messages.createdAt, startInclusive.toISOString()),
-          lt(messages.createdAt, endExclusive.toISOString()),
+          gte(messages.createdAt, startInclusive),
+          lt(messages.createdAt, endExclusive),
         ),
       )
       .groupBy(messagesDayExpression),
@@ -163,8 +164,8 @@ async function loadCommunityOverviewData(
       .where(
         and(
           eq(messages.communityId, communityId),
-          gte(messages.createdAt, startInclusive.toISOString()),
-          lt(messages.createdAt, endExclusive.toISOString()),
+          gte(messages.createdAt, startInclusive),
+          lt(messages.createdAt, endExclusive),
         ),
       )
       .groupBy(messagesDayExpression),
@@ -180,8 +181,8 @@ async function loadCommunityOverviewData(
       .where(
         and(
           eq(messages.communityId, communityId),
-          gte(messages.createdAt, startInclusive.toISOString()),
-          lt(messages.createdAt, endExclusive.toISOString()),
+          gte(messages.createdAt, startInclusive),
+          lt(messages.createdAt, endExclusive),
         ),
       )
       .groupBy(messages.userId, users.displayName, users.username)
@@ -262,7 +263,10 @@ async function loadCommunityOverviewData(
       : sortedDailyActiveUserCounts[Math.floor(activeUsersMedianIndex)];
 
   return {
-    community,
+    community: {
+      ...community,
+      chatId: community.chatId.toString(),
+    },
     chartPoints,
     messagesChartPoints,
     activeUsersChartPoints,

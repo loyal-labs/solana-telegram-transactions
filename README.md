@@ -14,7 +14,7 @@ bun install
 
 Enabled hooks:
 - `commit-msg`: validates Conventional Commit messages.
-- `pre-push`: runs `cd app && bun run lint` to catch lint issues before push.
+- `pre-push`: runs lint/build checks for both `app` and `admin` before push.
 - Bypass only when necessary: `SKIP_VERIFY=1 git push`
 - CI note: app build is not run in GitHub Actions; Vercel is the build/deploy gate.
 
@@ -24,6 +24,12 @@ echo "feat(scope): short description" | bunx commitlint --verbose
 ```
 
 GitHub pull requests also enforce commit messages and PR titles with the same rules.
+
+## Monorepo Apps
+- `app`: Telegram mini-app and API
+- `admin`: internal admin dashboard
+
+For Vercel admin deploys from this monorepo, set project Root Directory to `admin`.
 
 ## Local Development
 1. Run Solana validator

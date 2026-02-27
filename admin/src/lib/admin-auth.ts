@@ -95,21 +95,10 @@ async function getSigningKey() {
 export function validateAdminCredentials(user: string, password: string) {
   const expectedUser = process.env.ADMIN_USER;
   const expectedPassword = process.env.ADMIN_PASSWORD;
-  console.log("expectedUser", expectedUser);
-  console.log("expectedPassword", expectedPassword);
-  console.log("user", user);
-  console.log("password", password);
 
   if (!expectedUser || !expectedPassword) {
     return false;
   }
-
-  console.log(
-    "constantTimeEqual(user, expectedUser)",
-    constantTimeEqual(user, expectedUser),
-    "constantTimeEqual(password, expectedPassword)",
-    constantTimeEqual(password, expectedPassword),
-  );
 
   return (
     constantTimeEqual(user, expectedUser) &&

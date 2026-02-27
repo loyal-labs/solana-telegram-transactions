@@ -13,8 +13,8 @@ type CommunityNotificationSettingsCardProps = {
     isActive: boolean
     isPublic: boolean
     summaryNotificationsEnabled: boolean
-    summaryNotificationTimeHours: number | null
-    summaryNotificationMessageCount: number | null
+    summaryNotificationTimeHours: 24 | 48 | null
+    summaryNotificationMessageCount: 500 | 1000 | null
   }
 }
 

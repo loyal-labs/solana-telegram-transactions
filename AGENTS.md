@@ -19,6 +19,14 @@ bun db:migrate             # Apply migrations
 bun db:studio              # Open Drizzle Studio GUI
 ```
 
+### Admin Dashboard (run from `/admin`)
+
+```bash
+bun dev                    # Start dev server (turbopack)
+bun run build              # Production build (Next.js)
+bun lint                   # Next.js lint
+```
+
 ### Smart Contracts (run from root)
 
 ```bash
@@ -57,6 +65,9 @@ bun run lint:fix           # prettier -w
 bun run build:db-packages  # build shared DB workspace packages
 bun run typecheck:db-packages  # typecheck shared DB workspace packages
 bun run guard:shared-boundaries  # ensure shared packages stay app-env agnostic
+bun run admin:dev          # run admin dev server from repo root
+bun run admin:lint         # lint admin workspace from repo root
+bun run admin:build        # build admin workspace from repo root
 ```
 
 ### Git Hooks
@@ -66,7 +77,7 @@ bun run guard:shared-boundaries  # ensure shared packages stay app-env agnostic
 ```
 
 - Run once per clone/worktree to enable repo hooks.
-- Hooks enforce commit message format (`commit-msg`) and run lint before push (`pre-push`: `cd app && bun run lint`).
+- Hooks enforce commit message format (`commit-msg`) and run app/admin lint+build before push.
 - Temporary bypass (only when necessary): `SKIP_VERIFY=1 git push`
 - CI note: app builds are intentionally not run in GitHub Actions; Vercel is the build/deploy gate.
 
@@ -78,6 +89,7 @@ bun run guard:shared-boundaries  # ensure shared packages stay app-env agnostic
   - `telegram-transfer` - Deposit/claim/refund SOL transfers
   - `telegram-verification` - On-chain Ed25519 Telegram signature verification
 - **`/app`** - Next.js 15 frontend + API routes
+- **`/admin`** - Next.js 15 internal admin dashboard
 - **`/packages`** - Internal shared workspace packages (e.g. `db-core`, `db-adapter-neon`)
 - **`/sdk/transactions`** - Publishable `@loyal-labs/transactions` NPM package
 - **`/workers`** - Runtime services/workers
@@ -335,6 +347,7 @@ refactor(ui): extract pill button component
 - PR body should be a simple one-two sentence summary of the changes — no templates or checklists
 - Only merge a PR after its Vercel build/check is successful
 - Merge PRs using squash-and-merge
+- For admin deployments from monorepo, configure Vercel Root Directory as `admin`
 
 ## Tooling
 

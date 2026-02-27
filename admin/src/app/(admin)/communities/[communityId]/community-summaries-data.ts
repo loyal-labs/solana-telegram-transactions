@@ -3,9 +3,9 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { count, desc, eq, inArray } from "drizzle-orm";
 
-import { db } from "@/lib/db";
+import { getDatabase } from "@/lib/core/database";
 import { DATA_CACHE_TTL_SECONDS, communityTag } from "@/lib/data-cache";
-import { summaries, summaryVotes } from "@/lib/generated/schema";
+import { summaries, summaryVotes } from "@loyal-labs/db-core/schema";
 
 export const SUMMARY_PAGE_SIZE = 10;
 
@@ -87,6 +87,7 @@ async function loadCommunitySummariesPage(
   communityId: string,
   requestedPage: number,
 ): Promise<CommunitySummariesPageData> {
+  const db = getDatabase();
   const [totals] = await db
     .select({
       count: count(),
@@ -155,7 +156,7 @@ async function loadCommunitySummariesPage(
   const normalizedRows: CommunitySummaryRow[] = rows.map((row) => ({
     ...(voteCountsBySummaryId.get(row.id) ?? { likesCount: 0, dislikesCount: 0 }),
     id: row.id,
-    createdAt: row.createdAt,
+    createdAt: row.createdAt.toISOString(),
     oneliner: row.oneliner,
     topics: normalizeTopics(row.topics),
   }));
