@@ -39,7 +39,7 @@ HTTP, database, and storage/CDN utilities.
 |------|---------|-------------|
 | `http.ts` | `fetchJson()`, `fetchStream()` | Typed fetch wrappers |
 | `api.ts` | `resolveEndpoint()` | Builds URLs from `publicEnv.serverHost` (`NEXT_PUBLIC_SERVER_HOST`) |
-| `database.ts` | `getDatabase()` | Neon PostgreSQL connection via Drizzle ORM |
+| `database.ts` | `getDatabase()` | App-local DB singleton using shared `@loyal-labs/db-core` schema and `@loyal-labs/db-adapter-neon` |
 | `r2-upload.ts` | `createCloudflareR2UploadClient()`, `getCloudflareR2UploadClientFromEnv()` | Server-side Cloudflare R2 image upload client |
 | `cdn-url.ts` | `createCloudflareCdnUrlClient()`, `getCloudflareCdnUrlClientFromEnv()` | Resolves public CDN URLs from object keys |
 | `config/public.ts` | `publicEnv` | Public env access (`NEXT_PUBLIC_*`) |
@@ -102,7 +102,7 @@ Server-side AES-256-GCM encryption for personal messages.
 | `decrypt.ts` | `decrypt()` | Decrypts data, returns plaintext or `null` on failure |
 | `types.ts` | `EncryptedData` | TypeScript interface for encrypted payload |
 
-**JSONB storage type:** `EncryptedMessageContent` (defined in `schema.ts`) extends `EncryptedData` with:
+**JSONB storage type:** `EncryptedMessageContent` (defined in `@loyal-labs/db-core/schema`) extends `EncryptedData` with:
 - `type`: Content discriminator (`"text"`, `"image"`, `"voice"`)
 - `metadata`: Optional metadata preserved unencrypted (file name, size, duration)
 

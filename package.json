@@ -1,10 +1,23 @@
 {
+  "private": true,
   "license": "ISC",
   "type": "module",
+  "workspaces": [
+    "app",
+    "packages/*",
+    "sdk/*",
+    "workers/*"
+  ],
   "scripts": {
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
-    "commitlint:head": "commitlint --from HEAD~1 --to HEAD --verbose"
+    "commitlint:head": "commitlint --from HEAD~1 --to HEAD --verbose",
+    "build:db-packages": "bun run --cwd packages/db-core build && bun run --cwd packages/db-adapter-neon build",
+    "typecheck:db-packages": "bun run --cwd packages/db-core typecheck && bun run --cwd packages/db-adapter-neon typecheck",
+    "guard:shared-boundaries": "rg -n \"@/lib/core/config/server|app/src/lib/core/config/server\" packages && (echo \"Shared packages must not import app server config\" && exit 1) || true"
+  },
+  "overrides": {
+    "drizzle-orm": "0.45.1"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",

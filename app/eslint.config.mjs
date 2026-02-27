@@ -49,6 +49,11 @@ const eslintConfig = [
           message:
             "Use centralized config modules instead of direct process.env access.",
         },
+        {
+          selector: "ImportDeclaration[source.value='@/lib/core/schema']",
+          message:
+            "Import shared schema from '@loyal-labs/db-core/schema' instead of app-local schema.",
+        },
       ],
     },
   },

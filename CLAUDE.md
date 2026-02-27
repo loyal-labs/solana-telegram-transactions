@@ -54,6 +54,9 @@ anchor test --provider.cluster localnet --skip-local-validator --skip-build --sk
 ```bash
 bun run lint               # prettier --check
 bun run lint:fix           # prettier -w
+bun run build:db-packages  # build shared DB workspace packages
+bun run typecheck:db-packages  # typecheck shared DB workspace packages
+bun run guard:shared-boundaries  # ensure shared packages stay app-env agnostic
 ```
 
 ### Git Hooks
@@ -75,7 +78,9 @@ bun run lint:fix           # prettier -w
   - `telegram-transfer` - Deposit/claim/refund SOL transfers
   - `telegram-verification` - On-chain Ed25519 Telegram signature verification
 - **`/app`** - Next.js 15 frontend + API routes
+- **`/packages`** - Internal shared workspace packages (e.g. `db-core`, `db-adapter-neon`)
 - **`/sdk/transactions`** - Publishable `@loyal-labs/transactions` NPM package
+- **`/workers`** - Runtime services/workers
 - **`/tests`** - Anchor test suite (Mocha/Chai)
 - **`/docs`** - Project documentation
 
@@ -151,7 +156,7 @@ Use `/app/src/lib` for cross-slice infrastructure and integration primitives. Ex
 
 ### Database Patterns
 
-Schema conventions used in `/app/src/lib/core/schema.ts`:
+Schema conventions used in `/packages/db-core/src/schema.ts`:
 
 - **Primary Keys**: UUID with `defaultRandom()` for all tables
 - **Telegram IDs**: Use `bigint` with `{ mode: "bigint" }` for Telegram user/chat IDs
@@ -175,6 +180,10 @@ Service layer patterns:
 - **Driver Compatibility (Critical)**: Check `/app/src/lib/core/database.ts` before choosing advanced DB APIs. Do not assume all Drizzle drivers support the same capabilities.
 - **Atomic Multi-step Writes (Neon HTTP)**: This repo uses `drizzle-orm/neon-http`, which does **not** support `db.transaction()`. For atomic multi-statement writes, use `db.batch([...])`. Only use `db.transaction()` if the project is moved to a driver that supports it.
 - **Query Builder**: Prefer `db.query.table.findFirst()` with `with:` for relations over raw SQL
+- **Shared DB Guardrail**: In app code, import schema from `@loyal-labs/db-core/schema`.
+- **Shared DB Guardrail**: Keep Neon driver wiring and env access in app (`/app/src/lib/core/database.ts`).
+- **Shared DB Guardrail**: Shared packages must not import app-only server config modules.
+- **Shared DB Guardrail**: Preserve Neon HTTP semantics (`db.batch` for atomic multi-write flows; no `db.transaction()` assumptions).
 
 ### Code Patterns
 

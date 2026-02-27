@@ -1,8 +1,8 @@
+import { communities, summaries, type Summary } from "@loyal-labs/db-core/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDatabase } from "@/lib/core/database";
-import { communities, summaries, type Summary } from "@/lib/core/schema";
 
 type CommunityPhotoSettings = {
   photoBase64?: string;

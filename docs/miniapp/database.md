@@ -7,8 +7,15 @@ Neon PostgreSQL integration using Drizzle ORM.
 | File                       | Purpose                       |
 | -------------------------- | ----------------------------- |
 | `src/lib/core/database.ts` | Database connection singleton |
-| `src/lib/core/schema.ts`   | Drizzle table definitions     |
+| `../packages/db-core/src/schema.ts` | Shared Drizzle table definitions |
 | `drizzle.config.ts`        | Migration configuration       |
+
+## Ownership and Boundaries
+
+- `@loyal-labs/db-core`: shared Drizzle schema, relations, and table types.
+- `@loyal-labs/db-adapter-neon`: shared `createNeonDb()` adapter factory and Neon DB types.
+- `src/lib/core/database.ts`: app-local `getDatabase()` wrapper; owns `serverEnv` resolution and singleton lifecycle.
+- App code must import schema from `@loyal-labs/db-core/schema`.
 
 ## Usage
 
@@ -21,7 +28,7 @@ const users = await db.select().from(usersTable);
 
 ## Schema Management
 
-Define tables in `src/lib/core/schema.ts`:
+Define tables in `../packages/db-core/src/schema.ts`:
 
 ```typescript
 import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
@@ -33,15 +40,27 @@ export const users = pgTable("users", {
 });
 ```
 
+App code should import schema from the shared entrypoint:
+
+```typescript
+import { users } from "@loyal-labs/db-core/schema";
+```
+
 ## Migration Commands
 
-Run from `/app` directory:
+Run from `/app` (migrations remain app-owned while schema lives in `../packages/db-core/src/schema.ts`):
 
 | Command           | Description                             |
 | ----------------- | --------------------------------------- |
 | `bun db:generate` | Generate migrations from schema changes |
 | `bun db:migrate`  | Apply migrations to database            |
 | `bun db:studio`   | Open Drizzle Studio GUI                 |
+
+## Workspace Notes
+
+- Run installs from repository root: `bun install`.
+- If Drizzle type identity conflicts appear (for example duplicate `drizzle-orm` types), remove app-local `node_modules` and reinstall from root.
+- Keep migration commands app-scoped: `cd app && bun db:generate` and `cd app && bun db:migrate`.
 
 ## Environment
 
