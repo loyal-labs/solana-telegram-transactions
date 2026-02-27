@@ -14,8 +14,17 @@ if ! command -v bun >/dev/null 2>&1; then
   exit 1
 fi
 
+echo "[pre-push] Running admin shared-schema guard..."
+bun run guard:admin-shared-schema
+
 echo "[pre-push] Running app lint..."
 (cd app && bun run lint)
 
 echo "[pre-push] Running app build..."
 (cd app && bun run build)
+
+echo "[pre-push] Running admin lint..."
+(cd admin && bun run lint)
+
+echo "[pre-push] Running admin build..."
+(cd admin && bun run build)
