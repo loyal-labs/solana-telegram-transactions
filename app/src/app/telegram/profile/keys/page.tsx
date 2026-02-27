@@ -432,6 +432,7 @@ function ImportWalletSheet({
   // "confirm" = initial warning, "input" = key entry, "success" = done
   const [step, setStep] = useState<"confirm" | "input" | "success">("confirm");
   const [importedAddress, setImportedAddress] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [inputKey, setInputKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -546,6 +547,7 @@ function ImportWalletSheet({
   }, []);
 
   const handlePasteFromClipboard = useCallback(async () => {
+    // Try Clipboard API first (works in most modern browsers)
     try {
       if (navigator?.clipboard?.readText) {
         const text = await navigator.clipboard.readText();
@@ -555,10 +557,23 @@ function ImportWalletSheet({
           if (hapticFeedback.impactOccurred.isAvailable()) {
             hapticFeedback.impactOccurred("light");
           }
+          return;
         }
       }
     } catch {
-      // Clipboard API may not be available
+      // Clipboard API denied or unavailable — fall through to execCommand
+    }
+
+    // Fallback: focus textarea and trigger paste via execCommand
+    // This works on Android WebViews where clipboard.readText() is blocked
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.focus();
+      try {
+        document.execCommand("paste");
+      } catch {
+        // execCommand paste also blocked — nothing we can do
+      }
     }
   }, []);
 
@@ -831,6 +846,7 @@ function ImportWalletSheet({
               <div className="flex flex-col items-center gap-2.5 px-4 py-4">
                 <div className="w-full">
                   <textarea
+                    ref={textareaRef}
                     value={inputKey}
                     onChange={(e) => {
                       setInputKey(e.target.value);
@@ -855,6 +871,7 @@ function ImportWalletSheet({
 
                 {/* Paste From Clipboard pill */}
                 <button
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={handlePasteFromClipboard}
                   className="px-4 py-2 rounded-full flex items-center justify-center active:opacity-80 transition-opacity"
                   style={{ background: "rgba(249, 54, 60, 0.14)" }}
