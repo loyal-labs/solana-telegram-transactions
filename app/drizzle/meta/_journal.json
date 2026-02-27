@@ -71,6 +71,13 @@
       "when": 1772170186484,
       "tag": "0009_parched_the_executioner",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1771850473595,
+      "tag": "0010_cuddly_machine_man",
+      "breakpoints": true
     }
   ]
 }

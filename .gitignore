@@ -82,6 +82,12 @@ docs/scopes
 
 .entire/
 
+# Mobile
+/mobile/.expo/
+/mobile/node_modules/
+/mobile/ios/
+/mobile/android/
+
 # userbot worker local storage overrides
 /.data/userbot/
 /workers/userbot/.data/

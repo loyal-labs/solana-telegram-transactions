@@ -147,6 +147,10 @@
         "drizzle-orm": "^0.45.1",
       },
     },
+    "packages/shared": {
+      "name": "@loyal-labs/shared",
+      "version": "0.1.0",
+    },
     "sdk/private-transactions": {
       "name": "@loyal-labs/private-transactions",
       "version": "0.2.0",
@@ -621,6 +625,8 @@
     "@loyal-labs/db-core": ["@loyal-labs/db-core@workspace:packages/db-core"],
 
     "@loyal-labs/private-transactions": ["@loyal-labs/private-transactions@workspace:sdk/private-transactions"],
+
+    "@loyal-labs/shared": ["@loyal-labs/shared@workspace:packages/shared"],
 
     "@loyal-labs/transactions": ["@loyal-labs/transactions@workspace:sdk/transactions"],
 
