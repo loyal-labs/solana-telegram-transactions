@@ -18,6 +18,7 @@ This guide explains how to run the mtcute userbot worker with persistent SQLite 
 
 - `TELEGRAM_USERBOT_API_ID`
 - `TELEGRAM_USERBOT_API_HASH`
+- `DATABASE_URL` (required for `sync:once`)
 
 ## Optional Environment Variables
 
@@ -57,6 +58,14 @@ bun run auth:status
 
 - Exit code `0`: session is valid
 - Exit code `1`: session missing/invalid (re-bootstrap needed)
+
+## Cron Sync (One-shot)
+
+Configure a Render cron job with:
+
+```bash
+cd workers/userbot && bun install && bun run sync:once
+```
 
 ## Session Recovery Flow
 

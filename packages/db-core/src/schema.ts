@@ -59,6 +59,11 @@ export type SummaryNotificationTimeHours = 24 | 48;
 export type SummaryNotificationMessageCount = 500 | 1000;
 
 /**
+ * Community ingestion parser type.
+ */
+export type CommunityParserType = "bot" | "userbot";
+
+/**
  * Encrypted message content stored as JSONB.
  * Supports text now, extensible for images/voice later.
  */
@@ -157,6 +162,10 @@ export const communities = pgTable(
     chatTitle: text("chat_title").notNull(),
     activatedBy: bigint("activated_by", { mode: "bigint" }).notNull(),
     isActive: boolean("is_active").default(true).notNull(),
+    parserType: text("parser_type")
+      .$type<CommunityParserType>()
+      .default("bot")
+      .notNull(),
     summaryNotificationsEnabled: boolean("summary_notifications_enabled")
       .default(true)
       .notNull(),
@@ -180,9 +189,17 @@ export const communities = pgTable(
   (table) => [
     uniqueIndex("communities_chat_id_idx").on(table.chatId),
     index("communities_is_active_idx").on(table.isActive),
+    index("communities_is_active_parser_type_idx").on(
+      table.isActive,
+      table.parserType
+    ),
     check(
       "communities_summary_notification_time_hours_check",
       sql`${table.summaryNotificationTimeHours} IS NULL OR ${table.summaryNotificationTimeHours} IN (24, 48)`
+    ),
+    check(
+      "communities_parser_type_check",
+      sql`${table.parserType} IN ('bot', 'userbot')`
     ),
     check(
       "communities_summary_notification_message_count_check",
