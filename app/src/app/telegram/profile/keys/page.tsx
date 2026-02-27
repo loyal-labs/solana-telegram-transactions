@@ -862,7 +862,6 @@ function ImportWalletSheet({
                     onChange={(e) => {
                       setInputKey(e.target.value);
                       setError(null);
-                      setPasteHint(false);
                     }}
                     placeholder="Paste or start typing"
                     className="w-full min-h-[120px] bg-[#f2f2f7] rounded-[20px] px-4 py-[13px] text-[17px] font-normal leading-[22px] text-black placeholder:text-[rgba(60,60,67,0.6)] resize-none outline-none"
