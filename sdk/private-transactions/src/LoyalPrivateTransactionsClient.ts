@@ -1261,12 +1261,12 @@ export class LoyalPrivateTransactionsClient {
       );
 
       if (
-        delegationStatus.result?.delegationRecord.authority !==
+        delegationStatus.result?.delegationRecord?.authority !==
         ER_VALIDATOR.toString()
       ) {
         console.error(
           `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${
-            delegationStatus.result?.delegationRecord.authority
+            delegationStatus.result?.delegationRecord?.authority
           }`
         );
       }
@@ -1317,12 +1317,12 @@ export class LoyalPrivateTransactionsClient {
       );
     } else if (
       !skipValidatorCheck &&
-      delegationStatus.result?.delegationRecord.authority !==
+      delegationStatus.result?.delegationRecord?.authority !==
         ER_VALIDATOR.toString()
     ) {
       console.error(
         `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${
-          delegationStatus.result?.delegationRecord.authority
+          delegationStatus.result?.delegationRecord?.authority
         }`
       );
       console.error(
@@ -1337,7 +1337,7 @@ export class LoyalPrivateTransactionsClient {
 
       throw new Error(
         `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${
-          delegationStatus.result?.delegationRecord.authority
+          delegationStatus.result?.delegationRecord?.authority
         }`
       );
     }
@@ -1346,16 +1346,33 @@ export class LoyalPrivateTransactionsClient {
   private async getDelegationStatus(
     account: PublicKey
   ): Promise<DelegationStatusResponse> {
+    const body = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "getDelegationStatus",
+      params: [account.toString()],
+    });
     const options = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getDelegationStatus",
-        params: [account.toString()],
-      }),
+      body,
     };
+
+    // Try TEE first
+    try {
+      const teeRes = await fetch("https://tee.magicblock.app/", options);
+      const teeData = (await teeRes.json()) as DelegationStatusResponse;
+      if (teeData.result?.isDelegated) {
+        return teeData;
+      }
+    } catch (e) {
+      console.error(
+        "[getDelegationStatus] TEE fetch failed, falling back to devnet-router:",
+        e
+      );
+    }
+
+    // Fallback to devnet-router
     const res = await fetch(
       "https://devnet-router.magicblock.app/getDelegationStatus",
       options

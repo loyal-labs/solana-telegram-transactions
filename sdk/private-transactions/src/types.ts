@@ -256,12 +256,13 @@ export interface DelegationRecord {
 }
 
 /**
- * Response from MagicBlock getDelegationStatus RPC call
+ * Response from MagicBlock getDelegationStatus RPC call.
+ * TEE endpoint returns only { isDelegated }, devnet-router returns the full record.
  */
 export interface DelegationStatusResult {
   isDelegated: boolean;
   fqdn?: string;
-  delegationRecord: DelegationRecord;
+  delegationRecord?: DelegationRecord;
 }
 
 /**

@@ -62,7 +62,10 @@ pub(crate) fn get_auth_token(http: &HttpClient, rpc_url: &str, signer: &Keypair)
     let challenge_json = challenge_resp
         .json::<AuthChallengeResponse>()
         .context("invalid auth challenge response")?;
-    debug!("auth challenge payload={}", serde_json::to_string(&challenge_json)?);
+    debug!(
+        "auth challenge payload={}",
+        serde_json::to_string(&challenge_json)?
+    );
 
     if let Some(err) = challenge_json.error {
         bail!("failed to get auth challenge: {err}");
@@ -122,27 +125,61 @@ pub(crate) fn get_delegation_status(
     router_url: &str,
     account: &Pubkey,
 ) -> Result<Option<DelegationStatusResult>> {
-    let endpoint = if router_url.ends_with("/getDelegationStatus") {
-        router_url.to_string()
-    } else {
-        format!("{}/getDelegationStatus", router_url.trim_end_matches('/'))
-    };
-
     let payload = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "getDelegationStatus",
         "params": [account.to_string()],
     });
+
+    // Try TEE first
+    let tee_endpoint = crate::constants::DEFAULT_PER_RPC;
     debug!(
-        "router delegation request: endpoint={}, payload={}",
-        endpoint,
+        "TEE delegation request: endpoint={}, payload={}",
+        tee_endpoint,
         serde_json::to_string(&payload)?
     );
+    match fetch_delegation_status(http, tee_endpoint, &payload) {
+        Ok(Some(result)) if result.is_delegated => {
+            debug!("TEE reports account {} is delegated", account);
+            return Ok(Some(result));
+        }
+        Ok(_) => {
+            debug!(
+                "TEE reports account {} is not delegated, falling back to devnet-router",
+                account
+            );
+        }
+        Err(e) => {
+            debug!(
+                "TEE delegation check failed, falling back to devnet-router: {}",
+                e
+            );
+        }
+    }
 
+    // Fallback to devnet-router
+    let router_endpoint = if router_url.ends_with("/getDelegationStatus") {
+        router_url.to_string()
+    } else {
+        format!("{}/getDelegationStatus", router_url.trim_end_matches('/'))
+    };
+    debug!(
+        "router delegation request: endpoint={}, payload={}",
+        router_endpoint,
+        serde_json::to_string(&payload)?
+    );
+    fetch_delegation_status(http, &router_endpoint, &payload)
+}
+
+fn fetch_delegation_status(
+    http: &HttpClient,
+    endpoint: &str,
+    payload: &Value,
+) -> Result<Option<DelegationStatusResult>> {
     let response = http
-        .post(&endpoint)
-        .json(&payload)
+        .post(endpoint)
+        .json(payload)
         .send()
         .context("delegation status request failed")?;
 
@@ -150,7 +187,10 @@ pub(crate) fn get_delegation_status(
     let body = response
         .text()
         .context("failed to read delegation status response body")?;
-    debug!("router delegation response: status={}, body={}", status, body);
+    debug!(
+        "delegation response: endpoint={}, status={}, body={}",
+        endpoint, status, body
+    );
 
     if !status.is_success() {
         bail!(
@@ -166,7 +206,7 @@ pub(crate) fn get_delegation_status(
     })?;
 
     if let Some(error) = parsed.error {
-        debug!("router returned JSON-RPC error for {}: {}", account, error);
+        debug!("JSON-RPC error from {}: {}", endpoint, error);
         return Ok(None);
     }
 
