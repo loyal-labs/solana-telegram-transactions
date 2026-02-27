@@ -2,7 +2,7 @@
 
 import { Keypair } from "@solana/web3.js";
 import { backButton, readTextFromClipboard } from "@telegram-apps/sdk";
-import { hapticFeedback } from "@telegram-apps/sdk-react";
+import { hapticFeedback, retrieveLaunchParams } from "@telegram-apps/sdk-react";
 import bs58 from "bs58";
 import {
   CircleAlert,
@@ -437,6 +437,14 @@ function ImportWalletSheet({
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
 
+  const [isAndroid] = useState(() => {
+    try {
+      return retrieveLaunchParams().tgWebAppPlatform === "android";
+    } catch {
+      return false;
+    }
+  });
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -546,7 +554,7 @@ function ImportWalletSheet({
     setStep("input");
   }, []);
 
-  const handlePasteFromClipboard = useCallback(async () => {
+  const handlePasteFromClipboard = useCallback(() => {
     const applyText = (text: string) => {
       setInputKey(text.trim());
       setError(null);
@@ -555,30 +563,28 @@ function ImportWalletSheet({
       }
     };
 
-    // 1. Try Telegram SDK clipboard (works on Android/iOS WebView)
-    try {
-      if (readTextFromClipboard.isAvailable()) {
-        const text = await readTextFromClipboard();
-        if (text) {
-          applyText(text);
-          return;
-        }
-      }
-    } catch {
-      // Telegram SDK clipboard unavailable — fall through
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tgWebApp = (window as any).Telegram?.WebApp;
+
+    if (tgWebApp?.readTextFromClipboard) {
+      tgWebApp.readTextFromClipboard((text: string | null) => {
+        if (text) applyText(text);
+      });
+      return;
     }
 
-    // 2. Fallback: browser Clipboard API
-    try {
-      if (navigator?.clipboard?.readText) {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          applyText(text);
-          return;
-        }
-      }
-    } catch {
-      // Browser clipboard denied — fall through
+    if (readTextFromClipboard.isAvailable()) {
+      readTextFromClipboard()
+        .then((text) => { if (text) applyText(text); })
+        .catch(() => {});
+      return;
+    }
+
+    if (navigator?.clipboard?.readText) {
+      navigator.clipboard
+        .readText()
+        .then((text) => { if (text) applyText(text); })
+        .catch(() => {});
     }
   }, []);
 
@@ -856,6 +862,7 @@ function ImportWalletSheet({
                     onChange={(e) => {
                       setInputKey(e.target.value);
                       setError(null);
+                      setPasteHint(false);
                     }}
                     placeholder="Paste or start typing"
                     className="w-full min-h-[120px] bg-[#f2f2f7] rounded-[20px] px-4 py-[13px] text-[17px] font-normal leading-[22px] text-black placeholder:text-[rgba(60,60,67,0.6)] resize-none outline-none"
@@ -874,17 +881,22 @@ function ImportWalletSheet({
                   )}
                 </div>
 
-                {/* Paste From Clipboard pill */}
-                <button
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={handlePasteFromClipboard}
-                  className="px-4 py-2 rounded-full flex items-center justify-center active:opacity-80 transition-opacity"
-                  style={{ background: "rgba(249, 54, 60, 0.14)" }}
-                >
-                  <span className="text-[15px] font-normal leading-5 text-black text-center">
-                    Paste From Clipboard
-                  </span>
-                </button>
+                {isAndroid ? (
+                  <p className="text-[13px] font-normal leading-4 text-[rgba(60,60,67,0.6)] text-center px-4">
+                    Long-press the text field and select Paste.
+                  </p>
+                ) : (
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={handlePasteFromClipboard}
+                    className="px-4 py-2 rounded-full flex items-center justify-center active:opacity-80 transition-opacity"
+                    style={{ background: "rgba(249, 54, 60, 0.14)" }}
+                  >
+                    <span className="text-[15px] font-normal leading-5 text-black text-center">
+                      Paste From Clipboard
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
 
