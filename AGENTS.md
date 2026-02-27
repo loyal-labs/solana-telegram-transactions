@@ -65,6 +65,7 @@ bun run lint:fix           # prettier -w
 bun run build:db-packages  # build shared DB workspace packages
 bun run typecheck:db-packages  # typecheck shared DB workspace packages
 bun run guard:shared-boundaries  # ensure shared packages stay app-env agnostic
+bun run guard:admin-shared-schema  # prevent admin-local schema duplication
 bun run admin:dev          # run admin dev server from repo root
 bun run admin:lint         # lint admin workspace from repo root
 bun run admin:build        # build admin workspace from repo root
@@ -159,6 +160,17 @@ Use `/app/src/lib` for cross-slice infrastructure and integration primitives. Ex
 - New feature-specific behavior should stay in its owning slice unless it is clearly shared.
 - Promote code into `/app/src/lib` only after it is proven reusable across multiple slices.
 - Refactor incrementally by slice (wallet, summaries, telegram, etc.), not by file type alone.
+
+### Admin Guardrails (`/admin`)
+
+- Use shared DB modules only:
+  - `@loyal-labs/db-core/schema`
+  - `@loyal-labs/db-adapter-neon`
+- Keep admin DB wiring in `admin/src/lib/core/database.ts`.
+- Do not introduce `admin/src/lib/generated/*` or `admin/drizzle.config.ts`.
+- Do not re-add `/admin/schema`; prefer shared schema/docs references.
+- Run `bun run guard:admin-shared-schema` for admin DB/schema refactors.
+- Vercel monorepo deploy for admin must use Root Directory `admin` (see `admin/vercel.json`).
 
 ### Key Patterns
 
