@@ -1,5 +1,5 @@
 {
-  "installCommand": "bun install --frozen-lockfile",
+  "installCommand": "rm -rf node_modules && cd .. && bun install --frozen-lockfile",
   "buildCommand": "bun run build && bash scripts/upload-sourcemaps.sh",
   "crons": [
     {
