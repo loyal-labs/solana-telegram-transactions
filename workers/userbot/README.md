@@ -14,6 +14,7 @@ Standalone worker package for Telegram userbot foundations.
 
 - `TELEGRAM_USERBOT_API_ID`
 - `TELEGRAM_USERBOT_API_HASH`
+- `DATABASE_URL` (required for `sync:once`)
 
 ## Optional environment variables
 
@@ -30,6 +31,7 @@ bun install
 bun run auth:bootstrap
 bun run auth:status
 bun run auth:clear
+bun run sync:once
 bun run start
 ```
 

@@ -78,6 +78,7 @@ function createCommunity(overrides?: Partial<Community>): Community {
     chatTitle: "Test Community",
     activatedBy: BigInt("123456789"),
     isActive: true,
+    parserType: "bot",
     summaryNotificationsEnabled: true,
     summaryNotificationTimeHours: 24,
     summaryNotificationMessageCount: null,
