@@ -1,6 +1,3 @@
-import { and, asc, count, desc, eq, isNull } from "drizzle-orm";
-
-import { getDatabase } from "@/lib/core/database";
 import {
   botMessages,
   type BotThread,
@@ -8,7 +5,10 @@ import {
   type EncryptedMessageContent,
   type SenderType,
   type ThreadStatus,
-} from "@/lib/core/schema";
+} from "@loyal-labs/db-core/schema";
+import { and, asc, count, desc, eq, isNull } from "drizzle-orm";
+
+import { getDatabase } from "@/lib/core/database";
 import { decrypt, encrypt } from "@/lib/encryption";
 import type { ChatMessage } from "@/lib/redpill";
 

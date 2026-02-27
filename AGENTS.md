@@ -19,6 +19,14 @@ bun db:migrate             # Apply migrations
 bun db:studio              # Open Drizzle Studio GUI
 ```
 
+### Admin Dashboard (run from `/admin`)
+
+```bash
+bun dev                    # Start dev server (turbopack)
+bun run build              # Production build (Next.js)
+bun lint                   # Next.js lint
+```
+
 ### Smart Contracts (run from root)
 
 ```bash
@@ -54,6 +62,13 @@ anchor test --provider.cluster localnet --skip-local-validator --skip-build --sk
 ```bash
 bun run lint               # prettier --check
 bun run lint:fix           # prettier -w
+bun run build:db-packages  # build shared DB workspace packages
+bun run typecheck:db-packages  # typecheck shared DB workspace packages
+bun run guard:shared-boundaries  # ensure shared packages stay app-env agnostic
+bun run guard:admin-shared-schema  # prevent admin-local schema duplication
+bun run admin:dev          # run admin dev server from repo root
+bun run admin:lint         # lint admin workspace from repo root
+bun run admin:build        # build admin workspace from repo root
 ```
 
 ### Git Hooks
@@ -63,7 +78,7 @@ bun run lint:fix           # prettier -w
 ```
 
 - Run once per clone/worktree to enable repo hooks.
-- Hooks enforce commit message format (`commit-msg`) and run lint before push (`pre-push`: `cd app && bun run lint`).
+- Hooks enforce commit message format (`commit-msg`) and run app/admin lint+build before push.
 - Temporary bypass (only when necessary): `SKIP_VERIFY=1 git push`
 - CI note: app builds are intentionally not run in GitHub Actions; Vercel is the build/deploy gate.
 
@@ -75,9 +90,13 @@ bun run lint:fix           # prettier -w
   - `telegram-transfer` - Deposit/claim/refund SOL transfers
   - `telegram-verification` - On-chain Ed25519 Telegram signature verification
 - **`/app`** - Next.js 15 frontend + API routes
+- **`/admin`** - Next.js 15 internal admin dashboard
+- **`/packages`** - Internal shared workspace packages (e.g. `db-core`, `db-adapter-neon`)
 - **`/sdk/transactions`** - Publishable `@loyal-labs/transactions` NPM package
+- **`/workers`** - Runtime services/workers
 - **`/tests`** - Anchor test suite (Mocha/Chai)
-- **`/docs`** - Project documentation
+- **`/docs`** - Internal repository/engineering documentation
+- **`/user-docs`** - Mintlify-hosted public/user-facing documentation
 
 ### Program Addresses
 
@@ -143,6 +162,17 @@ Use `/app/src/lib` for cross-slice infrastructure and integration primitives. Ex
 - Promote code into `/app/src/lib` only after it is proven reusable across multiple slices.
 - Refactor incrementally by slice (wallet, summaries, telegram, etc.), not by file type alone.
 
+### Admin Guardrails (`/admin`)
+
+- Use shared DB modules only:
+  - `@loyal-labs/db-core/schema`
+  - `@loyal-labs/db-adapter-neon`
+- Keep admin DB wiring in `admin/src/lib/core/database.ts`.
+- Do not introduce `admin/src/lib/generated/*` or `admin/drizzle.config.ts`.
+- Do not re-add `/admin/schema`; prefer shared schema/docs references.
+- Run `bun run guard:admin-shared-schema` for admin DB/schema refactors.
+- Vercel monorepo deploy for admin must use Root Directory `admin` (see `admin/vercel.json`).
+
 ### Key Patterns
 
 - **PDAs**: Deposit accounts and vault use Program Derived Addresses with seeds `"deposit"`, `"vault"`, `"tg_session"`
@@ -151,7 +181,7 @@ Use `/app/src/lib` for cross-slice infrastructure and integration primitives. Ex
 
 ### Database Patterns
 
-Schema conventions used in `/app/src/lib/core/schema.ts`:
+Schema conventions used in `/packages/db-core/src/schema.ts`:
 
 - **Primary Keys**: UUID with `defaultRandom()` for all tables
 - **Telegram IDs**: Use `bigint` with `{ mode: "bigint" }` for Telegram user/chat IDs
@@ -175,6 +205,10 @@ Service layer patterns:
 - **Driver Compatibility (Critical)**: Check `/app/src/lib/core/database.ts` before choosing advanced DB APIs. Do not assume all Drizzle drivers support the same capabilities.
 - **Atomic Multi-step Writes (Neon HTTP)**: This repo uses `drizzle-orm/neon-http`, which does **not** support `db.transaction()`. For atomic multi-statement writes, use `db.batch([...])`. Only use `db.transaction()` if the project is moved to a driver that supports it.
 - **Query Builder**: Prefer `db.query.table.findFirst()` with `with:` for relations over raw SQL
+- **Shared DB Guardrail**: In app code, import schema from `@loyal-labs/db-core/schema`.
+- **Shared DB Guardrail**: Keep Neon driver wiring and env access in app (`/app/src/lib/core/database.ts`).
+- **Shared DB Guardrail**: Shared packages must not import app-only server config modules.
+- **Shared DB Guardrail**: Preserve Neon HTTP semantics (`db.batch` for atomic multi-write flows; no `db.transaction()` assumptions).
 
 ### Code Patterns
 
@@ -276,6 +310,16 @@ git worktree prune
 - Run `git worktree list` if unsure which worktrees exist
 - After merging a PR, clean up the worktree
 
+## Linear MCP Defaults
+
+- For every **new** Linear issue created via MCP, always set status to `Todo`.
+- Always set an explicit priority (`Urgent`, `High`, `Normal`, `Low`).
+- Always assign the issue to a concrete owner (never leave assignee empty).
+- Always attach the issue to the **current cycle** for the team.
+- Always attach the issue to the most appropriate project.
+- Keep descriptions concise but actionable so work can start immediately.
+- Each description must include: goal/context, key implementation ideas, key files/paths, and links/references (docs/PRs/issues) needed for follow-up queries.
+
 ## Commit Conventions
 
 This project enforces [Conventional Commits](https://www.conventionalcommits.org/) via `commitlint` with `@commitlint/config-conventional`. A CI workflow (`.github/workflows/commit-style.yml`) validates all commit messages in a PR and the PR title itself.
@@ -316,6 +360,7 @@ refactor(ui): extract pill button component
 - PR body should be a simple one-two sentence summary of the changes — no templates or checklists
 - Only merge a PR after its Vercel build/check is successful
 - Merge PRs using squash-and-merge
+- For admin deployments from monorepo, configure Vercel Root Directory as `admin`
 
 ## Tooling
 

@@ -1,13 +1,23 @@
+import { communities, summaries, type Summary } from "@loyal-labs/db-core/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDatabase } from "@/lib/core/database";
-import { communities, summaries, type Summary } from "@/lib/core/schema";
 
 type CommunityPhotoSettings = {
   photoBase64?: string;
   photoMimeType?: string;
 };
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
+}
 
 export async function GET(req: Request): Promise<NextResponse> {
   try {
@@ -49,12 +59,15 @@ export async function GET(req: Request): Promise<NextResponse> {
       };
     });
 
-    return NextResponse.json({ summaries: transformedSummaries });
+    return NextResponse.json(
+      { summaries: transformedSummaries },
+      { headers: corsHeaders }
+    );
   } catch (error) {
     console.error("[api/summaries] Failed to fetch summaries:", error);
     return NextResponse.json(
       { error: "Failed to fetch summaries" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

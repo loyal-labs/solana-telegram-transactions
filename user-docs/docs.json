@@ -1,0 +1,145 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Loyal Documentation",
+  "colors": {
+    "primary": "#CD1D09",
+    "light": "#CD1D09",
+    "dark": "#CD1D09"
+  },
+  "favicon": "/loyal_favicon.svg",
+  "banner": {
+    "content": "Public testing opens Jan, 12! Join [tg.askloyal.com](https://tg.askloyal.com) to get latest updates. [Get $LOYAL on Jupiter!](https://jup.ag/tokens/LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta)",
+    "dismissible": false
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Developers",
+        "groups": [
+          {
+            "group": "Telegram Transactions SDK",
+            "pages": [
+              "sdk/transactions/quick-start",
+              "sdk/transactions/usage",
+              "sdk/transactions/reference",
+              "sdk/transactions/errors"
+            ]
+          },
+          {
+            "group": "FAQ & Support",
+            "pages": [
+              "faq/index"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "resources/links"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Learn",
+        "groups": [
+          {
+            "group": "About Loyal",
+            "pages": [
+              "surveillance-crisis",
+              "Introduction/solution",
+              "Introduction/howitworks",
+              "Introduction/usecases"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/network",
+              "architecture/payments",
+              "architecture/privacy"
+            ]
+          },
+          {
+            "group": "Launch",
+            "pages": [
+              "launch/roadmap",
+              "launch/token"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Transparency",
+        "groups": [
+          {
+            "group": "Team",
+            "pages": [
+              "Introduction/team"
+            ]
+          },
+          {
+            "group": "Reports",
+            "pages": [
+              "transparency/q4-2025"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Home",
+          "href": "https://docs.askloyal.com",
+          "icon": "house"
+        },
+        {
+          "anchor": "Litepaper",
+          "href": "https://drive.google.com/file/d/17htv03yh9Ugddkq4kyc14Ut6XesbtRYB/view?usp=sharing",
+          "icon": "scroll"
+        },
+        {
+          "anchor": "MetaDAO Launch",
+          "href": "https://metadao.fi",
+          "icon": "rocket"
+        } 
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/light.png",
+    "dark": "/logo/dark.png"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "askloyal.com",
+        "href": "https://askloyal.com/"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Telegram community",
+      "href": "https://tg.askloyal.com"
+    }
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/loyal_hq",
+      "github": "https://github.com/loyal-labs",
+      "discord": "https://discord.gg/HSeXaVhzWU"
+    }
+  }
+}

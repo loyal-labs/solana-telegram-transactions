@@ -1,8 +1,8 @@
+import { telegramHelperMessageCleanup } from "@loyal-labs/db-core/schema";
 import { and, asc, eq, inArray, lte } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDatabase } from "@/lib/core/database";
-import { telegramHelperMessageCleanup } from "@/lib/core/schema";
 import { getBot } from "@/lib/telegram/bot-api/bot";
 
 import { validateCronAuthHeader } from "../_shared/auth";

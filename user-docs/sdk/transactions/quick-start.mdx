@@ -1,0 +1,40 @@
+---
+title: "Quick Start"
+description: "Quick start guide for Loyal's Telegram Transactions SDK"
+---
+
+SDK for Telegram-based Solana deposits. Deposit SOL for any Telegram username, which can later be claimed by the verified account owner through Loyal Mini App on Telegram.
+
+## Installation
+
+```bash
+bun add @loyal-labs/transactions
+# or
+npm install @loyal-labs/transactions
+```
+
+### Peer Dependencies
+
+This SDK requires the following peer dependencies:
+
+```bash
+bun add @coral-xyz/anchor @solana/web3.js
+```
+
+## Quick Start
+
+```typescript
+import { Connection } from "@solana/web3.js";
+import { LoyalTransactionsClient, solToLamports } from "@loyal-labs/transactions";
+
+const connection = new Connection("https://api.devnet.solana.com");
+const client = LoyalTransactionsClient.fromKeypair(connection, myKeypair);
+
+const result = await client.deposit({
+  username: "alice",
+  amountLamports: solToLamports(0.1), // 0.1 SOL
+});
+
+console.log("Transaction:", result.signature);
+console.log("Deposited:", result.deposit.amount, "lamports");
+```

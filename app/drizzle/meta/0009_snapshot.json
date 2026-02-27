@@ -1,5 +1,5 @@
 {
-  "id": "7d416ff5-01eb-4c7a-9981-90bbf0a9ac3b",
+  "id": "1255d42a-9277-4433-8e13-702b18c6ed55",
   "prevId": "7b53da59-a421-4f34-a028-b08f675e511d",
   "version": "7",
   "dialect": "postgresql",
@@ -463,6 +463,13 @@
           "notNull": true,
           "default": true
         },
+        "parser_type": {
+          "name": "parser_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'bot'"
+        },
         "summary_notifications_enabled": {
           "name": "summary_notifications_enabled",
           "type": "boolean",
@@ -543,6 +550,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "communities_is_active_parser_type_idx": {
+          "name": "communities_is_active_parser_type_idx",
+          "columns": [
+            {
+              "expression": "is_active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "parser_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -553,6 +581,10 @@
         "communities_summary_notification_time_hours_check": {
           "name": "communities_summary_notification_time_hours_check",
           "value": "\"communities\".\"summary_notification_time_hours\" IS NULL OR \"communities\".\"summary_notification_time_hours\" IN (24, 48)"
+        },
+        "communities_parser_type_check": {
+          "name": "communities_parser_type_check",
+          "value": "\"communities\".\"parser_type\" IN ('bot', 'userbot')"
         },
         "communities_summary_notification_message_count_check": {
           "name": "communities_summary_notification_message_count_check",
@@ -794,89 +826,6 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.push_tokens": {
-      "name": "push_tokens",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "token": {
-          "name": "token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "telegram_user_id": {
-          "name": "telegram_user_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "push_tokens_token_unique": {
-          "name": "push_tokens_token_unique",
-          "columns": [
-            {
-              "expression": "token",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "push_tokens_telegram_user_id_idx": {
-          "name": "push_tokens_telegram_user_id_idx",
-          "columns": [
-            {
-              "expression": "telegram_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

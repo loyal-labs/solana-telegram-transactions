@@ -23,6 +23,8 @@
 /out/
 /app/.next/
 /app/out/
+/admin/.next/
+/admin/out/
 /frontend/.next/
 /frontend/out/
 
@@ -49,6 +51,7 @@ yarn-error.log*
 
 # vercel
 /app/.vercel
+/admin/.vercel
 
 # typescript
 *.tsbuildinfo
@@ -84,3 +87,11 @@ docs/scopes
 /mobile/node_modules/
 /mobile/ios/
 /mobile/android/
+
+# userbot worker local storage overrides
+/.data/userbot/
+/workers/userbot/.data/
+/workers/userbot/node_modules/
+
+# internal workspace package build outputs
+/packages/*/dist/

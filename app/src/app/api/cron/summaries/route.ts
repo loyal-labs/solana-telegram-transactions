@@ -1,8 +1,8 @@
+import { communities, pushTokens } from "@loyal-labs/db-core/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDatabase } from "@/lib/core/database";
-import { communities, pushTokens } from "@/lib/core/schema";
 import { sendExpoPushNotifications } from "@/lib/push-notifications/send";
 import { getBot } from "@/lib/telegram/bot-api/bot";
 import {

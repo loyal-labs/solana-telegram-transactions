@@ -1,7 +1,6 @@
+import type { Community } from "@loyal-labs/db-core/schema";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { CallbackQueryContext, CommandContext, Context } from "grammy";
-
-import type { Community } from "@/lib/core/schema";
 
 let mockDb: {
   query: {
@@ -79,6 +78,7 @@ function createCommunity(overrides?: Partial<Community>): Community {
     chatTitle: "Test Community",
     activatedBy: BigInt("123456789"),
     isActive: true,
+    parserType: "bot",
     summaryNotificationsEnabled: true,
     summaryNotificationTimeHours: 24,
     summaryNotificationMessageCount: null,

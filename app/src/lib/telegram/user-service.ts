@@ -1,7 +1,7 @@
+import { users, userSettings } from "@loyal-labs/db-core/schema";
 import { eq } from "drizzle-orm";
 
 import { getDatabase } from "@/lib/core/database";
-import { users, userSettings } from "@/lib/core/schema";
 import { captureTelegramProfilePhotoToCdn } from "@/lib/telegram/profile-photo-service";
 
 type KnownUser = {

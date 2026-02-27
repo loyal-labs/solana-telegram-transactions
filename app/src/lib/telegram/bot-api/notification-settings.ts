@@ -1,15 +1,15 @@
-import { eq } from "drizzle-orm";
-import type { CallbackQueryContext, CommandContext, Context } from "grammy";
-import { InlineKeyboard } from "grammy";
-
-import { getDatabase } from "@/lib/core/database";
 import {
   admins,
   communities,
   type Community,
   type SummaryNotificationMessageCount,
   type SummaryNotificationTimeHours,
-} from "@/lib/core/schema";
+} from "@loyal-labs/db-core/schema";
+import { eq } from "drizzle-orm";
+import type { CallbackQueryContext, CommandContext, Context } from "grammy";
+import { InlineKeyboard } from "grammy";
+
+import { getDatabase } from "@/lib/core/database";
 
 import { isMessageNotModifiedError } from "./callback-query-utils";
 import { replyWithAutoCleanup } from "./helper-message-cleanup";

@@ -1,7 +1,6 @@
+import type { UserSettings } from "@loyal-labs/db-core/schema";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { CommandContext, Context } from "grammy";
-
-import type { UserSettings } from "@/lib/core/schema";
 
 mock.module("server-only", () => ({}));
 

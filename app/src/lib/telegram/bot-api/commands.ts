@@ -1,9 +1,9 @@
+import { admins, communities, type Community, userSettings } from "@loyal-labs/db-core/schema";
 import { eq } from "drizzle-orm";
 import type { CommandContext, Context } from "grammy";
 import { Bot, InlineKeyboard } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
-import { admins, communities, type Community, userSettings } from "@/lib/core/schema";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
 

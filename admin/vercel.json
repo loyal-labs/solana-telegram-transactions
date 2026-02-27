@@ -1,0 +1,4 @@
+{
+  "installCommand": "rm -rf node_modules && cd .. && bun install --frozen-lockfile",
+  "buildCommand": "bun run build"
+}
