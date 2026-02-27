@@ -1,7 +1,7 @@
 "use client";
 
 import { Keypair } from "@solana/web3.js";
-import { backButton } from "@telegram-apps/sdk";
+import { backButton, readTextFromClipboard } from "@telegram-apps/sdk";
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import bs58 from "bs58";
 import {
@@ -547,33 +547,38 @@ function ImportWalletSheet({
   }, []);
 
   const handlePasteFromClipboard = useCallback(async () => {
-    // Try Clipboard API first (works in most modern browsers)
+    const applyText = (text: string) => {
+      setInputKey(text.trim());
+      setError(null);
+      if (hapticFeedback.impactOccurred.isAvailable()) {
+        hapticFeedback.impactOccurred("light");
+      }
+    };
+
+    // 1. Try Telegram SDK clipboard (works on Android/iOS WebView)
     try {
-      if (navigator?.clipboard?.readText) {
-        const text = await navigator.clipboard.readText();
+      if (readTextFromClipboard.isAvailable()) {
+        const text = await readTextFromClipboard();
         if (text) {
-          setInputKey(text.trim());
-          setError(null);
-          if (hapticFeedback.impactOccurred.isAvailable()) {
-            hapticFeedback.impactOccurred("light");
-          }
+          applyText(text);
           return;
         }
       }
     } catch {
-      // Clipboard API denied or unavailable — fall through to execCommand
+      // Telegram SDK clipboard unavailable — fall through
     }
 
-    // Fallback: focus textarea and trigger paste via execCommand
-    // This works on Android WebViews where clipboard.readText() is blocked
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.focus();
-      try {
-        document.execCommand("paste");
-      } catch {
-        // execCommand paste also blocked — nothing we can do
+    // 2. Fallback: browser Clipboard API
+    try {
+      if (navigator?.clipboard?.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          applyText(text);
+          return;
+        }
       }
+    } catch {
+      // Browser clipboard denied — fall through
     }
   }, []);
 
