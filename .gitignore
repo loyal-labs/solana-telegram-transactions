@@ -76,6 +76,7 @@ sdk/private-transactions/.cache/devnet-mint.json
 CHANGELOG-*.md
 
 CLAUDE.md
+!/mobile/CLAUDE.md
 
 docs/plans
 docs/scopes
