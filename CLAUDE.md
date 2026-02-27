@@ -19,6 +19,18 @@ bun db:migrate             # Apply migrations
 bun db:studio              # Open Drizzle Studio GUI
 ```
 
+### Mobile App (run from `/mobile`)
+
+```bash
+npx expo start --clear     # Start Expo dev server (requires dev client)
+npx expo lint              # ESLint
+npm test                   # Jest tests
+npx eas build --profile development-simulator --platform ios  # Build dev client (iOS sim)
+npx eas build --profile development --platform ios            # Build dev client (device)
+npx eas build --profile preview --platform android            # Preview APK
+npx eas build --profile production --platform all             # Production build
+```
+
 ### Admin Dashboard (run from `/admin`)
 
 ```bash
@@ -90,8 +102,9 @@ bun run admin:build        # build admin workspace from repo root
   - `telegram-transfer` - Deposit/claim/refund SOL transfers
   - `telegram-verification` - On-chain Ed25519 Telegram signature verification
 - **`/app`** - Next.js 15 frontend + API routes
+- **`/mobile`** - Expo React Native mobile app (iOS/Android)
 - **`/admin`** - Next.js 15 internal admin dashboard
-- **`/packages`** - Internal shared workspace packages (e.g. `db-core`, `db-adapter-neon`)
+- **`/packages`** - Internal shared workspace packages (e.g. `db-core`, `db-adapter-neon`, `shared`)
 - **`/sdk/transactions`** - Publishable `@loyal-labs/transactions` NPM package
 - **`/workers`** - Runtime services/workers
 - **`/tests`** - Anchor test suite (Mocha/Chai)
