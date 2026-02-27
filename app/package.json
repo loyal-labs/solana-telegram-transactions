@@ -2,6 +2,7 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.2.17",
   "scripts": {
     "check:drizzle-singleton": "node scripts/check-drizzle-singleton.mjs",
     "predev": "bun run check:drizzle-singleton && bun run --cwd .. build:db-packages",
