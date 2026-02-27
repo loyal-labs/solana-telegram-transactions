@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getDatabase } from "@/lib/core/database";
-import { pushTokens } from "@/lib/core/schema";
+import { pushTokens } from "@loyal-labs/db-core/schema";
 
 export async function POST(req: Request): Promise<NextResponse> {
   try {
