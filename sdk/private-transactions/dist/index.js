@@ -23428,8 +23428,9 @@ class LoyalPrivateTransactionsClient {
       console.error("/getDelegationStatus", JSON.stringify(delegationStatus, null, 2));
       console.error("baseAccountInfo", prettyStringify(baseAccountInfo));
       console.error("ephemeralAccountInfo", prettyStringify(ephemeralAccountInfo));
-      if (delegationStatus.result.delegationRecord.authority !== ER_VALIDATOR.toString()) {
-        console.error(`Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${delegationStatus.result.delegationRecord.authority}`);
+      const authority = delegationStatus.result?.delegationRecord?.authority;
+      if (authority && authority !== ER_VALIDATOR.toString()) {
+        console.error(`Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${authority}`);
       }
       throw new Error(`Account is delegated to ER: ${displayName}${account.toString()}`);
     }
@@ -23488,7 +23489,19 @@ class LoyalPrivateTransactionsClient {
       console.error("[getDelegationStatus] TEE fetch failed, falling back to devnet-router:", e);
     }
     const res = await fetch("https://devnet-router.magicblock.app/getDelegationStatus", options);
-    return await res.json();
+    const routerData = await res.json();
+    if (routerData.error?.message?.includes(ER_VALIDATOR.toString())) {
+      return {
+        ...routerData,
+        result: {
+          isDelegated: true,
+          delegationRecord: {
+            authority: ER_VALIDATOR.toString()
+          }
+        }
+      };
+    }
+    return routerData;
   }
 }
 // index.ts

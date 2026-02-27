@@ -1260,14 +1260,11 @@ export class LoyalPrivateTransactionsClient {
         prettyStringify(ephemeralAccountInfo)
       );
 
-      if (
-        delegationStatus.result.delegationRecord.authority !==
-        ER_VALIDATOR.toString()
-      ) {
+      const authority =
+        delegationStatus.result?.delegationRecord?.authority;
+      if (authority && authority !== ER_VALIDATOR.toString()) {
         console.error(
-          `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${
-            delegationStatus.result.delegationRecord.authority
-          }`
+          `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${authority}`
         );
       }
 
@@ -1386,6 +1383,24 @@ export class LoyalPrivateTransactionsClient {
       "https://devnet-router.magicblock.app/getDelegationStatus",
       options
     );
-    return (await res.json()) as DelegationStatusResponse;
+    const routerData = (await res.json()) as DelegationStatusResponse;
+
+    // WORKAROUND: devnet-router returns an error for accounts delegated to the
+    // PER validator it doesn't recognize, e.g.:
+    //   {"error":{"code":-32604,"message":"account has been delegated to unknown ER node: FnE6..."}}
+    // Treat as valid delegation if it mentions our PER validator.
+    if (routerData.error?.message?.includes(ER_VALIDATOR.toString())) {
+      return {
+        ...routerData,
+        result: {
+          isDelegated: true,
+          delegationRecord: {
+            authority: ER_VALIDATOR.toString(),
+          },
+        },
+      };
+    }
+
+    return routerData;
   }
 }

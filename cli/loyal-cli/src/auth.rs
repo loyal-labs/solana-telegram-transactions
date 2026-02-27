@@ -214,8 +214,26 @@ fn fetch_delegation_status(
         format!("invalid delegation status response: endpoint={endpoint}, body={body}")
     })?;
 
-    if let Some(error) = parsed.error {
+    if let Some(error) = &parsed.error {
         debug!("JSON-RPC error from {}: {}", endpoint, error);
+        // WORKAROUND: devnet-router returns an error for accounts delegated to the
+        // PER validator it doesn't recognize, e.g.:
+        //   {"error":{"code":-32604,"message":"account has been delegated to unknown ER node: FnE6..."}}
+        // Treat as valid delegation if it mentions our PER validator.
+        if let Some(msg) = error.get("message").and_then(|m| m.as_str()) {
+            if msg.contains(crate::constants::DEFAULT_ER_VALIDATOR_STR) {
+                return Ok(Some(crate::types::DelegationStatusResult {
+                    is_delegated: true,
+                    fqdn: None,
+                    delegation_record: Some(crate::types::DelegationRecord {
+                        authority: crate::constants::DEFAULT_ER_VALIDATOR_STR.to_string(),
+                        owner: None,
+                        delegation_slot: None,
+                        lamports: None,
+                    }),
+                }));
+            }
+        }
         return Ok(None);
     }
 
