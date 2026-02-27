@@ -14,10 +14,32 @@ type CommunityRecord = {
 type CommunityQueryDb = {
   query: {
     communities: {
-      findFirst: (args: unknown) => Promise<CommunityRecord>;
+      findFirst: unknown;
     };
   };
 };
+
+type FindActiveCommunity = (args: {
+  columns: {
+    id: true;
+    parserType: true;
+  };
+  where: unknown;
+}) => Promise<CommunityRecord>;
+
+function findActiveCommunity(
+  db: CommunityQueryDb,
+  where: unknown
+): Promise<CommunityRecord> {
+  const findFirst = db.query.communities.findFirst as FindActiveCommunity;
+  return findFirst({
+    columns: {
+      id: true,
+      parserType: true,
+    },
+    where,
+  });
+}
 
 // Cache of active community state (chatId string -> parser-aware record).
 const activeCommunities = new Map<string, CacheEntry>();
@@ -37,17 +59,14 @@ export async function resolveActiveBotCommunityId(
 
   if (cached) {
     // Revalidate cached mapping so parser flips (bot -> userbot) are respected.
-    const stillActive = await db.query.communities.findFirst({
-      columns: {
-        id: true,
-        parserType: true,
-      },
-      where: and(
+    const stillActive = await findActiveCommunity(
+      db,
+      and(
         eq(communities.id, cached.communityId),
         eq(communities.chatId, chatId),
         eq(communities.isActive, true)
-      ),
-    });
+      )
+    );
 
     if (!stillActive || stillActive.parserType !== "bot") {
       activeCommunities.delete(chatIdStr);
@@ -61,16 +80,13 @@ export async function resolveActiveBotCommunityId(
     return stillActive.id;
   }
 
-  const community = await db.query.communities.findFirst({
-    columns: {
-      id: true,
-      parserType: true,
-    },
-    where: and(
+  const community = await findActiveCommunity(
+    db,
+    and(
       eq(communities.chatId, chatId),
       eq(communities.isActive, true)
-    ),
-  });
+    )
+  );
 
   if (!community || community.parserType !== "bot") {
     activeCommunities.delete(chatIdStr);
