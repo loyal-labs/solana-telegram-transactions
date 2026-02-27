@@ -281,16 +281,23 @@ export async function unshieldTokens(params: {
   const client = await getPrivateClient();
   const connection = getWebsocketConnection();
 
-  // 1. Undelegate from PER (waits for owner to be PROGRAM_ID on both connections)
-  console.log("undelegateDeposit");
-  const undelegateDepositSig = await client.undelegateDeposit({
-    tokenMint,
-    user: keypair.publicKey,
-    payer: keypair.publicKey,
-    magicProgram: MAGIC_PROGRAM_ID,
-    magicContext: MAGIC_CONTEXT_ID,
-  });
-  console.log("undelegateDeposit sig", undelegateDepositSig);
+  // 1. Undelegate from PER if currently delegated (waits for owner to be PROGRAM_ID on both connections)
+  const [depositPda] = findDepositPda(keypair.publicKey, tokenMint);
+  const depositAccountInfo =
+    await client.baseProgram.provider.connection.getAccountInfo(depositPda);
+  if (depositAccountInfo?.owner.equals(DELEGATION_PROGRAM_ID)) {
+    console.log("undelegateDeposit");
+    const undelegateDepositSig = await client.undelegateDeposit({
+      tokenMint,
+      user: keypair.publicKey,
+      payer: keypair.publicKey,
+      magicProgram: MAGIC_PROGRAM_ID,
+      magicContext: MAGIC_CONTEXT_ID,
+    });
+    console.log("undelegateDeposit sig", undelegateDepositSig);
+  } else {
+    console.log("undelegateDeposit: deposit is not delegated, skipping");
+  }
 
   // 2. Withdraw tokens back to regular wallet
   const isNativeSol = tokenMint.equals(NATIVE_MINT);

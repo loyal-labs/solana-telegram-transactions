@@ -69,9 +69,9 @@ pub(crate) struct DisplayResult {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DelegationRecord {
     pub(crate) authority: String,
-    pub(crate) owner: String,
-    pub(crate) delegation_slot: u64,
-    pub(crate) lamports: u64,
+    pub(crate) owner: Option<String>,
+    pub(crate) delegation_slot: Option<u64>,
+    pub(crate) lamports: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

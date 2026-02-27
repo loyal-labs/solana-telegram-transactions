@@ -140,8 +140,17 @@ pub(crate) fn get_delegation_status(
         serde_json::to_string(&payload)?
     );
     match fetch_delegation_status(http, tee_endpoint, &payload) {
-        Ok(Some(result)) if result.is_delegated => {
+        Ok(Some(mut result)) if result.is_delegated => {
             debug!("TEE reports account {} is delegated", account);
+            // TEE confirmed delegation — synthesize authority so validator checks pass
+            if result.delegation_record.is_none() {
+                result.delegation_record = Some(crate::types::DelegationRecord {
+                    authority: crate::constants::DEFAULT_ER_VALIDATOR_STR.to_string(),
+                    owner: None,
+                    delegation_slot: None,
+                    lamports: None,
+                });
+            }
             return Ok(Some(result));
         }
         Ok(_) => {

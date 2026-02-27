@@ -100,9 +100,9 @@ pub(crate) fn cmd_display(ctx: &AppContext, args: &TargetArgs) -> Result<()> {
                 println!("Router Delegated: {}", status.is_delegated);
                 if let Some(record) = &status.delegation_record {
                     println!("Router Authority: {}", record.authority);
-                    println!("Router Delegation Owner: {}", record.owner);
-                    println!("Router Delegation Slot: {}", record.delegation_slot);
-                    println!("Router Delegation Lamports: {}", record.lamports);
+                    println!("Router Delegation Owner: {}", record.owner.as_deref().unwrap_or("<missing>"));
+                    println!("Router Delegation Slot: {}", record.delegation_slot.map_or("<missing>".to_string(), |v| v.to_string()));
+                    println!("Router Delegation Lamports: {}", record.lamports.map_or("<missing>".to_string(), |v| v.to_string()));
                 } else {
                     println!("Router Authority: <missing delegationRecord>");
                 }

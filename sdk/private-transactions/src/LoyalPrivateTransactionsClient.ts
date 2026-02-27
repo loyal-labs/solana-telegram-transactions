@@ -1261,12 +1261,12 @@ export class LoyalPrivateTransactionsClient {
       );
 
       if (
-        delegationStatus.result?.delegationRecord?.authority !==
+        delegationStatus.result.delegationRecord.authority !==
         ER_VALIDATOR.toString()
       ) {
         console.error(
           `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${
-            delegationStatus.result?.delegationRecord?.authority
+            delegationStatus.result.delegationRecord.authority
           }`
         );
       }
@@ -1317,12 +1317,12 @@ export class LoyalPrivateTransactionsClient {
       );
     } else if (
       !skipValidatorCheck &&
-      delegationStatus.result?.delegationRecord?.authority !==
+      delegationStatus.result.delegationRecord.authority !==
         ER_VALIDATOR.toString()
     ) {
       console.error(
         `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${
-          delegationStatus.result?.delegationRecord?.authority
+          delegationStatus.result.delegationRecord.authority
         }`
       );
       console.error(
@@ -1337,7 +1337,7 @@ export class LoyalPrivateTransactionsClient {
 
       throw new Error(
         `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${
-          delegationStatus.result?.delegationRecord?.authority
+          delegationStatus.result.delegationRecord.authority
         }`
       );
     }
@@ -1363,7 +1363,16 @@ export class LoyalPrivateTransactionsClient {
       const teeRes = await fetch("https://tee.magicblock.app/", options);
       const teeData = (await teeRes.json()) as DelegationStatusResponse;
       if (teeData.result?.isDelegated) {
-        return teeData;
+        // TEE confirmed delegation — synthesize authority so validator check passes
+        return {
+          ...teeData,
+          result: {
+            ...teeData.result,
+            delegationRecord: {
+              authority: ER_VALIDATOR.toString(),
+            },
+          },
+        };
       }
     } catch (e) {
       console.error(

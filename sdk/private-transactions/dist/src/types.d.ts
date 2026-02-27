@@ -216,12 +216,12 @@ export interface TransferToUsernameDepositParams {
  */
 export interface DelegationRecord {
     authority: string;
-    owner: string;
-    delegationSlot: number;
-    lamports: number;
+    owner?: string;
+    delegationSlot?: number;
+    lamports?: number;
 }
 /**
- * Response from MagicBlock getDelegationStatus RPC call
+ * Response from MagicBlock getDelegationStatus RPC call.
  */
 export interface DelegationStatusResult {
     isDelegated: boolean;
@@ -234,7 +234,7 @@ export interface DelegationStatusResult {
 export interface DelegationStatusResponse {
     jsonrpc: "2.0";
     id: number | string;
-    result?: DelegationStatusResult;
+    result: DelegationStatusResult;
     error?: {
         code: number;
         message: string;
