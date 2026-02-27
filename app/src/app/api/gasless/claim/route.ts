@@ -348,7 +348,7 @@ const _claimDepositGasless = async (
   return true;
 };
 
-const RECIPIENT_TARGET_LAMPORTS = 1_000_000;
+const RECIPIENT_TARGET_LAMPORTS = 10_000_000;
 
 const ensureRecipientBalance = async (
   provider: AnchorProvider,
