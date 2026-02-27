@@ -1,8 +1,8 @@
+import { userSettings } from "@loyal-labs/db-core/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDatabase } from "@/lib/core/database";
-import { userSettings } from "@/lib/core/schema";
 import {
   cleanInitData,
   createValidationBytesFromRawInitData,

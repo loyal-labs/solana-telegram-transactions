@@ -1,4 +1,11 @@
 import {
+  communities,
+  messages,
+  summaries,
+  type Summary,
+  type Topic,
+} from "@loyal-labs/db-core/schema";
+import {
   and,
   asc,
   desc,
@@ -10,13 +17,6 @@ import {
 import { type Bot } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
-import {
-  communities,
-  messages,
-  summaries,
-  type Summary,
-  type Topic,
-} from "@/lib/core/schema";
 import { chatCompletion } from "@/lib/redpill";
 
 import { buildSummaryMessageWithPreview } from "./build-summary-og-url";

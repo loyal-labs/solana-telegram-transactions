@@ -1,7 +1,6 @@
+import type { Community } from "@loyal-labs/db-core/schema";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { CallbackQueryContext, CommandContext, Context } from "grammy";
-
-import type { Community } from "@/lib/core/schema";
 
 let mockDb: {
   query: {

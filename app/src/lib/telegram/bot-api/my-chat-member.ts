@@ -1,8 +1,8 @@
+import { communities } from "@loyal-labs/db-core/schema";
 import { eq } from "drizzle-orm";
 import type { Context } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
-import { communities } from "@/lib/core/schema";
 import { isCommunityChat, isPrivateChat } from "@/lib/telegram/utils";
 
 import { createBotTrackingProperties, trackBotEvent } from "./analytics";

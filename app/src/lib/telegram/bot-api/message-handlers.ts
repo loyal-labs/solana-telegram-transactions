@@ -1,8 +1,8 @@
+import { communities, communityMembers, messages } from "@loyal-labs/db-core/schema";
 import { and, eq } from "drizzle-orm";
 import type { Bot, Context } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
-import { communities, communityMembers, messages } from "@/lib/core/schema";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName, isCommunityChat, isGroupChat } from "@/lib/telegram/utils";
 

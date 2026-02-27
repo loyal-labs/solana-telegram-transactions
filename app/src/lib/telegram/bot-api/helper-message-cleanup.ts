@@ -1,7 +1,7 @@
+import { telegramHelperMessageCleanup } from "@loyal-labs/db-core/schema";
 import type { CommandContext, Context } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
-import { telegramHelperMessageCleanup } from "@/lib/core/schema";
 import { isCommunityChat } from "@/lib/telegram/utils";
 
 const DEFAULT_HELPER_MESSAGE_TTL_MS = 60_000;
