@@ -1,0 +1,24 @@
+---
+title: "Error Handling"
+description: "Errors for Loyal's Telegram Transactions SDK"
+---
+
+## Error Handling
+
+The SDK throws descriptive errors for common issues:
+
+```typescript
+try {
+  await client.deposit({
+    username: "ab", // Too short!
+    amountLamports: 100,
+  });
+} catch (error) {
+  // "Username must be between 5 and 32 characters"
+}
+```
+
+Common errors:
+- `"Username must be between 5 and 32 characters"` - Invalid username length
+- `"Amount must be greater than 0"` - Invalid deposit amount
+- `"Failed to fetch deposit account after transaction"` - Network/confirmation issue
