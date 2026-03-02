@@ -7,11 +7,23 @@ export type WalletTransfer = {
   direction: "in" | "out";
   type:
     | "transfer"
+    // telegram-verification
     | "verify_telegram_init_data"
     | "store"
-    | "claim_deposit"
-    | "claim_username_deposit"
-    | "deposit_for_username"
+    // telegram-private-transfer
+    | "initialize_deposit"
+    | "initialize_username_deposit"
+    | "modify_balance"
+    | "claim_username_deposit_to_deposit"
+    | "transfer_deposit"
+    | "transfer_to_username_deposit"
+    | "create_permission"
+    | "create_username_permission"
+    | "delegate"
+    | "delegate_username_deposit"
+    | "undelegate"
+    | "undelegate_username_deposit"
+    // rest
     | "swap"
     | "secure"
     | "unshield";

@@ -48,13 +48,13 @@ export function ActivityFeed({
   // Track seen transaction IDs to detect new ones for animation
   const seenTransactionIdsRef = useRef<Set<string>>(new Set());
   const [newTransactionIds, setNewTransactionIds] = useState<Set<string>>(
-    new Set(),
+    new Set()
   );
 
   // Detect new transactions for animation
   useEffect(() => {
     const currentIds = new Set(
-      limitedActivityItems.map((item) => item.transaction.id),
+      limitedActivityItems.map((item) => item.transaction.id)
     );
     const previousIds = seenTransactionIdsRef.current;
 
@@ -147,12 +147,7 @@ export function ActivityFeed({
         {/* Empty transactions state */}
         <div className="px-4 pb-36">
           <div className="flex flex-col gap-4 items-center justify-center px-8 py-6 rounded-[20px]">
-            <Image
-              src="/dogs/dog-cry.png"
-              alt=""
-              width={60}
-              height={48}
-            />
+            <Image src="/dogs/dog-cry.png" alt="" width={60} height={48} />
             <p
               className="text-[17px] leading-[22px] text-center"
               style={{ color: "rgba(60, 60, 67, 0.6)" }}
@@ -178,7 +173,7 @@ export function ActivityFeed({
           <AnimatePresence initial={false} mode="popLayout">
             {limitedActivityItems.map((item) => {
               const isNewTransaction = newTransactionIds.has(
-                item.transaction.id,
+                item.transaction.id
               );
 
               if (item.type === "incoming") {
@@ -233,11 +228,8 @@ export function ActivityFeed({
                         className="text-[13px] leading-4"
                         style={{ color: "rgba(60, 60, 67, 0.6)" }}
                       >
-                        {formatTransactionAmount(
-                          transaction.amountLamports,
-                        )}{" "}
-                        SOL from{" "}
-                        {formatSenderAddress(transaction.sender)}
+                        {formatTransactionAmount(transaction.amountLamports)}{" "}
+                        SOL from {formatSenderAddress(transaction.sender)}
                       </p>
                     </div>
 
@@ -270,21 +262,17 @@ export function ActivityFeed({
               const mockInfo = USE_MOCK_DATA
                 ? MOCK_ACTIVITY_INFO[transaction.id]
                 : undefined;
-              const isSecureTransaction =
-                transaction.transferType === "secure";
+              const isSecureTransaction = transaction.transferType === "secure";
               const isUnshieldTransaction =
                 transaction.transferType === "unshield";
               const isSecureOrUnshield =
                 isSecureTransaction || isUnshieldTransaction;
-              const _isDepositForUsername =
-                transaction.transferType === "deposit_for_username";
               const transferTypeLabel =
                 transaction.transferType === "store"
                   ? "Store data"
-                  : transaction.transferType ===
-                      "verify_telegram_init_data"
-                    ? "Verify data"
-                    : null;
+                  : transaction.transferType === "verify_telegram_init_data"
+                  ? "Verify data"
+                  : null;
               const counterparty = isIncoming
                 ? transaction.sender || "Unknown sender"
                 : transaction.recipient || "Unknown recipient";
@@ -294,21 +282,20 @@ export function ActivityFeed({
               const formattedCounterparty = isUnknownRecipient
                 ? counterparty
                 : counterparty.startsWith("@")
-                  ? counterparty
-                  : formatSenderAddress(counterparty);
+                ? counterparty
+                : formatSenderAddress(counterparty);
               const isEffectivelyZero =
-                Math.abs(transaction.amountLamports) <
-                LAMPORTS_PER_SOL / 10000; // below 0.0001 SOL displays as 0
+                Math.abs(transaction.amountLamports) < LAMPORTS_PER_SOL / 10000; // below 0.0001 SOL displays as 0
               const amountPrefix = isEffectivelyZero
                 ? ""
                 : isIncoming
-                  ? "+"
-                  : "\u2212";
+                ? "+"
+                : "\u2212";
               const amountColor = isIncoming
                 ? "#32e55e"
                 : isPending
-                  ? "#00b1fb"
-                  : "#000";
+                ? "#00b1fb"
+                : "#000";
               const timestamp = new Date(transaction.timestamp);
 
               // Compact view for store/verify transactions
@@ -375,12 +362,11 @@ export function ActivityFeed({
               // Secure/Unshield transaction view
               if (isSecureOrUnshield) {
                 const secureHolding = transaction.tokenMint
-                  ? tokenHoldings.find(
-                      (h) => h.mint === transaction.tokenMint,
-                    )
+                  ? tokenHoldings.find((h) => h.mint === transaction.tokenMint)
                   : undefined;
-                const secureIcon = transaction.secureTokenIcon
-                  || (transaction.tokenMint
+                const secureIcon =
+                  transaction.secureTokenIcon ||
+                  (transaction.tokenMint
                     ? resolveTokenIcon({
                         mint: transaction.tokenMint,
                         imageUrl: secureHolding?.imageUrl,
@@ -441,9 +427,7 @@ export function ActivityFeed({
                                 : "/icons/Unshield_32.png"
                             }
                             alt={
-                              isSecureTransaction
-                                ? "Shielded"
-                                : "Unshielded"
+                              isSecureTransaction ? "Shielded" : "Unshielded"
                             }
                             width={32}
                             height={32}
@@ -455,9 +439,7 @@ export function ActivityFeed({
                     {/* Middle - Text */}
                     <div className="flex-1 py-2.5 flex flex-col gap-0.5">
                       <p className="text-base text-black leading-5">
-                        {isSecureTransaction
-                          ? "Shielded"
-                          : "Unshielded"}
+                        {isSecureTransaction ? "Shielded" : "Unshielded"}
                       </p>
                       <p
                         className="text-[13px] leading-4"
@@ -471,12 +453,11 @@ export function ActivityFeed({
                     <div className="flex flex-col items-end gap-0.5 py-2.5 pl-3">
                       <p className="text-base leading-5 text-black">
                         {secureAmount != null
-                          ? `${secureAmount.toLocaleString(
-                              "en-US",
-                              { maximumFractionDigits: 4 },
-                            )} ${secureSymbol}`
+                          ? `${secureAmount.toLocaleString("en-US", {
+                              maximumFractionDigits: 4,
+                            })} ${secureSymbol}`
                           : `${formatTransactionAmount(
-                              transaction.amountLamports,
+                              transaction.amountLamports
                             )} SOL`}
                       </p>
                       <p
@@ -502,13 +483,11 @@ export function ActivityFeed({
               if (transaction.transferType === "swap") {
                 const swapFromHolding = transaction.swapFromMint
                   ? tokenHoldings.find(
-                      (h) => h.mint === transaction.swapFromMint,
+                      (h) => h.mint === transaction.swapFromMint
                     )
                   : undefined;
                 const swapToHolding = transaction.swapToMint
-                  ? tokenHoldings.find(
-                      (h) => h.mint === transaction.swapToMint,
-                    )
+                  ? tokenHoldings.find((h) => h.mint === transaction.swapToMint)
                   : undefined;
                 const swapFromIcon = transaction.swapFromMint
                   ? resolveTokenIcon({
@@ -523,13 +502,9 @@ export function ActivityFeed({
                     })
                   : "/tokens/solana-sol-logo.png";
                 const swapFromSymbol =
-                  transaction.swapFromSymbol ||
-                  swapFromHolding?.symbol ||
-                  "?";
+                  transaction.swapFromSymbol || swapFromHolding?.symbol || "?";
                 const swapToSymbol =
-                  transaction.swapToSymbol ||
-                  swapToHolding?.symbol ||
-                  "?";
+                  transaction.swapToSymbol || swapToHolding?.symbol || "?";
                 const swapToAmount = transaction.swapToAmount;
 
                 return (
@@ -582,9 +557,7 @@ export function ActivityFeed({
 
                     {/* Middle - Text */}
                     <div className="flex-1 py-2.5 flex flex-col gap-0.5">
-                      <p className="text-base text-black leading-5">
-                        Swap
-                      </p>
+                      <p className="text-base text-black leading-5">Swap</p>
                       <p
                         className="text-[13px] leading-4"
                         style={{ color: "rgba(60, 60, 67, 0.6)" }}
@@ -688,10 +661,10 @@ export function ActivityFeed({
                       {mockInfo
                         ? mockInfo.label
                         : isIncoming
-                          ? "Received"
-                          : isPending
-                            ? "To be claimed"
-                            : "Sent"}
+                        ? "Received"
+                        : isPending
+                        ? "To be claimed"
+                        : "Sent"}
                     </p>
                     {mockInfo ? (
                       <p
@@ -710,11 +683,7 @@ export function ActivityFeed({
                           className="text-[13px] leading-4"
                           style={{ color: "rgba(60, 60, 67, 0.6)" }}
                         >
-                          {isIncoming
-                            ? "from"
-                            : isPending
-                              ? "by"
-                              : "to"}{" "}
+                          {isIncoming ? "from" : isPending ? "by" : "to"}{" "}
                           {formattedCounterparty}
                         </p>
                       )
@@ -733,7 +702,7 @@ export function ActivityFeed({
                             isEffectivelyZero
                               ? "0"
                               : formatTransactionAmount(
-                                  transaction.amountLamports,
+                                  transaction.amountLamports
                                 )
                           } SOL`}
                     </p>
@@ -758,8 +727,7 @@ export function ActivityFeed({
           </AnimatePresence>
 
           {/* Show All button */}
-          {incomingTransactions.length + walletTransactions.length >
-            10 && (
+          {incomingTransactions.length + walletTransactions.length > 10 && (
             <button
               onClick={() => {
                 if (hapticFeedback.impactOccurred.isAvailable()) {

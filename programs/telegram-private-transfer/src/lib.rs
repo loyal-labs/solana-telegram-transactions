@@ -121,52 +121,7 @@ pub mod telegram_private_transfer {
         Ok(())
     }
 
-    /// Deposits tokens into a username-based deposit.
-    ///
-    /// Anyone can deposit tokens for a Telegram username.
-    pub fn deposit_for_username(
-        ctx: Context<DepositForUsername>,
-        username: String,
-        amount: u64,
-    ) -> Result<()> {
-        validate_username(&username)?;
-
-        let deposit = &mut ctx.accounts.deposit;
-        if deposit.token_mint == Pubkey::default() {
-            deposit.token_mint = ctx.accounts.token_mint.key();
-            deposit.username = username.clone();
-            deposit.amount = 0;
-        } else {
-            require!(deposit.username == username, ErrorCode::InvalidUsername);
-            require_keys_eq!(
-                deposit.token_mint,
-                ctx.accounts.token_mint.key(),
-                ErrorCode::InvalidMint
-            );
-        }
-
-        transfer_checked(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                TransferChecked {
-                    from: ctx.accounts.depositor_token_account.to_account_info(),
-                    mint: ctx.accounts.token_mint.to_account_info(),
-                    to: ctx.accounts.vault_token_account.to_account_info(),
-                    authority: ctx.accounts.depositor.to_account_info(),
-                },
-            ),
-            amount,
-            ctx.accounts.token_mint.decimals,
-        )?;
-
-        deposit.amount = deposit
-            .amount
-            .checked_add(amount)
-            .ok_or(ErrorCode::Overflow)?;
-
-        Ok(())
-    }
-
+    /// Claim tokens and transfer from username deposit to deposit
     pub fn claim_username_deposit_to_deposit(
         ctx: Context<ClaimUsernameDepositToDeposit>,
         amount: u64,
@@ -193,47 +148,6 @@ pub mod telegram_private_transfer {
             .amount
             .checked_add(amount)
             .ok_or(ErrorCode::Overflow)?;
-
-        Ok(())
-    }
-
-    /// Claims tokens from a username-based deposit using a verified Telegram session.
-    pub fn claim_username_deposit(ctx: Context<ClaimUsernameDeposit>, amount: u64) -> Result<()> {
-        let deposit = &mut ctx.accounts.deposit;
-        let session = &ctx.accounts.session;
-
-        require!(session.verified, ErrorCode::NotVerified);
-        require!(
-            session.username == deposit.username,
-            ErrorCode::InvalidUsername
-        );
-        require!(deposit.amount >= amount, ErrorCode::InsufficientDeposit);
-
-        let seeds = [
-            VAULT_PDA_SEED,
-            deposit.token_mint.as_ref(),
-            &[ctx.bumps.vault],
-        ];
-        let signer_seeds = &[&seeds[..]];
-        transfer_checked(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                TransferChecked {
-                    from: ctx.accounts.vault_token_account.to_account_info(),
-                    mint: ctx.accounts.token_mint.to_account_info(),
-                    to: ctx.accounts.recipient_token_account.to_account_info(),
-                    authority: ctx.accounts.vault.to_account_info(),
-                },
-                signer_seeds,
-            ),
-            amount,
-            ctx.accounts.token_mint.decimals,
-        )?;
-
-        deposit.amount = deposit
-            .amount
-            .checked_sub(amount)
-            .ok_or(ErrorCode::InsufficientDeposit)?;
 
         Ok(())
     }
@@ -576,48 +490,6 @@ pub struct ModifyDeposit<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(username: String)]
-pub struct DepositForUsername<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    #[account(mut)]
-    pub depositor: Signer<'info>,
-    #[account(
-        init_if_needed,
-        payer = payer,
-        space = 8 + UsernameDeposit::INIT_SPACE,
-        seeds = [USERNAME_DEPOSIT_PDA_SEED, username.as_bytes(), token_mint.key().as_ref()],
-        bump
-    )]
-    pub deposit: Account<'info, UsernameDeposit>,
-    #[account(
-        init_if_needed,
-        payer = payer,
-        space = 8 + Vault::INIT_SPACE,
-        seeds = [VAULT_PDA_SEED, token_mint.key().as_ref()],
-        bump,
-    )]
-    pub vault: Account<'info, Vault>,
-    #[account(
-        init_if_needed,
-        payer = payer,
-        associated_token::mint = token_mint,
-        associated_token::authority = vault,
-    )]
-    pub vault_token_account: Account<'info, TokenAccount>,
-    #[account(
-        mut,
-        constraint = depositor_token_account.mint == token_mint.key(),
-        constraint = depositor_token_account.owner == depositor.key(),
-    )]
-    pub depositor_token_account: Account<'info, TokenAccount>,
-    pub token_mint: Account<'info, Mint>,
-    pub token_program: Program<'info, Token>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
 pub struct ClaimUsernameDepositToDeposit<'info> {
     /// CHECK: Matched against the deposit account
     pub user: AccountInfo<'info>,
@@ -645,42 +517,6 @@ pub struct ClaimUsernameDepositToDeposit<'info> {
         constraint = session.user_wallet == destination_deposit.user @ ErrorCode::InvalidRecipient,
         constraint = session.verified @ ErrorCode::NotVerified,
         constraint = session.username == source_username_deposit.username @ ErrorCode::InvalidUsername,
-    )]
-    pub session: Account<'info, TelegramSession>,
-    pub token_program: Program<'info, Token>,
-}
-
-#[derive(Accounts)]
-pub struct ClaimUsernameDeposit<'info> {
-    #[account(
-        mut,
-        constraint = recipient_token_account.mint == token_mint.key() @ ErrorCode::InvalidMint,
-    )]
-    pub recipient_token_account: Account<'info, TokenAccount>,
-    #[account(
-        mut,
-        seeds = [VAULT_PDA_SEED, token_mint.key().as_ref()],
-        bump
-    )]
-    pub vault: Account<'info, Vault>,
-    #[account(
-        mut,
-        associated_token::mint = token_mint,
-        associated_token::authority = vault,
-    )]
-    pub vault_token_account: Account<'info, TokenAccount>,
-    #[account(
-        mut,
-        seeds = [USERNAME_DEPOSIT_PDA_SEED, deposit.username.as_bytes(), deposit.token_mint.as_ref()],
-        bump,
-        has_one = token_mint,
-    )]
-    pub deposit: Account<'info, UsernameDeposit>,
-    pub token_mint: Account<'info, Mint>,
-    #[account(
-        constraint = session.user_wallet == recipient_token_account.owner @ ErrorCode::InvalidRecipient,
-        constraint = session.verified @ ErrorCode::NotVerified,
-        constraint = session.username == deposit.username @ ErrorCode::InvalidUsername,
     )]
     pub session: Account<'info, TelegramSession>,
     pub token_program: Program<'info, Token>,

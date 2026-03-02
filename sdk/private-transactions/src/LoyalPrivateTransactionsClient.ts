@@ -3,12 +3,9 @@ import {
   PublicKey,
   SystemProgram,
   Transaction,
-  VersionedTransaction,
-  sendAndConfirmRawTransaction,
   type Commitment,
   type BlockhashWithExpiryBlockHeight,
   type ConfirmOptions,
-  type Signer,
 } from "@solana/web3.js";
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
 import {
@@ -49,8 +46,6 @@ import type {
   InitializeDepositParams,
   ModifyBalanceParams,
   ModifyBalanceResult,
-  DepositForUsernameParams,
-  ClaimUsernameDepositParams,
   CreatePermissionParams,
   CreateUsernamePermissionParams,
   DelegateDepositParams,
@@ -81,15 +76,6 @@ function prettyStringify(obj: unknown): string {
   });
 }
 
-/**
- * Create a typed Program instance from the IDL
- */
-function createProgram(
-  provider: AnchorProvider
-): Program<TelegramPrivateTransfer> {
-  return new Program(idl as TelegramPrivateTransfer, provider);
-}
-
 function programFromRpc(
   signer: WalletSigner,
   commitment: Commitment,
@@ -104,7 +90,7 @@ function programFromRpc(
   const baseProvider = new AnchorProvider(baseConnection, adapter, {
     commitment,
   });
-  return createProgram(baseProvider);
+  return new Program(idl as TelegramPrivateTransfer, baseProvider);
 }
 
 type MagicRouterConnection = Connection & {
@@ -452,103 +438,6 @@ export class LoyalPrivateTransactionsClient {
     }
 
     return { signature, deposit };
-  }
-
-  /**
-   * Deposit tokens for a Telegram username
-   */
-  async depositForUsername(params: DepositForUsernameParams): Promise<string> {
-    // TODO: deprecate
-    const {
-      username,
-      tokenMint,
-      amount,
-      depositor,
-      payer,
-      depositorTokenAccount,
-      rpcOptions,
-    } = params;
-
-    this.validateUsername(username);
-
-    const [depositPda] = findUsernameDepositPda(username, tokenMint);
-
-    await this.ensureDelegated(depositPda, "depositForUsername-depositPda");
-
-    // TODO: you don't need Vault while depositing!
-    const [vaultPda] = findVaultPda(tokenMint);
-    const vaultTokenAccount = getAssociatedTokenAddressSync(
-      tokenMint,
-      vaultPda,
-      true,
-      TOKEN_PROGRAM_ID,
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
-
-    const signature = await this.ephemeralProgram.methods
-      .depositForUsername(username, new BN(amount.toString()))
-      .accountsPartial({
-        payer,
-        depositor,
-        deposit: depositPda,
-        vault: vaultPda,
-        vaultTokenAccount,
-        depositorTokenAccount,
-        tokenMint,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc(rpcOptions);
-
-    return signature;
-  }
-
-  /**
-   * Claim tokens from a username-based deposit
-   */
-  async claimUsernameDeposit(
-    params: ClaimUsernameDepositParams
-  ): Promise<string> {
-    const {
-      username,
-      tokenMint,
-      amount,
-      recipientTokenAccount,
-      session,
-      rpcOptions,
-    } = params;
-
-    this.validateUsername(username);
-
-    const [depositPda] = findUsernameDepositPda(username, tokenMint);
-
-    await this.ensureDelegated(depositPda, "claimUsernameDeposit-depositPda");
-
-    // TODO: you don't need Vault while claiming!
-    const [vaultPda] = findVaultPda(tokenMint);
-    const vaultTokenAccount = getAssociatedTokenAddressSync(
-      tokenMint,
-      vaultPda,
-      true,
-      TOKEN_PROGRAM_ID,
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
-
-    const signature = await this.ephemeralProgram.methods
-      .claimUsernameDeposit(new BN(amount.toString()))
-      .accountsPartial({
-        recipientTokenAccount,
-        vault: vaultPda,
-        vaultTokenAccount,
-        deposit: depositPda,
-        tokenMint,
-        session,
-        tokenProgram: TOKEN_PROGRAM_ID,
-      })
-      .rpc(rpcOptions);
-
-    return signature;
   }
 
   async claimUsernameDepositToDeposit(
@@ -1260,8 +1149,7 @@ export class LoyalPrivateTransactionsClient {
         prettyStringify(ephemeralAccountInfo)
       );
 
-      const authority =
-        delegationStatus.result?.delegationRecord?.authority;
+      const authority = delegationStatus.result?.delegationRecord?.authority;
       if (authority && authority !== ER_VALIDATOR.toString()) {
         console.error(
           `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${authority}`

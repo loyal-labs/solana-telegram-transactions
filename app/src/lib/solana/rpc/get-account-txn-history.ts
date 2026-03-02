@@ -60,8 +60,7 @@ const TOKEN_2022_PROGRAM_ID = new PublicKey(
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 );
 
-const absBigInt = (n: bigint): bigint =>
-  n < BigInt(0) ? BigInt(0) - n : n;
+const absBigInt = (n: bigint): bigint => (n < BigInt(0) ? BigInt(0) - n : n);
 
 const getAtaAddress = (args: {
   walletAddress: string;
@@ -153,7 +152,9 @@ const formatTokenAmountFromRaw = (args: {
     .padStart(fracDigits, "0")
     .replace(/0+$/, "");
 
-  return fracStr.length ? `${integer.toString()}.${fracStr}` : integer.toString();
+  return fracStr.length
+    ? `${integer.toString()}.${fracStr}`
+    : integer.toString();
 };
 
 const findAllTokenBalanceChanges = (
@@ -285,10 +286,7 @@ const findSplTokenTransferCounterparty = (args: {
   const allInstructions = [...topLevel, ...inner];
 
   for (const ix of allInstructions) {
-    if (
-      ix.program !== "spl-token" &&
-      ix.program !== "spl-token-2022"
-    ) {
+    if (ix.program !== "spl-token" && ix.program !== "spl-token-2022") {
       continue;
     }
     const parsed = (
@@ -392,9 +390,10 @@ const mapTransactionToTransfer = (
   const allTokenChanges = onlySystemTransfers
     ? []
     : findAllTokenBalanceChanges(message, safeMeta, walletAddress);
-  const tokenChange = allTokenChanges.length > 0
-    ? allTokenChanges.reduce((best, c) => (c.absRaw > best.absRaw ? c : best))
-    : null;
+  const tokenChange =
+    allTokenChanges.length > 0
+      ? allTokenChanges.reduce((best, c) => (c.absRaw > best.absRaw ? c : best))
+      : null;
 
   if (accountIndex === -1 && !tokenChange) return null;
 
@@ -452,11 +451,22 @@ const mapTransactionToTransfer = (
   );
 
   const knownInstructionTypes: WalletTransfer["type"][] = [
+    // telegram-verification
     "verify_telegram_init_data",
     "store",
-    "claim_deposit",
-    "claim_username_deposit",
-    "deposit_for_username",
+    // telegram-private-transfer
+    "initialize_deposit",
+    "initialize_username_deposit",
+    "modify_balance",
+    "claim_username_deposit_to_deposit",
+    "transfer_deposit",
+    "transfer_to_username_deposit",
+    "create_permission",
+    "create_username_permission",
+    "delegate",
+    "delegate_username_deposit",
+    "undelegate",
+    "undelegate_username_deposit",
   ];
 
   const decodeInstructionData = (data: string) => {
@@ -510,15 +520,20 @@ const mapTransactionToTransfer = (
     type === "transfer" &&
     allTokenChanges.length > 0 &&
     [
-      ...(message.instructions as (ParsedInstruction | PartiallyDecodedInstruction)[]),
+      ...(message.instructions as (
+        | ParsedInstruction
+        | PartiallyDecodedInstruction
+      )[]),
       ...((innerInstructions ?? []) as ParsedInnerInstruction[]).flatMap(
         (ix: ParsedInnerInstruction) =>
-          (ix.instructions ?? []) as (ParsedInstruction | PartiallyDecodedInstruction)[]
+          (ix.instructions ?? []) as (
+            | ParsedInstruction
+            | PartiallyDecodedInstruction
+          )[]
       ),
     ].some(
       (ix) =>
-        "programId" in ix &&
-        ix.programId?.toBase58?.() === JUPITER_PROGRAM_ID
+        "programId" in ix && ix.programId?.toBase58?.() === JUPITER_PROGRAM_ID
     );
 
   if (isJupiterSwap) {
@@ -527,7 +542,10 @@ const mapTransactionToTransfer = (
 
   // Swap detection: wallet is signer + opposing SOL/token movements
   let swapFields: Partial<WalletTransfer> = {};
-  if (allTokenChanges.length > 0 && (type === "swap" || (isSigner && type === "transfer"))) {
+  if (
+    allTokenChanges.length > 0 &&
+    (type === "swap" || (isSigner && type === "transfer"))
+  ) {
     const tokenIn = allTokenChanges.find((c) => c.direction === "in");
     const tokenOut = allTokenChanges.find((c) => c.direction === "out");
     const solOut = netChangeLamports < -DUST_LAMPORTS_THRESHOLD;
@@ -599,22 +617,24 @@ const mapTransactionToTransfer = (
     type === "swap"
       ? "out" // swaps always show as outgoing (SOL/token spent)
       : isTokenTransfer || isSecureWithToken
-        ? tokenChange!.direction
-        : solDirection;
+      ? tokenChange!.direction
+      : solDirection;
   const amountLamports =
     type === "swap"
       ? solAmountLamports
       : isTokenTransfer || isSecureWithToken
-        ? 0
-        : solAmountLamports;
+      ? 0
+      : solAmountLamports;
 
-  if (type === "deposit_for_username") {
-    const usernameFromInstruction = (
-      decodedInstruction?.data as { username?: string }
-    )?.username;
-    if (usernameFromInstruction) {
-      counterparty = usernameFromInstruction;
-    }
+  if (type === "transfer_to_username_deposit") {
+    // FIXME: parse `transfer_to_username_deposit` accounts and find username in
+    // `destination_deposit.username`:
+    // const usernameFromInstruction = (
+    //   decodedInstruction?.data as { username?: string }
+    // )?.username;
+    // if (usernameFromInstruction) {
+    //   counterparty = usernameFromInstruction;
+    // }
   }
 
   if (isTokenTransfer && type !== "swap") {

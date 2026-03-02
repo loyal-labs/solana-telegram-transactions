@@ -262,15 +262,6 @@ export default function Home() {
       }
       // Clear incoming transaction ref
       setSelectedIncomingTransaction(null);
-      // Convert to TransactionDetailsData format
-      // For deposit_for_username transactions, the recipient is the username
-      const isDepositTransaction =
-        transaction.transferType === "deposit_for_username";
-      const recipientUsername = transaction.recipient?.startsWith("@")
-        ? transaction.recipient
-        : isDepositTransaction && transaction.recipient
-        ? `@${transaction.recipient}`
-        : undefined;
 
       const detailsData: TransactionDetailsData = {
         id: transaction.id,
@@ -281,7 +272,7 @@ export default function Home() {
         tokenAmount: transaction.tokenAmount,
         tokenDecimals: transaction.tokenDecimals,
         recipient: transaction.recipient,
-        recipientUsername,
+        recipientUsername: undefined, // FIXME: parse transfer_to_username_deposit transaction types
         sender: transaction.sender,
         senderUsername: transaction.sender?.startsWith("@")
           ? transaction.sender
@@ -1150,7 +1141,7 @@ export default function Home() {
         solPriceUsd={solPriceUsd}
         tokenHoldings={tokenHoldings}
         onShare={
-          selectedTransaction?.transferType === "deposit_for_username"
+          selectedTransaction?.transferType === "transfer_to_username_deposit"
             ? handleShareDepositTransaction
             : undefined
         }

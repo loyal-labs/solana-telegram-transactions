@@ -147,8 +147,8 @@ export default function TransactionDetailsSheet({
   const isDragging = useRef(false);
   const isClosing = useRef(false);
 
-  const isDepositForUsername =
-    transaction?.transferType === "deposit_for_username";
+  // FIXME: parse transfer_to_username_deposit instead
+  const isDepositForUsername = false;
   const isSwapTransaction = transaction?.transferType === "swap";
   const isSecureTransaction = transaction?.transferType === "secure";
   const isUnshieldTransaction = transaction?.transferType === "unshield";
@@ -169,7 +169,8 @@ export default function TransactionDetailsSheet({
   const resolvedSecureAmountUsd =
     secureAmountUsd ??
     (() => {
-      if (resolvedSecureAmount == null || !transaction?.tokenMint) return undefined;
+      if (resolvedSecureAmount == null || !transaction?.tokenMint)
+        return undefined;
       const holding = tokenHoldings.find(
         (h) => h.mint === transaction.tokenMint
       );
@@ -259,6 +260,7 @@ export default function TransactionDetailsSheet({
     }
   }, [onCancelDeposit, transaction?.recipientUsername, depositAmount]);
 
+  // TODO: enable when refund will be implemented
   // Show "Cancel transaction" button for deposit_for_username transactions with non-zero deposit
   useEffect(() => {
     if (!open) {
@@ -847,7 +849,8 @@ export default function TransactionDetailsSheet({
                 <div className="flex flex-col items-center gap-1">
                   <div className="flex items-baseline gap-2">
                     <p className="text-[40px] font-semibold leading-[48px] text-black">
-                      {resolvedSecureAmount?.toFixed(4).replace(/\.?0+$/, "") || "0"}
+                      {resolvedSecureAmount?.toFixed(4).replace(/\.?0+$/, "") ||
+                        "0"}
                     </p>
                     <p
                       className="text-[28px] font-semibold leading-8 tracking-[0.4px]"

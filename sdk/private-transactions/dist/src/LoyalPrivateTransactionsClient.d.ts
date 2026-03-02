@@ -1,7 +1,7 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Program } from "@coral-xyz/anchor";
 import type { TelegramPrivateTransfer } from "./idl/telegram_private_transfer.ts";
-import type { WalletLike, ClientConfig, DepositData, UsernameDepositData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, DepositForUsernameParams, ClaimUsernameDepositParams, CreatePermissionParams, CreateUsernamePermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams, TransferDepositParams, TransferToUsernameDepositParams, InitializeUsernameDepositParams, ClaimUsernameDepositToDepositParams } from "./types";
+import type { WalletLike, ClientConfig, DepositData, UsernameDepositData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, CreatePermissionParams, CreateUsernamePermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams, TransferDepositParams, TransferToUsernameDepositParams, InitializeUsernameDepositParams, ClaimUsernameDepositToDepositParams } from "./types";
 export declare function waitForAccountOwnerChange(connection: Connection, account: PublicKey, expectedOwner: PublicKey, timeoutMs?: number, intervalMs?: number): {
     wait: () => Promise<void>;
     cancel: () => Promise<void>;
@@ -52,14 +52,6 @@ export declare class LoyalPrivateTransactionsClient {
      * Modify the balance of a user's deposit account
      */
     modifyBalance(params: ModifyBalanceParams): Promise<ModifyBalanceResult>;
-    /**
-     * Deposit tokens for a Telegram username
-     */
-    depositForUsername(params: DepositForUsernameParams): Promise<string>;
-    /**
-     * Claim tokens from a username-based deposit
-     */
-    claimUsernameDeposit(params: ClaimUsernameDepositParams): Promise<string>;
     claimUsernameDepositToDeposit(params: ClaimUsernameDepositToDepositParams): Promise<string>;
     /**
      * Create a permission for a deposit account (required for PER)
