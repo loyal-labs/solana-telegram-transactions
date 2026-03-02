@@ -42,6 +42,7 @@ import {
   shieldTokens,
   unshieldTokens,
 } from "@/lib/solana/deposits/loyal-deposits";
+import { invalidatePrivateClient } from "@/lib/solana/deposits/private-client";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import { getSolanaEnv } from "@/lib/solana/rpc/connection";
@@ -458,7 +459,14 @@ export default function Home() {
       void refreshTokenHoldings(true);
     } catch (error) {
       console.error("[secure] Error:", error);
-      setSwapError(error instanceof Error ? error.message : "Operation failed");
+      const errorMessage =
+        error instanceof Error ? error.message : "Operation failed";
+      // Recreate authToken for PER connection
+      // Error: 500 : {"error":"error sending request for url (http://127.0.0.1:8899/)"}
+      if (errorMessage.includes("http://127.0.0.1:8899/")) {
+        void invalidatePrivateClient();
+      }
+      setSwapError(errorMessage);
       setSwapView("result");
       track(WALLET_ANALYTICS_EVENTS.swapTokensFailed, {
         path: WALLET_ANALYTICS_PATH,
@@ -647,6 +655,11 @@ export default function Home() {
         error instanceof Error
           ? error.message
           : "Something went wrong. Please try again.";
+      // Recreate authToken for PER connection
+      // Error: 500 : {"error":"error sending request for url (http://127.0.0.1:8899/)"}
+      if (errorMessage.includes("http://127.0.0.1:8899/")) {
+        void invalidatePrivateClient();
+      }
       setSendError(errorMessage);
     } finally {
       setIsSendingTransaction(false);
@@ -800,7 +813,8 @@ export default function Home() {
     try {
       const amountSol = selectedTransaction.amountLamports / LAMPORTS_PER_SOL;
       const amountUsd = amountSol * solPriceUsd;
-      const isSecure = selectedTransaction.transferType === "secure" ||
+      const isSecure =
+        selectedTransaction.transferType === "secure" ||
         !!selectedTransaction.secureTokenSymbol;
 
       const msgId = await createShareMessage(

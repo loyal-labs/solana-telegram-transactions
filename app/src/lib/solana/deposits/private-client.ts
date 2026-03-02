@@ -8,12 +8,13 @@ import { sign } from "tweetnacl";
 
 import { PRIVATE_AUTH_TOKEN_STORAGE_KEY_PREFIX } from "../../constants";
 import {
+  deleteCloudValue,
   getCloudValue,
   setCloudValue,
 } from "../../telegram/mini-app/cloud-storage";
 import { getEndpoints, getSolanaEnv } from "../rpc/connection";
 import { PER_RPC_ENDPOINT, PER_WS_ENDPOINT } from "../rpc/constants";
-import { getWalletKeypair } from "../wallet/wallet-details";
+import { getWalletKeypair, getWalletPublicKey } from "../wallet/wallet-details";
 
 const AUTH_TOKEN_REFRESH_BUFFER_MS = 60_000;
 
@@ -27,7 +28,7 @@ const getPrivateAuthTokenStorageKey = (publicKey: string): string =>
   `${PRIVATE_AUTH_TOKEN_STORAGE_KEY_PREFIX}_${publicKey}`;
 
 const parseStoredPrivateAuthToken = (
-  value: string,
+  value: string
 ): StoredPrivateAuthToken | null => {
   try {
     const parsed = JSON.parse(value);
@@ -57,7 +58,7 @@ const isAuthTokenFresh = (token: StoredPrivateAuthToken): boolean =>
   token.expiresAt > Date.now() + AUTH_TOKEN_REFRESH_BUFFER_MS;
 
 const getCachedAuthToken = async (
-  publicKey: string,
+  publicKey: string
 ): Promise<{ token: string; expiresAt: number } | null> => {
   const storageKey = getPrivateAuthTokenStorageKey(publicKey);
   const cachedValue = await getCloudValue(storageKey);
@@ -76,21 +77,30 @@ const getCachedAuthToken = async (
   };
 };
 
+const verifyTeeIntegrity = (): void => {
+  const t0 = performance.now();
+  verifyTeeRpcIntegrity(PER_RPC_ENDPOINT)
+    .then((isVerified) => {
+      console.log(
+        `[private-client] verifyTeeRpcIntegrity: ${(
+          performance.now() - t0
+        ).toFixed(1)}ms`
+      );
+      if (!isVerified) {
+        console.error("TEE RPC integrity verification failed");
+      }
+    })
+    .catch((error) => {
+      console.error("TEE RPC integrity verification error", error);
+    });
+};
+
 const fetchAndCacheAuthToken = async (
-  keypair: Keypair,
+  keypair: Keypair
 ): Promise<{ token: string; expiresAt: number } | null> => {
   try {
-    const t0 = performance.now();
-    const isVerified = await verifyTeeRpcIntegrity(PER_RPC_ENDPOINT);
-    console.log(
-      `[private-client] verifyTeeRpcIntegrity: ${(
-        performance.now() - t0
-      ).toFixed(1)}ms`,
-    );
-    if (!isVerified) {
-      console.error("TEE RPC integrity verification failed");
-      return null;
-    }
+    // Fire-and-forget TEE integrity check; logs result but does not block callers
+    setTimeout(verifyTeeIntegrity, 10_000);
 
     const signMessage = (message: Uint8Array): Promise<Uint8Array> =>
       Promise.resolve(sign.detached(message, keypair.secretKey));
@@ -99,21 +109,21 @@ const fetchAndCacheAuthToken = async (
     const authToken = await getAuthToken(
       PER_RPC_ENDPOINT,
       keypair.publicKey,
-      signMessage,
+      signMessage
     );
     console.log(
-      `[private-client] getAuthToken: ${(performance.now() - t1).toFixed(1)}ms`,
+      `[private-client] getAuthToken: ${(performance.now() - t1).toFixed(1)}ms`
     );
 
     const storageKey = getPrivateAuthTokenStorageKey(
-      keypair.publicKey.toBase58(),
+      keypair.publicKey.toBase58()
     );
     const persisted = await setCloudValue(
       storageKey,
       JSON.stringify({
         ...authToken,
         endpoint: PER_RPC_ENDPOINT,
-      }),
+      })
     );
 
     if (!persisted) {
@@ -131,31 +141,49 @@ let cachedPrivateClient: LoyalPrivateTransactionsClient | null = null;
 let cachedPrivateClientPromise: Promise<LoyalPrivateTransactionsClient> | null =
   null;
 
-export const getPrivateClient =
-  async (): Promise<LoyalPrivateTransactionsClient> => {
-    const keypair = await getWalletKeypair();
-    if (cachedPrivateClient) return cachedPrivateClient;
-    if (!cachedPrivateClientPromise) {
-      cachedPrivateClientPromise = (async () => {
-        const selectedSolanaEnv = getSolanaEnv();
-        const { rpcEndpoint, websocketEndpoint } =
-          getEndpoints(selectedSolanaEnv);
+export const invalidatePrivateClient = async (): Promise<void> => {
+  cachedPrivateClient = null;
+  cachedPrivateClientPromise = null;
 
-        const cachedAuthToken = await getCachedAuthToken(
-          keypair.publicKey.toBase58(),
-        );
-        const authToken =
-          cachedAuthToken ?? (await fetchAndCacheAuthToken(keypair));
-        cachedPrivateClient = await LoyalPrivateTransactionsClient.fromConfig({
-          signer: keypair,
-          baseRpcEndpoint: rpcEndpoint,
-          baseWsEndpoint: websocketEndpoint,
-          ephemeralRpcEndpoint: PER_RPC_ENDPOINT,
-          ephemeralWsEndpoint: PER_WS_ENDPOINT,
-          authToken: authToken ?? undefined,
-        });
-        return cachedPrivateClient;
-      })();
-    }
-    return cachedPrivateClientPromise;
-  };
+  try {
+    const publicKey = await getWalletPublicKey();
+    const storageKey = getPrivateAuthTokenStorageKey(publicKey.toBase58());
+    await deleteCloudValue(storageKey);
+  } catch {
+    // Best-effort: cloud storage clear may fail if wallet isn't available yet
+  }
+};
+
+export const getPrivateClient = async ({
+  forceRecreate = false,
+}: {
+  forceRecreate?: boolean;
+} = {}): Promise<LoyalPrivateTransactionsClient> => {
+  if (cachedPrivateClient) return cachedPrivateClient;
+  if (!cachedPrivateClientPromise) {
+    cachedPrivateClientPromise = (async () => {
+      if (forceRecreate) await invalidatePrivateClient();
+
+      const keypair = await getWalletKeypair();
+      const selectedSolanaEnv = getSolanaEnv();
+      const { rpcEndpoint, websocketEndpoint } =
+        getEndpoints(selectedSolanaEnv);
+
+      const cachedAuthToken = await getCachedAuthToken(
+        keypair.publicKey.toBase58()
+      );
+      const authToken =
+        cachedAuthToken ?? (await fetchAndCacheAuthToken(keypair));
+      cachedPrivateClient = await LoyalPrivateTransactionsClient.fromConfig({
+        signer: keypair,
+        baseRpcEndpoint: rpcEndpoint,
+        baseWsEndpoint: websocketEndpoint,
+        ephemeralRpcEndpoint: PER_RPC_ENDPOINT,
+        ephemeralWsEndpoint: PER_WS_ENDPOINT,
+        authToken: authToken ?? undefined,
+      });
+      return cachedPrivateClient;
+    })();
+  }
+  return cachedPrivateClientPromise;
+};

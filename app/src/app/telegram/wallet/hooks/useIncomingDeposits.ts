@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY } from "@/lib/constants";
 import { track } from "@/lib/core/analytics";
 import { subscribeToDepositsWithUsername } from "@/lib/solana/deposits";
+import { invalidatePrivateClient } from "@/lib/solana/deposits/private-client";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { getTelegramVerificationProgram } from "@/lib/solana/solana-helpers";
 import { storeInitDataGasless } from "@/lib/solana/verification/store-init-data";
@@ -68,7 +69,7 @@ export function useIncomingDeposits(params: {
     IncomingTransaction[]
   >(() => {
     const cached = cachedUsername
-      ? (getCachedIncomingTransactions(cachedUsername) ?? [])
+      ? getCachedIncomingTransactions(cachedUsername) ?? []
       : [];
     return cached;
   });
@@ -92,7 +93,7 @@ export function useIncomingDeposits(params: {
       }
 
       const transaction = incomingTransactions.find(
-        (tx) => tx.id === transactionId,
+        (tx) => tx.id === transactionId
       );
       if (!transaction) {
         console.warn("Transaction not found for approval:", transactionId);
@@ -140,7 +141,7 @@ export function useIncomingDeposits(params: {
           verificationProgram,
           payerPublicKey,
           validationBytes,
-          wallet,
+          wallet
         );
 
         await sendStoreInitDataTxn(
@@ -150,13 +151,13 @@ export function useIncomingDeposits(params: {
           amountLamports,
           validationBytes,
           signatureBytes,
-          TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY,
+          TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
         );
 
         // TODO: filter out tx instead
         setCachedIncomingTransactions(username, []);
         setIncomingTransactions((prev) =>
-          prev.filter((tx) => tx.id !== transactionId),
+          prev.filter((tx) => tx.id !== transactionId)
         );
 
         await refreshBalance(true);
@@ -203,6 +204,11 @@ export function useIncomingDeposits(params: {
           error instanceof Error
             ? error.message
             : "Something went wrong. Please try again.";
+        // Recreate authToken for PER connection
+        // Error: 500 : {"error":"error sending request for url (http://127.0.0.1:8899/)"}
+        if (errorMessage.includes("http://127.0.0.1:8899/")) {
+          void invalidatePrivateClient();
+        }
         setClaimError(errorMessage);
       } finally {
         setIsClaimingTransaction(false);
@@ -214,7 +220,7 @@ export function useIncomingDeposits(params: {
       refreshBalance,
       refreshTokenHoldings,
       loadWalletTransactions,
-    ],
+    ]
   );
 
   useEffect(() => {
@@ -250,7 +256,7 @@ export function useIncomingDeposits(params: {
         console.log("Fetching deposits for username:", username);
         const deposits = await fetchDeposits(
           provider.wallet.publicKey,
-          username,
+          username
         );
         console.log("Deposits fetched:", deposits.length, deposits);
         if (isCancelled) {
@@ -258,7 +264,7 @@ export function useIncomingDeposits(params: {
         }
 
         const mappedTransactions = deposits.map(
-          mapDepositToIncomingTransaction,
+          mapDepositToIncomingTransaction
         );
 
         setCachedIncomingTransactions(username, mappedTransactions);
@@ -284,7 +290,7 @@ export function useIncomingDeposits(params: {
               setCachedIncomingTransactions(username, next);
               return next;
             });
-          },
+          }
         );
       } catch (error) {
         console.error("Failed to fetch deposits", error);
@@ -301,7 +307,7 @@ export function useIncomingDeposits(params: {
       isCancelled = true;
       if (unsubscribe) {
         void unsubscribe().catch((error) =>
-          console.error("Failed to remove deposit subscription", error),
+          console.error("Failed to remove deposit subscription", error)
         );
       }
     };
