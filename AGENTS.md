@@ -188,6 +188,27 @@ Use `/app/src/lib` for cross-slice infrastructure and integration primitives. Ex
 - Promote code into `/app/src/lib` only after it is proven reusable across multiple slices.
 - Refactor incrementally by slice (wallet, summaries, telegram, etc.), not by file type alone.
 
+### Mobile App-Specific Guardrails (`/mobile`)
+
+These complement the command list above and mirror guidance in `mobile/CLAUDE.md`.
+
+- **Architecture and boundaries**:
+  - Routes live in `mobile/app` (Expo Router); reusable UI/hook/service logic lives in `mobile/src`.
+  - Keep network calls centralized in `mobile/src/services/api.ts` (avoid ad-hoc fetches in UI components).
+  - Use `@/` alias for imports under `mobile/src`.
+  - Shared cross-app types/utilities belong in `@loyal-labs/shared` (do not duplicate between `/app` and `/mobile`).
+- **Environment config**:
+  - Client-exposed vars must use `EXPO_PUBLIC_` prefix.
+  - For cloud builds, `eas.json` env is source of truth; `.env` is local-only.
+  - Keep fallback behavior in `mobile/src/config/env.ts` aligned with production API expectations.
+- **Build/runtime constraints**:
+  - Maintain Metro monorepo + SVG transformer settings in `mobile/metro.config.js` (watchFolders for shared package, svg as source extension).
+  - Keep typed routes and New Architecture settings compatible with Expo SDK/React Native versions already pinned.
+- **Testing and validation**:
+  - Lint mobile changes with `cd mobile && npx expo lint`.
+  - Run mobile unit tests with `cd mobile && npm test` when touching shared mobile logic.
+  - Do not start Expo dev server unless explicitly requested by user.
+
 ### Admin Guardrails (`/admin`)
 
 - Use shared DB modules only:
@@ -268,6 +289,54 @@ Service layer patterns:
 ### Troubleshooting
 
 - **Runtime vs Code Mismatch**: If logs/stack traces reference code that no longer matches current file contents, restart the local dev server or worker process. Stale processes can keep executing old code after edits.
+
+### Webhook + Drizzle Reliability Guardrails
+
+- **Context-bound method safety (critical)**:
+  - Never detach Drizzle/SDK methods that may rely on `this` (for example `db.query.*.findFirst`, `findMany`, or SDK instance methods).
+  - Prefer direct invocation from owning object: `db.query.communities.findFirst({...})`.
+  - If extraction is unavoidable, explicitly bind method context and add a regression test for bound behavior.
+- **Webhook failure policy**:
+  - Classify logic in webhook handlers as either `critical` or `best-effort`.
+  - `critical` ingest/storage/auth failures must bubble and fail the webhook request to allow upstream retries.
+  - `best-effort` side effects (reactions, analytics, forwarding) must never block webhook acknowledgment.
+  - For best-effort paths, use fire-and-catch (`void task().catch(...)`) with structured logs.
+- **Error logging standard**:
+  - Log structured context (`chatId`, `messageId`, `telegramUserId`, `updateId`) without message text.
+  - Include both normalized error fields (`errorName`, `errorMessage`) and stack/raw error for debugging.
+- **Test design requirements**:
+  - When wrappers call ORM methods, include context-sensitive mocks that would fail if method context is detached.
+  - For webhook ingest, include retry/idempotency tests that simulate partial write failure then successful retry.
+  - Include non-blocking tests for best-effort side effects to ensure handler completion does not await them.
+- **Required validation after webhook/ingest changes**:
+  - `cd app && bun lint`
+  - Run targeted tests for touched webhook/ingest modules
+  - `cd app && bun run build`
+  - Manual canary in Telegram + verify new `messages` rows are written
+- **On-call detection runbook**:
+  - If cron summary stats suddenly show high `skippedNotEnoughMessages` for historically active communities, assume ingest regression until disproven.
+  - Verify webhook errors and message freshness immediately.
+  - SQL templates:
+    ```sql
+    -- Freshness by active community
+    SELECT c.chat_title, c.chat_id, MAX(m.created_at) AS latest_message_at, COUNT(m.id) AS total_messages
+    FROM communities c
+    LEFT JOIN messages m ON m.community_id = c.id
+    WHERE c.is_active = true
+    GROUP BY c.id, c.chat_title, c.chat_id
+    ORDER BY latest_message_at DESC NULLS LAST;
+    ```
+    ```sql
+    -- 24h ingest volume by active community
+    SELECT c.chat_title, c.chat_id, COUNT(m.id) AS messages_24h
+    FROM communities c
+    LEFT JOIN messages m
+      ON m.community_id = c.id
+     AND m.created_at >= NOW() - INTERVAL '24 hours'
+    WHERE c.is_active = true
+    GROUP BY c.id, c.chat_title, c.chat_id
+    ORDER BY messages_24h DESC;
+    ```
 
 ### Telegram SDK + Cloud Storage Guardrails
 

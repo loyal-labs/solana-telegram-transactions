@@ -25,6 +25,8 @@ This guide explains how to run the mtcute userbot worker with persistent SQLite 
 - `TELEGRAM_USERBOT_ACCOUNT_KEY` (default: `primary`)
 - `USERBOT_STORAGE_DIR` (default: `/var/data/userbot`)
 - `TELEGRAM_USERBOT_PHONE` (used as default phone in bootstrap flow)
+- `TELEGRAM_USERBOT_BOT_TOKEN` (preferred bot auth token)
+- `ASKLOYAL_TGBOT_KEY` (fallback bot auth token, compatible with app env)
 
 ## Render Service Setup
 
@@ -49,6 +51,9 @@ bun run auth:bootstrap
 
 Then complete Telegram login prompts (code + 2FA if enabled).
 
+If bot token auth is configured (`TELEGRAM_USERBOT_BOT_TOKEN` or `ASKLOYAL_TGBOT_KEY`),
+`auth:bootstrap` logs in non-interactively as a bot and does not prompt for phone/code.
+
 ## Validate Session
 
 ```bash
@@ -65,6 +70,12 @@ Configure a Render cron job with:
 
 ```bash
 cd workers/userbot && bun install && bun run sync:once
+```
+
+Optional recovery flags for targeted backfill:
+
+```bash
+cd workers/userbot && bun install && bun run sync:once --parser-types=bot,userbot --lookback-days=2
 ```
 
 ## Session Recovery Flow

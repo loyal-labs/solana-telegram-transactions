@@ -1,4 +1,8 @@
 export type TelegramHistoryClient = {
+  getMessages: (
+    chatId: number,
+    messageIds: number[]
+  ) => Promise<Array<unknown | null>>;
   getHistory: (chatId: number, params?: { limit?: number }) => Promise<unknown[]>;
   iterHistory: (
     chatId: number,

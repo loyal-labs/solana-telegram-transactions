@@ -2,7 +2,10 @@ import { stat } from "node:fs/promises";
 
 import { createUserbotClient, type UserbotClientBundle } from "../lib/client";
 import { loadUserbotConfig, type UserbotConfig } from "../lib/env";
-import { createNonInteractiveAuthCallbacks } from "../lib/non-interactive-auth";
+import {
+  buildReauthGuidance,
+  createNonInteractiveStartParams,
+} from "../lib/non-interactive-auth";
 import { resolveSessionSqlitePath } from "../lib/storage";
 
 type EnvRecord = Record<string, string | undefined>;
@@ -50,12 +53,16 @@ export async function runAuthStatus(
 ): Promise<boolean> {
   const deps = resolveDeps(overrides);
   const config = deps.loadConfig(deps.env);
+  deps.logger.info(
+    `[userbot] Checking auth status for '${config.accountKey}' (authMode=${config.authMode}).`
+  );
   const sessionPath = resolveSessionSqlitePath(
     config.accountKey,
     config.storageDir
   );
 
-  if (!(await deps.hasFile(sessionPath))) {
+  const sessionExists = await deps.hasFile(sessionPath);
+  if (!sessionExists && config.authMode === "user") {
     deps.logger.info(
       `[userbot] No session found for '${config.accountKey}'. Run auth:bootstrap first.`
     );
@@ -63,23 +70,25 @@ export async function runAuthStatus(
     return false;
   }
 
+  if (!sessionExists && config.authMode === "bot") {
+    deps.logger.info(
+      `[userbot] No session found for '${config.accountKey}' in bot mode; validating token login directly.`
+    );
+  }
+
   const bundle = await deps.createClient(config);
 
   try {
-    await bundle.client.start(
-      createNonInteractiveAuthCallbacks(
-        `Session for '${config.accountKey}' is invalid. Run bun run auth:bootstrap.`
-      )
-    );
+    await bundle.client.start(createNonInteractiveStartParams(config));
 
     deps.logger.info(
-      `[userbot] Session is valid for account '${config.accountKey}'.`
+      `[userbot] Session is valid for account '${config.accountKey}' (authMode=${config.authMode}).`
     );
 
     return true;
   } catch (error) {
     deps.logger.error(
-      `[userbot] Session check failed for '${config.accountKey}'. Re-run auth:bootstrap.`,
+      `[userbot] Session check failed for '${config.accountKey}'. ${buildReauthGuidance(config)}`,
       error
     );
     return false;

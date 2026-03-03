@@ -7,10 +7,14 @@ const ACCOUNT_KEY_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 type EnvRecord = Record<string, string | undefined>;
 
+export type UserbotAuthMode = "bot" | "user";
+
 export type UserbotConfig = {
   accountKey: string;
+  authMode: UserbotAuthMode;
   apiHash: string;
   apiId: number;
+  botToken: string | null;
   storageDir: string;
 };
 
@@ -58,14 +62,31 @@ function parseStorageDir(rawStorageDir: string | undefined): string {
   return resolve(normalized);
 }
 
+function parseBotToken(env: EnvRecord): string | null {
+  const explicitBotToken = normalizeOptionalValue(env.TELEGRAM_USERBOT_BOT_TOKEN);
+  if (explicitBotToken) {
+    return explicitBotToken;
+  }
+
+  const askLoyalBotToken = normalizeOptionalValue(env.ASKLOYAL_TGBOT_KEY);
+  if (askLoyalBotToken) {
+    return askLoyalBotToken;
+  }
+
+  return null;
+}
+
 export function loadUserbotConfig(env: EnvRecord = process.env): UserbotConfig {
   const apiId = parseApiId(getRequiredEnv("TELEGRAM_USERBOT_API_ID", env));
   const apiHash = getRequiredEnv("TELEGRAM_USERBOT_API_HASH", env);
+  const botToken = parseBotToken(env);
 
   return {
     accountKey: parseAccountKey(env.TELEGRAM_USERBOT_ACCOUNT_KEY),
+    authMode: botToken ? "bot" : "user",
     apiHash,
     apiId,
+    botToken,
     storageDir: parseStorageDir(env.USERBOT_STORAGE_DIR),
   };
 }

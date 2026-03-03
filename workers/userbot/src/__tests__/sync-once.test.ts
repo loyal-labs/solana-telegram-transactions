@@ -35,6 +35,8 @@ type FakeState = {
   existingMembershipKeys: Set<string>;
   existingMessageKeys: Set<string>;
   getHistoryCalls: Array<{ chatId: number; limit: number }>;
+  getMessagesCalls: Array<{ chatId: number; firstId: number; size: number }>;
+  getMessagesResponsesByFirstId: Map<number, Array<unknown | null>>;
   getHistoryLimitOneFailCount: number;
   incrementalHistory: unknown[];
   initialHistory: unknown[];
@@ -58,8 +60,10 @@ function createLogger(): FakeLogger {
 function createConfig(): UserbotConfig {
   return {
     accountKey: "primary",
+    authMode: "user",
     apiHash: "hash",
     apiId: 123,
+    botToken: null,
     storageDir: "/tmp/userbot",
   };
 }
@@ -71,6 +75,7 @@ function createFakeState(
       | "existingMembershipKeys"
       | "existingMessageKeys"
       | "getHistoryCalls"
+      | "getMessagesCalls"
       | "insertedMembershipRows"
       | "insertedMessageRows"
       | "insertedUserRows"
@@ -84,6 +89,9 @@ function createFakeState(
     existingMembershipKeys: new Set<string>(),
     existingMessageKeys: new Set<string>(),
     getHistoryCalls: [],
+    getMessagesCalls: [],
+    getMessagesResponsesByFirstId:
+      overrides.getMessagesResponsesByFirstId ?? new Map<number, Array<unknown | null>>(),
     getHistoryLimitOneFailCount: overrides.getHistoryLimitOneFailCount ?? 0,
     incrementalHistory: overrides.incrementalHistory ?? [],
     initialHistory: overrides.initialHistory ?? [],
@@ -107,8 +115,7 @@ function createFakeDb(state: FakeState): any {
   return {
     query: {
       communities: {
-        findMany: async () =>
-          state.communities.filter((community) => community.parserType === "userbot"),
+        findMany: async () => state.communities,
       },
       messages: {
         findFirst: async () =>
@@ -188,7 +195,10 @@ function createFakeDb(state: FakeState): any {
   };
 }
 
-function createFakeBundle(state: FakeState): any {
+function createFakeBundle(
+  state: FakeState,
+  config: UserbotConfig = createConfig()
+): any {
   return {
     client: {
       destroy: async () => undefined,
@@ -219,6 +229,16 @@ function createFakeBundle(state: FakeState): any {
 
         return [];
       },
+      getMessages: async (chatId: number, messageIds: number[]) => {
+        const firstId = messageIds[0] ?? 0;
+        state.getMessagesCalls.push({
+          chatId,
+          firstId,
+          size: messageIds.length,
+        });
+
+        return state.getMessagesResponsesByFirstId.get(firstId) ?? [];
+      },
       iterHistory: (_chatId: number, params?: { minId?: number }) => {
         state.iterHistoryCalls.push({
           chatId: _chatId,
@@ -234,7 +254,7 @@ function createFakeBundle(state: FakeState): any {
       },
       start: async () => ({ id: 1 }),
     },
-    config: createConfig(),
+    config,
     sessionPath: "/tmp/userbot/mtcute-primary.sqlite",
   };
 }
@@ -257,6 +277,118 @@ describe("sync:once command", () => {
 
     expect(statusCode).toBe(1);
     expect(createClientCalls).toBe(0);
+  });
+
+  test("bot mode can start sync without a pre-existing session file", async () => {
+    const state = createFakeState();
+    let receivedBotToken = "";
+    const baseBundle = createFakeBundle(state);
+
+    const result = await runSyncOnce(
+      {
+        createClient: async () => ({
+          config: baseBundle.config,
+          sessionPath: baseBundle.sessionPath,
+          client: {
+            ...(baseBundle.client as any),
+            start: async (params?: { botToken?: string }) => {
+              receivedBotToken = params?.botToken ?? "";
+              return { id: 1 };
+            },
+          } as any,
+        }),
+        createDb: () => createFakeDb(state),
+        hasFile: async () => false,
+        loadConfig: () => ({
+          ...createConfig(),
+          authMode: "bot",
+          botToken: "bot-token-999",
+        }),
+        loadDatabaseUrl: () => "postgres://db",
+        logger: createLogger(),
+        sleep: async () => undefined,
+      },
+      { parserTypes: ["bot", "userbot"] }
+    );
+
+    expect(result.stats.communitiesScanned).toBe(0);
+    expect(receivedBotToken).toBe("bot-token-999");
+  });
+
+  test("bot mode uses getMessages id batches and avoids getHistory", async () => {
+    const state = createFakeState({
+      communities: [
+        {
+          chatId: BigInt(-1000000000099),
+          chatTitle: "Bot Community",
+          id: "community-bot",
+          parserType: "bot",
+        },
+      ],
+      latestStoredMessageId: BigInt(500),
+      getMessagesResponsesByFirstId: new Map<number, Array<unknown | null>>([
+        [
+          501,
+          [
+            {
+              date: new Date("2026-03-01T12:00:00.000Z"),
+              id: 501,
+              isService: false,
+              media: null,
+              sender: { displayName: "Bob", id: 2, type: "user", username: "bob" },
+              text: "message 1",
+            } satisfies MessageRecord,
+            {
+              date: new Date("2026-03-01T12:01:00.000Z"),
+              id: 502,
+              isService: false,
+              media: null,
+              sender: { displayName: "Bob", id: 2, type: "user", username: "bob" },
+              text: "message 2",
+            } satisfies MessageRecord,
+          ],
+        ],
+        [701, []],
+      ]),
+    });
+    const botConfig: UserbotConfig = {
+      ...createConfig(),
+      authMode: "bot",
+      botToken: "bot-token-999",
+    };
+
+    const result = await runSyncOnce(
+      {
+        createClient: async () => createFakeBundle(state, botConfig),
+        createDb: () => createFakeDb(state),
+        hasFile: async () => true,
+        loadConfig: () => botConfig,
+        loadDatabaseUrl: () => "postgres://db",
+        logger: createLogger(),
+        sleep: async () => undefined,
+      },
+      { parserTypes: ["bot", "userbot"] }
+    );
+
+    expect(result.stats.authMode).toBe("bot");
+    expect(result.stats.botUsedIdBatchFetch).toBe(true);
+    expect(result.stats.botBatchSize).toBe(200);
+    expect(result.stats.botBatchRequests).toBe(2);
+    expect(result.stats.botEmptyBatches).toBe(1);
+    expect(result.stats.insertedMessages).toBe(2);
+    expect(state.getHistoryCalls).toEqual([]);
+    expect(state.getMessagesCalls).toEqual([
+      {
+        chatId: Number(BigInt(-1000000000099)),
+        firstId: 501,
+        size: 200,
+      },
+      {
+        chatId: Number(BigInt(-1000000000099)),
+        firstId: 701,
+        size: 200,
+      },
+    ]);
   });
 
   test("returns zero-work stats when no userbot communities exist", async () => {
@@ -303,6 +435,81 @@ describe("sync:once command", () => {
     expect(result.stats.communitiesScanned).toBe(0);
     expect(result.stats.communitiesProcessed).toBe(0);
     expect(result.stats.insertedMessages).toBe(0);
+  });
+
+  test("includes bot communities when parser types include bot", async () => {
+    const state = createFakeState({
+      communities: [
+        {
+          chatId: BigInt(-1000000000011),
+          chatTitle: "Bot Community",
+          id: "community-bot",
+          parserType: "bot",
+        },
+      ],
+      latestStoredMessageId: BigInt(4),
+      latestTelegramMessageId: 4,
+    });
+
+    const result = await runSyncOnce(
+      {
+        createClient: async () => createFakeBundle(state),
+        createDb: () => createFakeDb(state),
+        hasFile: async () => true,
+        loadConfig: () => createConfig(),
+        loadDatabaseUrl: () => "postgres://db",
+        logger: createLogger(),
+        sleep: async () => undefined,
+      },
+      { parserTypes: ["bot", "userbot"] }
+    );
+
+    expect(result.stats.communitiesScanned).toBe(1);
+    expect(result.stats.communitiesProcessed).toBe(1);
+    expect(result.stats.selectedParserTypes).toEqual(["bot", "userbot"]);
+  });
+
+  test("filters communities by explicit chat ids when provided", async () => {
+    const state = createFakeState({
+      communities: [
+        {
+          chatId: BigInt(-1000000000012),
+          chatTitle: "Keep",
+          id: "community-keep",
+          parserType: "userbot",
+        },
+        {
+          chatId: BigInt(-1000000000013),
+          chatTitle: "Skip",
+          id: "community-skip",
+          parserType: "userbot",
+        },
+      ],
+      latestStoredMessageId: BigInt(4),
+      latestTelegramMessageId: 4,
+    });
+
+    const result = await runSyncOnce(
+      {
+        createClient: async () => createFakeBundle(state),
+        createDb: () => createFakeDb(state),
+        hasFile: async () => true,
+        loadConfig: () => createConfig(),
+        loadDatabaseUrl: () => "postgres://db",
+        logger: createLogger(),
+        sleep: async () => undefined,
+      },
+      { chatIds: [BigInt(-1000000000012)] }
+    );
+
+    expect(result.stats.communitiesScanned).toBe(1);
+    expect(result.stats.communitiesProcessed).toBe(1);
+    expect(state.getHistoryCalls).toEqual([
+      {
+        chatId: Number(BigInt(-1000000000012)),
+        limit: 1,
+      },
+    ]);
   });
 
   test("skips insertion when no new Telegram messages are available", async () => {
@@ -537,5 +744,82 @@ describe("sync:once command", () => {
     expect(result.stats.retryCount).toBe(1);
     expect(result.stats.communitiesFailed).toBe(0);
     expect(result.stats.communitiesUpToDate).toBe(1);
+  });
+
+  test("lookback mode in bot auth inserts only messages inside UTC recovery window", async () => {
+    const state = createFakeState({
+      communities: [
+        {
+          chatId: BigInt(-1000000000014),
+          chatTitle: "Lookback",
+          id: "community-1",
+          parserType: "bot",
+        },
+      ],
+      latestStoredMessageId: BigInt(100),
+      getMessagesResponsesByFirstId: new Map<number, Array<unknown | null>>([
+        [
+          101,
+          [
+            {
+              date: new Date("2026-03-01T12:00:00.000Z"),
+              id: 101,
+              isService: false,
+              media: null,
+              sender: { displayName: "Bob", id: 2, type: "user", username: "bob" },
+              text: "inside window",
+            } satisfies MessageRecord,
+            {
+              date: new Date("2026-03-03T01:00:00.000Z"),
+              id: 102,
+              isService: false,
+              media: null,
+              sender: { displayName: "Bob", id: 2, type: "user", username: "bob" },
+              text: "outside window end",
+            } satisfies MessageRecord,
+          ],
+        ],
+      ]),
+    });
+    const botConfig: UserbotConfig = {
+      ...createConfig(),
+      authMode: "bot",
+      botToken: "bot-token-999",
+    };
+
+    const result = await runSyncOnce(
+      {
+        createClient: async () => createFakeBundle(state, botConfig),
+        createDb: () => createFakeDb(state),
+        hasFile: async () => true,
+        loadConfig: () => botConfig,
+        loadDatabaseUrl: () => "postgres://db",
+        logger: createLogger(),
+        sleep: async () => undefined,
+      },
+      {
+        lookbackDays: 2,
+        now: new Date("2026-03-03T12:00:00.000Z"),
+        parserTypes: ["bot", "userbot"],
+      }
+    );
+
+    expect(result.stats.lookbackDays).toBe(2);
+    expect(result.stats.lookbackWindowStartUtc).toBe("2026-03-01T00:00:00.000Z");
+    expect(result.stats.lookbackWindowEndExclusiveUtc).toBe(
+      "2026-03-03T00:00:00.000Z"
+    );
+    expect(result.stats.botUsedLookbackFilter).toBe(true);
+    expect(result.stats.insertedMessages).toBe(1);
+    expect(result.stats.communitiesUpToDate).toBe(0);
+    expect(state.getHistoryCalls).toEqual([]);
+    expect(state.iterHistoryCalls).toEqual([]);
+    expect(state.getMessagesCalls).toEqual([
+      {
+        chatId: Number(BigInt(-1000000000014)),
+        firstId: 101,
+        size: 200,
+      },
+    ]);
   });
 });

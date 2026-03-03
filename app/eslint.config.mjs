@@ -40,7 +40,14 @@ const eslintConfig = [
   },
   {
     files: ["src/**/*.{ts,tsx}"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: __dirname,
+      },
+    },
     rules: {
+      "@typescript-eslint/unbound-method": "error",
       "no-restricted-syntax": [
         "error",
         {
@@ -66,6 +73,7 @@ const eslintConfig = [
     ],
     rules: {
       "no-restricted-syntax": "off",
+      "@typescript-eslint/unbound-method": "off",
     },
   },
   {

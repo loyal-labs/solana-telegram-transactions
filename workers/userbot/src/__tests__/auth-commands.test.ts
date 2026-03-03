@@ -23,12 +23,18 @@ function createLogger(): FakeLogger {
   };
 }
 
-function createConfig(storageDir: string): UserbotConfig {
+function createConfig(
+  storageDir: string,
+  overrides: Partial<UserbotConfig> = {}
+): UserbotConfig {
   return {
     accountKey: "primary",
+    authMode: "user",
     apiHash: "hash",
     apiId: 123,
+    botToken: null,
     storageDir,
+    ...overrides,
   };
 }
 
@@ -99,6 +105,49 @@ describe("auth command primitives", () => {
       ).rejects.toThrow("invalid code");
 
       expect(destroyCalls).toBe(1);
+    } finally {
+      await rm(storageDir, { force: true, recursive: true });
+    }
+  });
+
+  test("auth-bootstrap uses bot token mode without interactive prompts", async () => {
+    const storageDir = await mkdtemp(join(tmpdir(), "userbot-bootstrap-bot-"));
+    const sessionPath = join(storageDir, "mtcute-primary.sqlite");
+
+    let promptCreated = false;
+    let receivedBotToken = "";
+
+    try {
+      await runAuthBootstrap({
+        createClient: async (config) => ({
+          config,
+          sessionPath,
+          client: {
+            destroy: async () => undefined,
+            start: async (params?: { botToken?: string }) => {
+              receivedBotToken = params?.botToken ?? "";
+              await writeFile(sessionPath, "sqlite");
+              return { id: 321n, username: "askloyal_bot" };
+            },
+          } as any,
+        }),
+        createPrompt: () => {
+          promptCreated = true;
+          return {
+            ask: async () => "noop",
+            close: () => undefined,
+          };
+        },
+        loadConfig: () =>
+          createConfig(storageDir, {
+            authMode: "bot",
+            botToken: "bot-token-123",
+          }),
+        logger: createLogger(),
+      });
+
+      expect(promptCreated).toBe(false);
+      expect(receivedBotToken).toBe("bot-token-123");
     } finally {
       await rm(storageDir, { force: true, recursive: true });
     }
@@ -196,6 +245,44 @@ describe("auth command primitives", () => {
       await expect(stat(`${basePath}-wal`)).rejects.toThrow();
       await expect(stat(`${basePath}-shm`)).rejects.toThrow();
       await stat(siblingPath);
+    } finally {
+      await rm(storageDir, { force: true, recursive: true });
+    }
+  });
+
+  test("auth-status in bot mode can validate token login without session file", async () => {
+    const storageDir = await mkdtemp(join(tmpdir(), "userbot-status-bot-"));
+
+    let createClientCalls = 0;
+    let receivedBotToken = "";
+
+    try {
+      const authenticated = await runAuthStatus({
+        createClient: async (config) => {
+          createClientCalls += 1;
+          return {
+            config,
+            sessionPath: join(storageDir, "mtcute-primary.sqlite"),
+            client: {
+              destroy: async () => undefined,
+              start: async (params?: { botToken?: string }) => {
+                receivedBotToken = params?.botToken ?? "";
+                return { id: 1 };
+              },
+            } as any,
+          };
+        },
+        loadConfig: () =>
+          createConfig(storageDir, {
+            authMode: "bot",
+            botToken: "bot-token-456",
+          }),
+        logger: createLogger(),
+      });
+
+      expect(authenticated).toBe(true);
+      expect(createClientCalls).toBe(1);
+      expect(receivedBotToken).toBe("bot-token-456");
     } finally {
       await rm(storageDir, { force: true, recursive: true });
     }
