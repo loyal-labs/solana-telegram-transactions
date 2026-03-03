@@ -8,17 +8,14 @@ import {
 type CommunityRecord = {
   id: string;
   parserType: "bot" | "userbot";
-} | null;
+} | null | undefined;
 
 type CacheDb = Parameters<typeof resolveActiveBotCommunityId>[0];
 
-function createDb(sequence: CommunityRecord[]): CacheDb & { calls: number } {
+function createDb(sequence: CommunityRecord[]): CacheDb {
   let index = 0;
 
   return {
-    get calls() {
-      return index;
-    },
     query: {
       communities: {
         findFirst: async () => sequence[index++] ?? null,
@@ -34,34 +31,31 @@ describe("active community cache", () => {
     evictActiveCommunityCache(chatId);
   });
 
-  test("reuses cached bot community after revalidation", async () => {
-    const db = createDb([
-      { id: "community-1", parserType: "bot" },
-      { id: "community-1", parserType: "bot" },
-    ]);
+  test("returns community id for active bot community", async () => {
+    const db = createDb([{ id: "community-1", parserType: "bot" }]);
 
-    const first = await resolveActiveBotCommunityId(db, chatId);
-    const second = await resolveActiveBotCommunityId(db, chatId);
+    const resolved = await resolveActiveBotCommunityId(db, chatId);
 
-    expect(first).toBe("community-1");
-    expect(second).toBe("community-1");
-    expect(db.calls).toBe(2);
+    expect(resolved).toBe("community-1");
   });
 
-  test("invalidates cache when parser flips away from bot", async () => {
-    const db = createDb([
-      { id: "community-1", parserType: "bot" },
-      { id: "community-1", parserType: "userbot" },
-      { id: "community-1", parserType: "userbot" },
-    ]);
+  test("returns null when no active community exists", async () => {
+    const db = createDb([null]);
 
-    const initial = await resolveActiveBotCommunityId(db, chatId);
-    const afterFlip = await resolveActiveBotCommunityId(db, chatId);
-    const subsequent = await resolveActiveBotCommunityId(db, chatId);
+    const resolved = await resolveActiveBotCommunityId(db, chatId);
 
-    expect(initial).toBe("community-1");
-    expect(afterFlip).toBeNull();
-    expect(subsequent).toBeNull();
-    expect(db.calls).toBe(3);
+    expect(resolved).toBeNull();
+  });
+
+  test("returns null when resolved community parser is not bot", async () => {
+    const db = createDb([{ id: "community-1", parserType: "userbot" }]);
+
+    const resolved = await resolveActiveBotCommunityId(db, chatId);
+
+    expect(resolved).toBeNull();
+  });
+
+  test("evictActiveCommunityCache remains safe no-op for compatibility", () => {
+    expect(() => evictActiveCommunityCache(chatId)).not.toThrow();
   });
 });

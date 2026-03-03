@@ -6,6 +6,7 @@ import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName, isCommunityChat, isGroupChat } from "@/lib/telegram/utils";
 
 import { resolveActiveBotCommunityId } from "./active-community-cache";
+import { logWebhookHandlerError } from "./webhook-error-log";
 
 export { evictActiveCommunityCache } from "./active-community-cache";
 
@@ -59,6 +60,10 @@ export async function handleCommunityMessage(ctx: Context): Promise<void> {
   const chatId = BigInt(chat.id);
   const message = ctx.message;
   if (!message?.text || !message.from) return;
+  const updateId =
+    "update_id" in ctx.update && typeof ctx.update.update_id === "number"
+      ? ctx.update.update_id
+      : undefined;
 
   try {
     const db = getDatabase();
@@ -95,6 +100,12 @@ export async function handleCommunityMessage(ctx: Context): Promise<void> {
       })
       .onConflictDoNothing();
   } catch (error) {
-    console.error("Failed to handle community message", error);
+    logWebhookHandlerError("Failed to handle community message", error, {
+      chatId: String(chatId),
+      messageId: message.message_id,
+      telegramUserId: String(message.from.id),
+      updateId,
+    });
+    throw error;
   }
 }

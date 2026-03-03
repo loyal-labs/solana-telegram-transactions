@@ -43,7 +43,15 @@ import {
 } from "@/lib/telegram/conversation-service";
 import { isPrivateChat } from "@/lib/telegram/utils";
 
+import { handleWebhookTextMessage } from "./message-text-handler";
+
 const bot = await getBot();
+const webhookTextMessageHandlerDeps = {
+  handleCommunityMessage,
+  handleDirectMessage,
+  handleGLoyalReaction,
+  isPrivateChat,
+} as const;
 
 bot.command("start", async (ctx: CommandContext<Context>) => {
   await handleStartCommand(ctx, bot);
@@ -135,22 +143,7 @@ bot.on("message:forum_topic_created", async (ctx) => {
 });
 
 bot.on("message:text", async (ctx) => {
-  const chatType = ctx.chat?.type;
-
-  // Route private DMs to conversation handler (skip commands)
-  if (chatType && isPrivateChat(chatType)) {
-    // Commands are handled by bot.command() handlers above
-    if (!ctx.message?.text?.startsWith("/")) {
-      await handleDirectMessage(ctx, bot);
-    }
-    return;
-  }
-
-  // Handle group/community messages
-  await Promise.all([
-    handleGLoyalReaction(ctx, bot),
-    handleCommunityMessage(ctx),
-  ]);
+  await handleWebhookTextMessage(ctx, bot, webhookTextMessageHandlerDeps);
 });
 
 export const POST = webhookCallback(bot, "std/http");
