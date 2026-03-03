@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package query;
+
+message Role {
+    enum Type {
+        USER = 0;
+        ASSISTANT = 1;
+    }
+    Type type = 1;
+}
+
+message DialogEntry {
+    Role role = 1;
+    string content = 2;
+    int64 date = 3;
+}
+
+message QueryRequest {
+    repeated DialogEntry dialog = 1;
+    string query = 2;
+}
+
+message QueryResponse {
+    string response = 1;
+}
+
+service QueryService {
+    rpc Query(QueryRequest) returns (QueryResponse);
+}
