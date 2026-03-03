@@ -30,6 +30,8 @@ describe("loadUserbotConfig", () => {
     });
 
     expect(config.accountKey).toBe(DEFAULT_ACCOUNT_KEY);
+    expect(config.authMode).toBe("user");
+    expect(config.botToken).toBeNull();
     expect(config.storageDir).toBe(DEFAULT_STORAGE_DIR);
   });
 
@@ -42,6 +44,31 @@ describe("loadUserbotConfig", () => {
     });
 
     expect(config.accountKey).toBe("ops_userbot");
+    expect(config.authMode).toBe("user");
+    expect(config.botToken).toBeNull();
     expect(config.storageDir.endsWith("/.data/userbot")).toBe(true);
+  });
+
+  test("prefers TELEGRAM_USERBOT_BOT_TOKEN for bot auth mode", () => {
+    const config = loadUserbotConfig({
+      ASKLOYAL_TGBOT_KEY: "fallback-token",
+      TELEGRAM_USERBOT_API_HASH: "hash",
+      TELEGRAM_USERBOT_API_ID: "123",
+      TELEGRAM_USERBOT_BOT_TOKEN: "preferred-token",
+    });
+
+    expect(config.authMode).toBe("bot");
+    expect(config.botToken).toBe("preferred-token");
+  });
+
+  test("falls back to ASKLOYAL_TGBOT_KEY for bot auth mode", () => {
+    const config = loadUserbotConfig({
+      ASKLOYAL_TGBOT_KEY: "fallback-token",
+      TELEGRAM_USERBOT_API_HASH: "hash",
+      TELEGRAM_USERBOT_API_ID: "123",
+    });
+
+    expect(config.authMode).toBe("bot");
+    expect(config.botToken).toBe("fallback-token");
   });
 });

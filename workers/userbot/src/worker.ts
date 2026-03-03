@@ -2,7 +2,10 @@ import { stat } from "node:fs/promises";
 
 import { createUserbotClient, type UserbotClientBundle } from "./lib/client";
 import { loadUserbotConfig, type UserbotConfig } from "./lib/env";
-import { createNonInteractiveAuthCallbacks } from "./lib/non-interactive-auth";
+import {
+  buildReauthGuidance,
+  createNonInteractiveStartParams,
+} from "./lib/non-interactive-auth";
 import { resolveSessionSqlitePath } from "./lib/storage";
 
 type EnvRecord = Record<string, string | undefined>;
@@ -120,9 +123,15 @@ export function createUserbotWorker(overrides: Partial<WorkerDeps> = {}) {
         config.storageDir
       );
 
-      if (!(await deps.hasFile(sessionPath))) {
+      const sessionExists = await deps.hasFile(sessionPath);
+      if (!sessionExists && config.authMode === "user") {
         throw new Error(
           `[userbot] Missing session file for '${config.accountKey}'. Run auth:bootstrap first. Expected: ${sessionPath}`
+        );
+      }
+      if (!sessionExists && config.authMode === "bot") {
+        deps.logger.info(
+          `[userbot] No session found for '${config.accountKey}' in bot mode; proceeding with token-based startup.`
         );
       }
 
@@ -130,18 +139,16 @@ export function createUserbotWorker(overrides: Partial<WorkerDeps> = {}) {
       startupBundle = bundle;
 
       try {
-        const user = await bundle.client.start(
-          createNonInteractiveAuthCallbacks(
-            `Session for '${config.accountKey}' is invalid. Run bun run auth:bootstrap.`
-          )
-        );
+        const user = await bundle.client.start(createNonInteractiveStartParams(config));
 
         bundle.client.onRawUpdate.add(() => {
           // Intentionally noop in foundation PR.
         });
 
         activeBundle = bundle;
-        deps.logger.info(`[userbot] Worker started for '${config.accountKey}'.`);
+        deps.logger.info(
+          `[userbot] Worker started for '${config.accountKey}' (authMode=${config.authMode}).`
+        );
         deps.logger.info(`[userbot] Session path: ${bundle.sessionPath}`);
         deps.logger.info(`[userbot] Account: ${getIdentityLabel(user)}`);
       } catch (error) {
@@ -232,6 +239,8 @@ export async function runWorkerCli(
 ): Promise<number> {
   const logger = overrides.logger ?? console;
   const worker = createUserbotWorker(overrides);
+  const loadConfig = overrides.loadConfig ?? loadUserbotConfig;
+  const env = overrides.env ?? process.env;
 
   try {
     registerShutdownHandlers(worker, { logger });
@@ -241,7 +250,13 @@ export async function runWorkerCli(
       // intentionally unresolved; process exits through signal handlers
     });
   } catch (error) {
-    logger.error("[userbot] Worker failed to start", error);
+    let guidance = "Run bun run auth:bootstrap.";
+    try {
+      guidance = buildReauthGuidance(loadConfig(env));
+    } catch {
+      // Keep default guidance when config cannot be loaded.
+    }
+    logger.error(`[userbot] Worker failed to start. ${guidance}`, error);
     await worker.shutdown("startup_error");
     return 1;
   }

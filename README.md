@@ -2,13 +2,14 @@
 
 Loyal App is a monorepo for Telegram-native Solana products.
 It combines on-chain Anchor programs, a Telegram mini-app, an internal admin dashboard,
-shared packages/SDKs, and worker services.
+the Loyal web frontend, shared packages/SDKs, and worker services.
 
 ## Monorepo Structure
 
 | Directory | What it contains | Start here |
 | --- | --- | --- |
 | [`app/`](./app) | Next.js Telegram mini-app and API routes | [`app/README.md`](./app/README.md) |
+| [`frontend/`](./frontend) | Next.js Loyal web frontend | [`frontend/README.md`](./frontend/README.md) |
 | [`admin/`](./admin) | Internal Next.js admin dashboard | [`admin/README.md`](./admin/README.md) |
 | [`programs/`](./programs) | Anchor smart contracts (`telegram-transfer`, `telegram-verification`, `telegram-private-transfer`) | [`programs/`](./programs) |
 | [`tests/`](./tests) | Anchor integration tests and fixtures | [`tests/`](./tests) |
@@ -37,7 +38,7 @@ shared packages/SDKs, and worker services.
    bun dev
    ```
 
-For Vercel admin deploys from this monorepo, set project Root Directory to `admin`.
+For Vercel monorepo deploys, use separate projects with Root Directory set to `app`, `admin`, and `frontend` respectively.
 
 ## Common Commands
 
@@ -53,9 +54,12 @@ bun run guard:admin-shared-schema
 bun run admin:dev
 bun run admin:lint
 bun run admin:build
+bun run frontend:dev
+bun run frontend:lint
+bun run frontend:build
 ```
 
-### Frontend (`/app`)
+### Telegram App (`/app`)
 
 ```bash
 bun dev
@@ -64,6 +68,14 @@ bun lint
 bun db:generate
 bun db:migrate
 bun db:studio
+```
+
+### Loyal Web Frontend (`/frontend`)
+
+```bash
+bun dev
+bun run build
+bun run lint
 ```
 
 ### Admin (`/admin`)
@@ -140,7 +152,7 @@ We use Conventional Commits for commit messages and pull request titles.
 Enabled hooks:
 
 - `commit-msg`: validates Conventional Commit messages
-- `pre-push`: runs lint/build checks for both `app` and `admin` before push
+- `pre-push`: runs lint/build checks for `app`, `admin`, and `frontend` before push
 - Temporary bypass when required: `SKIP_VERIFY=1 git push`
 - CI note: app build is intentionally not run in GitHub Actions; Vercel is the build/deploy gate
 

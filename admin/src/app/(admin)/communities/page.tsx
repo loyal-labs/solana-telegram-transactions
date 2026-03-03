@@ -1,11 +1,15 @@
 import { unstable_cache } from "next/cache";
 import Link from "next/link";
-import { count, desc, inArray } from "drizzle-orm";
+import { count, desc, eq, inArray } from "drizzle-orm";
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
 
 import { getDatabase } from "@/lib/core/database";
 import { CACHE_TAGS, DATA_CACHE_TTL_SECONDS } from "@/lib/data-cache";
-import { communities, summaries } from "@loyal-labs/db-core/schema";
+import {
+  type CommunityParserType,
+  communities,
+  summaries,
+} from "@loyal-labs/db-core/schema";
 import { PageContainer } from "@/components/layout/page-container";
 import { SectionHeader } from "@/components/layout/section-header";
 import {
@@ -23,14 +27,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const dynamic = "force-dynamic";
 
 const COMMUNITY_PAGE_SIZE = 20;
+const DEFAULT_PARSER_TYPE: CommunityParserType = "bot";
 
 type HomePageProps = {
   searchParams?: Promise<{
     page?: string | string[];
+    parserType?: string | string[];
   }>;
 };
 
@@ -47,6 +54,7 @@ type HomeCommunityRow = {
 type HomePageData = {
   rows: HomeCommunityRow[];
   summaryCountByCommunityId: Record<string, number>;
+  totalCountByParserType: Record<CommunityParserType, number>;
   currentPage: number;
   totalPages: number;
   hasPreviousPage: boolean;
@@ -62,6 +70,14 @@ function parsePageParam(value: string | undefined): number {
   }
 
   return parsed;
+}
+
+function parseParserTypeParam(value: string | undefined): CommunityParserType {
+  if (value === "bot" || value === "userbot") {
+    return value;
+  }
+
+  return DEFAULT_PARSER_TYPE;
 }
 
 function getPaginationTokens(currentPage: number, totalPages: number): PaginationToken[] {
@@ -89,17 +105,57 @@ function getPaginationTokens(currentPage: number, totalPages: number): Paginatio
   return tokens;
 }
 
-function getPageHref(page: number) {
-  return page > 1 ? `/communities?page=${page}` : "/communities";
+function getParserTypeHref(parserType: CommunityParserType): string {
+  return parserType === DEFAULT_PARSER_TYPE
+    ? "/communities"
+    : `/communities?parserType=${parserType}`;
 }
 
-async function loadHomePageData(requestedPage: number): Promise<HomePageData> {
+function getPageHref(page: number, parserType: CommunityParserType): string {
+  if (page <= 1) {
+    return getParserTypeHref(parserType);
+  }
+
+  const searchParams = new URLSearchParams();
+  if (parserType !== DEFAULT_PARSER_TYPE) {
+    searchParams.set("parserType", parserType);
+  } else {
+    searchParams.set("parserType", DEFAULT_PARSER_TYPE);
+  }
+  searchParams.set("page", String(page));
+
+  return `/communities?${searchParams.toString()}`;
+}
+
+async function loadHomePageData(
+  requestedPage: number,
+  parserType: CommunityParserType,
+): Promise<HomePageData> {
   const db = getDatabase();
+  const totalsByParserTypeRows = await db
+    .select({
+      parserType: communities.parserType,
+      count: count(),
+    })
+    .from(communities)
+    .groupBy(communities.parserType);
+
+  const totalCountByParserType: Record<CommunityParserType, number> = {
+    bot: 0,
+    userbot: 0,
+  };
+  for (const row of totalsByParserTypeRows) {
+    if (row.parserType === "bot" || row.parserType === "userbot") {
+      totalCountByParserType[row.parserType] = Number(row.count) || 0;
+    }
+  }
+
   const [totals] = await db
     .select({
       count: count(),
     })
-    .from(communities);
+    .from(communities)
+    .where(eq(communities.parserType, parserType));
 
   const totalCount = Number(totals?.count) || 0;
   const totalPages = totalCount > 0 ? Math.ceil(totalCount / COMMUNITY_PAGE_SIZE) : 1;
@@ -116,6 +172,7 @@ async function loadHomePageData(requestedPage: number): Promise<HomePageData> {
       isPublic: communities.isPublic,
     })
     .from(communities)
+    .where(eq(communities.parserType, parserType))
     .orderBy(desc(communities.activatedAt), desc(communities.id))
     .limit(COMMUNITY_PAGE_SIZE)
     .offset(offset);
@@ -146,6 +203,7 @@ async function loadHomePageData(requestedPage: number): Promise<HomePageData> {
   return {
     rows: serializedRows,
     summaryCountByCommunityId,
+    totalCountByParserType,
     currentPage,
     totalPages,
     hasPreviousPage: currentPage > 1,
@@ -153,10 +211,13 @@ async function loadHomePageData(requestedPage: number): Promise<HomePageData> {
   };
 }
 
-async function getHomePageData(requestedPage: number): Promise<HomePageData> {
+async function getHomePageData(
+  requestedPage: number,
+  parserType: CommunityParserType,
+): Promise<HomePageData> {
   const getCachedHomePageData = unstable_cache(
-    async () => loadHomePageData(requestedPage),
-    ["communities-page-data", String(requestedPage)],
+    async () => loadHomePageData(requestedPage, parserType),
+    ["communities-page-data", parserType, String(requestedPage)],
     {
       revalidate: DATA_CACHE_TTL_SECONDS,
       tags: [CACHE_TAGS.communitiesList],
@@ -171,20 +232,62 @@ export default async function Home({ searchParams }: HomePageProps) {
   const pageParam = Array.isArray(resolvedSearchParams.page)
     ? resolvedSearchParams.page[0]
     : resolvedSearchParams.page;
+  const parserTypeParam = Array.isArray(resolvedSearchParams.parserType)
+    ? resolvedSearchParams.parserType[0]
+    : resolvedSearchParams.parserType;
+  const parserType = parseParserTypeParam(parserTypeParam);
   const requestedPage = parsePageParam(pageParam);
   const {
     rows,
     summaryCountByCommunityId,
+    totalCountByParserType,
     currentPage,
     totalPages,
     hasPreviousPage,
     hasNextPage,
-  } = await getHomePageData(requestedPage);
+  } = await getHomePageData(requestedPage, parserType);
   const paginationTokens = getPaginationTokens(currentPage, totalPages);
+  const emptyStateLabel = parserType === "bot" ? "bot communities" : "userbot communities";
 
   return (
     <PageContainer>
       <SectionHeader title="Communities" breadcrumbs={[{ label: "Communities" }]} />
+      <Tabs value={parserType} className="mb-6">
+        <TabsList className="grid h-auto w-full grid-cols-1 items-stretch gap-3 rounded-none bg-transparent p-0 group-data-[orientation=horizontal]/tabs:!h-auto sm:grid-cols-2">
+          <TabsTrigger
+            value="bot"
+            asChild
+            className="!h-auto w-full items-start justify-start gap-0 rounded-xl border border-border bg-card p-0 text-left hover:bg-accent/40 data-[state=active]:border-foreground data-[state=active]:bg-accent/40"
+          >
+            <Link
+              href={getParserTypeHref("bot")}
+              prefetch={false}
+              className="flex w-full flex-col items-start gap-2 px-4 py-4"
+            >
+              <span className="text-sm font-medium leading-none">Bot communities</span>
+              <span className="text-4xl font-semibold leading-none tabular-nums">
+                {totalCountByParserType.bot.toLocaleString()}
+              </span>
+            </Link>
+          </TabsTrigger>
+          <TabsTrigger
+            value="userbot"
+            asChild
+            className="!h-auto w-full items-start justify-start gap-0 rounded-xl border border-border bg-card p-0 text-left hover:bg-accent/40 data-[state=active]:border-foreground data-[state=active]:bg-accent/40"
+          >
+            <Link
+              href={getParserTypeHref("userbot")}
+              prefetch={false}
+              className="flex w-full flex-col items-start gap-2 px-4 py-4"
+            >
+              <span className="text-sm font-medium leading-none">Userbot communities</span>
+              <span className="text-4xl font-semibold leading-none tabular-nums">
+                {totalCountByParserType.userbot.toLocaleString()}
+              </span>
+            </Link>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {rows.length > 0 ? (
         <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -251,7 +354,7 @@ export default async function Home({ searchParams }: HomePageProps) {
                   <PaginationItem>
                     {hasPreviousPage ? (
                       <PaginationLink asChild size="default" className="gap-1 pl-2.5">
-                        <Link href={getPageHref(currentPage - 1)} prefetch={false}>
+                        <Link href={getPageHref(currentPage - 1, parserType)} prefetch={false}>
                           <ChevronLeftIcon className="size-4" />
                           <span>Previous</span>
                         </Link>
@@ -280,7 +383,7 @@ export default async function Home({ searchParams }: HomePageProps) {
                     return (
                       <PaginationItem key={token}>
                         <PaginationLink asChild isActive={token === currentPage}>
-                          <Link href={getPageHref(token)} prefetch={false}>
+                          <Link href={getPageHref(token, parserType)} prefetch={false}>
                             {token}
                           </Link>
                         </PaginationLink>
@@ -291,7 +394,7 @@ export default async function Home({ searchParams }: HomePageProps) {
                   <PaginationItem>
                     {hasNextPage ? (
                       <PaginationLink asChild size="default" className="gap-1 pr-2.5">
-                        <Link href={getPageHref(currentPage + 1)} prefetch={false}>
+                        <Link href={getPageHref(currentPage + 1, parserType)} prefetch={false}>
                           <span>Next</span>
                           <ChevronRightIcon className="size-4" />
                         </Link>
@@ -314,7 +417,7 @@ export default async function Home({ searchParams }: HomePageProps) {
         </div>
       ) : (
         <div className="rounded-lg border border-border bg-card p-10 text-center text-muted-foreground">
-          No communities found
+          No {emptyStateLabel} found
         </div>
       )}
     </PageContainer>

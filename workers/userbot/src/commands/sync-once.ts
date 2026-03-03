@@ -1,13 +1,27 @@
 import { stat } from "node:fs/promises";
 
-import { communities, messages } from "@loyal-labs/db-core/schema";
-import { and, desc, eq } from "drizzle-orm";
+import {
+  communities,
+  messages,
+  type CommunityParserType,
+} from "@loyal-labs/db-core/schema";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { createUserbotClient, type UserbotClientBundle } from "../lib/client";
 import { createWorkerDatabase, loadDatabaseUrl, type UserbotDb } from "../lib/database";
 import { loadUserbotConfig, type UserbotConfig } from "../lib/env";
-import { createNonInteractiveAuthCallbacks } from "../lib/non-interactive-auth";
-import { fetchUnseenMessages, getLatestTelegramMessageId } from "../lib/sync/history-source";
+import {
+  buildReauthGuidance,
+  createNonInteractiveStartParams,
+} from "../lib/non-interactive-auth";
+import {
+  BOT_EMPTY_BATCH_STOP_COUNT,
+  BOT_ID_BATCH_SIZE,
+  fetchMessagesSince,
+  fetchUnseenMessagesByIdBatches,
+  fetchUnseenMessages,
+  getLatestTelegramMessageId,
+} from "../lib/sync/history-source";
 import { toIngestibleMessage } from "../lib/sync/message-filter";
 import { persistEligibleMessage } from "../lib/sync/persistence";
 import { resolveSessionSqlitePath } from "../lib/storage";
@@ -27,10 +41,26 @@ type SyncOnceDeps = {
   sleep: (ms: number) => Promise<void>;
 };
 
-type ActiveUserbotCommunity = {
+type SyncOnceOptions = {
+  chatIds?: bigint[];
+  lookbackDays?: number | null;
+  now?: Date;
+  parserTypes?: CommunityParserType[];
+};
+
+type ResolvedSyncOnceOptions = {
+  chatIds: bigint[] | null;
+  lookbackDays: number | null;
+  lookbackWindowEndExclusiveUtc: Date | null;
+  lookbackWindowStartUtc: Date | null;
+  parserTypes: CommunityParserType[];
+};
+
+type ActiveSyncCommunity = {
   chatId: bigint;
   chatTitle: string;
   id: string;
+  parserType: CommunityParserType;
 };
 
 type CommunitySyncError = {
@@ -40,6 +70,14 @@ type CommunitySyncError = {
 };
 
 export type SyncOnceStats = {
+  authMode: UserbotConfig["authMode"];
+  botBatchRequests: number;
+  botEmptyBatches: number;
+  botStopAfterEmptyBatches: number | null;
+  botUsedIdBatchFetch: boolean;
+  botUsedLookbackFilter: boolean;
+  botBatchSize: number | null;
+  chatIdFilterCount: number | null;
   communitiesFailed: number;
   communitiesProcessed: number;
   communitiesScanned: number;
@@ -58,6 +96,10 @@ export type SyncOnceStats = {
   telegramMessagesConsidered: number;
   telegramMessagesFetched: number;
   userMetadataUpdates: number;
+  lookbackDays: number | null;
+  lookbackWindowEndExclusiveUtc: string | null;
+  lookbackWindowStartUtc: string | null;
+  selectedParserTypes: CommunityParserType[];
 };
 
 export type SyncOnceResult = {
@@ -67,6 +109,7 @@ export type SyncOnceResult = {
 
 const RETRY_BASE_DELAY_MS = 250;
 const RETRY_MAX_ATTEMPTS = 3;
+const SUPPORTED_PARSER_TYPES: CommunityParserType[] = ["bot", "userbot"];
 
 function isDirectExecution(scriptName: string): boolean {
   const entrypoint = process.argv[1];
@@ -90,6 +133,122 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function toUtcDayStart(date: Date): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+  );
+}
+
+function resolveSyncOptions(options: SyncOnceOptions = {}): ResolvedSyncOnceOptions {
+  const parserTypes: CommunityParserType[] = options.parserTypes?.length
+    ? [...new Set(options.parserTypes)]
+    : ["userbot"];
+  const invalidParserTypes = parserTypes.filter(
+    (entry) => !SUPPORTED_PARSER_TYPES.includes(entry)
+  );
+  if (invalidParserTypes.length > 0) {
+    throw new Error(
+      `Unsupported parser type(s): ${invalidParserTypes.join(", ")}. Supported values: ${SUPPORTED_PARSER_TYPES.join(", ")}`
+    );
+  }
+
+  const lookbackDays = options.lookbackDays ?? null;
+  if (lookbackDays !== null && (!Number.isInteger(lookbackDays) || lookbackDays <= 0)) {
+    throw new Error("lookbackDays must be a positive integer");
+  }
+
+  if (lookbackDays === null) {
+    return {
+      chatIds: options.chatIds?.length ? options.chatIds : null,
+      lookbackDays: null,
+      lookbackWindowEndExclusiveUtc: null,
+      lookbackWindowStartUtc: null,
+      parserTypes,
+    };
+  }
+
+  const now = options.now ?? new Date();
+  const lookbackWindowEndExclusiveUtc = toUtcDayStart(now);
+  const lookbackWindowStartUtc = new Date(
+    lookbackWindowEndExclusiveUtc.getTime() - lookbackDays * 24 * 60 * 60 * 1_000
+  );
+
+  return {
+    chatIds: options.chatIds?.length ? options.chatIds : null,
+    lookbackDays,
+    lookbackWindowEndExclusiveUtc,
+    lookbackWindowStartUtc,
+    parserTypes,
+  };
+}
+
+function parseParserTypes(value: string): CommunityParserType[] {
+  const parsed = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  if (parsed.length === 0) {
+    throw new Error("--parser-types must include at least one parser type");
+  }
+
+  const invalid = parsed.filter(
+    (entry) => !SUPPORTED_PARSER_TYPES.includes(entry as CommunityParserType)
+  );
+  if (invalid.length > 0) {
+    throw new Error(
+      `Unsupported parser type(s): ${invalid.join(", ")}. Supported values: ${SUPPORTED_PARSER_TYPES.join(", ")}`
+    );
+  }
+
+  return [...new Set(parsed as CommunityParserType[])];
+}
+
+function parseChatIds(value: string): bigint[] {
+  const parsed = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  if (parsed.length === 0) {
+    throw new Error("--chat-ids must include at least one chat id");
+  }
+
+  return parsed.map((entry) => {
+    try {
+      return BigInt(entry);
+    } catch {
+      throw new Error(`Invalid --chat-ids value: '${entry}'`);
+    }
+  });
+}
+
+function parseSyncOnceCliOptions(argv: string[]): SyncOnceOptions {
+  const options: SyncOnceOptions = {};
+
+  for (const arg of argv.slice(2)) {
+    if (arg.startsWith("--parser-types=")) {
+      options.parserTypes = parseParserTypes(arg.slice("--parser-types=".length));
+      continue;
+    }
+
+    if (arg.startsWith("--lookback-days=")) {
+      const value = Number.parseInt(arg.slice("--lookback-days=".length), 10);
+      if (!Number.isInteger(value) || value <= 0) {
+        throw new Error("--lookback-days must be a positive integer");
+      }
+      options.lookbackDays = value;
+      continue;
+    }
+
+    if (arg.startsWith("--chat-ids=")) {
+      options.chatIds = parseChatIds(arg.slice("--chat-ids=".length));
+      continue;
+    }
+  }
+
+  return options;
+}
+
 function resolveDeps(overrides: Partial<SyncOnceDeps>): SyncOnceDeps {
   return {
     createClient: overrides.createClient ?? createUserbotClient,
@@ -103,8 +262,22 @@ function resolveDeps(overrides: Partial<SyncOnceDeps>): SyncOnceDeps {
   };
 }
 
-function createInitialStats(communitiesScanned: number): SyncOnceStats {
+function createInitialStats(
+  communitiesScanned: number,
+  options: ResolvedSyncOnceOptions,
+  config: UserbotConfig
+): SyncOnceStats {
+  const isBotAuthMode = config.authMode === "bot";
+
   return {
+    authMode: config.authMode,
+    botBatchRequests: 0,
+    botBatchSize: isBotAuthMode ? BOT_ID_BATCH_SIZE : null,
+    botEmptyBatches: 0,
+    botStopAfterEmptyBatches: isBotAuthMode ? BOT_EMPTY_BATCH_STOP_COUNT : null,
+    botUsedIdBatchFetch: isBotAuthMode,
+    botUsedLookbackFilter: isBotAuthMode && options.lookbackWindowStartUtc !== null,
+    chatIdFilterCount: options.chatIds?.length ?? null,
     communitiesFailed: 0,
     communitiesProcessed: 0,
     communitiesScanned,
@@ -123,6 +296,11 @@ function createInitialStats(communitiesScanned: number): SyncOnceStats {
     telegramMessagesConsidered: 0,
     telegramMessagesFetched: 0,
     userMetadataUpdates: 0,
+    lookbackDays: options.lookbackDays,
+    lookbackWindowEndExclusiveUtc:
+      options.lookbackWindowEndExclusiveUtc?.toISOString() ?? null,
+    lookbackWindowStartUtc: options.lookbackWindowStartUtc?.toISOString() ?? null,
+    selectedParserTypes: options.parserTypes,
   };
 }
 
@@ -189,29 +367,175 @@ async function destroyBundle(
   }
 }
 
-async function syncCommunity(
+async function getLatestStoredMessageId(
   db: UserbotDb,
-  bundle: UserbotClientBundle,
-  community: ActiveUserbotCommunity,
-  stats: SyncOnceStats,
-  userIdCache: Map<string, string>,
-  membershipCache: Set<string>
-): Promise<void> {
+  communityId: string
+): Promise<number | null> {
   const latestStored = await db.query.messages.findFirst({
     columns: { telegramMessageId: true },
     orderBy: [desc(messages.telegramMessageId)],
-    where: eq(messages.communityId, community.id),
+    where: eq(messages.communityId, communityId),
   });
-  const latestStoredMessageId =
-    latestStored?.telegramMessageId !== undefined
-      ? Number(latestStored.telegramMessageId)
-      : null;
+
+  return latestStored?.telegramMessageId !== undefined
+    ? Number(latestStored.telegramMessageId)
+    : null;
+}
+
+async function syncCommunityWithBotIdBatches(
+  db: UserbotDb,
+  bundle: UserbotClientBundle,
+  community: ActiveSyncCommunity,
+  stats: SyncOnceStats,
+  options: ResolvedSyncOnceOptions,
+  userIdCache: Map<string, string>,
+  membershipCache: Set<string>
+): Promise<void> {
+  const chatPeerId = Number(community.chatId);
+  const latestStoredMessageId = await getLatestStoredMessageId(db, community.id);
 
   if (latestStoredMessageId === null) {
     stats.communitiesWithNoStoredMessages += 1;
   }
 
+  let fetchedMessages = 0;
+  for await (const rawMessage of fetchUnseenMessagesByIdBatches(
+    bundle.client,
+    chatPeerId,
+    latestStoredMessageId,
+    {
+      batchSize: BOT_ID_BATCH_SIZE,
+      onBatch: (payload) => {
+        stats.botBatchRequests += 1;
+        if (payload.wasEmpty) {
+          stats.botEmptyBatches += 1;
+        }
+      },
+      stopAfterEmptyBatches: BOT_EMPTY_BATCH_STOP_COUNT,
+    }
+  )) {
+    fetchedMessages += 1;
+    stats.telegramMessagesFetched += 1;
+    stats.telegramMessagesConsidered += 1;
+
+    const message = toIngestibleMessage(rawMessage, stats);
+    if (!message) {
+      continue;
+    }
+
+    if (
+      latestStoredMessageId !== null &&
+      message.messageId <= latestStoredMessageId
+    ) {
+      stats.skippedOldOrEqual += 1;
+      continue;
+    }
+
+    if (
+      options.lookbackWindowEndExclusiveUtc &&
+      message.createdAt >= options.lookbackWindowEndExclusiveUtc
+    ) {
+      break;
+    }
+
+    if (
+      options.lookbackWindowStartUtc &&
+      message.createdAt < options.lookbackWindowStartUtc
+    ) {
+      continue;
+    }
+
+    await persistEligibleMessage({
+      communityId: community.id,
+      db,
+      membershipCache,
+      message,
+      stats,
+      userIdCache,
+    });
+  }
+
+  if (fetchedMessages === 0) {
+    if (latestStoredMessageId === null) {
+      stats.communitiesWithNoTelegramHistory += 1;
+      return;
+    }
+
+    stats.communitiesUpToDate += 1;
+  }
+}
+
+async function syncCommunity(
+  db: UserbotDb,
+  bundle: UserbotClientBundle,
+  authMode: UserbotConfig["authMode"],
+  community: ActiveSyncCommunity,
+  stats: SyncOnceStats,
+  options: ResolvedSyncOnceOptions,
+  userIdCache: Map<string, string>,
+  membershipCache: Set<string>
+): Promise<void> {
+  if (authMode === "bot") {
+    await syncCommunityWithBotIdBatches(
+      db,
+      bundle,
+      community,
+      stats,
+      options,
+      userIdCache,
+      membershipCache
+    );
+    return;
+  }
+
   const chatPeerId = Number(community.chatId);
+
+  if (options.lookbackWindowStartUtc) {
+    let fetchedMessages = 0;
+
+    for await (const rawMessage of fetchMessagesSince(
+      bundle.client,
+      chatPeerId,
+      options.lookbackWindowStartUtc
+    )) {
+      fetchedMessages += 1;
+      stats.telegramMessagesFetched += 1;
+      stats.telegramMessagesConsidered += 1;
+
+      const message = toIngestibleMessage(rawMessage, stats);
+      if (!message) {
+        continue;
+      }
+
+      if (
+        options.lookbackWindowEndExclusiveUtc &&
+        message.createdAt >= options.lookbackWindowEndExclusiveUtc
+      ) {
+        continue;
+      }
+
+      await persistEligibleMessage({
+        communityId: community.id,
+        db,
+        membershipCache,
+        message,
+        stats,
+        userIdCache,
+      });
+    }
+
+    if (fetchedMessages === 0) {
+      stats.communitiesUpToDate += 1;
+    }
+    return;
+  }
+
+  const latestStoredMessageId = await getLatestStoredMessageId(db, community.id);
+
+  if (latestStoredMessageId === null) {
+    stats.communitiesWithNoStoredMessages += 1;
+  }
+
   const latestTelegramMessageId = await getLatestTelegramMessageId(
     bundle.client,
     chatPeerId
@@ -262,18 +586,34 @@ async function syncCommunity(
 }
 
 export async function runSyncOnce(
-  overrides: Partial<SyncOnceDeps> = {}
+  overrides: Partial<SyncOnceDeps> = {},
+  options: SyncOnceOptions = {}
 ): Promise<SyncOnceResult> {
   const deps = resolveDeps(overrides);
+  const resolvedOptions = resolveSyncOptions(options);
   const config = deps.loadConfig(deps.env);
+  deps.logger.info(
+    `[userbot] Starting sync:once for '${config.accountKey}' (authMode=${config.authMode}).`
+  );
+  deps.logger.info(
+    `[userbot] sync:once fetch strategy: ${
+      config.authMode === "bot" ? "getMessages-id-batch" : "history"
+    }`
+  );
   const sessionPath = resolveSessionSqlitePath(
     config.accountKey,
     config.storageDir
   );
 
-  if (!(await deps.hasFile(sessionPath))) {
+  const sessionExists = await deps.hasFile(sessionPath);
+  if (!sessionExists && config.authMode === "user") {
     throw new Error(
       `[userbot] Missing session file for '${config.accountKey}'. Run auth:bootstrap first. Expected: ${sessionPath}`
+    );
+  }
+  if (!sessionExists && config.authMode === "bot") {
+    deps.logger.info(
+      `[userbot] No session found for '${config.accountKey}' in bot mode; proceeding with token-based startup.`
     );
   }
 
@@ -282,31 +622,54 @@ export async function runSyncOnce(
   const membershipCache = new Set<string>();
 
   try {
-    await bundle.client.start(
-      createNonInteractiveAuthCallbacks(
-        `Session for '${config.accountKey}' is invalid. Run bun run auth:bootstrap.`
-      )
-    );
+    await bundle.client.start(createNonInteractiveStartParams(config));
 
     const databaseUrl = deps.loadDatabaseUrl(deps.env);
     const db = deps.createDb(databaseUrl);
 
-    const userbotCommunities = await db.query.communities.findMany({
+    const whereClauses = [
+      eq(communities.isActive, true),
+      inArray(communities.parserType, resolvedOptions.parserTypes),
+    ];
+    if (resolvedOptions.chatIds) {
+      whereClauses.push(inArray(communities.chatId, resolvedOptions.chatIds));
+    }
+
+    const queriedCommunities = await db.query.communities.findMany({
       columns: {
         chatId: true,
         chatTitle: true,
         id: true,
+        parserType: true,
       },
-      where: and(
-        eq(communities.isActive, true),
-        eq(communities.parserType, "userbot")
-      ),
+      where: and(...whereClauses),
     });
 
-    const stats = createInitialStats(userbotCommunities.length);
+    // Keep runtime filtering explicit for auditability in tests and logs.
+    const chatIdFilter =
+      resolvedOptions.chatIds === null
+        ? null
+        : new Set(resolvedOptions.chatIds.map((chatId) => chatId.toString()));
+    const selectedCommunities = queriedCommunities.filter((community) => {
+      if (!resolvedOptions.parserTypes.includes(community.parserType)) {
+        return false;
+      }
+
+      if (!chatIdFilter) {
+        return true;
+      }
+
+      return chatIdFilter.has(community.chatId.toString());
+    });
+
+    const stats = createInitialStats(
+      selectedCommunities.length,
+      resolvedOptions,
+      config
+    );
     const errors: CommunitySyncError[] = [];
 
-    for (const community of userbotCommunities) {
+    for (const community of selectedCommunities) {
       stats.communitiesProcessed += 1;
 
       try {
@@ -318,8 +681,10 @@ export async function runSyncOnce(
             await syncCommunity(
               db,
               bundle,
+              config.authMode,
               community,
               stats,
+              resolvedOptions,
               userIdCache,
               membershipCache
             );
@@ -351,12 +716,23 @@ export async function runSyncOnceCli(
   overrides: Partial<SyncOnceDeps> = {}
 ): Promise<number> {
   const logger = overrides.logger ?? console;
+  const argv = process.argv;
+  const loadConfig = overrides.loadConfig ?? loadUserbotConfig;
+  const env = overrides.env ?? process.env;
 
   try {
-    await runSyncOnce(overrides);
+    const config = loadConfig(env);
+    const options = parseSyncOnceCliOptions(argv);
+    await runSyncOnce(overrides, options);
     return 0;
   } catch (error) {
-    logger.error("[userbot] sync:once failed to start", error);
+    let guidance = "Run bun run auth:bootstrap.";
+    try {
+      guidance = buildReauthGuidance(loadConfig(env));
+    } catch {
+      // Keep default guidance when config cannot be loaded.
+    }
+    logger.error(`[userbot] sync:once failed to start. ${guidance}`, error);
     return 1;
   }
 }

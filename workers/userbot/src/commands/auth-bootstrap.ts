@@ -2,6 +2,10 @@ import { createInterface } from "node:readline/promises";
 
 import { createUserbotClient, type UserbotClientBundle } from "../lib/client";
 import { loadUserbotConfig, readBootstrapPhone, type UserbotConfig } from "../lib/env";
+import {
+  buildReauthGuidance,
+  createBotTokenStartParams,
+} from "../lib/non-interactive-auth";
 
 type EnvRecord = Record<string, string | undefined>;
 
@@ -96,28 +100,39 @@ export async function runAuthBootstrap(
 ): Promise<void> {
   const deps = resolveDeps(overrides);
   const config = deps.loadConfig(deps.env);
-  const phoneFromEnv = readBootstrapPhone(deps.env);
-  const prompt = deps.createPrompt();
 
   deps.logger.info(
-    `[userbot] Starting interactive auth bootstrap for account '${config.accountKey}'.`
+    `[userbot] Starting auth bootstrap for account '${config.accountKey}' (authMode=${config.authMode}).`
   );
 
   const bundle = await deps.createClient(config);
   deps.logger.info(`[userbot] Session storage: ${bundle.sessionPath}`);
 
   try {
-    const user = await bundle.client.start({
-      code: async () => prompt.ask("Telegram code: "),
-      password: async () => prompt.ask("2FA password (if enabled): "),
-      phone: async () => phoneFromEnv ?? prompt.ask("Phone number (+...): "),
-    });
+    const user = await (async () => {
+      if (config.authMode === "bot") {
+        return bundle.client.start(createBotTokenStartParams(config));
+      }
+
+      const phoneFromEnv = readBootstrapPhone(deps.env);
+      const prompt = deps.createPrompt();
+      try {
+        return bundle.client.start({
+          code: async () => prompt.ask("Telegram code: "),
+          password: async () =>
+            prompt.ask("2FA password (if enabled): "),
+          phone: async () =>
+            phoneFromEnv ?? prompt.ask("Phone number (+...): "),
+        });
+      } finally {
+        prompt.close();
+      }
+    })();
 
     deps.logger.info(
       `[userbot] Auth bootstrap complete for account '${config.accountKey}' as ${getIdentityLabel(user)}.`
     );
   } finally {
-    prompt.close();
     await bundle.client.destroy();
   }
 }
@@ -126,12 +141,20 @@ export async function runAuthBootstrapCli(
   overrides: Partial<AuthBootstrapDeps> = {}
 ): Promise<number> {
   const logger = overrides.logger ?? console;
+  const loadConfig = overrides.loadConfig ?? loadUserbotConfig;
+  const env = overrides.env ?? process.env;
 
   try {
     await runAuthBootstrap(overrides);
     return 0;
   } catch (error) {
-    logger.error("[userbot] Auth bootstrap failed", error);
+    let guidance = "Run bun run auth:bootstrap.";
+    try {
+      guidance = buildReauthGuidance(loadConfig(env));
+    } catch {
+      // Keep default guidance when config cannot be loaded.
+    }
+    logger.error(`[userbot] Auth bootstrap failed. ${guidance}`, error);
     return 1;
   }
 }

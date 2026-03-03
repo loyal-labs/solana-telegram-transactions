@@ -42,6 +42,9 @@ mock.module("@/lib/core/database", () => ({
       values: (values: unknown) => {
         insertedSummaryValues.push(values);
         return {
+          onConflictDoNothing: () => ({
+            returning: async () => insertReturningQueue.shift() ?? [],
+          }),
           returning: async () => insertReturningQueue.shift() ?? [],
         };
       },
@@ -128,6 +131,25 @@ describe("generateOrGetSummaryForRun", () => {
     expect(insertedSummaryValues).toHaveLength(0);
   });
 
+  test("falls back to legacy created-at day lookup when trigger key is absent", async () => {
+    countResult = 9;
+    summariesFindFirstResults = [null, { id: "existing-legacy", messageCount: 9 }];
+
+    const result = await generateOrGetSummaryForRun({
+      chatTitle: "General",
+      communityId: "community-1",
+      run,
+    });
+
+    expect(result).toEqual({
+      status: "existing",
+      summaryId: "existing-legacy",
+      messageCount: 9,
+    });
+    expect(chatCompletionCalls).toHaveLength(0);
+    expect(insertedSummaryValues).toHaveLength(0);
+  });
+
   test("creates a summary when enough messages exist and no summary exists for today", async () => {
     countResult = 5;
     summariesFindFirstResults = [null];
@@ -150,6 +172,10 @@ describe("generateOrGetSummaryForRun", () => {
     });
     expect(chatCompletionCalls).toHaveLength(2);
     expect(insertedSummaryValues).toHaveLength(1);
+    expect(insertedSummaryValues[0]).toMatchObject({
+      triggerKey: "daily:2026-02-13",
+      triggerType: "daily",
+    });
   });
 
   test("creates a summary when message count reaches the minimum threshold", async () => {
@@ -179,7 +205,7 @@ describe("generateOrGetSummaryForRun", () => {
 
   test("does not create duplicate summaries on repeated runs for the same day", async () => {
     countResult = 4;
-    summariesFindFirstResults = [null, { id: "existing-2", messageCount: 4 }];
+    summariesFindFirstResults = [null, null, { id: "existing-2", messageCount: 4 }];
     insertReturningQueue = [[{ id: "summary-1", messageCount: 4 }]];
     recentMessages = Array.from({ length: 4 }, (_, index) => ({
       content: `msg ${index + 1}`,
@@ -206,6 +232,30 @@ describe("generateOrGetSummaryForRun", () => {
     expect(secondRun).toEqual({
       status: "existing",
       summaryId: "existing-2",
+      messageCount: 4,
+    });
+    expect(insertedSummaryValues).toHaveLength(1);
+  });
+
+  test("returns existing summary when insert conflicts on trigger key", async () => {
+    countResult = 4;
+    summariesFindFirstResults = [null, null, { id: "existing-3", messageCount: 4 }];
+    insertReturningQueue = [[]];
+    recentMessages = Array.from({ length: 4 }, (_, index) => ({
+      content: `msg ${index + 1}`,
+      telegramMessageId: BigInt(index + 1),
+      user: { displayName: `User${index + 1}` },
+    }));
+
+    const result = await generateOrGetSummaryForRun({
+      chatTitle: "General",
+      communityId: "community-1",
+      run,
+    });
+
+    expect(result).toEqual({
+      status: "existing",
+      summaryId: "existing-3",
       messageCount: 4,
     });
     expect(insertedSummaryValues).toHaveLength(1);

@@ -5,6 +5,7 @@
   "workspaces": [
     "admin",
     "app",
+    "frontend",
     "packages/*",
     "sdk/*",
     "workers/*"
@@ -13,6 +14,9 @@
     "admin:dev": "bun run --cwd admin dev",
     "admin:build": "bun run --cwd admin build",
     "admin:lint": "bun run --cwd admin lint",
+    "frontend:dev": "bun run --cwd frontend dev",
+    "frontend:build": "bun run --cwd frontend build",
+    "frontend:lint": "bun run --cwd frontend lint",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "commitlint:head": "commitlint --from HEAD~1 --to HEAD --verbose",

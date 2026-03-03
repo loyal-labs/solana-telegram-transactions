@@ -21,6 +21,8 @@ Standalone worker package for Telegram userbot foundations.
 - `TELEGRAM_USERBOT_ACCOUNT_KEY` (default: `primary`)
 - `USERBOT_STORAGE_DIR` (default: `/var/data/userbot`)
 - `TELEGRAM_USERBOT_PHONE` (used by `auth:bootstrap` as default phone)
+- `TELEGRAM_USERBOT_BOT_TOKEN` (preferred bot auth token)
+- `ASKLOYAL_TGBOT_KEY` (fallback bot auth token, compatible with app env)
 
 ## Commands
 
@@ -34,6 +36,18 @@ bun run auth:clear
 bun run sync:once
 bun run start
 ```
+
+`auth:bootstrap` auto-selects login mode:
+
+- If `TELEGRAM_USERBOT_BOT_TOKEN` (or `ASKLOYAL_TGBOT_KEY`) is set, it signs in as a bot without phone/code prompts.
+- Otherwise, it uses interactive user login (phone/code/2FA).
+
+`sync:once` supports optional recovery flags:
+
+- `--parser-types=userbot` (default)
+- `--parser-types=bot,userbot` (include activated bot-parser communities)
+- `--lookback-days=2` (scan history for previous full UTC days)
+- `--chat-ids=-100123,-100456` (scope to specific chat IDs)
 
 ## Render operational flow
 
