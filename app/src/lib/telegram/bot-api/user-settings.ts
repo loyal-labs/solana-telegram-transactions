@@ -1,3 +1,6 @@
+import type { UserSettings } from "@loyal-labs/db-core/schema";
+import { userSettings } from "@loyal-labs/db-core/schema";
+import { users } from "@loyal-labs/db-core/schema";
 import { eq } from "drizzle-orm";
 import {
   type CallbackQueryContext,
@@ -7,9 +10,6 @@ import {
 } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
-import type { UserSettings } from "@/lib/core/schema";
-import { userSettings } from "@/lib/core/schema";
-import { users } from "@/lib/core/schema";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 
 import { isMessageNotModifiedError } from "./callback-query-utils";

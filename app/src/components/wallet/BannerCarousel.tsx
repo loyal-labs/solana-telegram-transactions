@@ -24,7 +24,7 @@ type Banner = {
   onPress: () => void;
 };
 
-const SWIPE_THRESHOLD = 50;
+const SWIPE_THRESHOLD = 30;
 const SLIDE_DURATION = 180;
 const AUTO_ROTATE_INTERVAL = 3000;
 
@@ -75,6 +75,7 @@ function BannerCard({
       style={{
         backgroundImage:
           "linear-gradient(90deg, rgba(249, 54, 60, 0) 0%, rgba(249, 54, 60, 0.14) 100%), linear-gradient(90deg, #f2f2f7 0%, #f2f2f7 100%)",
+        touchAction: "pan-y",
       }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -279,13 +280,13 @@ export default function BannerCarousel({
       if (
         !isSwipingRef.current &&
         Math.abs(deltaX) > 10 &&
-        Math.abs(deltaX) > Math.abs(deltaY) * 1.5
+        Math.abs(deltaX) > Math.abs(deltaY) * 1.2
       ) {
         isSwipingRef.current = true;
       }
 
       if (isSwipingRef.current) {
-        setSwipeX(deltaX * 0.35);
+        setSwipeX(deltaX * 0.5);
 
         if (
           Math.abs(deltaX) >= SWIPE_THRESHOLD &&
@@ -311,7 +312,7 @@ export default function BannerCarousel({
 
       if (
         Math.abs(deltaX) > SWIPE_THRESHOLD &&
-        Math.abs(deltaX) > Math.abs(deltaY) * 1.5
+        Math.abs(deltaX) > Math.abs(deltaY) * 1.2
       ) {
         if (deltaX < 0) {
           goTo(activeIndex + 1, "left");

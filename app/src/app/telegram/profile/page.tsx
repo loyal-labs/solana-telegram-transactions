@@ -18,6 +18,7 @@ import {
   Copy,
   Fingerprint,
   Globe,
+  KeyRound,
   Network,
   Smile,
   Sparkle,
@@ -460,7 +461,90 @@ export default function ProfilePage() {
 
         {/* Settings Sections */}
         <div className="flex flex-col gap-4 px-4 pb-4">
-          {/* Section 1: Language, Notifications, Model */}
+          {/* Section 1: Keys & Recovery, Biometric Access */}
+          <SettingsSection>
+            <ProfileCell
+              icon={<KeyRound size={28} strokeWidth={1.5} />}
+              title="Keys & Recovery"
+              showChevron
+              onClick={() => {
+                if (hapticFeedback.impactOccurred.isAvailable()) {
+                  hapticFeedback.impactOccurred("light");
+                }
+                router.push("/telegram/profile/keys");
+              }}
+            />
+            <ProfileCell
+              icon={<Fingerprint size={28} strokeWidth={1.5} />}
+              title="Biometric Access"
+              showChevron
+              onClick={handleBiometrics}
+              disabled={!isMobilePlatform}
+            />
+          </SettingsSection>
+
+          {/* Section 2: Network */}
+          <SettingsSection>
+            <div ref={networkDropdownRef} className="relative">
+              <button
+                onClick={() => {
+                  if (hapticFeedback.impactOccurred.isAvailable()) {
+                    hapticFeedback.impactOccurred("light");
+                  }
+                  setIsNetworkDropdownOpen((prev) => !prev);
+                }}
+                className="w-full text-left active:opacity-80 transition-opacity"
+              >
+                <div className="flex items-center w-full overflow-hidden px-4">
+                  <div className="flex items-center pr-3 py-1.5">
+                    <div className="flex items-center justify-center pr-1 py-2.5">
+                      <div className="text-black/60">
+                        <Network size={28} strokeWidth={1.5} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 flex flex-col min-w-0 py-[13px]">
+                    <p className="text-[17px] font-medium leading-[22px] tracking-[-0.187px] text-black">
+                      Network
+                    </p>
+                  </div>
+                  <div className="pl-3 flex items-center gap-1 py-[13px]">
+                    <p className="text-[17px] font-normal leading-[22px] text-[rgba(60,60,67,0.6)]">
+                      {networkOptions.find((o) => o.value === networkEnv)?.label}
+                    </p>
+                    <ChevronDown
+                      size={16}
+                      className={cn(
+                        "text-[rgba(60,60,67,0.3)] transition-transform duration-200",
+                        isNetworkDropdownOpen && "rotate-180",
+                      )}
+                    />
+                  </div>
+                </div>
+              </button>
+
+              {isNetworkDropdownOpen && (
+                <div className="absolute right-4 top-full -mt-1 z-50 min-w-[160px] bg-white rounded-xl shadow-[0px_4px_24px_rgba(0,0,0,0.12)] py-1 overflow-hidden">
+                  {networkOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleNetworkSelect(option.value)}
+                      className="w-full flex items-center justify-between px-4 py-2.5 active:bg-black/5 transition-colors"
+                    >
+                      <span className="text-[17px] font-normal leading-[22px] text-black">
+                        {option.label}
+                      </span>
+                      {option.value === networkEnv && (
+                        <Check size={18} className="text-[#f9363c]" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </SettingsSection>
+
+          {/* Section 3: Language, Notifications, Model */}
           <SettingsSection>
             <ProfileCell
               icon={<Globe size={28} strokeWidth={1.5} />}
@@ -559,7 +643,7 @@ export default function ProfilePage() {
             </div>
           </SettingsSection>
 
-          {/* Section 2: Actions */}
+          {/* Section 4: Actions */}
           <SettingsSection>
             <ProfileCell
               icon={<CirclePlus size={28} strokeWidth={1.5} />}
@@ -573,78 +657,6 @@ export default function ProfilePage() {
               title="Set Custom Emoji"
               showArrow
               onClick={handleSetCustomEmoji}
-            />
-          </SettingsSection>
-
-          {/* Section 3: Network */}
-          <SettingsSection>
-            <div ref={networkDropdownRef} className="relative">
-              <button
-                onClick={() => {
-                  if (hapticFeedback.impactOccurred.isAvailable()) {
-                    hapticFeedback.impactOccurred("light");
-                  }
-                  setIsNetworkDropdownOpen((prev) => !prev);
-                }}
-                className="w-full text-left active:opacity-80 transition-opacity"
-              >
-                <div className="flex items-center w-full overflow-hidden px-4">
-                  <div className="flex items-center pr-3 py-1.5">
-                    <div className="flex items-center justify-center pr-1 py-2.5">
-                      <div className="text-black/60">
-                        <Network size={28} strokeWidth={1.5} />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex-1 flex flex-col min-w-0 py-[13px]">
-                    <p className="text-[17px] font-medium leading-[22px] tracking-[-0.187px] text-black">
-                      Network
-                    </p>
-                  </div>
-                  <div className="pl-3 flex items-center gap-1 py-[13px]">
-                    <p className="text-[17px] font-normal leading-[22px] text-[rgba(60,60,67,0.6)]">
-                      {networkOptions.find((o) => o.value === networkEnv)?.label}
-                    </p>
-                    <ChevronDown
-                      size={16}
-                      className={cn(
-                        "text-[rgba(60,60,67,0.3)] transition-transform duration-200",
-                        isNetworkDropdownOpen && "rotate-180",
-                      )}
-                    />
-                  </div>
-                </div>
-              </button>
-
-              {isNetworkDropdownOpen && (
-                <div className="absolute right-4 top-full -mt-1 z-50 min-w-[160px] bg-white rounded-xl shadow-[0px_4px_24px_rgba(0,0,0,0.12)] py-1 overflow-hidden">
-                  {networkOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => handleNetworkSelect(option.value)}
-                      className="w-full flex items-center justify-between px-4 py-2.5 active:bg-black/5 transition-colors"
-                    >
-                      <span className="text-[17px] font-normal leading-[22px] text-black">
-                        {option.label}
-                      </span>
-                      {option.value === networkEnv && (
-                        <Check size={18} className="text-[#f9363c]" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </SettingsSection>
-
-          {/* Section 4: Biometrics */}
-          <SettingsSection>
-            <ProfileCell
-              icon={<Fingerprint size={28} strokeWidth={1.5} />}
-              title="Biometrics"
-              showChevron
-              onClick={handleBiometrics}
-              disabled={!isMobilePlatform}
             />
           </SettingsSection>
 

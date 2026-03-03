@@ -1,10 +1,10 @@
-import type { BusinessConnection as TelegramBusinessConnection } from "grammy/types";
-
-import { getDatabase } from "@/lib/core/database";
 import {
   type BusinessBotRights,
   businessConnections,
-} from "@/lib/core/schema";
+} from "@loyal-labs/db-core/schema";
+import type { BusinessConnection as TelegramBusinessConnection } from "grammy/types";
+
+import { getDatabase } from "@/lib/core/database";
 import { getBot } from "@/lib/telegram/bot-api/bot";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 

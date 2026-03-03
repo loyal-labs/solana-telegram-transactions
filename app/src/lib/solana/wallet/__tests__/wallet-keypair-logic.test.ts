@@ -11,8 +11,8 @@ import {
 // --- Mock cloud-storage module ---
 
 type GetCloudValueFn = (
-  keys: string | string[]
-) => Promise<string | Record<string, string> | null>;
+  key: string
+) => Promise<string | null>;
 type SetCloudValueFn = (key: string, value: string) => Promise<boolean>;
 type DeleteCloudValueFn = (keys: string | string[]) => Promise<boolean>;
 
@@ -20,12 +20,12 @@ let getCloudValueImpl: GetCloudValueFn = async () => null;
 let setCloudValueImpl: SetCloudValueFn = async () => true;
 let deleteCloudValueImpl: DeleteCloudValueFn = async () => true;
 
-let getCloudValueCalls: Array<string | string[]> = [];
+let getCloudValueCalls: string[] = [];
 
 mock.module("@/lib/telegram/mini-app/cloud-storage", () => ({
-  getCloudValue: async (keys: string | string[]) => {
-    getCloudValueCalls.push(keys);
-    return getCloudValueImpl(keys);
+  getCloudValue: async (key: string) => {
+    getCloudValueCalls.push(key);
+    return getCloudValueImpl(key);
   },
   setCloudValue: async (key: string, value: string) =>
     setCloudValueImpl(key, value),
@@ -52,19 +52,27 @@ beforeEach(() => {
 // Helper: create a stored keypair in cloud storage format
 const makeStoredKeypair = () => {
   const kp = Keypair.generate();
+  const publicKeyStr = kp.publicKey.toBase58();
+  const secretKeyStr = JSON.stringify(Array.from(kp.secretKey));
   return {
     keypair: kp,
     stored: {
-      solana_public_key: kp.publicKey.toBase58(),
-      solana_secret_key: JSON.stringify(Array.from(kp.secretKey)),
+      solana_public_key: publicKeyStr,
+      solana_secret_key: secretKeyStr,
+    },
+    // Mock that returns per-key values for individual getCloudValue calls
+    perKeyImpl: async (key: string) => {
+      if (key === "solana_public_key") return publicKeyStr;
+      if (key === "solana_secret_key") return secretKeyStr;
+      return null;
     },
   };
 };
 
 describe("ensureWalletKeypair", () => {
   test("returns existing keypair when cloud storage has valid data", async () => {
-    const { keypair, stored } = makeStoredKeypair();
-    getCloudValueImpl = async () => stored;
+    const { keypair, perKeyImpl } = makeStoredKeypair();
+    getCloudValueImpl = perKeyImpl;
 
     const result = await ensureWalletKeypair();
 
@@ -75,10 +83,7 @@ describe("ensureWalletKeypair", () => {
   });
 
   test("generates new keypair when cloud storage returns empty strings (new user)", async () => {
-    getCloudValueImpl = async () => ({
-      solana_public_key: "",
-      solana_secret_key: "",
-    });
+    getCloudValueImpl = async () => "";
 
     const result = await ensureWalletKeypair();
 
@@ -87,12 +92,21 @@ describe("ensureWalletKeypair", () => {
   });
 
   test("retries when cloud storage returns null, then succeeds", async () => {
-    const { keypair, stored } = makeStoredKeypair();
-    let attempt = 0;
-    getCloudValueImpl = async () => {
-      attempt += 1;
-      if (attempt <= 2) return null; // First 2 attempts fail
-      return stored;
+    const { keypair, perKeyImpl } = makeStoredKeypair();
+    let round = 0;
+    let callsInRound = 0;
+    getCloudValueImpl = async (key: string) => {
+      callsInRound += 1;
+      // Each round fetches 2 keys (public + secret in parallel)
+      if (callsInRound > 2) {
+        callsInRound = 1;
+        round += 1;
+      }
+      if (round === 0) callsInRound = callsInRound; // first 2 calls = round 0
+      // First 2 rounds fail (return null), third succeeds
+      const currentRound = Math.floor((getCloudValueCalls.length - 1) / 2);
+      if (currentRound < 2) return null;
+      return perKeyImpl(key);
     };
 
     const result = await ensureWalletKeypair();
@@ -101,7 +115,8 @@ describe("ensureWalletKeypair", () => {
     expect(result.keypair.publicKey.toBase58()).toBe(
       keypair.publicKey.toBase58()
     );
-    expect(getCloudValueCalls.length).toBe(3);
+    // 3 rounds × 2 keys per round = 6 individual calls
+    expect(getCloudValueCalls.length).toBe(6);
   });
 
   test("throws CloudStorageUnavailableError after all retries return null", async () => {
@@ -111,12 +126,13 @@ describe("ensureWalletKeypair", () => {
   });
 
   test("retries when cloud storage throws, then succeeds", async () => {
-    const { keypair, stored } = makeStoredKeypair();
-    let attempt = 0;
-    getCloudValueImpl = async () => {
-      attempt += 1;
-      if (attempt <= 1) throw new Error("SDK not ready");
-      return stored;
+    const { keypair, perKeyImpl } = makeStoredKeypair();
+    let callCount = 0;
+    getCloudValueImpl = async (key: string) => {
+      callCount += 1;
+      // First round (calls 1-2) throws
+      if (callCount <= 2) throw new Error("SDK not ready");
+      return perKeyImpl(key);
     };
 
     const result = await ensureWalletKeypair();
@@ -137,15 +153,13 @@ describe("ensureWalletKeypair", () => {
 
   test("generates new keypair only when cloud storage returns empty strings on first attempt", async () => {
     // Empty strings on first try = genuinely new user (no retry needed)
-    getCloudValueImpl = async () => ({
-      solana_public_key: "",
-      solana_secret_key: "",
-    });
+    getCloudValueImpl = async () => "";
 
     const result = await ensureWalletKeypair();
 
     expect(result.isNew).toBe(true);
     // Should NOT have retried — empty strings are a definitive "not found"
-    expect(getCloudValueCalls.length).toBe(1);
+    // 2 individual calls (public + secret) in a single round
+    expect(getCloudValueCalls.length).toBe(2);
   });
 });

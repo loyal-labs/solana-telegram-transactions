@@ -49,16 +49,20 @@ const deserializeSecretKey = (storedSecretKey: string): Uint8Array | null => {
 const fetchStoredKeypairStrings = async (): Promise<
   StoredKeypairStrings | "not_found" | "unavailable"
 > => {
-  const stored = await getCloudValue([
-    PUBLIC_KEY_STORAGE_KEY,
-    SECRET_KEY_STORAGE_KEY,
+  // Fetch keys individually to avoid @telegram-apps/sdk ValiError when
+  // some Telegram clients return a JSON string instead of a parsed Object
+  // for multi-key getItem requests.
+  const [publicKey, secretKey] = await Promise.all([
+    getCloudValue(PUBLIC_KEY_STORAGE_KEY),
+    getCloudValue(SECRET_KEY_STORAGE_KEY),
   ]);
 
-  // null or wrong type = cloud storage didn't respond properly
-  if (!stored || typeof stored === "string") return "unavailable";
+  // null = cloud storage didn't respond properly
+  if (publicKey === null || secretKey === null) return "unavailable";
 
-  const publicKey = stored[PUBLIC_KEY_STORAGE_KEY];
-  const secretKey = stored[SECRET_KEY_STORAGE_KEY];
+  // Non-string = unexpected response shape
+  if (typeof publicKey !== "string" || typeof secretKey !== "string")
+    return "unavailable";
 
   // Empty strings = keys genuinely don't exist (new user)
   if (!publicKey || !secretKey) return "not_found";

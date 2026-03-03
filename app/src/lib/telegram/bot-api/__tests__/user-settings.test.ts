@@ -1,7 +1,6 @@
+import type { UserSettings } from "@loyal-labs/db-core/schema";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { CallbackQueryContext, Context } from "grammy";
-
-import type { UserSettings } from "@/lib/core/schema";
 
 let mockDb: {
   query: {

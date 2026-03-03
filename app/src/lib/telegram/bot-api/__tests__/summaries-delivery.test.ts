@@ -3,6 +3,8 @@ import type { Bot } from "grammy";
 
 import { buildSummaryFeedMiniAppUrl } from "@/lib/telegram/mini-app/start-param";
 
+import { buildSummaryOgImageUrl } from "../build-summary-og-url";
+
 mock.module("server-only", () => ({}));
 
 const SUMMARY_ID = "123e4567-e89b-12d3-a456-426614174000";
@@ -10,6 +12,8 @@ const SUMMARY_VOTE_LIKE_CUSTOM_EMOJI_ID = "5447485069386090205";
 const SUMMARY_VOTE_DISLIKE_CUSTOM_EMOJI_ID = "5445146433923616423";
 const SUMMARY_OPEN_BUTTON_CUSTOM_EMOJI_ID = "5235480870860660944";
 const SUMMARY_SCORE_POSITIVE_CUSTOM_EMOJI_ID = "5445293605272984280";
+const SUMMARY_BULLET_CUSTOM_EMOJI_TAG =
+  '<tg-emoji emoji-id="5255883309841422076">🔹</tg-emoji>';
 
 type CommunityRecord = {
   chatId: bigint;
@@ -27,6 +31,11 @@ type SummaryWithCommunityRecord = {
   createdAt: Date;
   id: string;
   oneliner: string;
+  topics: Array<{
+    content: string;
+    sources: string[];
+    title: string;
+  }>;
 } | null;
 
 let communityResult: CommunityRecord | null = null;
@@ -77,6 +86,18 @@ function createActiveSummaryRecord(): Exclude<SummaryWithCommunityRecord, null> 
     createdAt: new Date("2026-02-12T00:00:00Z"),
     id: SUMMARY_ID,
     oneliner: "Daily recap",
+    topics: [
+      {
+        content: "Team discussed launch scope. Second sentence should not appear.",
+        sources: ["Alice", "Bob"],
+        title: "Launch",
+      },
+      {
+        content: "Finalized dates for rollout! More context not shown.",
+        sources: ["Alice"],
+        title: "Rollout",
+      },
+    ],
   };
 }
 
@@ -141,9 +162,26 @@ describe("summary delivery guards", () => {
         };
       },
     ];
-    expect(messageText).toContain("Daily recap");
+    const ogSuffix = `<a href="${buildSummaryOgImageUrl(
+      "Daily recap",
+      summaryResult!.createdAt
+    )}">\u200b</a>`;
+    expect(messageText).toContain(
+      `${SUMMARY_BULLET_CUSTOM_EMOJI_TAG} Team discussed launch scope.`
+    );
+    expect(messageText).toContain(
+      `${SUMMARY_BULLET_CUSTOM_EMOJI_TAG} Finalized dates for rollout!`
+    );
+    expect(messageText).toContain(
+      `${SUMMARY_BULLET_CUSTOM_EMOJI_TAG} Team discussed launch scope.\n\n${SUMMARY_BULLET_CUSTOM_EMOJI_TAG} Finalized dates for rollout!`
+    );
+    expect(messageText).not.toContain("(Alice");
+    expect(messageText).not.toContain("Second sentence should not appear.");
+    expect(messageText).not.toContain("More context not shown.");
+    expect(messageText).not.toContain("Today's chat highlights:");
+    expect(messageText).not.toContain("Daily recap\n");
     expect(messageText).not.toContain("Summary:");
-    expect(messageText).not.toContain("<tg-emoji");
+    expect(messageText).toEndWith(ogSuffix);
     const rows = messageOptions.reply_markup.inline_keyboard;
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveLength(3);
@@ -315,6 +353,7 @@ describe("summary delivery guards", () => {
       createdAt: new Date("2026-02-12T00:00:00Z"),
       id: "summary-1",
       oneliner: "Daily recap",
+      topics: createActiveSummaryRecord().topics,
     };
 
     const result = await sendSummaryById(bot, "summary-1");
@@ -343,6 +382,7 @@ describe("summary delivery guards", () => {
       createdAt: new Date("2026-02-12T00:00:00Z"),
       id: "summary-1",
       oneliner: "Daily recap",
+      topics: createActiveSummaryRecord().topics,
     };
 
     const result = await sendSummaryById(bot, "summary-1");
@@ -373,5 +413,149 @@ describe("summary delivery guards", () => {
 
     expect(result).toEqual({ sent: false, reason: "notifications_disabled" });
     expect(sendMessageCalls).toHaveLength(0);
+  });
+
+  test(
+    "sendSummaryById extracts first sentence, escapes, truncates, and limits bullet topics",
+    async () => {
+    const sendMessageCalls: unknown[] = [];
+    const bot = {
+      api: {
+        sendMessage: async (...args: unknown[]) => {
+          sendMessageCalls.push(args);
+          return { message_id: 999 } as never;
+        },
+      },
+    } as unknown as Bot;
+
+    const longContent = "A".repeat(500);
+    summaryResult = {
+      community: {
+        chatId: BigInt("-1001234567890"),
+        isActive: true,
+        summaryNotificationsEnabled: true,
+      },
+      createdAt: new Date("2026-02-12T00:00:00Z"),
+      id: SUMMARY_ID,
+      oneliner: "Keep this only for OG",
+      topics: [
+        {
+          content: "Contains <tag> & symbols > safely. This should not appear.",
+          sources: ["Alice & Bob"],
+          title: "Topic 1",
+        },
+        {
+          content: longContent,
+          sources: [],
+          title: "Topic 2",
+        },
+        {
+          content: "Third topic content",
+          sources: [],
+          title: "Topic 3",
+        },
+        {
+          content: "Fourth topic content",
+          sources: [],
+          title: "Topic 4",
+        },
+        {
+          content: "Fifth topic content",
+          sources: [],
+          title: "Topic 5",
+        },
+        {
+          content: "Sixth topic should not appear",
+          sources: [],
+          title: "Topic 6",
+        },
+      ],
+    };
+
+    await sendSummaryById(bot, SUMMARY_ID);
+
+    const [, messageText] = sendMessageCalls[0] as [number, string];
+    expect(messageText).toContain(
+      `${SUMMARY_BULLET_CUSTOM_EMOJI_TAG} Contains &lt;tag&gt; &amp; symbols &gt; safely.`
+    );
+    expect(messageText).not.toContain("(Alice");
+    expect(messageText).not.toContain("This should not appear.");
+    expect(messageText).toContain(
+      `${SUMMARY_BULLET_CUSTOM_EMOJI_TAG} ${"A".repeat(449)}…`
+    );
+    expect(messageText).toContain(
+      `${SUMMARY_BULLET_CUSTOM_EMOJI_TAG} Fifth topic content`
+    );
+    expect(messageText).not.toContain("Sixth topic should not appear");
+    }
+  );
+
+  test("sendSummaryById uses fallback bullet when no valid topic content exists", async () => {
+    const sendMessageCalls: unknown[] = [];
+    const bot = {
+      api: {
+        sendMessage: async (...args: unknown[]) => {
+          sendMessageCalls.push(args);
+          return { message_id: 1000 } as never;
+        },
+      },
+    } as unknown as Bot;
+
+    summaryResult = {
+      community: {
+        chatId: BigInt("-1001234567890"),
+        isActive: true,
+        summaryNotificationsEnabled: true,
+      },
+      createdAt: new Date("2026-02-12T00:00:00Z"),
+      id: SUMMARY_ID,
+      oneliner: "Daily recap",
+      topics: [
+        { content: "   ", sources: [], title: "Blank 1" },
+        { content: "\n\t", sources: [], title: "Blank 2" },
+      ],
+    };
+
+    await sendSummaryById(bot, SUMMARY_ID);
+
+    const [, messageText] = sendMessageCalls[0] as [number, string];
+    expect(messageText).not.toContain("Today's chat highlights:");
+    expect(messageText).toContain(
+      `${SUMMARY_BULLET_CUSTOM_EMOJI_TAG} No detailed points available today.`
+    );
+  });
+
+  test("sendSummaryById falls back OG text to first bullet when oneliner is blank", async () => {
+    const sendMessageCalls: unknown[] = [];
+    const bot = {
+      api: {
+        sendMessage: async (...args: unknown[]) => {
+          sendMessageCalls.push(args);
+          return { message_id: 1001 } as never;
+        },
+      },
+    } as unknown as Bot;
+
+    const fallbackOgText = "First bullet should become OG text";
+    summaryResult = {
+      community: {
+        chatId: BigInt("-1001234567890"),
+        isActive: true,
+        summaryNotificationsEnabled: true,
+      },
+      createdAt: new Date("2026-02-12T00:00:00Z"),
+      id: SUMMARY_ID,
+      oneliner: "   ",
+      topics: [{ content: fallbackOgText, sources: [], title: "Topic 1" }],
+    };
+
+    await sendSummaryById(bot, SUMMARY_ID);
+
+    const [, messageText] = sendMessageCalls[0] as [number, string];
+    const ogSuffix = `<a href="${buildSummaryOgImageUrl(
+      fallbackOgText,
+      summaryResult.createdAt
+    )}">\u200b</a>`;
+    expect(messageText).toEndWith(ogSuffix);
   });
 });

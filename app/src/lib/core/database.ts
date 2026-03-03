@@ -1,18 +1,15 @@
-import { neon } from "@neondatabase/serverless";
-import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
-import { drizzle } from "drizzle-orm/neon-http";
+import { createNeonDb, type NeonDb } from "@loyal-labs/db-adapter-neon";
+import * as schema from "@loyal-labs/db-core/schema";
 
 import { serverEnv } from "./config/server";
-import * as schema from "./schema";
 
-let db: NeonHttpDatabase<typeof schema> | null = null;
+let db: NeonDb<typeof schema> | null = null;
 
-export const getDatabase = (): NeonHttpDatabase<typeof schema> => {
+export const getDatabase = (): NeonDb<typeof schema> => {
   const databaseUrl = serverEnv.databaseUrl;
 
   if (db) return db;
 
-  const sql = neon(databaseUrl);
-  db = drizzle({ client: sql, schema });
+  db = createNeonDb({ databaseUrl, schema });
   return db;
 };

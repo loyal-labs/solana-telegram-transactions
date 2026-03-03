@@ -442,7 +442,7 @@ function DirectFeedContent() {
 
       // Only handle horizontal swipes
       if (isHorizontalSwipeRef.current) {
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         setSwipeX(deltaX);
 
         // Haptic feedback at threshold

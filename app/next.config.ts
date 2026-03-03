@@ -1,5 +1,6 @@
 import { execSync } from "child_process";
 import type { NextConfig } from "next";
+import path from "path";
 
 function getGitInfo() {
   const vercelCommit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
@@ -32,6 +33,10 @@ const mixpanelProxyPath = mixpanelProxyPathRaw
   : "/ingest";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(__dirname, ".."),
+  },
+  transpilePackages: ["@loyal-labs/db-core", "@loyal-labs/db-adapter-neon"],
   productionBrowserSourceMaps: Boolean(process.env.DATADOG_API_KEY),
   env: {
     NEXT_PUBLIC_GIT_COMMIT_HASH: commitHash,

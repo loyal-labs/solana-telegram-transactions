@@ -122,56 +122,61 @@ export function BalanceCard({
               {/* Top: Wallet address + network */}
               <div className="flex flex-col gap-0.5">
                 {isLoading || !walletAddress ? (
-                  <div className="flex items-center gap-1">
-                    <div className="w-4 h-4 bg-white/20 animate-pulse rounded" />
-                    <div className="w-24 h-5 bg-white/20 animate-pulse rounded" />
-                  </div>
+                  <>
+                    <div className="flex items-center gap-1">
+                      <div className="w-4 h-4 bg-white/20 animate-pulse rounded" />
+                      <div className="w-24 h-5 bg-white/20 animate-pulse rounded" />
+                    </div>
+                    <div className="w-20 h-4 bg-white/10 animate-pulse rounded mt-0.5 ml-0.5" />
+                  </>
                 ) : (
-                  <button
-                    onClick={() => {
-                      if (hapticFeedback.impactOccurred.isAvailable()) {
-                        hapticFeedback.impactOccurred("light");
-                      }
-                      if (walletAddress) {
-                        if (navigator?.clipboard?.writeText) {
-                          navigator.clipboard.writeText(walletAddress);
-                          setAddressCopied(true);
-                          setTimeout(() => setAddressCopied(false), 2000);
+                  <>
+                    <button
+                      onClick={() => {
+                        if (hapticFeedback.impactOccurred.isAvailable()) {
+                          hapticFeedback.impactOccurred("light");
                         }
-                        if (hapticFeedback.notificationOccurred.isAvailable()) {
-                          hapticFeedback.notificationOccurred("success");
+                        if (walletAddress) {
+                          if (navigator?.clipboard?.writeText) {
+                            navigator.clipboard.writeText(walletAddress);
+                            setAddressCopied(true);
+                            setTimeout(() => setAddressCopied(false), 2000);
+                          }
+                          if (hapticFeedback.notificationOccurred.isAvailable()) {
+                            hapticFeedback.notificationOccurred("success");
+                          }
                         }
-                      }
-                    }}
-                    className="flex items-center gap-1 active:opacity-70 transition-opacity self-start"
-                  >
-                    <Copy
-                      className="w-5 h-5"
-                      strokeWidth={1.5}
-                      style={{
-                        color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
                       }}
-                    />
+                      className="flex items-center gap-1 active:opacity-70 transition-opacity self-start"
+                    >
+                      <Copy
+                        className="w-5 h-5"
+                        strokeWidth={1.5}
+                        style={{
+                          color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
+                        }}
+                      />
+                      <span
+                        className="text-[17px] leading-[22px]"
+                        style={{
+                          color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
+                        }}
+                      >
+                        {addressCopied ? "Copied!" : formatAddress(walletAddress)}
+                      </span>
+                    </button>
                     <span
-                      className="text-[17px] leading-[22px]"
+                      className="text-[13px] leading-[18px] capitalize pl-0.5"
                       style={{
-                        color: balanceBg ? "white" : "rgba(60, 60, 67, 0.6)",
+                        color: balanceBg
+                          ? "rgba(255, 255, 255, 0.7)"
+                          : "rgba(60, 60, 67, 0.45)",
                       }}
                     >
-                      {addressCopied ? "Copied!" : formatAddress(walletAddress)}
+                      Solana {solanaEnv}
                     </span>
-                  </button>
+                  </>
                 )}
-                <span
-                  className="text-[13px] leading-[18px] capitalize pl-0.5"
-                  style={{
-                    color: balanceBg
-                      ? "rgba(255, 255, 255, 0.7)"
-                      : "rgba(60, 60, 67, 0.45)",
-                  }}
-                >
-                  Solana {solanaEnv}
-                </span>
               </div>
 
           {/* Bottom: Balance + USD value */}

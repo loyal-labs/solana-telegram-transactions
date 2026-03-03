@@ -1,10 +1,13 @@
-import { and, eq } from "drizzle-orm";
+import { communityMembers, messages } from "@loyal-labs/db-core/schema";
 import type { Bot, Context } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
-import { communities, communityMembers, messages } from "@/lib/core/schema";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName, isCommunityChat, isGroupChat } from "@/lib/telegram/utils";
+
+import { resolveActiveBotCommunityId } from "./active-community-cache";
+
+export { evictActiveCommunityCache } from "./active-community-cache";
 
 const POSITIVE_REACTIONS = [
   "❤",
@@ -48,41 +51,20 @@ export async function handleGLoyalReaction(ctx: Context, bot: Bot): Promise<void
   ]);
 }
 
-// Cache of active community IDs (chatId string -> communityUUID)
-const activeCommunities = new Map<string, string>();
-
-export function evictActiveCommunityCache(
-  chatId: bigint | number | string
-): void {
-  activeCommunities.delete(String(chatId));
-}
-
 export async function handleCommunityMessage(ctx: Context): Promise<void> {
   const chat = ctx.chat;
   if (!chat) return;
   if (!isCommunityChat(chat.type)) return;
 
   const chatId = BigInt(chat.id);
-  const chatIdStr = String(chat.id);
   const message = ctx.message;
   if (!message?.text || !message.from) return;
 
   try {
     const db = getDatabase();
 
-    // Check if community is active (use cache first)
-    let communityId = activeCommunities.get(chatIdStr);
-    if (!communityId) {
-      const community = await db.query.communities.findFirst({
-        where: and(
-          eq(communities.chatId, chatId),
-          eq(communities.isActive, true)
-        ),
-      });
-      if (!community) return;
-      communityId = community.id;
-      activeCommunities.set(chatIdStr, communityId);
-    }
+    const communityId = await resolveActiveBotCommunityId(db, chatId);
+    if (!communityId) return;
 
     const telegramUserId = BigInt(message.from.id);
     const displayName = getTelegramDisplayName(message.from);

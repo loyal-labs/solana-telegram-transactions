@@ -79,7 +79,7 @@ export function usePullToRefresh({
         return;
       }
 
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
       isPullingRef.current = true;
 
       const distance = Math.min(deltaY * RESISTANCE, MAX_PULL);

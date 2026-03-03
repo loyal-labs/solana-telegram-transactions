@@ -85,7 +85,7 @@ function TopicCard({ topic }: { topic: ChatSummary["topics"][0] }) {
       <h2 className="font-semibold text-black pb-3" style={{ fontSize: 20, lineHeight: "24px" }}>
         {topic.title}
       </h2>
-      <p className="font-normal" style={{ fontSize: 15, lineHeight: "20px", color: "rgba(60,60,67,0.8)" }}>
+      <p className="font-normal" style={{ fontSize: 16, lineHeight: "22px", color: "rgba(60,60,67,0.9)" }}>
         {topic.content}
       </p>
       <SourceAvatars sources={topic.sources} />

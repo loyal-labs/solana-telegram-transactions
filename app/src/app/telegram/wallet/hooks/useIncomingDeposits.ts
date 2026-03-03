@@ -1,6 +1,6 @@
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY } from "@/lib/constants";
 import { track } from "@/lib/core/analytics";
@@ -84,6 +84,10 @@ export function useIncomingDeposits(params: {
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+
+  // Track transaction IDs that failed auto-claim to prevent infinite retry loops.
+  // Only gates auto-claim; manual claims still work for these IDs.
+  const failedAutoClaimIds = useRef(new Set<string>());
 
   const handleApproveTransaction = useCallback(
     async (transactionId: string, claimSource: ClaimSource) => {
@@ -195,6 +199,7 @@ export function useIncomingDeposits(params: {
         }
       } catch (error) {
         console.error("Failed to claim transaction", error);
+        failedAutoClaimIds.current.add(transactionId);
         if (hapticFeedback.notificationOccurred.isAvailable()) {
           hapticFeedback.notificationOccurred("error");
         }
@@ -320,12 +325,32 @@ export function useIncomingDeposits(params: {
       return;
     }
 
-    // Auto-claim the first available transaction
-    const firstTransaction = incomingTransactions[0];
-    if (firstTransaction) {
-      void handleApproveTransaction(firstTransaction.id, CLAIM_SOURCES.auto);
+    // Find the first transaction that hasn't already failed auto-claim
+    const claimableTransaction = incomingTransactions.find(
+      (tx) => !failedAutoClaimIds.current.has(tx.id),
+    );
+    if (claimableTransaction) {
+      void handleApproveTransaction(
+        claimableTransaction.id,
+        CLAIM_SOURCES.auto,
+      );
     }
   }, [incomingTransactions, isClaimingTransaction, handleApproveTransaction]);
+
+  // Wrap setClaimError so clearing the error also resets the failed-claim
+  // guard, allowing auto-claim to retry on next user-initiated dismiss.
+  const resetClaimError = useCallback(
+    (value: React.SetStateAction<string | null>) => {
+      setClaimError((prev) => {
+        const next = typeof value === "function" ? value(prev) : value;
+        if (next === null) {
+          failedAutoClaimIds.current.clear();
+        }
+        return next;
+      });
+    },
+    [],
+  );
 
   return {
     incomingTransactions,
@@ -335,7 +360,7 @@ export function useIncomingDeposits(params: {
     showClaimSuccess,
     setShowClaimSuccess,
     claimError,
-    setClaimError,
+    setClaimError: resetClaimError,
     showConfetti,
     setShowConfetti,
     handleApproveTransaction,

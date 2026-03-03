@@ -1,3 +1,8 @@
+import {
+  summaries,
+  type SummaryVoteAction as PersistedSummaryVoteAction,
+  summaryVotes,
+} from "@loyal-labs/db-core/schema";
 import { eq, sql } from "drizzle-orm";
 import type { CallbackQueryContext, Context } from "grammy";
 import { InlineKeyboard } from "grammy";
@@ -5,11 +10,6 @@ import Mixpanel from "mixpanel";
 
 import { serverEnv } from "@/lib/core/config/server";
 import { getDatabase } from "@/lib/core/database";
-import {
-  summaries,
-  type SummaryVoteAction as PersistedSummaryVoteAction,
-  summaryVotes,
-} from "@/lib/core/schema";
 import { buildSummaryFeedMiniAppUrl } from "@/lib/telegram/mini-app/start-param";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName } from "@/lib/telegram/utils";
