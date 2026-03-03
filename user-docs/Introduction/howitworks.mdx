@@ -28,6 +28,19 @@ mode: "wide"
     const connection = new Connection(`${PRIVATE_ER_URL}?token=${authToken}`, "confirmed");
     ```
 
+    ### PER Lifetime and Anonymity Window
+
+    MagicBlock PER is a parallel execution layer that settles back to Solana; it is not one rollup instance per user.
+
+    For privacy, two windows matter:
+
+    1. **Session window**: your PER auth token is short-lived (`getAuthToken` returns `expiresAt`). When it expires, the client must re-authenticate.
+    2. **Delegation window**: your private account access on PER starts when accounts are delegated and ends when they are undelegated/committed back to Solana.
+
+    Your practical anonymity set comes from overlapping delegated activity on the same PER endpoint and permission domain during that time, not from a single fixed “rollup lifetime.”
+
+    To tune the tradeoff, keep delegation windows short, batch private actions, and undelegate promptly after completion.
+
     Once the handshake succeeds, the user links a Solana wallet and receives a PDA that anchors every chat session and settles payments automatically.
 
     Because the state lives on-chain, users are not tied to our interface. They can fork the frontend, self-host a minimal web or mobile client, or embed Loyal into an existing product while preserving the same conversations. Privacy-conscious users keep control over their history, export encrypted transcripts, or delete them without asking permission from a centralized provider.
