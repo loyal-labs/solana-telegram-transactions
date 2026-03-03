@@ -1,4 +1,4 @@
-import { shareMessage } from "@telegram-apps/sdk";
+import { isShareMessageError, shareMessage } from "@telegram-apps/sdk";
 
 import { resolveEndpoint } from "@/lib/core/api";
 
@@ -49,7 +49,11 @@ export const shareSavedInlineMessage = async (
     await shareMessage(msgId);
     return true;
   } catch (error) {
-    console.error("Failed to share message", error);
+    if (isShareMessageError(error)) {
+      console.warn("User declined to share message");
+    } else {
+      console.error("Failed to share message", error);
+    }
     return false;
   }
 };

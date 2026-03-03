@@ -47,8 +47,6 @@ export type {
   InitializeDepositParams,
   ModifyBalanceParams,
   ModifyBalanceResult,
-  DepositForUsernameParams,
-  ClaimUsernameDepositParams,
   CreatePermissionParams,
   CreateUsernamePermissionParams,
   DelegateDepositParams,

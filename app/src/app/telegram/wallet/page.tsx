@@ -2,16 +2,15 @@
 
 import { hashes } from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha512";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import {
-  hapticFeedback,
-  useRawInitData,
-} from "@telegram-apps/sdk-react";
+import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { hapticFeedback, useRawInitData } from "@telegram-apps/sdk-react";
 import { ArrowDown, ArrowUp, Copy, RefreshCcw } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const Confetti = dynamic(() => import("react-confetti"), { ssr: false });
+
+import { NATIVE_MINT } from "@solana/spl-token";
 
 import { ScanIcon } from "@/components/ui/icons/ScanIcon";
 import { ActionButton } from "@/components/wallet/ActionButton";
@@ -28,14 +27,25 @@ import SwapSheet, {
 import TokensSheet from "@/components/wallet/TokensSheet";
 import TransactionDetailsSheet from "@/components/wallet/TransactionDetailsSheet";
 import { useSwap } from "@/hooks/useSwap";
-import { useDeviceSafeAreaTop, useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
+import {
+  useDeviceSafeAreaTop,
+  useTelegramSafeArea,
+} from "@/hooks/useTelegramSafeArea";
 import { DISPLAY_CURRENCY_KEY } from "@/lib/constants";
 import { track } from "@/lib/core/analytics";
-import { refundDeposit, topUpDeposit } from "@/lib/solana/deposits";
+import {
+  refundDeposit,
+  transferTokens,
+  transferTokensToUsername,
+} from "@/lib/solana/deposits";
+import {
+  shieldTokens,
+  unshieldTokens,
+} from "@/lib/solana/deposits/loyal-deposits";
+import { invalidatePrivateClient } from "@/lib/solana/deposits/private-client";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import { getSolanaEnv } from "@/lib/solana/rpc/connection";
-import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import { computePortfolioTotals } from "@/lib/solana/token-holdings";
 import { formatAddress } from "@/lib/solana/wallet/formatters";
 import {
@@ -137,10 +147,23 @@ export default function Home() {
   const [isTokensSheetOpen, setTokensSheetOpen] = useState(false);
   const [isTransactionDetailsSheetOpen, setTransactionDetailsSheetOpen] =
     useState(false);
-  const { walletAddress, setWalletAddress, isLoading, walletError, retryWalletInit } = useWalletInit();
-  const { solBalanceLamports, setSolBalanceLamports, refreshBalance } = useWalletBalance(walletAddress);
-  const { tokenHoldings, isHoldingsLoading, refreshTokenHoldings } = useTokenHoldings(walletAddress);
-  const { walletTransactions, setWalletTransactions, isFetchingTransactions, loadWalletTransactions } = useWalletTransactions(walletAddress);
+  const {
+    walletAddress,
+    setWalletAddress,
+    isLoading,
+    walletError,
+    retryWalletInit,
+  } = useWalletInit();
+  const { solBalanceLamports, setSolBalanceLamports, refreshBalance } =
+    useWalletBalance(walletAddress);
+  const { tokenHoldings, isHoldingsLoading, refreshTokenHoldings } =
+    useTokenHoldings(walletAddress);
+  const {
+    walletTransactions,
+    setWalletTransactions,
+    isFetchingTransactions,
+    loadWalletTransactions,
+  } = useWalletTransactions(walletAddress);
   const {
     incomingTransactions,
     setIncomingTransactions,
@@ -157,6 +180,7 @@ export default function Home() {
     rawInitData,
     walletAddress,
     refreshBalance,
+    refreshTokenHoldings,
     loadWalletTransactions,
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -171,12 +195,20 @@ export default function Home() {
   const [sendFormValues, setSendFormValues] = useState<{
     amount: string;
     recipient: string;
+    isSecured: boolean;
   }>({
     amount: "",
     recipient: "",
+    isSecured: false,
   });
   const [isSendingTransaction, setIsSendingTransaction] = useState(false);
-  const { displayCurrency, setDisplayCurrency, balanceBg, bgLoaded, handleBgSelect } = useDisplayPreferences();
+  const {
+    displayCurrency,
+    setDisplayCurrency,
+    balanceBg,
+    bgLoaded,
+    handleBgSelect,
+  } = useDisplayPreferences();
   const [isBgPickerOpen, setBgPickerOpen] = useState(false);
   const { isMobilePlatform } = useTelegramSetup(rawInitData);
   const { solPriceUsd, setSolPriceUsd, isSolPriceLoading } = useSolPrice();
@@ -194,10 +226,14 @@ export default function Home() {
     setSendStep(1); // Reset step
     if (recipientName) {
       setSelectedRecipient(recipientName);
-      setSendFormValues({ amount: "", recipient: recipientName });
+      setSendFormValues({
+        amount: "",
+        recipient: recipientName,
+        isSecured: false,
+      });
     } else {
       setSelectedRecipient("");
-      setSendFormValues({ amount: "", recipient: "" });
+      setSendFormValues({ amount: "", recipient: "", isSecured: false });
     }
     setSendSheetOpen(true);
   }, []);
@@ -226,15 +262,6 @@ export default function Home() {
       }
       // Clear incoming transaction ref
       setSelectedIncomingTransaction(null);
-      // Convert to TransactionDetailsData format
-      // For deposit_for_username transactions, the recipient is the username
-      const isDepositTransaction =
-        transaction.transferType === "deposit_for_username";
-      const recipientUsername = transaction.recipient?.startsWith("@")
-        ? transaction.recipient
-        : isDepositTransaction && transaction.recipient
-        ? `@${transaction.recipient}`
-        : undefined;
 
       const detailsData: TransactionDetailsData = {
         id: transaction.id,
@@ -245,7 +272,7 @@ export default function Home() {
         tokenAmount: transaction.tokenAmount,
         tokenDecimals: transaction.tokenDecimals,
         recipient: transaction.recipient,
-        recipientUsername,
+        recipientUsername: undefined, // FIXME: parse transfer_to_username_deposit transaction types
         sender: transaction.sender,
         senderUsername: transaction.sender?.startsWith("@")
           ? transaction.sender
@@ -278,7 +305,7 @@ export default function Home() {
   }, []);
 
   const handleSendFormValuesChange = useCallback(
-    (values: { amount: string; recipient: string }) => {
+    (values: { amount: string; recipient: string; isSecured: boolean }) => {
       setSendFormValues(values);
     },
     []
@@ -292,7 +319,7 @@ export default function Home() {
     if (!open) {
       setSendStep(1); // Reset step when closing
       setSelectedRecipient("");
-      setSendFormValues({ amount: "", recipient: "" });
+      setSendFormValues({ amount: "", recipient: "", isSecured: false });
       setSentAmountSol(undefined); // Reset sent amount
       setSendError(null); // Reset send error
     }
@@ -397,9 +424,16 @@ export default function Home() {
     hapticFeedback.impactOccurred("medium");
 
     try {
-      // TODO: Implement actual secure/unshield transaction
-      // For now, simulate success after a delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const tokenMint = new PublicKey(secureFormValues.mint);
+      const rawAmount = Math.floor(
+        secureFormValues.amount * Math.pow(10, secureFormValues.decimals)
+      );
+
+      if (secureDirection === "shield") {
+        await shieldTokens({ tokenMint, amount: rawAmount });
+      } else {
+        await unshieldTokens({ tokenMint, amount: rawAmount });
+      }
 
       setSwappedToAmount(secureFormValues.amount);
       setSwappedToSymbol(secureFormValues.symbol);
@@ -413,9 +447,17 @@ export default function Home() {
         amount: secureFormValues.amount,
       });
       void refreshBalance(true);
+      void refreshTokenHoldings(true);
     } catch (error) {
       console.error("[secure] Error:", error);
-      setSwapError(error instanceof Error ? error.message : "Operation failed");
+      const errorMessage =
+        error instanceof Error ? error.message : "Operation failed";
+      // Recreate authToken for PER connection
+      // Error: 500 : {"error":"error sending request for url (http://127.0.0.1:8899/)"}
+      if (errorMessage.includes("http://127.0.0.1:8899/")) {
+        void invalidatePrivateClient();
+      }
+      setSwapError(errorMessage);
       setSwapView("result");
       track(WALLET_ANALYTICS_EVENTS.swapTokensFailed, {
         path: WALLET_ANALYTICS_PATH,
@@ -426,7 +468,14 @@ export default function Home() {
     } finally {
       setIsSwapping(false);
     }
-  }, [secureDirection, secureFormValues, isSwapFormValid, isSwapping, refreshBalance]);
+  }, [
+    secureDirection,
+    secureFormValues,
+    isSwapFormValid,
+    isSwapping,
+    refreshBalance,
+    refreshTokenHoldings,
+  ]);
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
@@ -462,9 +511,14 @@ export default function Home() {
 
         if (username) {
           const provider = await getWalletProvider();
-          const deposits = await fetchDeposits(provider, username);
+          const deposits = await fetchDeposits(
+            provider.wallet.publicKey,
+            username
+          );
 
-          const mappedTransactions = deposits.map(mapDepositToIncomingTransaction);
+          const mappedTransactions = deposits.map(
+            mapDepositToIncomingTransaction
+          );
           setCachedIncomingTransactions(username, mappedTransactions);
           setIncomingTransactions(mappedTransactions);
         }
@@ -500,11 +554,14 @@ export default function Home() {
     isTransactionDetailsSheetOpen ||
     isBgPickerOpen;
 
-  const { pullDistance, isRefreshing: isPullRefreshing, containerRef } =
-    usePullToRefresh({
-      onRefresh: handleRefresh,
-      disabled: anySheetOpen,
-    });
+  const {
+    pullDistance,
+    isRefreshing: isPullRefreshing,
+    containerRef,
+  } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    disabled: anySheetOpen,
+  });
 
   const handleSubmitSend = useCallback(async () => {
     if (!isSendFormValid || isSendingTransaction) {
@@ -530,12 +587,25 @@ export default function Home() {
       let signature: string | null = null;
 
       if (sendMethod === SEND_METHODS.walletAddress) {
-        signature = await sendSolTransaction(trimmedRecipient, lamports);
+        if (sendFormValues.isSecured) {
+          const destinationUser = new PublicKey(trimmedRecipient);
+
+          // Transfer via privateClient
+          signature = await transferTokens({
+            tokenMint: NATIVE_MINT,
+            amount: lamports,
+            destination: destinationUser,
+          });
+        } else {
+          signature = await sendSolTransaction(trimmedRecipient, lamports);
+        }
       } else if (sendMethod === SEND_METHODS.telegram) {
         const username = trimmedRecipient.replace(/^@/, "");
-        const provider = await getWalletProvider();
-        const transferProgram = getTelegramTransferProgram(provider);
-        await topUpDeposit(provider, transferProgram, username, lamports);
+        signature = await transferTokensToUsername({
+          tokenMint: NATIVE_MINT,
+          amount: lamports,
+          destinationUsername: username,
+        });
       } else {
         throw new Error("Invalid recipient");
       }
@@ -576,6 +646,11 @@ export default function Home() {
         error instanceof Error
           ? error.message
           : "Something went wrong. Please try again.";
+      // Recreate authToken for PER connection
+      // Error: 500 : {"error":"error sending request for url (http://127.0.0.1:8899/)"}
+      if (errorMessage.includes("http://127.0.0.1:8899/")) {
+        void invalidatePrivateClient();
+      }
       setSendError(errorMessage);
     } finally {
       setIsSendingTransaction(false);
@@ -609,27 +684,29 @@ export default function Home() {
     setActivitySheetOpen(open);
   }, []);
 
-  const handleTransactionDetailsSheetChange = useCallback((open: boolean) => {
-    if (!open && hapticFeedback.impactOccurred.isAvailable()) {
-      hapticFeedback.impactOccurred("light");
-    }
-    setTransactionDetailsSheetOpen(open);
-    if (!open) {
-      setSelectedTransaction(null);
-      setSelectedIncomingTransaction(null);
-      setShowClaimSuccess(false); // Reset claim success state
-      setClaimError(null); // Reset claim error state
-      setShowConfetti(false); // Reset confetti state
-    }
-  }, [setClaimError, setShowClaimSuccess, setShowConfetti]);
+  const handleTransactionDetailsSheetChange = useCallback(
+    (open: boolean) => {
+      if (!open && hapticFeedback.impactOccurred.isAvailable()) {
+        hapticFeedback.impactOccurred("light");
+      }
+      setTransactionDetailsSheetOpen(open);
+      if (!open) {
+        setSelectedTransaction(null);
+        setSelectedIncomingTransaction(null);
+        setShowClaimSuccess(false); // Reset claim success state
+        setClaimError(null); // Reset claim error state
+        setShowConfetti(false); // Reset confetti state
+      }
+    },
+    [setClaimError, setShowClaimSuccess, setShowConfetti]
+  );
 
   // Handle canceling (refunding) a deposit_for_username transaction
   const handleCancelDeposit = useCallback(
     async (username: string, amount: number) => {
       try {
         const provider = await getWalletProvider();
-        const transferProgram = getTelegramTransferProgram(provider);
-        await refundDeposit(provider, transferProgram, username, amount);
+        await refundDeposit(provider, username, amount);
 
         if (hapticFeedback.notificationOccurred.isAvailable()) {
           hapticFeedback.notificationOccurred("success");
@@ -695,7 +772,7 @@ export default function Home() {
           await navigator.clipboard.writeText(address);
           return;
         } catch (copyError) {
-          console.warn("Clipboard copy failed", copyError);
+          console.warn("Clipboard copy failed", copyError, address);
         }
       }
 
@@ -727,7 +804,8 @@ export default function Home() {
     try {
       const amountSol = selectedTransaction.amountLamports / LAMPORTS_PER_SOL;
       const amountUsd = amountSol * solPriceUsd;
-      const isSecure = selectedTransaction.transferType === "secure" ||
+      const isSecure =
+        selectedTransaction.transferType === "secure" ||
         !!selectedTransaction.secureTokenSymbol;
 
       const msgId = await createShareMessage(
@@ -910,8 +988,12 @@ export default function Home() {
           ref={containerRef}
           className="relative flex-1 flex flex-col w-full"
           style={{
-            transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
-            transition: pullDistance > 0 && !isPullRefreshing ? "none" : "transform 0.3s cubic-bezier(0.2, 0, 0, 1)",
+            transform:
+              pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
+            transition:
+              pullDistance > 0 && !isPullRefreshing
+                ? "none"
+                : "transform 0.3s cubic-bezier(0.2, 0, 0, 1)",
           }}
         >
           <PullToRefreshIndicator
@@ -1059,7 +1141,7 @@ export default function Home() {
         solPriceUsd={solPriceUsd}
         tokenHoldings={tokenHoldings}
         onShare={
-          selectedTransaction?.transferType === "deposit_for_username"
+          selectedTransaction?.transferType === "transfer_to_username_deposit"
             ? handleShareDepositTransaction
             : undefined
         }
@@ -1122,7 +1204,9 @@ export default function Home() {
                     className="text-[17px] leading-[22px]"
                     style={{ color: decimalColor }}
                   >
-                    {walletAddress ? formatAddress(walletAddress) : "Loading..."}
+                    {walletAddress
+                      ? formatAddress(walletAddress)
+                      : "Loading..."}
                   </span>
                 </div>
                 <span

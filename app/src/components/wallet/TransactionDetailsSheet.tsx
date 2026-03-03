@@ -16,7 +16,6 @@ import { createPortal } from "react-dom";
 import { useTelegramSafeArea } from "@/hooks/useTelegramSafeArea";
 import { SOLANA_FEE_SOL } from "@/lib/constants";
 import { getDeposit } from "@/lib/solana/deposits/get-deposit";
-import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
 import type { TokenHolding } from "@/lib/solana/token-holdings";
 import { resolveTokenInfo } from "@/lib/solana/token-holdings/resolve-token-info";
 import {
@@ -63,19 +62,56 @@ export type TransactionDetailsSheetProps = {
 
 // Globe icon for "View in explorer" button (light theme)
 const ExplorerIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg
+    width="28"
+    height="28"
+    viewBox="0 0 28 28"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <circle cx="14" cy="14" r="9.33" stroke="#3C3C43" strokeWidth="2" />
-    <ellipse cx="14" cy="14" rx="4.67" ry="9.33" stroke="#3C3C43" strokeWidth="2" />
+    <ellipse
+      cx="14"
+      cy="14"
+      rx="4.67"
+      ry="9.33"
+      stroke="#3C3C43"
+      strokeWidth="2"
+    />
     <path d="M4.67 14H23.33" stroke="#3C3C43" strokeWidth="2" />
   </svg>
 );
 
 // Share icon (light theme, same as ReceiveSheet)
 const ShareIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M14 2.33333V17.5" stroke="#3C3C43" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M9.33333 7L14 2.33333L18.6667 7" stroke="#3C3C43" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M23.3333 14V22.1667C23.3333 22.7855 23.0875 23.379 22.6499 23.8166C22.2123 24.2542 21.6188 24.5 21 24.5H7C6.38116 24.5 5.78767 24.2542 5.35008 23.8166C4.9125 23.379 4.66667 22.7855 4.66667 22.1667V14" stroke="#3C3C43" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  <svg
+    width="28"
+    height="28"
+    viewBox="0 0 28 28"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M14 2.33333V17.5"
+      stroke="#3C3C43"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9.33333 7L14 2.33333L18.6667 7"
+      stroke="#3C3C43"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M23.3333 14V22.1667C23.3333 22.7855 23.0875 23.379 22.6499 23.8166C22.2123 24.2542 21.6188 24.5 21 24.5H7C6.38116 24.5 5.78767 24.2542 5.35008 23.8166C4.9125 23.379 4.66667 22.7855 4.66667 22.1667V14"
+      stroke="#3C3C43"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -111,11 +147,37 @@ export default function TransactionDetailsSheet({
   const isDragging = useRef(false);
   const isClosing = useRef(false);
 
-  const isDepositForUsername = transaction?.transferType === "deposit_for_username";
+  // FIXME: parse transfer_to_username_deposit instead
+  const isDepositForUsername = false;
   const isSwapTransaction = transaction?.transferType === "swap";
   const isSecureTransaction = transaction?.transferType === "secure";
   const isUnshieldTransaction = transaction?.transferType === "unshield";
   const isSecureOrUnshield = isSecureTransaction || isUnshieldTransaction;
+
+  // Resolve secure/unshield display data from tokenMint when explicit props are absent
+  const secureResolvedInfo =
+    isSecureOrUnshield && !secureTokenSymbol && transaction?.tokenMint
+      ? resolveTokenInfo(transaction.tokenMint, tokenHoldings)
+      : null;
+  const resolvedSecureSymbol =
+    secureTokenSymbol || secureResolvedInfo?.symbol || "?";
+  const resolvedSecureAmount =
+    secureAmount ??
+    (isSecureOrUnshield && transaction?.tokenAmount
+      ? parseFloat(transaction.tokenAmount)
+      : undefined);
+  const resolvedSecureAmountUsd =
+    secureAmountUsd ??
+    (() => {
+      if (resolvedSecureAmount == null || !transaction?.tokenMint)
+        return undefined;
+      const holding = tokenHoldings.find(
+        (h) => h.mint === transaction.tokenMint
+      );
+      return holding?.priceUsd != null
+        ? resolvedSecureAmount * holding.priceUsd
+        : undefined;
+    })();
 
   // Deposit state for deposit_for_username transactions
   const [depositAmount, setDepositAmount] = useState<number | null>(null);
@@ -162,9 +224,8 @@ export default function TransactionDetailsSheet({
       setIsLoadingDeposit(true);
       try {
         const provider = await getWalletProvider();
-        const transferProgram = getTelegramTransferProgram(provider);
         const username = transaction.recipientUsername!.replace(/^@/, "");
-        const deposit = await getDeposit(provider, transferProgram, username);
+        const deposit = await getDeposit(provider, username);
         setDepositAmount(deposit.amount);
       } catch (error) {
         console.warn("Failed to fetch deposit info:", error);
@@ -178,7 +239,8 @@ export default function TransactionDetailsSheet({
   }, [open, isDepositForUsername, transaction?.recipientUsername]);
 
   const handleCancelTransaction = useCallback(async () => {
-    if (!onCancelDeposit || !transaction?.recipientUsername || !depositAmount) return;
+    if (!onCancelDeposit || !transaction?.recipientUsername || !depositAmount)
+      return;
 
     if (hapticFeedback.impactOccurred.isAvailable()) {
       hapticFeedback.impactOccurred("medium");
@@ -198,6 +260,7 @@ export default function TransactionDetailsSheet({
     }
   }, [onCancelDeposit, transaction?.recipientUsername, depositAmount]);
 
+  // TODO: enable when refund will be implemented
   // Show "Cancel transaction" button for deposit_for_username transactions with non-zero deposit
   useEffect(() => {
     if (!open) {
@@ -206,7 +269,11 @@ export default function TransactionDetailsSheet({
       return;
     }
 
-    const canCancel = isDepositForUsername && !isLoadingDeposit && depositAmount !== null && depositAmount > 0;
+    const canCancel =
+      isDepositForUsername &&
+      !isLoadingDeposit &&
+      depositAmount !== null &&
+      depositAmount > 0;
 
     if (canCancel) {
       showMainButton({
@@ -238,7 +305,14 @@ export default function TransactionDetailsSheet({
       hideMainButton();
       hideSecondaryButton();
     };
-  }, [open, isDepositForUsername, isLoadingDeposit, depositAmount, isCancelling, handleCancelTransaction]);
+  }, [
+    open,
+    isDepositForUsername,
+    isLoadingDeposit,
+    depositAmount,
+    isCancelling,
+    handleCancelTransaction,
+  ]);
 
   const unmount = useCallback(() => {
     setRendered(false);
@@ -270,7 +344,7 @@ export default function TransactionDetailsSheet({
         unmount();
       }
     },
-    [unmount],
+    [unmount]
   );
 
   // Pull-down-to-close
@@ -318,7 +392,9 @@ export default function TransactionDetailsSheet({
   useEffect(() => {
     if (rendered) {
       document.body.style.overflow = "hidden";
-      return () => { document.body.style.overflow = ""; };
+      return () => {
+        document.body.style.overflow = "";
+      };
     }
   }, [rendered]);
 
@@ -328,7 +404,8 @@ export default function TransactionDetailsSheet({
 
   const isIncoming = transaction.type === "incoming";
   const isStoreTransaction = transaction.transferType === "store";
-  const isVerifyTransaction = transaction.transferType === "verify_telegram_init_data";
+  const isVerifyTransaction =
+    transaction.transferType === "verify_telegram_init_data";
   const isSpecialTransaction = isStoreTransaction || isVerifyTransaction;
   const isTokenTransfer =
     !!transaction.tokenMint && typeof transaction.tokenAmount === "string";
@@ -364,8 +441,8 @@ export default function TransactionDetailsSheet({
     solUsdPrice === null ? null : networkFeeSol * solUsdPrice;
 
   const displayAddress = isIncoming
-    ? (transaction.senderUsername || transaction.sender || "Unknown")
-    : (transaction.recipientUsername || transaction.recipient || "Unknown");
+    ? transaction.senderUsername || transaction.sender || "Unknown"
+    : transaction.recipientUsername || transaction.recipient || "Unknown";
 
   const isUsername = displayAddress.startsWith("@");
 
@@ -374,8 +451,8 @@ export default function TransactionDetailsSheet({
     : `${displayAddress.slice(0, 4)}…${displayAddress.slice(-4)}`;
 
   const fullAddress = isIncoming
-    ? (transaction.sender || "Unknown")
-    : (transaction.recipient || "Unknown");
+    ? transaction.sender || "Unknown"
+    : transaction.recipient || "Unknown";
 
   const handleViewInExplorer = () => {
     if (hapticFeedback.impactOccurred.isAvailable()) {
@@ -397,7 +474,9 @@ export default function TransactionDetailsSheet({
       return;
     }
 
-    const shareText = `Transaction: ${isIncoming ? "+" : "-"}${formattedAmount} ${mainSymbol}`;
+    const shareText = `Transaction: ${
+      isIncoming ? "+" : "-"
+    }${formattedAmount} ${mainSymbol}`;
 
     if (shareURL.isAvailable()) {
       const explorerUrl = transaction.signature
@@ -416,12 +495,12 @@ export default function TransactionDetailsSheet({
   const headerPrefix = isSpecialTransaction
     ? null
     : showSuccess
-      ? "Claimed from "
-      : showError
-        ? "Claim from "
-        : isIncoming
-          ? "Received from "
-          : "Sent to ";
+    ? "Claimed from "
+    : showError
+    ? "Claim from "
+    : isIncoming
+    ? "Received from "
+    : "Sent to ";
 
   const headerSpecialLabel = isStoreTransaction ? "Store data" : "Verify data";
 
@@ -478,7 +557,8 @@ export default function TransactionDetailsSheet({
             </span>
           ) : isSecureOrUnshield ? (
             <span className="text-[17px] font-semibold text-black leading-[22px]">
-              {isSecureTransaction ? "Secure" : "Unshield"} {secureTokenSymbol || "?"}
+              {isSecureTransaction ? "Secure" : "Unshield"}{" "}
+              {resolvedSecureSymbol}
             </span>
           ) : (
             /* Header Pill for non-swap transactions */
@@ -557,13 +637,27 @@ export default function TransactionDetailsSheet({
 
               <style jsx>{`
                 @keyframes result-pulse {
-                  0% { transform: scale(0); opacity: 0; }
-                  50% { transform: scale(1.1); }
-                  100% { transform: scale(1); opacity: 1; }
+                  0% {
+                    transform: scale(0);
+                    opacity: 0;
+                  }
+                  50% {
+                    transform: scale(1.1);
+                  }
+                  100% {
+                    transform: scale(1);
+                    opacity: 1;
+                  }
                 }
                 @keyframes result-icon {
-                  0% { transform: scale(0) rotate(-45deg); opacity: 0; }
-                  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+                  0% {
+                    transform: scale(0) rotate(-45deg);
+                    opacity: 0;
+                  }
+                  100% {
+                    transform: scale(1) rotate(0deg);
+                    opacity: 1;
+                  }
                 }
               `}</style>
             </div>
@@ -595,21 +689,35 @@ export default function TransactionDetailsSheet({
                   className="text-base leading-5"
                   style={{ color: "rgba(60, 60, 67, 0.6)" }}
                 >
-                  <span className="text-black">{formattedAmount} SOL</span>
-                  {" "}successfully claimed from{" "}
+                  <span className="text-black">{formattedAmount} SOL</span>{" "}
+                  successfully claimed from{" "}
                   <span className="text-black">{abbreviatedAddress}</span>
                 </p>
               </div>
 
               <style jsx>{`
                 @keyframes result-pulse {
-                  0% { transform: scale(0); opacity: 0; }
-                  50% { transform: scale(1.1); }
-                  100% { transform: scale(1); opacity: 1; }
+                  0% {
+                    transform: scale(0);
+                    opacity: 0;
+                  }
+                  50% {
+                    transform: scale(1.1);
+                  }
+                  100% {
+                    transform: scale(1);
+                    opacity: 1;
+                  }
                 }
                 @keyframes result-icon {
-                  0% { transform: scale(0) rotate(-45deg); opacity: 0; }
-                  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+                  0% {
+                    transform: scale(0) rotate(-45deg);
+                    opacity: 0;
+                  }
+                  100% {
+                    transform: scale(1) rotate(0deg);
+                    opacity: 1;
+                  }
                 }
               `}</style>
             </div>
@@ -671,7 +779,11 @@ export default function TransactionDetailsSheet({
                     <p className="text-base leading-5">
                       <span className="text-black">{networkFeeSol} SOL</span>
                       <span style={{ color: "rgba(60, 60, 67, 0.6)" }}>
-                        {" "}≈ {networkFeeUsd !== null ? `$${networkFeeUsd.toFixed(2)}` : "—"}
+                        {" "}
+                        ≈{" "}
+                        {networkFeeUsd !== null
+                          ? `$${networkFeeUsd.toFixed(2)}`
+                          : "—"}
                       </span>
                     </p>
                   </div>
@@ -736,16 +848,15 @@ export default function TransactionDetailsSheet({
               <div className="flex flex-col items-center justify-center px-4 pb-6">
                 <div className="flex flex-col items-center gap-1">
                   <div className="flex items-baseline gap-2">
-                    <p
-                      className="text-[40px] font-semibold leading-[48px] text-black"
-                    >
-                      {secureAmount?.toFixed(4).replace(/\.?0+$/, '') || "0"}
+                    <p className="text-[40px] font-semibold leading-[48px] text-black">
+                      {resolvedSecureAmount?.toFixed(4).replace(/\.?0+$/, "") ||
+                        "0"}
                     </p>
                     <p
                       className="text-[28px] font-semibold leading-8 tracking-[0.4px]"
                       style={{ color: "rgba(60, 60, 67, 0.4)" }}
                     >
-                      {secureTokenSymbol || "?"}
+                      {resolvedSecureSymbol}
                     </p>
                   </div>
                   {/* USD Value */}
@@ -753,8 +864,12 @@ export default function TransactionDetailsSheet({
                     className="text-[17px] leading-[22px] text-center"
                     style={{ color: "rgba(60, 60, 67, 0.6)" }}
                   >
-                    ≈{secureAmountUsd !== undefined
-                      ? `$${secureAmountUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    ≈
+                    {resolvedSecureAmountUsd !== undefined
+                      ? `$${resolvedSecureAmountUsd.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
                       : "—"}
                   </p>
                   {/* Date */}
@@ -797,7 +912,11 @@ export default function TransactionDetailsSheet({
                     <p className="text-[17px] leading-[22px] tracking-[-0.187px]">
                       <span className="text-black">{networkFeeSol} SOL</span>
                       <span style={{ color: "rgba(60, 60, 67, 0.6)" }}>
-                        {" "}≈ {networkFeeUsd !== null ? `$${networkFeeUsd.toFixed(2)}` : "—"}
+                        {" "}
+                        ≈{" "}
+                        {networkFeeUsd !== null
+                          ? `$${networkFeeUsd.toFixed(2)}`
+                          : "—"}
                       </span>
                     </p>
                   </div>
@@ -855,7 +974,7 @@ export default function TransactionDetailsSheet({
                       className="text-[40px] font-semibold leading-[48px]"
                       style={{ color: "#34C759" }}
                     >
-                      +{swapToAmount?.toFixed(4).replace(/\.?0+$/, '') || "0"}
+                      +{swapToAmount?.toFixed(4).replace(/\.?0+$/, "") || "0"}
                     </p>
                     <p
                       className="text-[28px] font-semibold leading-8 tracking-[0.4px]"
@@ -869,8 +988,12 @@ export default function TransactionDetailsSheet({
                     className="text-[17px] leading-[22px] text-center"
                     style={{ color: "rgba(60, 60, 67, 0.6)" }}
                   >
-                    ≈{swapToAmountUsd !== undefined
-                      ? `$${swapToAmountUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    ≈
+                    {swapToAmountUsd !== undefined
+                      ? `$${swapToAmountUsd.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
                       : "—"}
                   </p>
                   {/* Date */}
@@ -913,7 +1036,11 @@ export default function TransactionDetailsSheet({
                     <p className="text-[17px] leading-[22px] tracking-[-0.187px]">
                       <span className="text-black">{networkFeeSol} SOL</span>
                       <span style={{ color: "rgba(60, 60, 67, 0.6)" }}>
-                        {" "}≈ {networkFeeUsd !== null ? `$${networkFeeUsd.toFixed(2)}` : "—"}
+                        {" "}
+                        ≈{" "}
+                        {networkFeeUsd !== null
+                          ? `$${networkFeeUsd.toFixed(2)}`
+                          : "—"}
                       </span>
                     </p>
                   </div>
@@ -971,7 +1098,8 @@ export default function TransactionDetailsSheet({
                       className="text-[40px] font-semibold leading-[48px]"
                       style={{ color: isIncoming ? "#34C759" : "#000" }}
                     >
-                      {isIncoming ? "+" : "−"}{formattedAmount}
+                      {isIncoming ? "+" : "−"}
+                      {formattedAmount}
                     </p>
                     <p
                       className="text-[28px] font-semibold leading-8 tracking-[0.4px]"
@@ -985,8 +1113,12 @@ export default function TransactionDetailsSheet({
                     className="text-base leading-[22px] text-center"
                     style={{ color: "rgba(60, 60, 67, 0.6)" }}
                   >
-                    ≈{mainAmountUsd !== null
-                      ? `$${mainAmountUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    ≈
+                    {mainAmountUsd !== null
+                      ? `$${mainAmountUsd.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
                       : "—"}
                   </p>
                   {/* Date */}
@@ -1043,7 +1175,11 @@ export default function TransactionDetailsSheet({
                       <p className="text-base leading-5">
                         <span className="text-black">{networkFeeSol} SOL</span>
                         <span style={{ color: "rgba(60, 60, 67, 0.6)" }}>
-                          {" "}≈ {networkFeeUsd !== null ? `$${networkFeeUsd.toFixed(2)}` : "—"}
+                          {" "}
+                          ≈{" "}
+                          {networkFeeUsd !== null
+                            ? `$${networkFeeUsd.toFixed(2)}`
+                            : "—"}
                         </span>
                       </p>
                     </div>

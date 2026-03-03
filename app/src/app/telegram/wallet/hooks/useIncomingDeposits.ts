@@ -1,4 +1,3 @@
-import { PublicKey } from "@solana/web3.js";
 import { hapticFeedback } from "@telegram-apps/sdk-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -6,14 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY } from "@/lib/constants";
 import { track } from "@/lib/core/analytics";
 import { subscribeToDepositsWithUsername } from "@/lib/solana/deposits";
+import { invalidatePrivateClient } from "@/lib/solana/deposits/private-client";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
-import { getTelegramTransferProgram } from "@/lib/solana/solana-helpers";
-import {
-  prepareStoreInitDataTxn,
-  sendStoreInitDataTxn,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  verifyAndClaimDeposit,
-} from "@/lib/solana/verify-and-claim-deposit";
+import { getTelegramVerificationProgram } from "@/lib/solana/solana-helpers";
+import { storeInitDataGasless } from "@/lib/solana/verification/store-init-data";
+import { sendStoreInitDataTxn } from "@/lib/solana/verify-and-claim-deposit";
 import {
   getGaslessPublicKey,
   getWalletKeypair,
@@ -45,6 +41,7 @@ export function useIncomingDeposits(params: {
   rawInitData: string | undefined;
   walletAddress: string | null;
   refreshBalance: (force?: boolean) => Promise<void>;
+  refreshTokenHoldings: (force?: boolean) => Promise<void>;
   loadWalletTransactions: (opts?: { force?: boolean }) => Promise<void>;
 }): {
   incomingTransactions: IncomingTransaction[];
@@ -59,12 +56,14 @@ export function useIncomingDeposits(params: {
   setClaimError: React.Dispatch<React.SetStateAction<string | null>>;
   showConfetti: boolean;
   setShowConfetti: React.Dispatch<React.SetStateAction<boolean>>;
-  handleApproveTransaction: (
-    id: string,
-    source: ClaimSource,
-  ) => Promise<void>;
+  handleApproveTransaction: (id: string, source: ClaimSource) => Promise<void>;
 } {
-  const { rawInitData, refreshBalance, loadWalletTransactions } = params;
+  const {
+    rawInitData,
+    refreshBalance,
+    refreshTokenHoldings,
+    loadWalletTransactions,
+  } = params;
 
   const [incomingTransactions, setIncomingTransactions] = useState<
     IncomingTransaction[]
@@ -117,15 +116,33 @@ export function useIncomingDeposits(params: {
 
         const { validationBytes, signatureBytes } =
           createValidationBytesFromRawInitData(rawInitData);
-        const senderPublicKey = new PublicKey(transaction.sender);
 
         const username = transaction.username;
         const amountLamports = transaction.amountLamports;
         const payerPublicKey = await getGaslessPublicKey();
         console.log("payerPublicKey", payerPublicKey);
 
-        const preparedStoreInitDataTxn = await prepareStoreInitDataTxn(
+        // Overview of PER claim:
+        //
+        // assert usernameDeposit is delegated
+        // assert usernameDeposit is not zero
+        //
+        // IDEAL:
+        // base:  store bytes
+        // base:  validate bytes
+        // base:    create destination deposit
+        // base:    delegate destination deposit
+        // <wait delegation>
+        // per:   claim
+        //
+        // OUR CURRENT IMPLEMENTATION
+        // check if client have enough SOL
+        //   airdrop up to 20k lamports
+
+        const verificationProgram = getTelegramVerificationProgram(provider);
+        const preparedStoreInitDataTxn = await storeInitDataGasless(
           provider,
+          verificationProgram,
           payerPublicKey,
           validationBytes,
           wallet
@@ -133,7 +150,6 @@ export function useIncomingDeposits(params: {
 
         await sendStoreInitDataTxn(
           preparedStoreInitDataTxn,
-          senderPublicKey,
           recipientPublicKey,
           username,
           amountLamports,
@@ -142,11 +158,14 @@ export function useIncomingDeposits(params: {
           TELEGRAM_PUBLIC_KEY_PROD_UINT8ARRAY
         );
 
+        // TODO: filter out tx instead
+        setCachedIncomingTransactions(username, []);
         setIncomingTransactions((prev) =>
           prev.filter((tx) => tx.id !== transactionId)
         );
 
         await refreshBalance(true);
+        void refreshTokenHoldings(true);
         void loadWalletTransactions({ force: true });
         track(WALLET_ANALYTICS_EVENTS.claimFunds, {
           path: WALLET_ANALYTICS_PATH,
@@ -190,6 +209,11 @@ export function useIncomingDeposits(params: {
           error instanceof Error
             ? error.message
             : "Something went wrong. Please try again.";
+        // Recreate authToken for PER connection
+        // Error: 500 : {"error":"error sending request for url (http://127.0.0.1:8899/)"}
+        if (errorMessage.includes("http://127.0.0.1:8899/")) {
+          void invalidatePrivateClient();
+        }
         setClaimError(errorMessage);
       } finally {
         setIsClaimingTransaction(false);
@@ -199,6 +223,7 @@ export function useIncomingDeposits(params: {
       incomingTransactions,
       rawInitData,
       refreshBalance,
+      refreshTokenHoldings,
       loadWalletTransactions,
     ]
   );
@@ -233,9 +258,11 @@ export function useIncomingDeposits(params: {
         }
 
         const provider = await getWalletProvider();
-        const transferProgram = getTelegramTransferProgram(provider);
         console.log("Fetching deposits for username:", username);
-        const deposits = await fetchDeposits(provider, username);
+        const deposits = await fetchDeposits(
+          provider.wallet.publicKey,
+          username
+        );
         console.log("Deposits fetched:", deposits.length, deposits);
         if (isCancelled) {
           return;
@@ -249,7 +276,7 @@ export function useIncomingDeposits(params: {
         setIncomingTransactions(mappedTransactions);
 
         unsubscribe = await subscribeToDepositsWithUsername(
-          transferProgram,
+          provider.wallet.publicKey,
           username,
           (deposit) => {
             if (isCancelled) {

@@ -8,7 +8,7 @@ import {
 
 import { publicEnv } from "@/lib/core/config/public";
 
-import { getConnection } from "../rpc/connection";
+import { getConnection, getWebsocketConnection } from "../rpc/connection";
 import { SimpleWallet } from "./wallet-implementation";
 import { ensureWalletKeypair } from "./wallet-keypair-logic";
 
@@ -43,7 +43,7 @@ export const getWalletProvider = async (): Promise<AnchorProvider> => {
 export const getCustomWalletProvider = async (
   keypair: Keypair
 ): Promise<AnchorProvider> => {
-  const connection = getConnection();
+  const connection = getWebsocketConnection();
   const wallet = new SimpleWallet(keypair);
   return new AnchorProvider(connection, wallet);
 };
@@ -126,12 +126,12 @@ const invalidateBalanceCache = () => {
 export const subscribeToWalletBalance = async (
   onChange: (lamports: number) => void
 ): Promise<() => Promise<void>> => {
-  const connection = getConnection();
+  const connection = getWebsocketConnection();
   const keypair = await getWalletKeypair();
 
   let lastLamports = balanceCache?.lamports;
 
-  const subscriptionId = await connection.onAccountChange(
+  const subscriptionId = connection.onAccountChange(
     keypair.publicKey,
     (accountInfo) => {
       const lamports = accountInfo.lamports;

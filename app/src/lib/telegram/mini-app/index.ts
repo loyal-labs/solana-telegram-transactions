@@ -209,9 +209,24 @@ export const initTelegram = () => {
   if (initialized) return;
 
   try {
-    if (isTMA()) {
-      init();
-      miniApp.ready();
+    // isTMA() relies on retrieveLaunchParams() which needs tgWebAppPlatform in the URL.
+    // Some Telegram clients (old versions, certain desktop builds) may not inject it.
+    // Fall back to checking window.Telegram?.WebApp which is set by the Telegram JS bridge.
+    const inTelegram = isTMA() || !!window.Telegram?.WebApp;
+
+    if (inTelegram) {
+      try {
+        init();
+      } catch {
+        // init() may throw LaunchParamsRetrieveError if URL params are missing,
+        // but native bridge features (safe area, ready()) still work.
+      }
+
+      try {
+        miniApp.ready();
+      } catch {
+        // Gracefully handle if SDK init was incomplete
+      }
 
       // Also call native ready() for good measure
       window.Telegram?.WebApp?.ready();

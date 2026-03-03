@@ -4,7 +4,8 @@ import type { Transaction } from "@/types/wallet";
 // ─── Mock data for development ─────────────────────────────────────────────
 export const USE_MOCK_DATA = false;
 
-export const MOCK_WALLET_ADDRESS = "UQAt7f8Kq9xZ3mNpR2vL5wYcD4bJ6hTgSoAeWnFqZir";
+export const MOCK_WALLET_ADDRESS =
+  "UQAt7f8Kq9xZ3mNpR2vL5wYcD4bJ6hTgSoAeWnFqZir";
 export const MOCK_BALANCE_LAMPORTS = 1_267_476_540_000; // ~1267.47654 SOL
 export const MOCK_SOL_PRICE_USD = 132.05;
 
@@ -179,7 +180,7 @@ export const MOCK_WALLET_TRANSACTIONS: Transaction[] = [
   {
     id: "mock-4",
     type: "pending",
-    transferType: "deposit_for_username",
+    transferType: "transfer_to_username_deposit",
     amountLamports: 250_000_000,
     sender: undefined,
     recipient: "UQAt...qZir",

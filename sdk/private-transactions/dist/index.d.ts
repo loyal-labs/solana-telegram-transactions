@@ -35,7 +35,7 @@
  * await ephemeralClient.undelegateDeposit({ user, tokenMint, ... });
  */
 export { LoyalPrivateTransactionsClient, waitForAccountOwnerChange, } from "./src/LoyalPrivateTransactionsClient";
-export type { WalletSigner, WalletLike, RpcOptions, ClientConfig, DepositData, UsernameDepositData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, DepositForUsernameParams, ClaimUsernameDepositParams, CreatePermissionParams, CreateUsernamePermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams, TransferDepositParams, TransferToUsernameDepositParams, DelegationRecord, DelegationStatusResult, DelegationStatusResponse, } from "./src/types";
+export type { WalletSigner, WalletLike, RpcOptions, ClientConfig, DepositData, UsernameDepositData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, CreatePermissionParams, CreateUsernamePermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams, TransferDepositParams, TransferToUsernameDepositParams, DelegationRecord, DelegationStatusResult, DelegationStatusResponse, } from "./src/types";
 export { isKeypair, isAnchorProvider, isWalletLike } from "./src/types";
 export { ER_VALIDATOR, PROGRAM_ID, DELEGATION_PROGRAM_ID, PERMISSION_PROGRAM_ID, MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID, DEPOSIT_SEED, DEPOSIT_SEED_BYTES, USERNAME_DEPOSIT_SEED, USERNAME_DEPOSIT_SEED_BYTES, VAULT_SEED, VAULT_SEED_BYTES, PERMISSION_SEED, PERMISSION_SEED_BYTES, LAMPORTS_PER_SOL, solToLamports, lamportsToSol, } from "./src/constants";
 export { findDepositPda, findUsernameDepositPda, findVaultPda, findPermissionPda, findDelegationRecordPda, findDelegationMetadataPda, findBufferPda, } from "./src/pda";
@@ -53,94 +53,6 @@ export declare const IDL: {
         discriminator: number[];
         accounts: ({
             name: string;
-            writable: boolean;
-            pda?: undefined;
-            relations?: undefined;
-            address?: undefined;
-        } | {
-            name: string;
-            writable: boolean;
-            pda: {
-                seeds: ({
-                    kind: string;
-                    value: number[];
-                    path?: undefined;
-                } | {
-                    kind: string;
-                    path: string;
-                    value?: undefined;
-                })[];
-                program?: undefined;
-            };
-            relations?: undefined;
-            address?: undefined;
-        } | {
-            name: string;
-            writable: boolean;
-            pda: {
-                seeds: ({
-                    kind: string;
-                    path: string;
-                    value?: undefined;
-                } | {
-                    kind: string;
-                    value: number[];
-                    path?: undefined;
-                })[];
-                program: {
-                    kind: string;
-                    value: number[];
-                };
-            };
-            relations?: undefined;
-            address?: undefined;
-        } | {
-            name: string;
-            writable: boolean;
-            pda: {
-                seeds: ({
-                    kind: string;
-                    value: number[];
-                    path?: undefined;
-                    account?: undefined;
-                } | {
-                    kind: string;
-                    path: string;
-                    account: string;
-                    value?: undefined;
-                })[];
-                program?: undefined;
-            };
-            relations?: undefined;
-            address?: undefined;
-        } | {
-            name: string;
-            relations: string[];
-            writable?: undefined;
-            pda?: undefined;
-            address?: undefined;
-        } | {
-            name: string;
-            writable?: undefined;
-            pda?: undefined;
-            relations?: undefined;
-            address?: undefined;
-        } | {
-            name: string;
-            address: string;
-            writable?: undefined;
-            pda?: undefined;
-            relations?: undefined;
-        })[];
-        args: {
-            name: string;
-            type: string;
-        }[];
-    } | {
-        name: string;
-        discriminator: number[];
-        accounts: ({
-            name: string;
             relations: string[];
             writable?: undefined;
             pda?: undefined;
@@ -180,7 +92,6 @@ export declare const IDL: {
             name: string;
             type: string;
         }[];
-        docs?: undefined;
     } | {
         name: string;
         docs: string[];
@@ -326,76 +237,6 @@ export declare const IDL: {
             writable?: undefined;
             signer?: undefined;
             optional?: undefined;
-            pda?: undefined;
-        })[];
-        args: {
-            name: string;
-            type: string;
-        }[];
-    } | {
-        name: string;
-        docs: string[];
-        discriminator: number[];
-        accounts: ({
-            name: string;
-            writable: boolean;
-            signer: boolean;
-            pda?: undefined;
-            address?: undefined;
-        } | {
-            name: string;
-            writable: boolean;
-            pda: {
-                seeds: ({
-                    kind: string;
-                    value: number[];
-                    path?: undefined;
-                } | {
-                    kind: string;
-                    path: string;
-                    value?: undefined;
-                })[];
-                program?: undefined;
-            };
-            signer?: undefined;
-            address?: undefined;
-        } | {
-            name: string;
-            writable: boolean;
-            pda: {
-                seeds: ({
-                    kind: string;
-                    path: string;
-                    value?: undefined;
-                } | {
-                    kind: string;
-                    value: number[];
-                    path?: undefined;
-                })[];
-                program: {
-                    kind: string;
-                    value: number[];
-                };
-            };
-            signer?: undefined;
-            address?: undefined;
-        } | {
-            name: string;
-            writable: boolean;
-            signer?: undefined;
-            pda?: undefined;
-            address?: undefined;
-        } | {
-            name: string;
-            writable?: undefined;
-            signer?: undefined;
-            pda?: undefined;
-            address?: undefined;
-        } | {
-            name: string;
-            address: string;
-            writable?: undefined;
-            signer?: undefined;
             pda?: undefined;
         })[];
         args: {

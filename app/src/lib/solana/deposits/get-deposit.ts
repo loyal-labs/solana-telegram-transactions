@@ -1,26 +1,28 @@
-import { AnchorProvider, Program } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@coral-xyz/anchor";
+import { NATIVE_MINT } from "@solana/spl-token";
 
-import type { TelegramTransfer } from "../../../../../target/types/telegram_transfer";
 import type { TelegramDeposit } from "../../../types/deposits";
-import { getDepositPda } from "../solana-helpers";
+import { getPrivateClient } from "./private-client";
 
 export const getDeposit = async (
   provider: AnchorProvider,
-  transferProgram: Program<TelegramTransfer>,
   username: string
 ): Promise<TelegramDeposit> => {
-  const depositPda = getDepositPda(
-    provider.wallet.publicKey,
+  const privateClient = await getPrivateClient();
+  const deposit = await privateClient.getEphemeralUsernameDeposit(
     username,
-    transferProgram
+    NATIVE_MINT
   );
-
-  const deposit = await transferProgram.account.deposit.fetch(depositPda);
+  if (!deposit) {
+    throw new Error("Deposit account not found");
+  }
 
   return {
-    user: deposit.user,
+    user: provider.publicKey,
     username: deposit.username,
-    amount: deposit.amount.toNumber(),
-    lastNonce: deposit.lastNonce.toNumber(),
+    amount: Number(deposit.amount),
+    lastNonce: 0,
+    tokenMint: deposit.tokenMint,
+    address: deposit.address,
   };
 };

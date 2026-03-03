@@ -591,6 +591,23 @@ export default function ActivitySheet({
 
                     // Secure/Unshield transaction view
                     if (isSecureOrUnshield) {
+                      const secureResolvedInfo = transaction.tokenMint
+                        ? resolveTokenInfo(transaction.tokenMint, tokenHoldings)
+                        : null;
+                      const secureSymbol =
+                        transaction.secureTokenSymbol ||
+                        secureResolvedInfo?.symbol ||
+                        "Token";
+                      const secureIcon =
+                        transaction.secureTokenIcon ||
+                        secureResolvedInfo?.icon ||
+                        "/tokens/solana-sol-logo.png";
+                      const secureAmount =
+                        transaction.secureAmount ??
+                        (transaction.tokenAmount
+                          ? parseFloat(transaction.tokenAmount)
+                          : null);
+
                       return (
                         <button
                           key={transaction.id}
@@ -602,8 +619,8 @@ export default function ActivitySheet({
                             <div className="w-12 h-12 relative">
                               <div className="absolute left-0 top-0 w-8 h-8 rounded-full overflow-hidden bg-[#f2f2f7]">
                                 <Image
-                                  src={transaction.secureTokenIcon || "/tokens/solana-sol-logo.png"}
-                                  alt={transaction.secureTokenSymbol || "Token"}
+                                  src={secureIcon}
+                                  alt={secureSymbol}
                                   fill
                                   className="object-cover"
                                 />
@@ -628,7 +645,7 @@ export default function ActivitySheet({
                               className="text-[13px] leading-4 truncate"
                               style={{ color: "rgba(60, 60, 67, 0.6)" }}
                             >
-                              {transaction.secureTokenSymbol || "Token"}
+                              {secureSymbol}
                             </p>
                           </div>
 
@@ -637,8 +654,8 @@ export default function ActivitySheet({
                             <p
                               className="text-base leading-5 text-black"
                             >
-                              {transaction.secureAmount
-                                ? `${transaction.secureAmount.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${transaction.secureTokenSymbol || ""}`
+                              {secureAmount != null
+                                ? `${secureAmount.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${secureSymbol}`
                                 : `${formatTransactionAmount(transaction.amountLamports)} SOL`}
                             </p>
                             <p

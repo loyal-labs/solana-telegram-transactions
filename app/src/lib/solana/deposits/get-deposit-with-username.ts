@@ -1,71 +1,73 @@
-import { Program } from "@coral-xyz/anchor";
+import {
+  findUsernameDepositPda,
+  type UsernameDepositData,
+} from "@loyal-labs/private-transactions";
+import { NATIVE_MINT } from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
 
-import { TelegramTransfer } from "../../../../../target/types/telegram_transfer";
-import { TelegramDeposit } from "../../../types/deposits";
-import { encodeAnchorStringFilter } from "../solana-helpers";
+import type { TelegramDeposit } from "../../../types/deposits";
+import { getPrivateClient } from "./private-client";
 
-const depositFilter = (username: string) => ({
-  memcmp: {
-    offset: 8 + 32,
-    bytes: encodeAnchorStringFilter(username),
-  },
+const mapUsernameDepositToTelegramDeposit = (
+  user: PublicKey,
+  deposit: UsernameDepositData,
+): TelegramDeposit => ({
+  user,
+  username: deposit.username,
+  amount: Number(deposit.amount),
+  lastNonce: 0,
+  tokenMint: deposit.tokenMint,
+  address: deposit.address,
 });
 
-const depositFilters = (username: string) => [depositFilter(username)];
-
 export const getDepositWithUsername = async (
-  transferProgram: Program<TelegramTransfer>,
-  username: string
+  user: PublicKey,
+  username: string,
 ): Promise<TelegramDeposit[]> => {
-  const filters = depositFilters(username);
+  const privateClient = await getPrivateClient();
+  const deposit = await privateClient.getEphemeralUsernameDeposit(
+    username,
+    NATIVE_MINT,
+  );
+  if (!deposit) {
+    return [];
+  }
 
-  const accounts = await transferProgram.account.deposit.all(filters);
-  const deposits = accounts.map(({ account }) => ({
-    user: account.user,
-    username: account.username,
-    amount: account.amount.toNumber(),
-    lastNonce: account.lastNonce.toNumber(),
-  }));
-
-  return deposits;
+  return [mapUsernameDepositToTelegramDeposit(user, deposit)];
 };
 
 export const subscribeToDepositsWithUsername = async (
-  transferProgram: Program<TelegramTransfer>,
+  user: PublicKey,
   username: string,
-  onChange: (deposit: TelegramDeposit) => void
+  onChange: (deposit: TelegramDeposit) => void,
 ): Promise<() => Promise<void>> => {
-  const filters = depositFilters(username);
-  const connection = transferProgram.provider.connection;
-  const programId = transferProgram.programId;
+  const privateClient = await getPrivateClient();
+  const [depositPda] = findUsernameDepositPda(username, NATIVE_MINT);
 
-  const subscriptionId = await connection.onProgramAccountChange(
-    programId,
-    (keyedAccountInfo) => {
+  const connection = privateClient.ephemeralProgram.provider.connection;
+  const subscriptionId = connection.onAccountChange(
+    depositPda,
+    async () => {
       try {
-        const account = transferProgram.coder.accounts.decode(
-          "deposit",
-          keyedAccountInfo.accountInfo.data
+        const deposit = await privateClient.getEphemeralUsernameDeposit(
+          username,
+          NATIVE_MINT,
         );
+        if (!deposit || deposit.amount <= 0) {
+          return;
+        }
 
-        const deposit: TelegramDeposit = {
-          user: account.user,
-          username: account.username,
-          amount: account.amount.toNumber(),
-          lastNonce: account.lastNonce.toNumber(),
-        };
-
-        onChange(deposit);
+        onChange(mapUsernameDepositToTelegramDeposit(user, deposit));
       } catch (error) {
-        console.error("Failed to decode deposit account change", error);
+        console.error("Failed to fetch username deposit account change", error);
       }
     },
-    { commitment: "confirmed", filters }
+    { commitment: "confirmed" },
   );
 
   return async () => {
     try {
-      await connection.removeProgramAccountChangeListener(subscriptionId);
+      await connection.removeAccountChangeListener(subscriptionId);
     } catch (error) {
       console.error("Failed to remove deposit subscription", error);
     }

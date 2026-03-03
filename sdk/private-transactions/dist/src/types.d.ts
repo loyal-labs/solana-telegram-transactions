@@ -91,30 +91,6 @@ export interface ModifyBalanceResult {
     signature: string;
     deposit: DepositData;
 }
-/**
- * Parameters for depositing tokens for a username
- */
-export interface DepositForUsernameParams {
-    username: string;
-    tokenMint: PublicKey;
-    amount: number | bigint;
-    depositor: PublicKey;
-    payer: PublicKey;
-    depositorTokenAccount: PublicKey;
-    rpcOptions?: RpcOptions;
-}
-/**
- * Parameters for claiming tokens from a username deposit
- */
-export interface ClaimUsernameDepositParams {
-    username: string;
-    tokenMint: PublicKey;
-    amount: number | bigint;
-    recipient: PublicKey;
-    recipientTokenAccount: PublicKey;
-    session: PublicKey;
-    rpcOptions?: RpcOptions;
-}
 export interface ClaimUsernameDepositToDepositParams {
     username: string;
     tokenMint: PublicKey;
@@ -216,12 +192,12 @@ export interface TransferToUsernameDepositParams {
  */
 export interface DelegationRecord {
     authority: string;
-    owner: string;
-    delegationSlot: number;
-    lamports: number;
+    owner?: string;
+    delegationSlot?: number;
+    lamports?: number;
 }
 /**
- * Response from MagicBlock getDelegationStatus RPC call
+ * Response from MagicBlock getDelegationStatus RPC call.
  */
 export interface DelegationStatusResult {
     isDelegated: boolean;
@@ -234,7 +210,7 @@ export interface DelegationStatusResult {
 export interface DelegationStatusResponse {
     jsonrpc: "2.0";
     id: number | string;
-    result?: DelegationStatusResult;
+    result: DelegationStatusResult;
     error?: {
         code: number;
         message: string;
