@@ -33,18 +33,14 @@ type PhantomWalletProviderProps = {
 };
 
 const PHANTOM_APP_ID = "4b74c407-6337-44e5-bf42-eae48c9c35a7";
+const DEFAULT_SOLANA_RPC_ENDPOINT = "https://api.mainnet-beta.solana.com";
 
 export const PhantomWalletProvider: FC<PhantomWalletProviderProps> = ({
   children,
 }) => {
   const endpoint = useMemo(() => {
     const rpcEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_ENDPOINT;
-    if (!rpcEndpoint) {
-      throw new Error(
-        "NEXT_PUBLIC_SOLANA_RPC_ENDPOINT environment variable is not set. Please add it to your .env file."
-      );
-    }
-    return rpcEndpoint;
+    return rpcEndpoint || DEFAULT_SOLANA_RPC_ENDPOINT;
   }, []);
 
   const connection = useMemo(

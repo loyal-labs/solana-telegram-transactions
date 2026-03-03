@@ -24,7 +24,7 @@
     "@irys/upload-solana": "^0.1.8",
     "@irys/web-upload": "^0.0.15",
     "@irys/web-upload-solana": "^0.1.8",
-    "@loyal-labs/transactions": "^0.1.0",
+    "@loyal-labs/transactions": "workspace:*",
     "@nillion/nilai-ts": "^0.2.0",
     "@nillion/nuc": "^1.0.0",
     "@nillion/secretvaults": "^1.0.0",

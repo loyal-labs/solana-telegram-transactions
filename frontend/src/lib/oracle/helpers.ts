@@ -39,5 +39,5 @@ export function getModelClient(): NilaiOpenAIClient {
 // 2. Notify users when they need to sign in again
 // 3.
 export function deserializeDelegationToken(delegationToken: string): Envelope {
-  return Codec.decodeBase64Url(delegationToken);
+  return Codec._unsafeDecodeBase64Url(delegationToken);
 }

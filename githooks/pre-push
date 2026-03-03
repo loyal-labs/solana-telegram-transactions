@@ -28,3 +28,9 @@ echo "[pre-push] Running admin lint..."
 
 echo "[pre-push] Running admin build..."
 (cd admin && bun run build)
+
+echo "[pre-push] Running frontend lint..."
+(cd frontend && bun run lint)
+
+echo "[pre-push] Running frontend build..."
+(cd frontend && bun run build)

@@ -89,8 +89,12 @@ export function useSend() {
           destinationType,
         });
 
-        // Get the public key from Phantom
-        const publicKeyString = await solana.getPublicKey();
+        // Prefer the current public key; reconnect if the provider needs refresh.
+        let publicKeyString = solana.publicKey;
+        if (!publicKeyString) {
+          const connectionResult = await solana.connect();
+          publicKeyString = connectionResult.publicKey;
+        }
         if (!publicKeyString) {
           throw new Error("Failed to get public key from wallet");
         }
