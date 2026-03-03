@@ -20,12 +20,15 @@ function createLogger(): FakeLogger {
   };
 }
 
-function createConfig(): UserbotConfig {
+function createConfig(overrides: Partial<UserbotConfig> = {}): UserbotConfig {
   return {
     accountKey: "primary",
+    authMode: "user",
     apiHash: "hash",
     apiId: 123,
+    botToken: null,
     storageDir: "/tmp/userbot",
+    ...overrides,
   };
 }
 
@@ -111,6 +114,35 @@ describe("worker runtime", () => {
 
     await expect(worker.start()).rejects.toThrow("invalid session");
     expect(callbackErrorMessage).toContain("Run bun run auth:bootstrap");
+  });
+
+  test("bot mode starts without pre-existing session file", async () => {
+    let receivedBotToken = "";
+
+    const worker = createUserbotWorker({
+      createClient: async (config) => ({
+        config,
+        sessionPath: join(config.storageDir, "mtcute-primary.sqlite"),
+        client: {
+          destroy: async () => undefined,
+          onRawUpdate: { add: () => undefined },
+          start: async (params?: { botToken?: string }) => {
+            receivedBotToken = params?.botToken ?? "";
+            return { id: 999 };
+          },
+        } as any,
+      }),
+      hasFile: async () => false,
+      loadConfig: () =>
+        createConfig({
+          authMode: "bot",
+          botToken: "bot-token-789",
+        }),
+      logger: createLogger(),
+    });
+
+    await expect(worker.start()).resolves.toBeUndefined();
+    expect(receivedBotToken).toBe("bot-token-789");
   });
 
   test("shutdown handler is idempotent across repeated signals", async () => {

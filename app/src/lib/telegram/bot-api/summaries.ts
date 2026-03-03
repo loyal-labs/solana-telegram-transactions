@@ -28,6 +28,7 @@ import type {
 } from "./types";
 
 export const MIN_MESSAGES_FOR_SUMMARY = 3;
+export const DAILY_SUMMARY_TRIGGER_TYPE = "daily";
 const MAX_SUMMARY_INPUT_CHARS = 12_000;
 const MAX_SUMMARY_BULLET_COUNT = 5;
 const MAX_SUMMARY_BULLET_CONTENT_CHARS = 450;
@@ -68,14 +69,16 @@ export async function generateOrGetSummaryForRun(input: {
   run: SummaryRunContext;
 }): Promise<GenerateOrGetSummaryForRunResult> {
   const db = getDatabase();
+  const triggerKey = buildDailySummaryTriggerKey(input.run.dayStartUtc);
   const messageCount = await countMessagesInWindow(input.communityId, input.run);
 
   if (messageCount < MIN_MESSAGES_FOR_SUMMARY) {
     return { status: "not_enough_messages", messageCount };
   }
 
-  const existingSummary = await findTodaySummary(
+  const existingSummary = await findExistingSummaryForRun(
     input.communityId,
+    triggerKey,
     input.run.dayStartUtc,
     input.run.dayEndUtc
   );
@@ -133,17 +136,29 @@ export async function generateOrGetSummaryForRun(input: {
       messageCount,
       oneliner,
       topics,
+      triggerKey,
+      triggerType: DAILY_SUMMARY_TRIGGER_TYPE,
     })
+    .onConflictDoNothing()
     .returning({ id: summaries.id, messageCount: summaries.messageCount });
 
-  if (insertedSummary.length === 0) {
+  if (insertedSummary.length > 0) {
+    return {
+      status: "created",
+      summaryId: insertedSummary[0].id,
+      messageCount: insertedSummary[0].messageCount,
+    };
+  }
+
+  const conflictedSummary = await findSummaryByTriggerKey(input.communityId, triggerKey);
+  if (!conflictedSummary) {
     throw new Error("Failed to create summary");
   }
 
   return {
-    status: "created",
-    summaryId: insertedSummary[0].id,
-    messageCount: insertedSummary[0].messageCount,
+    status: "existing",
+    summaryId: conflictedSummary.id,
+    messageCount: conflictedSummary.messageCount,
   };
 }
 
@@ -300,11 +315,38 @@ async function countMessagesInWindow(
   return Number(result?.count ?? 0);
 }
 
-async function findTodaySummary(
+function toUtcDayKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function buildDailySummaryTriggerKey(dayStartUtc: Date): string {
+  return `${DAILY_SUMMARY_TRIGGER_TYPE}:${toUtcDayKey(dayStartUtc)}`;
+}
+
+async function findSummaryByTriggerKey(
   communityId: string,
+  triggerKey: string
+): Promise<Summary | null> {
+  const db = getDatabase();
+  return (
+    (await db.query.summaries.findFirst({
+      where: and(eq(summaries.communityId, communityId), eq(summaries.triggerKey, triggerKey)),
+      orderBy: [desc(summaries.createdAt)],
+    })) ?? null
+  );
+}
+
+async function findExistingSummaryForRun(
+  communityId: string,
+  triggerKey: string,
   dayStartUtc: Date,
   dayEndUtc: Date
 ): Promise<Summary | null> {
+  const byTriggerKey = await findSummaryByTriggerKey(communityId, triggerKey);
+  if (byTriggerKey) {
+    return byTriggerKey;
+  }
+
   const db = getDatabase();
   return (
     (await db.query.summaries.findFirst({
