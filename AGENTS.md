@@ -8,7 +8,7 @@ Solana Telegram Transactions enables users to deposit SOL for any Telegram usern
 
 ## Commands
 
-### Frontend (run from `/app`)
+### Telegram Mini-App Frontend (run from `/app`)
 
 ```bash
 bun dev                    # Start dev server (turbopack)
@@ -17,6 +17,15 @@ bun lint                   # ESLint
 bun db:generate            # Generate Drizzle migrations from schema
 bun db:migrate             # Apply migrations
 bun db:studio              # Open Drizzle Studio GUI
+```
+
+### Loyal Web Frontend (run from `/frontend`)
+
+```bash
+bun dev                    # Start dev server (turbopack)
+bun run build              # Production build (Next.js)
+bun run lint               # Next.js lint
+bun run ultracite          # Biome/Ultracite checks
 ```
 
 ### Mobile App (run from `/mobile`)
@@ -81,6 +90,9 @@ bun run guard:admin-shared-schema  # prevent admin-local schema duplication
 bun run admin:dev          # run admin dev server from repo root
 bun run admin:lint         # lint admin workspace from repo root
 bun run admin:build        # build admin workspace from repo root
+bun run frontend:dev       # run loyal web frontend from repo root
+bun run frontend:lint      # lint loyal web frontend from repo root
+bun run frontend:build     # build loyal web frontend from repo root
 ```
 
 ### Git Hooks
@@ -90,7 +102,7 @@ bun run admin:build        # build admin workspace from repo root
 ```
 
 - Run once per clone/worktree to enable repo hooks.
-- Hooks enforce commit message format (`commit-msg`) and run app/admin lint+build before push.
+- Hooks enforce commit message format (`commit-msg`) and run app/admin/frontend lint+build before push.
 - Temporary bypass (only when necessary): `SKIP_VERIFY=1 git push`
 - CI note: app builds are intentionally not run in GitHub Actions; Vercel is the build/deploy gate.
 
@@ -102,6 +114,7 @@ bun run admin:build        # build admin workspace from repo root
   - `telegram-transfer` - Deposit/claim/refund SOL transfers
   - `telegram-verification` - On-chain Ed25519 Telegram signature verification
 - **`/app`** - Next.js 15 frontend + API routes
+- **`/frontend`** - Next.js 15 Loyal web frontend
 - **`/mobile`** - Expo React Native mobile app (iOS/Android)
 - **`/admin`** - Next.js 15 internal admin dashboard
 - **`/packages`** - Internal shared workspace packages (e.g. `db-core`, `db-adapter-neon`, `shared`)
@@ -185,6 +198,7 @@ Use `/app/src/lib` for cross-slice infrastructure and integration primitives. Ex
 - Do not re-add `/admin/schema`; prefer shared schema/docs references.
 - Run `bun run guard:admin-shared-schema` for admin DB/schema refactors.
 - Vercel monorepo deploy for admin must use Root Directory `admin` (see `admin/vercel.json`).
+- Vercel monorepo deploy for Loyal web frontend must use Root Directory `frontend` (see `frontend/vercel.json`).
 
 ### Key Patterns
 
@@ -374,6 +388,7 @@ refactor(ui): extract pill button component
 - Only merge a PR after its Vercel build/check is successful
 - Merge PRs using squash-and-merge
 - For admin deployments from monorepo, configure Vercel Root Directory as `admin`
+- For frontend deployments from monorepo, configure Vercel Root Directory as `frontend`
 
 ## Tooling
 
@@ -384,7 +399,7 @@ refactor(ui): extract pill button component
 
 ## Environment Variables
 
-Required for frontend (in `/app/.env.local`):
+Required for Telegram mini-app frontend (in `/app/.env.local`):
 
 ```env
 NEXT_PUBLIC_TELEGRAM_BOT_ID=<bot_id>
