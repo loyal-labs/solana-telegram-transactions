@@ -1,0 +1,127 @@
+---
+title: "API Reference"
+description: "API reference for @loyal-labs/private-transactions"
+---
+
+## Package
+
+```typescript
+import { ... } from "@loyal-labs/private-transactions";
+```
+
+## Main Client
+
+### `LoyalPrivateTransactionsClient`
+
+The SDK client wraps both base-layer and PER program access.
+
+### Factory
+
+- `LoyalPrivateTransactionsClient.fromConfig(config: ClientConfig): Promise<LoyalPrivateTransactionsClient>`
+
+```typescript
+interface ClientConfig {
+  signer: WalletSigner;
+  baseRpcEndpoint: string;
+  baseWsEndpoint?: string;
+  ephemeralRpcEndpoint: string;
+  ephemeralWsEndpoint?: string;
+  commitment?: Commitment;
+  authToken?: { token: string; expiresAt: number };
+}
+```
+
+## Core Methods
+
+### Deposit + Claim
+
+- `initializeDeposit(params)`
+- `initializeUsernameDeposit(params)`
+- `modifyBalance(params)`
+- `depositForUsername(params)`
+- `claimUsernameDeposit(params)`
+- `claimUsernameDepositToDeposit(params)`
+
+### Permissions + Delegation
+
+- `createPermission(params)`
+- `createUsernamePermission(params)`
+- `delegateDeposit(params)`
+- `delegateUsernameDeposit(params)`
+- `undelegateDeposit(params)`
+- `undelegateUsernameDeposit(params)`
+
+### Private Transfers
+
+- `transferDeposit(params)`
+- `transferToUsernameDeposit(params)`
+
+### Queries
+
+- `getBaseDeposit(user, tokenMint)`
+- `getEphemeralDeposit(user, tokenMint)`
+- `getBaseUsernameDeposit(username, tokenMint)`
+- `getEphemeralUsernameDeposit(username, tokenMint)`
+
+### PDA Helpers (instance)
+
+- `findDepositPda(user, tokenMint)`
+- `findUsernameDepositPda(username, tokenMint)`
+- `findVaultPda(tokenMint)`
+
+### Accessors
+
+- `publicKey`
+- `getBaseProgram()`
+- `getEphemeralProgram()`
+- `getProgramId()`
+
+## Exported Types
+
+- `WalletLike`, `WalletSigner`, `RpcOptions`, `ClientConfig`
+- `DepositData`, `UsernameDepositData`
+- All method param types in `sdk/private-transactions/src/types.ts`
+
+## Exported Constants and Utilities
+
+- `PROGRAM_ID`
+- `DELEGATION_PROGRAM_ID`
+- `PERMISSION_PROGRAM_ID`
+- `ER_VALIDATOR`
+- `MAGIC_PROGRAM_ID`
+- `MAGIC_CONTEXT_ID`
+- `DEPOSIT_SEED`, `USERNAME_DEPOSIT_SEED`, `VAULT_SEED`, `PERMISSION_SEED`
+- `LAMPORTS_PER_SOL`, `solToLamports`, `lamportsToSol`
+
+## Exported PDA Helpers (standalone)
+
+- `findDepositPda(...)`
+- `findUsernameDepositPda(...)`
+- `findVaultPda(...)`
+- `findPermissionPda(...)`
+- `findDelegationRecordPda(...)`
+- `findDelegationMetadataPda(...)`
+- `findBufferPda(...)`
+
+## Example
+
+```typescript
+import { Keypair, PublicKey } from "@solana/web3.js";
+import {
+  ER_VALIDATOR,
+  LoyalPrivateTransactionsClient,
+} from "@loyal-labs/private-transactions";
+
+const signer = Keypair.fromSecretKey(Uint8Array.from([...secretBytes]));
+const tokenMint = new PublicKey("<token-mint>");
+
+const client = await LoyalPrivateTransactionsClient.fromConfig({
+  signer,
+  baseRpcEndpoint: "https://api.devnet.solana.com",
+  ephemeralRpcEndpoint: "https://tee.magicblock.app",
+  ephemeralWsEndpoint: "wss://tee.magicblock.app",
+});
+
+await client.createPermission({ user: signer.publicKey, tokenMint, payer: signer.publicKey });
+await client.delegateDeposit({ user: signer.publicKey, tokenMint, payer: signer.publicKey, validator: ER_VALIDATOR });
+```

@@ -18,12 +18,13 @@
         "tab": "Developers",
         "groups": [
           {
-            "group": "Telegram Transactions SDK",
+            "group": "Private Transactions SDK",
             "pages": [
-              "sdk/transactions/quick-start",
-              "sdk/transactions/usage",
-              "sdk/transactions/reference",
-              "sdk/transactions/errors"
+              "sdk/private-transactions/quick-start",
+              "sdk/private-transactions/how-it-works",
+              "sdk/private-transactions/reference",
+              "sdk/private-transactions/cli",
+              "sdk/private-transactions/errors"
             ]
           },
           {

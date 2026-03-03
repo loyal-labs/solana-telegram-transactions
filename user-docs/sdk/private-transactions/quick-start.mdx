@@ -1,0 +1,127 @@
+---
+title: "Quick Start"
+description: "Quick start guide for Loyal's Private Transactions SDK"
+---
+
+`@loyal-labs/private-transactions` is the SDK for private SPL token transfer flows backed by the `telegram-private-transfer` program and MagicBlock Private Ephemeral Rollups (PER).
+
+## Installation
+
+```bash
+bun add @loyal-labs/private-transactions
+# or
+npm install @loyal-labs/private-transactions
+```
+
+### Peer Dependencies
+
+```bash
+bun add @coral-xyz/anchor @solana/web3.js @solana/spl-token @magicblock-labs/ephemeral-rollups-sdk
+```
+
+## Create a Client with `fromConfig`
+
+`fromConfig(...)` is the canonical SDK entrypoint.
+
+```typescript
+import { Keypair, PublicKey } from "@solana/web3.js";
+import {
+  ER_VALIDATOR,
+  LoyalPrivateTransactionsClient,
+  MAGIC_CONTEXT_ID,
+  MAGIC_PROGRAM_ID,
+} from "@loyal-labs/private-transactions";
+
+const signer = Keypair.fromSecretKey(Uint8Array.from([...secretBytes]));
+
+const client = await LoyalPrivateTransactionsClient.fromConfig({
+  signer,
+  baseRpcEndpoint: "https://api.devnet.solana.com",
+  ephemeralRpcEndpoint: "https://tee.magicblock.app",
+  ephemeralWsEndpoint: "wss://tee.magicblock.app",
+  commitment: "confirmed",
+});
+
+const tokenMint = new PublicKey("<token-mint>");
+const user = signer.publicKey;
+```
+
+## Private Transfer Flow
+
+### 1. Initialize and fund the sender deposit (base layer)
+
+```typescript
+await client.initializeDeposit({
+  tokenMint,
+  user,
+  payer: user,
+});
+
+await client.modifyBalance({
+  tokenMint,
+  user,
+  payer: user,
+  userTokenAccount: new PublicKey("<sender-ata>"),
+  amount: 1_000_000,
+  increase: true,
+});
+```
+
+### 2. Create permission and delegate to PER
+
+```typescript
+await client.createPermission({
+  tokenMint,
+  user,
+  payer: user,
+});
+
+await client.delegateDeposit({
+  tokenMint,
+  user,
+  payer: user,
+  validator: ER_VALIDATOR,
+});
+```
+
+### 3. Run the private transfer on PER
+
+The destination username deposit must already exist and be delegated.
+
+```typescript
+await client.transferToUsernameDeposit({
+  tokenMint,
+  username: "alice_user",
+  amount: 100_000,
+  user,
+  payer: user,
+  sessionToken: null,
+});
+```
+
+### 4. Claim and undelegate/commit
+
+```typescript
+await client.claimUsernameDeposit({
+  username: "alice_user",
+  tokenMint,
+  amount: 100_000,
+  recipient: new PublicKey("<recipient-wallet>"),
+  recipientTokenAccount: new PublicKey("<recipient-ata>"),
+  session: new PublicKey("<telegram-session-pda>"),
+});
+
+await client.undelegateDeposit({
+  tokenMint,
+  user,
+  payer: user,
+  sessionToken: null,
+  magicProgram: MAGIC_PROGRAM_ID,
+  magicContext: MAGIC_CONTEXT_ID,
+});
+```
+
+## Next Steps
+
+- Read [How It Works](/sdk/private-transactions/how-it-works) for the full base-layer + PER lifecycle.
+- Use [CLI Guide](/sdk/private-transactions/cli) if you want to execute the same flow via `bun scripts/telegram-private-transfer.ts`.
