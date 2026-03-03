@@ -39,7 +39,7 @@ mode: "wide"
 
     Your practical anonymity set comes from overlapping delegated activity on the same PER endpoint and permission domain during that time, not from a single fixed “rollup lifetime.”
 
-    To tune the tradeoff, keep delegation windows short, batch private actions, and undelegate promptly after completion.
+    To tune the tradeoff, choose delegation windows based on your threat model: longer windows can increase overlap (and therefore anonymity set), while shorter windows reduce exposure if keys, sessions, or delegated permissions are compromised. In practice, batch private actions when possible, keep windows only as long as needed, and undelegate promptly after completion.
 
     Once the handshake succeeds, the user links a Solana wallet and receives a PDA that anchors every chat session and settles payments automatically.
 
