@@ -1,0 +1,70 @@
+---
+title: "How It Works"
+description: "How private transfers move between base Solana state and MagicBlock PER"
+---
+
+Private transfers in Loyal are an account-lifecycle flow across two execution domains:
+
+1. **Base Solana**: initialize and fund deposits, create permissions, validate Telegram ownership.
+2. **MagicBlock PER**: execute private account-to-account balance updates.
+3. **Commit back to base**: undelegate to finalize state on base chain.
+
+## Source of Truth in This Repo
+
+- Private transfer program logic: `programs/telegram-private-transfer/src/lib.rs`
+- Telegram session verification logic: `programs/telegram-verification/src/lib.rs`
+- SDK orchestration/client behavior: `sdk/private-transactions/src/LoyalPrivateTransactionsClient.ts`
+
+## Lifecycle
+
+### 1. Deposits and vault are initialized on base layer
+
+The private transfer program maintains:
+
+- `Deposit` PDA: per `(user, token_mint)`
+- `UsernameDeposit` PDA: per `(username, token_mint)`
+- `Vault` PDA + vault ATA: custody for SPL token balances
+
+`initialize_deposit` and `modify_balance` handle setup and SPL token movement between user ATA and vault ATA.
+
+### 2. Telegram identity is verified on-chain
+
+The verification program stores Telegram init data and checks the previous Ed25519 instruction against Telegram's public key before marking the `tg_session` PDA as verified.
+
+That verified session is then required by username-claim and username-delegation flows.
+
+### 3. Permission accounts are created
+
+`create_permission` and `create_username_permission` create ACL permission PDAs so delegated accounts can be used safely in PER execution.
+
+### 4. Deposit accounts are delegated to PER
+
+`delegate` / `delegate_username_deposit` transfer account ownership to the delegation program and bind execution to the configured validator.
+
+The SDK enforces delegation preconditions:
+
+- Base-only operations require **not delegated**.
+- Private PER operations require **delegated**.
+
+### 5. Private transfer executes on PER
+
+On delegated accounts, private transfer instructions update internal balances:
+
+- `transfer_deposit`
+- `transfer_to_username_deposit`
+
+These instructions move accounting balances, while SPL custody remains in vault accounts.
+
+### 6. Recipient claims from username deposit
+
+`claim_username_deposit` (or `claim_username_deposit_to_deposit`) uses a verified Telegram session to release balance from username deposit.
+
+### 7. Commit and undelegate back to base
+
+`undelegate` / `undelegate_username_deposit` call commit-and-undelegate flow so the final PER state is persisted back to base layer.
+
+## Why this model
+
+- **Privacy-preserving execution**: transfer logic runs in PER while delegated.
+- **Auditable settlement**: committed state lands back on base Solana accounts.
+- **Identity-gated claims**: Telegram session verification controls username claim rights.

@@ -1,24 +1,16 @@
 ---
 title: "Error Handling"
-description: "Errors for Loyal's Telegram Transactions SDK"
+description: "This page moved to the Private Transactions SDK docs"
 ---
 
-## Error Handling
+This page has moved.
 
-The SDK throws descriptive errors for common issues:
+The Telegram Transactions SDK docs for `@loyal-labs/transactions` have been replaced by the Private Transactions SDK docs for `@loyal-labs/private-transactions`.
 
-```typescript
-try {
-  await client.deposit({
-    username: "ab", // Too short!
-    amountLamports: 100,
-  });
-} catch (error) {
-  // "Username must be between 5 and 32 characters"
-}
-```
+Use the new docs:
 
-Common errors:
-- `"Username must be between 5 and 32 characters"` - Invalid username length
-- `"Amount must be greater than 0"` - Invalid deposit amount
-- `"Failed to fetch deposit account after transaction"` - Network/confirmation issue
+- [Quick Start](/sdk/private-transactions/quick-start)
+- [How It Works](/sdk/private-transactions/how-it-works)
+- [API Reference](/sdk/private-transactions/reference)
+- [CLI Usage](/sdk/private-transactions/cli)
+- [Error Handling](/sdk/private-transactions/errors)

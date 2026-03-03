@@ -1,6 +1,6 @@
 # @loyal-labs/private-transactions
 
-SDK for Telegram-based private SPL token deposits and transfers using MagicBlock Private Ephemeral Rollups (PER). This wraps the `telegram-private-transfer` Anchor program and provides helpers for permissions, delegation, private transfers, and undelegation.
+SDK for private SPL token deposits and transfers using MagicBlock Private Ephemeral Rollups (PER). This package wraps the `telegram-private-transfer` Anchor program and provides helpers for permissions, delegation, private transfers, claims, and undelegation.
 
 ## Installation
 
@@ -19,70 +19,68 @@ bun add @coral-xyz/anchor @solana/web3.js @solana/spl-token @magicblock-labs/eph
 ## Quick Start
 
 ```ts
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
 import {
+  ER_VALIDATOR,
   LoyalPrivateTransactionsClient,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
 } from "@loyal-labs/private-transactions";
 
-const connection = new Connection("https://api.devnet.solana.com");
-const client = LoyalPrivateTransactionsClient.from(connection, myKeypair);
-
+const signer = Keypair.fromSecretKey(Uint8Array.from([...secretBytes]));
 const tokenMint = new PublicKey("<mint>");
 
-// Initialize a user deposit
+const client = await LoyalPrivateTransactionsClient.fromConfig({
+  signer,
+  baseRpcEndpoint: "https://api.devnet.solana.com",
+  ephemeralRpcEndpoint: "https://tee.magicblock.app",
+  ephemeralWsEndpoint: "wss://tee.magicblock.app",
+  commitment: "confirmed",
+});
+
 await client.initializeDeposit({
   tokenMint,
-  user: myKeypair.publicKey,
-  payer: myKeypair.publicKey,
+  user: signer.publicKey,
+  payer: signer.publicKey,
 });
 
-// Move tokens into the private deposit vault
 await client.modifyBalance({
   tokenMint,
+  user: signer.publicKey,
+  payer: signer.publicKey,
+  userTokenAccount: new PublicKey("<sender-ata>"),
   amount: 1_000_000,
   increase: true,
-  user: myKeypair.publicKey,
-  payer: myKeypair.publicKey,
 });
 
-// Create permission + delegate deposit to the PER validator
 await client.createPermission({
   tokenMint,
-  user: myKeypair.publicKey,
-  payer: myKeypair.publicKey,
+  user: signer.publicKey,
+  payer: signer.publicKey,
 });
+
 await client.delegateDeposit({
   tokenMint,
-  user: myKeypair.publicKey,
-  payer: myKeypair.publicKey,
-  validator: new PublicKey("<validator>")
+  user: signer.publicKey,
+  payer: signer.publicKey,
+  validator: ER_VALIDATOR,
 });
 
-// Use the PER API for operations on delegated accounts
-const perClient = await LoyalPrivateTransactionsClient.fromEphemeral({
-  signer: myKeypair,
-  rpcEndpoint: "http://127.0.0.1:7799",
-  wsEndpoint: "ws://127.0.0.1:7800",
-});
-
-// Ensure the destination username deposit exists (and is delegated on PER)
-// e.g. via depositForUsername + createUsernamePermission + delegateUsernameDeposit.
-await perClient.transferToUsernameDeposit({
+// Destination username deposit must already exist and be delegated.
+await client.transferToUsernameDeposit({
   tokenMint,
-  username: "alice",
+  username: "alice_user",
   amount: 100_000,
-  user: myKeypair.publicKey,
-  payer: myKeypair.publicKey,
+  user: signer.publicKey,
+  payer: signer.publicKey,
   sessionToken: null,
 });
 
-// Undelegate and commit back to the base chain
-await perClient.undelegateDeposit({
+await client.undelegateDeposit({
   tokenMint,
-  user: myKeypair.publicKey,
-  payer: myKeypair.publicKey,
+  user: signer.publicKey,
+  payer: signer.publicKey,
+  sessionToken: null,
   magicProgram: MAGIC_PROGRAM_ID,
   magicContext: MAGIC_CONTEXT_ID,
 });
@@ -90,54 +88,42 @@ await perClient.undelegateDeposit({
 
 ## PER Authentication
 
-When using MagicBlock hosted PER endpoints, you must attach an auth token. The SDK can fetch it automatically.
+For hosted PER endpoints (`tee.magicblock.app`), the SDK can request auth tokens automatically.
+
+If you need explicit control, fetch token externally and pass it through `authToken`:
 
 ```ts
-const perClient = await LoyalPrivateTransactionsClient.fromEphemeral({
-  signer: walletAdapter,
-  rpcEndpoint: "https://tee.magicblock.app",
-  wsEndpoint: "wss://tee.magicblock.app",
-  useAuth: true,
-  // If your signer does not expose signMessage, pass authToken or signMessage explicitly.
-  // signMessage: walletAdapter.signMessage,
-});
-```
+import { getAuthToken } from "@magicblock-labs/ephemeral-rollups-sdk";
 
-You can also pre-fetch the token:
-
-```ts
-import { getAuthToken } from "@loyal-labs/private-transactions";
-
-const { token } = await getAuthToken(
+const authToken = await getAuthToken(
   "https://tee.magicblock.app",
   wallet.publicKey,
   wallet.signMessage
 );
 
-const perClient = await LoyalPrivateTransactionsClient.fromEphemeral({
+const client = await LoyalPrivateTransactionsClient.fromConfig({
   signer: wallet,
-  rpcEndpoint: "https://tee.magicblock.app",
-  wsEndpoint: "wss://tee.magicblock.app",
-  authToken: token,
+  baseRpcEndpoint: "https://api.devnet.solana.com",
+  ephemeralRpcEndpoint: "https://tee.magicblock.app",
+  ephemeralWsEndpoint: "wss://tee.magicblock.app",
+  authToken,
 });
 ```
 
 ## API Overview
 
-### Factory Methods
+### Factory Method
 
-- `fromProvider(provider)`
-- `from(connection, signer)`
-- `fromWallet(connection, wallet)`
-- `fromKeypair(connection, keypair)`
-- `fromEphemeral({ signer, rpcEndpoint, wsEndpoint, useAuth, authToken })`
+- `fromConfig({ signer, baseRpcEndpoint, ephemeralRpcEndpoint, ... })`
 
 ### Core Actions
 
 - `initializeDeposit`
+- `initializeUsernameDeposit`
 - `modifyBalance`
 - `depositForUsername`
 - `claimUsernameDeposit`
+- `claimUsernameDepositToDeposit`
 - `createPermission`
 - `createUsernamePermission`
 - `delegateDeposit`
@@ -149,14 +135,23 @@ const perClient = await LoyalPrivateTransactionsClient.fromEphemeral({
 
 ### Queries
 
-- `getDeposit(user, tokenMint)`
-- `getUsernameDeposit(username, tokenMint)`
+- `getBaseDeposit`
+- `getEphemeralDeposit`
+- `getBaseUsernameDeposit`
+- `getEphemeralUsernameDeposit`
+
+### Accessors
+
+- `publicKey`
+- `getBaseProgram()`
+- `getEphemeralProgram()`
+- `getProgramId()`
 
 ### PDA Helpers
 
-- `findDepositPda(user, tokenMint)`
-- `findUsernameDepositPda(username, tokenMint)`
-- `findVaultPda(tokenMint)`
+- `findDepositPda`
+- `findUsernameDepositPda`
+- `findVaultPda`
 
 ## Development
 

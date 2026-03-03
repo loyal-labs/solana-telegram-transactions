@@ -215,27 +215,25 @@ export function waitForAccountOwnerChange(
  * with MagicBlock PER (Private Ephemeral Rollups) support
  *
  * @example
- * // Base layer client with keypair
- * const client = LoyalPrivateTransactionsClient.from(connection, keypair);
- *
- * // Ephemeral rollup client
- * const ephemeralClient = await LoyalPrivateTransactionsClient.fromEphemeral({
+ * // Create one client with both base + ephemeral endpoints
+ * const client = await LoyalPrivateTransactionsClient.fromConfig({
  *   signer: keypair,
- *   rpcEndpoint: "http://localhost:7799",
- *   wsEndpoint: "ws://localhost:7800",
+ *   baseRpcEndpoint: "https://api.devnet.solana.com",
+ *   ephemeralRpcEndpoint: "https://tee.magicblock.app",
+ *   ephemeralWsEndpoint: "wss://tee.magicblock.app",
  * });
  *
- * // Deposit tokens and delegate to PER
+ * // Base-layer setup
  * await client.initializeDeposit({ user, tokenMint, payer });
  * await client.modifyBalance({ user, tokenMint, amount: 1000000, increase: true, ... });
  * await client.createPermission({ user, tokenMint, payer });
  * await client.delegateDeposit({ user, tokenMint, payer, validator });
  *
- * // Execute private transfers on ephemeral rollup
- * await ephemeralClient.transferToUsernameDeposit({ username, tokenMint, amount, ... });
+ * // Private transfer on delegated account
+ * await client.transferToUsernameDeposit({ username, tokenMint, amount, ... });
  *
- * // Commit and undelegate
- * await ephemeralClient.undelegateDeposit({ user, tokenMint, ... });
+ * // Commit and undelegate back to base
+ * await client.undelegateDeposit({ user, tokenMint, ... });
  */
 export class LoyalPrivateTransactionsClient {
   readonly baseProgram: Program<TelegramPrivateTransfer>;

@@ -1,0 +1,55 @@
+---
+title: "Error Handling"
+description: "Common errors and troubleshooting for @loyal-labs/private-transactions"
+---
+
+## Common Error Categories
+
+### Username validation errors
+
+Triggered before transaction submission when username input is invalid:
+
+- `"Username must be between 5 and 32 characters"`
+- `"Username can only contain alphanumeric characters and underscores"`
+
+### Delegation state errors
+
+The SDK guards execution context for every operation:
+
+- `"Account is delegated to ER: ..."` when a base-layer operation is attempted on delegated accounts.
+- `"Account is not delegated to ER: ..."` when a PER operation is attempted before delegation.
+- `"Account is delegated on wrong validator: ..."` when delegation authority does not match expected validator.
+
+### Permission idempotency behavior
+
+`createPermission` and `createUsernamePermission` are idempotent:
+
+- Return `null` when permission account already exists.
+- May return `"permission-exists"` if an `already in use` race is observed.
+
+### PER auth / signer capability errors
+
+When auth is needed on hosted PER endpoints, the SDK may throw:
+
+- `"Wallet does not support signMessage, required for PER auth"`
+- `"AnchorProvider wallet does not support signMessage, required for PER auth"`
+
+Pass a signer with `signMessage` support or use an explicit `authToken` in `fromConfig`.
+
+### On-chain program errors
+
+Depending on instruction and account state, on-chain failures can include:
+
+- `Unauthorized`
+- `NotVerified`
+- `InvalidUsername`
+- `InvalidMint`
+- `InsufficientDeposit`
+- `Overflow`
+
+## Troubleshooting Checklist
+
+1. Confirm deposit/username deposit are in the correct delegation state for the method you are calling.
+2. Verify username session flow completed (`store` + `verify_telegram_init_data`) before username claim/delegation paths.
+3. Confirm token mint and token accounts align with the same mint.
+4. For hosted PER, verify RPC endpoint/token wiring and signer `signMessage` support.
