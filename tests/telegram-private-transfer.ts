@@ -261,6 +261,7 @@ describe("telegram-private-transfer", () => {
       process.env.EPHEMERAL_AUTH === "true" ||
       (!hasEphemeralToken &&
         (ephemeralProviderEndpoint.includes("tee.magicblock.app") ||
+          ephemeralProviderEndpoint.includes("mainnet-tee.magicblock.app") ||
           ephemeralProviderEndpoint.includes("magicblock.app")));
     const ephemeralRpcBase = ephemeralProviderEndpoint;
     const ephemeralWsBase = ephemeralWsEndpoint;

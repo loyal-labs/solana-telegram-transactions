@@ -20,8 +20,8 @@
  * const client = await LoyalPrivateTransactionsClient.fromConfig({
  *   signer,
  *   baseRpcEndpoint: "https://api.devnet.solana.com",
- *   ephemeralRpcEndpoint: "https://tee.magicblock.app",
- *   ephemeralWsEndpoint: "wss://tee.magicblock.app",
+ *   ephemeralRpcEndpoint: "https://mainnet-tee.magicblock.app",
+ *   ephemeralWsEndpoint: "wss://mainnet-tee.magicblock.app",
  * });
  *
  * await client.createPermission({ user: signer.publicKey, tokenMint, payer: signer.publicKey });

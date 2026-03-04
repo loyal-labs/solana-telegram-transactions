@@ -55,7 +55,7 @@ pub(crate) fn cmd_display(ctx: &AppContext, args: &TargetArgs) -> Result<()> {
         .map(|a| a.owner == delegation_program_id())
         .unwrap_or(false);
 
-    let delegation_status = get_delegation_status(&ctx.http_client, &ctx.router_url, &account)?;
+    let delegation_status = get_delegation_status(&ctx.http_client, &ctx.per_rpc_url, &ctx.router_url, &account)?;
 
     let result = DisplayResult {
         target_type,

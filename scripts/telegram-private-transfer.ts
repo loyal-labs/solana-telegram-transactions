@@ -220,7 +220,8 @@ const buildEphemeralProvider = async (
     process.env.EPHEMERAL_AUTH === "true" ||
     (!hasToken &&
       (config.rpcEndpoint.includes("magicblock.app") ||
-        config.rpcEndpoint.includes("tee.magicblock.app")));
+        config.rpcEndpoint.includes("tee.magicblock.app") ||
+        config.rpcEndpoint.includes("mainnet-tee.magicblock.app")));
   let rpcEndpoint = config.rpcEndpoint;
   let wsEndpoint = config.wsEndpoint;
   if (useAuth) {

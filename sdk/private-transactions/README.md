@@ -33,8 +33,10 @@ const tokenMint = new PublicKey("<mint>");
 const client = await LoyalPrivateTransactionsClient.fromConfig({
   signer,
   baseRpcEndpoint: "https://api.devnet.solana.com",
-  ephemeralRpcEndpoint: "https://tee.magicblock.app",
-  ephemeralWsEndpoint: "wss://tee.magicblock.app",
+  // Mainnet: https://mainnet-tee.magicblock.app
+  // Devnet: https://tee.magicblock.app
+  ephemeralRpcEndpoint: "https://mainnet-tee.magicblock.app",
+  ephemeralWsEndpoint: "wss://mainnet-tee.magicblock.app",
   commitment: "confirmed",
 });
 
@@ -88,7 +90,7 @@ await client.undelegateDeposit({
 
 ## PER Authentication
 
-For hosted PER endpoints (`tee.magicblock.app`), the SDK can request auth tokens automatically.
+For hosted PER endpoints (`tee.magicblock.app`, `mainnet-tee.magicblock.app`), the SDK can request auth tokens automatically.
 
 If you need explicit control, fetch token externally and pass it through `authToken`:
 
@@ -96,16 +98,16 @@ If you need explicit control, fetch token externally and pass it through `authTo
 import { getAuthToken } from "@magicblock-labs/ephemeral-rollups-sdk";
 
 const authToken = await getAuthToken(
-  "https://tee.magicblock.app",
+  "https://mainnet-tee.magicblock.app",
   wallet.publicKey,
   wallet.signMessage
 );
 
 const client = await LoyalPrivateTransactionsClient.fromConfig({
   signer: wallet,
-  baseRpcEndpoint: "https://api.devnet.solana.com",
-  ephemeralRpcEndpoint: "https://tee.magicblock.app",
-  ephemeralWsEndpoint: "wss://tee.magicblock.app",
+  baseRpcEndpoint: "https://api.mainnet-beta.solana.com",
+  ephemeralRpcEndpoint: "https://mainnet-tee.magicblock.app",
+  ephemeralWsEndpoint: "wss://mainnet-tee.magicblock.app",
   authToken,
 });
 ```

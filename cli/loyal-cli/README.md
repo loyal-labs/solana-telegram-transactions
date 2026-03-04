@@ -31,9 +31,9 @@ Global flags mirror Solana CLI style:
 
 ## MagicBlock PER
 
-Defaults:
+Defaults (auto-detected from Solana config / `--url`):
 
-- `--per-rpc https://tee.magicblock.app`
+- `--per-rpc https://mainnet-tee.magicblock.app` (mainnet) or `https://tee.magicblock.app` (devnet)
 - `--router-url https://devnet-router.magicblock.app`
 
 When `--per-rpc` contains `tee` and no `token=` is present, the CLI:

@@ -205,8 +205,8 @@ export function waitForAccountOwnerChange(
  * const client = await LoyalPrivateTransactionsClient.fromConfig({
  *   signer: keypair,
  *   baseRpcEndpoint: "https://api.devnet.solana.com",
- *   ephemeralRpcEndpoint: "https://tee.magicblock.app",
- *   ephemeralWsEndpoint: "wss://tee.magicblock.app",
+ *   ephemeralRpcEndpoint: "https://mainnet-tee.magicblock.app",
+ *   ephemeralWsEndpoint: "wss://mainnet-tee.magicblock.app",
  * });
  *
  * // Base-layer setup
@@ -1241,9 +1241,14 @@ export class LoyalPrivateTransactionsClient {
       body,
     };
 
-    // Try TEE first
+    // Try TEE first — pick mainnet or devnet TEE based on ephemeral RPC URL
+    const ephemeralUrl =
+      this.ephemeralProgram.provider.connection.rpcEndpoint;
+    const teeBaseUrl = ephemeralUrl.includes("mainnet-tee")
+      ? "https://mainnet-tee.magicblock.app/"
+      : "https://tee.magicblock.app/";
     try {
-      const teeRes = await fetch("https://tee.magicblock.app/", options);
+      const teeRes = await fetch(teeBaseUrl, options);
       const teeData = (await teeRes.json()) as DelegationStatusResponse;
       if (teeData.result?.isDelegated) {
         // TEE confirmed delegation — synthesize authority so validator check passes
