@@ -5,34 +5,29 @@
  * MagicBlock's Private Ephemeral Rollups (PER) for confidential transactions.
  *
  * @example
- * // Base layer client for setup operations
- * import { LoyalPrivateTransactionsClient } from '@loyal-labs/private-transactions';
- * import { Connection, Keypair } from '@solana/web3.js';
+ * // Create one client that has base + ephemeral program access
+ * import { Keypair, PublicKey } from "@solana/web3.js";
+ * import {
+ *   ER_VALIDATOR,
+ *   LoyalPrivateTransactionsClient,
+ *   MAGIC_CONTEXT_ID,
+ *   MAGIC_PROGRAM_ID,
+ * } from "@loyal-labs/private-transactions";
  *
- * const connection = new Connection('https://api.devnet.solana.com');
- * const client = LoyalPrivateTransactionsClient.from(connection, keypair);
+ * const signer = Keypair.fromSecretKey(Uint8Array.from([...secretBytes]));
+ * const tokenMint = new PublicKey("<token-mint>");
  *
- * // Initialize and fund deposit
- * await client.initializeDeposit({ user, tokenMint, payer });
- * await client.modifyBalance({ user, tokenMint, amount, increase: true, ... });
- *
- * // Create permission and delegate to ephemeral rollup
- * await client.createPermission({ user, tokenMint, payer });
- * await client.delegateDeposit({ user, tokenMint, payer, validator });
- *
- * @example
- * // Ephemeral rollup client for private operations
- * const ephemeralClient = await LoyalPrivateTransactionsClient.fromEphemeral({
- *   signer: keypair,
- *   rpcEndpoint: 'http://localhost:7799',
- *   wsEndpoint: 'ws://localhost:7800',
+ * const client = await LoyalPrivateTransactionsClient.fromConfig({
+ *   signer,
+ *   baseRpcEndpoint: "https://api.devnet.solana.com",
+ *   ephemeralRpcEndpoint: "https://mainnet-tee.magicblock.app",
+ *   ephemeralWsEndpoint: "wss://mainnet-tee.magicblock.app",
  * });
  *
- * // Execute private transfer
- * await ephemeralClient.transferToUsernameDeposit({ username, tokenMint, amount, ... });
- *
- * // Commit and undelegate
- * await ephemeralClient.undelegateDeposit({ user, tokenMint, ... });
+ * await client.createPermission({ user: signer.publicKey, tokenMint, payer: signer.publicKey });
+ * await client.delegateDeposit({ user: signer.publicKey, tokenMint, payer: signer.publicKey, validator: ER_VALIDATOR });
+ * await client.transferToUsernameDeposit({ username: "alice_user", tokenMint, amount: 100_000, user: signer.publicKey, payer: signer.publicKey, sessionToken: null });
+ * await client.undelegateDeposit({ user: signer.publicKey, tokenMint, payer: signer.publicKey, sessionToken: null, magicProgram: MAGIC_PROGRAM_ID, magicContext: MAGIC_CONTEXT_ID });
  */
 export { LoyalPrivateTransactionsClient, waitForAccountOwnerChange, } from "./src/LoyalPrivateTransactionsClient";
 export type { WalletSigner, WalletLike, RpcOptions, ClientConfig, DepositData, UsernameDepositData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, CreatePermissionParams, CreateUsernamePermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams, TransferDepositParams, TransferToUsernameDepositParams, DelegationRecord, DelegationStatusResult, DelegationStatusResponse, } from "./src/types";

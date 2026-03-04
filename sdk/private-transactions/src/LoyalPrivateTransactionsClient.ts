@@ -1265,7 +1265,7 @@ export class LoyalPrivateTransactionsClient {
       console.error(
         "[getDelegationStatus] TEE fetch failed, falling back to devnet-router: Options:",
         options,
-        "Error:"
+        "Error:",
         e
       );
     }
