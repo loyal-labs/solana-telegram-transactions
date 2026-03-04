@@ -34,18 +34,33 @@ type FakeState = {
   communities: CommunityRecord[];
   existingMembershipKeys: Set<string>;
   existingMessageKeys: Set<string>;
+  existingCommunityChatIds: Set<string>;
   getHistoryCalls: Array<{ chatId: number; limit: number }>;
   getMessagesCalls: Array<{ chatId: number; firstId: number; size: number }>;
   getMessagesResponsesByFirstId: Map<number, Array<unknown | null>>;
   getHistoryLimitOneFailCount: number;
   incrementalHistory: unknown[];
   initialHistory: unknown[];
+  insertedCommunityRows: Array<{
+    activatedBy: bigint;
+    chatId: bigint;
+    chatTitle: string;
+    isActive: boolean;
+    isPublic: boolean;
+    parserType: "userbot";
+    summaryNotificationMessageCount: null;
+    summaryNotificationTimeHours: null;
+    summaryNotificationsEnabled: boolean;
+  }>;
   insertedMembershipRows: number;
   insertedMessageRows: number;
   insertedUserRows: number;
+  iterDialogsCalls: Array<{ archived: string | undefined }>;
+  iterDialogsEntries: unknown[];
   iterHistoryCalls: Array<{ chatId: number; minId: number }>;
   latestStoredMessageId: bigint | null;
   latestTelegramMessageId: number | null;
+  startedAccountId: bigint | number;
   usersByTelegramId: Map<string, { displayName: string; id: string; username: string | null }>;
 };
 
@@ -74,20 +89,28 @@ function createFakeState(
       FakeState,
       | "existingMembershipKeys"
       | "existingMessageKeys"
+      | "existingCommunityChatIds"
       | "getHistoryCalls"
       | "getMessagesCalls"
+      | "insertedCommunityRows"
       | "insertedMembershipRows"
       | "insertedMessageRows"
       | "insertedUserRows"
+      | "iterDialogsCalls"
       | "iterHistoryCalls"
       | "usersByTelegramId"
     >
   > = {}
 ): FakeState {
+  const existingCommunities = overrides.communities ?? [];
+
   return {
-    communities: overrides.communities ?? [],
+    communities: existingCommunities,
     existingMembershipKeys: new Set<string>(),
     existingMessageKeys: new Set<string>(),
+    existingCommunityChatIds: new Set(
+      existingCommunities.map((community) => community.chatId.toString())
+    ),
     getHistoryCalls: [],
     getMessagesCalls: [],
     getMessagesResponsesByFirstId:
@@ -95,9 +118,12 @@ function createFakeState(
     getHistoryLimitOneFailCount: overrides.getHistoryLimitOneFailCount ?? 0,
     incrementalHistory: overrides.incrementalHistory ?? [],
     initialHistory: overrides.initialHistory ?? [],
+    insertedCommunityRows: [],
     insertedMembershipRows: 0,
     insertedMessageRows: 0,
     insertedUserRows: 0,
+    iterDialogsCalls: [],
+    iterDialogsEntries: overrides.iterDialogsEntries ?? [],
     iterHistoryCalls: [],
     latestStoredMessageId:
       overrides.latestStoredMessageId === undefined
@@ -107,6 +133,7 @@ function createFakeState(
       overrides.latestTelegramMessageId === undefined
         ? null
         : overrides.latestTelegramMessageId,
+    startedAccountId: overrides.startedAccountId ?? 1,
     usersByTelegramId: new Map<string, { displayName: string; id: string; username: string | null }>(),
   };
 }
@@ -182,6 +209,35 @@ function createFakeDb(state: FakeState): any {
               return [{ id: `message-${state.insertedMessageRows}` }];
             }
 
+            if (
+              "chatId" in values &&
+              "activatedBy" in values &&
+              "parserType" in values &&
+              !("communityId" in values)
+            ) {
+              const chatId = BigInt(values.chatId as bigint | number | string);
+              const chatIdKey = chatId.toString();
+              if (state.existingCommunityChatIds.has(chatIdKey)) {
+                return [];
+              }
+
+              state.existingCommunityChatIds.add(chatIdKey);
+              state.insertedCommunityRows.push({
+                activatedBy: BigInt(values.activatedBy as bigint | number | string),
+                chatId,
+                chatTitle: String(values.chatTitle),
+                isActive: Boolean(values.isActive),
+                isPublic: Boolean(values.isPublic),
+                parserType: "userbot",
+                summaryNotificationMessageCount:
+                  (values.summaryNotificationMessageCount as null) ?? null,
+                summaryNotificationTimeHours:
+                  (values.summaryNotificationTimeHours as null) ?? null,
+                summaryNotificationsEnabled: Boolean(values.summaryNotificationsEnabled),
+              });
+              return [{ id: `community-${state.insertedCommunityRows.length}` }];
+            }
+
             return [];
           },
         }),
@@ -239,6 +295,18 @@ function createFakeBundle(
 
         return state.getMessagesResponsesByFirstId.get(firstId) ?? [];
       },
+      iterDialogs: (params?: { archived?: "exclude" | "keep" | "only" }) => {
+        state.iterDialogsCalls.push({
+          archived: params?.archived,
+        });
+
+        const dialogs = state.iterDialogsEntries;
+        return (async function* () {
+          for (const dialog of dialogs) {
+            yield dialog;
+          }
+        })();
+      },
       iterHistory: (_chatId: number, params?: { minId?: number }) => {
         state.iterHistoryCalls.push({
           chatId: _chatId,
@@ -252,7 +320,7 @@ function createFakeBundle(
           }
         })();
       },
-      start: async () => ({ id: 1 }),
+      start: async () => ({ id: state.startedAccountId }),
     },
     config,
     sessionPath: "/tmp/userbot/mtcute-primary.sqlite",
@@ -312,7 +380,281 @@ describe("sync:once command", () => {
     );
 
     expect(result.stats.communitiesScanned).toBe(0);
+    expect(result.stats.telegramDialogsScanned).toBe(0);
+    expect(result.stats.telegramEligibleGroupDialogs).toBe(0);
+    expect(result.stats.missingUserbotCommunitiesDetected).toBe(0);
+    expect(result.stats.missingUserbotCommunitiesInserted).toBe(0);
     expect(receivedBotToken).toBe("bot-token-999");
+  });
+
+  test("imports missing eligible userbot communities as inactive records", async () => {
+    const state = createFakeState({
+      iterDialogsEntries: [
+        {
+          peer: {
+            chatType: "group",
+            id: -1000000000101,
+            isMember: true,
+            title: "Group One",
+            type: "chat",
+          },
+        },
+        {
+          peer: {
+            chatType: "supergroup",
+            id: -1000000000102,
+            isMember: true,
+            title: "Super One",
+            type: "chat",
+          },
+        },
+        {
+          peer: {
+            chatType: "group",
+            id: -1000000000101,
+            isMember: true,
+            title: "Group One Duplicate",
+            type: "chat",
+          },
+        },
+        {
+          peer: {
+            id: 123456,
+            type: "user",
+          },
+        },
+        {
+          peer: {
+            chatType: "group",
+            id: -1000000000103,
+            isMember: false,
+            title: "Left Group",
+            type: "chat",
+          },
+        },
+        {
+          peer: {
+            chatType: "channel",
+            id: -1000000000104,
+            isMember: true,
+            title: "Channel",
+            type: "chat",
+          },
+        },
+      ],
+      startedAccountId: BigInt(777000),
+    });
+
+    const result = await runSyncOnce({
+      createClient: async () => createFakeBundle(state),
+      createDb: () => createFakeDb(state),
+      hasFile: async () => true,
+      loadConfig: () => createConfig(),
+      loadDatabaseUrl: () => "postgres://db",
+      logger: createLogger(),
+      sleep: async () => undefined,
+    });
+
+    expect(result.stats.telegramDialogsScanned).toBe(6);
+    expect(result.stats.telegramEligibleGroupDialogs).toBe(3);
+    expect(result.stats.missingUserbotCommunitiesDetected).toBe(2);
+    expect(result.stats.missingUserbotCommunitiesInserted).toBe(2);
+    expect(result.stats.communitiesScanned).toBe(0);
+    expect(state.iterDialogsCalls).toEqual([{ archived: "exclude" }]);
+    expect(state.insertedCommunityRows).toEqual([
+      {
+        activatedBy: BigInt(777000),
+        chatId: BigInt(-1000000000101),
+        chatTitle: "Group One",
+        isActive: false,
+        isPublic: false,
+        parserType: "userbot",
+        summaryNotificationMessageCount: null,
+        summaryNotificationTimeHours: null,
+        summaryNotificationsEnabled: false,
+      },
+      {
+        activatedBy: BigInt(777000),
+        chatId: BigInt(-1000000000102),
+        chatTitle: "Super One",
+        isActive: false,
+        isPublic: false,
+        parserType: "userbot",
+        summaryNotificationMessageCount: null,
+        summaryNotificationTimeHours: null,
+        summaryNotificationsEnabled: false,
+      },
+    ]);
+  });
+
+  test("dialog-sync-only mode imports missing communities and skips message sync", async () => {
+    const state = createFakeState({
+      communities: [
+        {
+          chatId: BigInt(-1000000001101),
+          chatTitle: "Active Community",
+          id: "community-active",
+          parserType: "userbot",
+        },
+      ],
+      iterDialogsEntries: [
+        {
+          peer: {
+            chatType: "group",
+            id: -1000000001102,
+            isMember: true,
+            title: "Discovery Only Group",
+            type: "chat",
+          },
+        },
+      ],
+      latestStoredMessageId: BigInt(10),
+      latestTelegramMessageId: 11,
+    });
+
+    const result = await runSyncOnce(
+      {
+        createClient: async () => createFakeBundle(state),
+        createDb: () => createFakeDb(state),
+        hasFile: async () => true,
+        loadConfig: () => createConfig(),
+        loadDatabaseUrl: () => "postgres://db",
+        logger: createLogger(),
+        sleep: async () => undefined,
+      },
+      { dialogSyncOnly: true }
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.stats.telegramDialogsScanned).toBe(1);
+    expect(result.stats.missingUserbotCommunitiesInserted).toBe(1);
+    expect(result.stats.communitiesScanned).toBe(0);
+    expect(result.stats.communitiesProcessed).toBe(0);
+    expect(result.stats.telegramMessagesFetched).toBe(0);
+    expect(state.getHistoryCalls).toEqual([]);
+    expect(state.iterHistoryCalls).toEqual([]);
+    expect(state.getMessagesCalls).toEqual([]);
+    expect(state.insertedCommunityRows).toEqual([
+      {
+        activatedBy: BigInt(1),
+        chatId: BigInt(-1000000001102),
+        chatTitle: "Discovery Only Group",
+        isActive: false,
+        isPublic: false,
+        parserType: "userbot",
+        summaryNotificationMessageCount: null,
+        summaryNotificationTimeHours: null,
+        summaryNotificationsEnabled: false,
+      },
+    ]);
+  });
+
+  test("dialog-sync-only mode in bot auth remains a no-op and skips message sync", async () => {
+    const state = createFakeState({
+      communities: [
+        {
+          chatId: BigInt(-1000000001201),
+          chatTitle: "Bot Community",
+          id: "community-bot",
+          parserType: "bot",
+        },
+      ],
+      latestStoredMessageId: BigInt(50),
+      getMessagesResponsesByFirstId: new Map<number, Array<unknown | null>>([
+        [51, [{ id: 51 }]],
+      ]),
+    });
+    const botConfig: UserbotConfig = {
+      ...createConfig(),
+      authMode: "bot",
+      botToken: "bot-token-999",
+    };
+
+    const result = await runSyncOnce(
+      {
+        createClient: async () => createFakeBundle(state, botConfig),
+        createDb: () => createFakeDb(state),
+        hasFile: async () => true,
+        loadConfig: () => botConfig,
+        loadDatabaseUrl: () => "postgres://db",
+        logger: createLogger(),
+        sleep: async () => undefined,
+      },
+      { dialogSyncOnly: true, parserTypes: ["bot", "userbot"] }
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.stats.telegramDialogsScanned).toBe(0);
+    expect(result.stats.missingUserbotCommunitiesInserted).toBe(0);
+    expect(result.stats.communitiesProcessed).toBe(0);
+    expect(result.stats.telegramMessagesFetched).toBe(0);
+    expect(state.iterDialogsCalls).toEqual([]);
+    expect(state.getMessagesCalls).toEqual([]);
+    expect(state.getHistoryCalls).toEqual([]);
+  });
+
+  test("does not insert discovered community when it already exists in database", async () => {
+    const state = createFakeState({
+      communities: [
+        {
+          chatId: BigInt(-1000000000201),
+          chatTitle: "Existing Bot Community",
+          id: "community-bot-existing",
+          parserType: "bot",
+        },
+      ],
+      iterDialogsEntries: [
+        {
+          peer: {
+            chatType: "group",
+            id: -1000000000201,
+            isMember: true,
+            title: "Existing Bot Community",
+            type: "chat",
+          },
+        },
+      ],
+    });
+
+    const result = await runSyncOnce({
+      createClient: async () => createFakeBundle(state),
+      createDb: () => createFakeDb(state),
+      hasFile: async () => true,
+      loadConfig: () => createConfig(),
+      loadDatabaseUrl: () => "postgres://db",
+      logger: createLogger(),
+      sleep: async () => undefined,
+    });
+
+    expect(result.stats.missingUserbotCommunitiesDetected).toBe(0);
+    expect(result.stats.missingUserbotCommunitiesInserted).toBe(0);
+    expect(state.insertedCommunityRows).toHaveLength(0);
+  });
+
+  test("skips non-member or non-group dialogs during community discovery", async () => {
+    const state = createFakeState({
+      iterDialogsEntries: [
+        { peer: { chatType: "channel", id: -1000000000301, isMember: true, type: "chat" } },
+        { peer: { chatType: "group", id: -1000000000302, isMember: false, type: "chat" } },
+        { peer: { id: 555, type: "user" } },
+      ],
+    });
+
+    const result = await runSyncOnce({
+      createClient: async () => createFakeBundle(state),
+      createDb: () => createFakeDb(state),
+      hasFile: async () => true,
+      loadConfig: () => createConfig(),
+      loadDatabaseUrl: () => "postgres://db",
+      logger: createLogger(),
+      sleep: async () => undefined,
+    });
+
+    expect(result.stats.telegramDialogsScanned).toBe(3);
+    expect(result.stats.telegramEligibleGroupDialogs).toBe(0);
+    expect(result.stats.missingUserbotCommunitiesDetected).toBe(0);
+    expect(result.stats.missingUserbotCommunitiesInserted).toBe(0);
+    expect(state.insertedCommunityRows).toHaveLength(0);
   });
 
   test("bot mode uses getMessages id batches and avoids getHistory", async () => {
@@ -376,7 +718,12 @@ describe("sync:once command", () => {
     expect(result.stats.botBatchRequests).toBe(2);
     expect(result.stats.botEmptyBatches).toBe(1);
     expect(result.stats.insertedMessages).toBe(2);
+    expect(result.stats.telegramDialogsScanned).toBe(0);
+    expect(result.stats.telegramEligibleGroupDialogs).toBe(0);
+    expect(result.stats.missingUserbotCommunitiesDetected).toBe(0);
+    expect(result.stats.missingUserbotCommunitiesInserted).toBe(0);
     expect(state.getHistoryCalls).toEqual([]);
+    expect(state.iterDialogsCalls).toEqual([]);
     expect(state.getMessagesCalls).toEqual([
       {
         chatId: Number(BigInt(-1000000000099)),
