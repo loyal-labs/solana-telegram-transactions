@@ -23,7 +23,8 @@ let mockDb: {
   };
 };
 
-let getChatCalls = 0;
+let captureCommunityPhotoCalls: Array<bigint | number | string> = [];
+let captureCommunityPhotoResult: string | null = null;
 let evictCalls: Array<bigint | number | string> = [];
 let autoCleanupReplyTexts: string[] = [];
 let notificationSettingsCalls: Array<{
@@ -35,18 +36,11 @@ mock.module("@/lib/core/database", () => ({
   getDatabase: () => mockDb,
 }));
 
-mock.module("../get-chat", () => ({
-  getChat: async () => {
-    getChatCalls += 1;
-    return {};
+mock.module("@/lib/telegram/community-photo-service", () => ({
+  captureCommunityPhotoToCdn: async (chatId: bigint | number | string) => {
+    captureCommunityPhotoCalls.push(chatId);
+    return captureCommunityPhotoResult;
   },
-}));
-
-mock.module("../get-file", () => ({
-  downloadTelegramFile: async () => ({
-    body: Buffer.from(""),
-    contentType: "image/jpeg",
-  }),
 }));
 
 mock.module("@/lib/telegram/user-service", () => ({
@@ -160,7 +154,8 @@ describe("commands admin authorization", () => {
     communityResult = null;
     communityFindResults = [];
     insertReturningRows = [{ id: "new-community" }];
-    getChatCalls = 0;
+    captureCommunityPhotoCalls = [];
+    captureCommunityPhotoResult = "https://cdn.example.com/community-avatar.jpg";
     evictCalls = [];
     autoCleanupReplyTexts = [];
     notificationSettingsCalls = [];
@@ -202,14 +197,24 @@ describe("commands admin authorization", () => {
 
   test("activate succeeds for whitelisted user without requiring Telegram chat-admin check", async () => {
     adminResult = { id: "admin-1" };
-    communityResult = createCommunity({ isActive: true });
+    communityResult = createCommunity({
+      isActive: true,
+      settings: {
+        photoBase64: "old-base64",
+        photoMimeType: "image/jpeg",
+      },
+    });
     const { ctx, replyCalls } = createCommandContext();
 
     await handleActivateCommunityCommand(ctx);
 
-    expect(getChatCalls).toBe(1);
+    expect(captureCommunityPhotoCalls).toEqual([ctx.chat.id]);
     expect(updateValuesCaptured).toHaveLength(1);
     expect(updateValuesCaptured[0]?.updatedAt).toBeInstanceOf(Date);
+    const settings = updateValuesCaptured[0]?.settings as Record<string, unknown>;
+    expect(settings?.photoUrl).toBe(captureCommunityPhotoResult);
+    expect(settings?.photoBase64).toBeUndefined();
+    expect(settings?.photoMimeType).toBeUndefined();
     expect(replyCalls).toContain(
       "Community is already activated. Data updated!"
     );
@@ -235,10 +240,14 @@ describe("commands admin authorization", () => {
 
     await handleActivateCommunityCommand(ctx);
 
-    expect(getChatCalls).toBe(1);
+    expect(captureCommunityPhotoCalls).toEqual([ctx.chat.id]);
     expect(updateValuesCaptured).toHaveLength(0);
     expect(insertValuesCaptured).toHaveLength(1);
     expect(insertValuesCaptured[0]?.isPublic).toBe(false);
+    const settings = insertValuesCaptured[0]?.settings as Record<string, unknown>;
+    expect(settings?.photoUrl).toBe(captureCommunityPhotoResult);
+    expect(settings?.photoBase64).toBeUndefined();
+    expect(settings?.photoMimeType).toBeUndefined();
     expect(replyCalls).toContain("Community activated for message tracking!");
   });
 

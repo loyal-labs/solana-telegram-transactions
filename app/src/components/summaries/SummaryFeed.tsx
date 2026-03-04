@@ -26,6 +26,8 @@ export type ChatSummary = {
   title: string;
   messageCount?: number;
   createdAt?: string;
+  photoUrl?: string;
+  // Deprecated compatibility fields; remove after migration window.
   photoBase64?: string;
   photoMimeType?: string;
   topics: Array<{
@@ -218,11 +220,11 @@ export default function SummaryFeed({
   const groupPhoto = useMemo(() => {
     if (summaries.length === 0) return null;
     const first = summaries[0];
+    if (first.photoUrl) {
+      return first.photoUrl;
+    }
     if (first.photoBase64) {
-      return {
-        base64: first.photoBase64,
-        mimeType: first.photoMimeType || "image/jpeg",
-      };
+      return `data:${first.photoMimeType || "image/jpeg"};base64,${first.photoBase64}`;
     }
     return null;
   }, [summaries]);
@@ -657,7 +659,7 @@ export default function SummaryFeed({
           {groupPhoto ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={`data:${groupPhoto.mimeType};base64,${groupPhoto.base64}`}
+              src={groupPhoto}
               alt={groupTitle}
               className="rounded-full object-cover shrink-0"
               style={{ width: 44, height: 44 }}

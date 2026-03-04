@@ -239,7 +239,14 @@ export default function SummariesPage() {
   const { summaries: cachedSummaries, setSummaries, hasCachedData } = useSummaries();
 
   // Transform summaries to unique group chats format (deduplicate by group chat id)
-  const transformToGroupChats = (summaries: Array<{ chatId?: string; title: string; photoBase64?: string; photoMimeType?: string; topics?: Array<{ content: string }> }>) => {
+  const transformToGroupChats = (summaries: Array<{
+    chatId?: string;
+    title: string;
+    photoUrl?: string;
+    photoBase64?: string;
+    photoMimeType?: string;
+    topics?: Array<{ content: string }>;
+  }>) => {
     const groupMap = new Map<string, GroupChat>();
 
     for (const summary of summaries) {
@@ -251,6 +258,7 @@ export default function SummariesPage() {
           id: groupKey,
           title: summary.title,
           subtitle: summary.topics?.[0]?.content || "",
+          photoUrl: summary.photoUrl,
           photoBase64: summary.photoBase64,
           photoMimeType: summary.photoMimeType,
         });

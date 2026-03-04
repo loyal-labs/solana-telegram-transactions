@@ -6,6 +6,8 @@ export type GroupChat = {
   id: string;
   title: string;
   subtitle: string;
+  photoUrl?: string;
+  // Deprecated compatibility fields; remove after migration window.
   photoBase64?: string;
   photoMimeType?: string;
 };
@@ -54,6 +56,7 @@ export function transformSummariesToGroups(
         id: groupKey,
         title: summary.title,
         subtitle: summary.topics[0]?.content ?? "",
+        photoUrl: summary.photoUrl,
         photoBase64: summary.photoBase64,
         photoMimeType: summary.photoMimeType,
       });

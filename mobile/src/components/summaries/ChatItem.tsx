@@ -8,6 +8,8 @@ import { getAvatarColor, getFirstLetter } from "./avatar-utils";
 type ChatItemProps = {
   title: string;
   subtitle?: string;
+  photoUrl?: string;
+  // Deprecated compatibility fields; remove after migration window.
   photoBase64?: string;
   photoMimeType?: string;
   onPress: () => void;
@@ -16,6 +18,7 @@ type ChatItemProps = {
 export function ChatItem({
   title,
   subtitle,
+  photoUrl,
   photoBase64,
   photoMimeType,
   onPress,
@@ -23,9 +26,11 @@ export function ChatItem({
   const avatarColor = getAvatarColor(title);
   const firstLetter = getFirstLetter(title);
 
-  const photoUri = photoBase64
-    ? `data:${photoMimeType ?? "image/jpeg"};base64,${photoBase64}`
-    : null;
+  const photoUri =
+    photoUrl ??
+    (photoBase64
+      ? `data:${photoMimeType ?? "image/jpeg"};base64,${photoBase64}`
+      : null);
 
   return (
     <Pressable

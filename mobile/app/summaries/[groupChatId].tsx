@@ -284,12 +284,11 @@ export default function SummaryFeedScreen() {
     );
   }
 
-  const groupPhoto = summaries[0]?.photoBase64
-    ? {
-        base64: summaries[0].photoBase64,
-        mimeType: summaries[0].photoMimeType ?? "image/jpeg",
-      }
-    : null;
+  const groupPhoto =
+    summaries[0]?.photoUrl ??
+    (summaries[0]?.photoBase64
+      ? `data:${summaries[0].photoMimeType ?? "image/jpeg"};base64,${summaries[0].photoBase64}`
+      : null);
   const avatarColor = getAvatarColor(groupTitle);
   const firstLetter = getFirstLetter(groupTitle);
 
@@ -304,9 +303,7 @@ export default function SummaryFeedScreen() {
         <View className="px-4 pt-4 pb-2 flex-row items-center gap-3">
           {groupPhoto ? (
             <Image
-              source={{
-                uri: `data:${groupPhoto.mimeType};base64,${groupPhoto.base64}`,
-              }}
+              source={{ uri: groupPhoto }}
               className="w-11 h-11 rounded-full object-cover"
             />
           ) : (
