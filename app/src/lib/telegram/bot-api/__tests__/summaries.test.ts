@@ -84,7 +84,7 @@ describe("generateOrGetSummaryForRun", () => {
             diagnostics: {
               attempts: 2,
               failureReasons: [],
-              finalModel: "deepseek/deepseek-v3.2",
+              finalModel: "z-ai/glm-4.7",
               latencyMs: 120,
               usedExampleSet: "summaries/examples/v1",
             },
@@ -99,7 +99,7 @@ describe("generateOrGetSummaryForRun", () => {
           };
         },
       },
-      summaryModelResolver: () => "deepseek/deepseek-v3.2",
+      summaryModelResolver: () => "z-ai/glm-4.7",
     });
   });
 
@@ -178,7 +178,7 @@ describe("generateOrGetSummaryForRun", () => {
     expect(summaryGenerationCalls).toHaveLength(1);
     expect(summaryGenerationCalls[0]).toMatchObject({
       dayKeyUtc: "2026-02-13",
-      modelKey: "deepseek/deepseek-v3.2",
+      modelKey: "z-ai/glm-4.7",
       participants: ["User1", "User2", "User3", "User4", "User5"],
     });
     expect(insertedSummaryValues).toHaveLength(1);

@@ -81,7 +81,7 @@ export const serverEnv = {
     return (
       getOptionalEnv("AX_SUMMARY_MODEL_DEFAULT") ??
       getOptionalEnv("SUMMARY_AX_MODEL") ??
-      "deepseek/deepseek-v3.2"
+      "z-ai/glm-4.7"
     );
   },
   get axSummaryMaxAttempts(): number {

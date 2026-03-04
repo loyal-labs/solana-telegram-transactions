@@ -118,7 +118,7 @@ describe("server config", () => {
   });
 
   test("returns Ax summary defaults when env values are not set", () => {
-    expect(serverEnv.axSummaryModelDefault).toBe("deepseek/deepseek-v3.2");
+    expect(serverEnv.axSummaryModelDefault).toBe("z-ai/glm-4.7");
     expect(serverEnv.axSummaryMaxAttempts).toBe(3);
     expect(serverEnv.axSummaryExamplesVersion).toBe("v1");
     expect(serverEnv.axSummaryEnableTelemetry).toBe(true);

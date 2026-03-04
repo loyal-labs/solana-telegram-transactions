@@ -29,7 +29,7 @@ const result = await runAxProgram({
   ai,
   input,
   label: "feature.program",
-  model: "deepseek/deepseek-v3.2",
+  model: "z-ai/glm-4.7",
   normalizeOutput: (output) => output,
   program,
   retryPolicy: { maxAttempts: 3 },

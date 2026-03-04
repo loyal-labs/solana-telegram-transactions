@@ -56,7 +56,7 @@ describe("createAxSummaryGenerationService", () => {
 
     const service = createAxSummaryGenerationService({
       ai: {} as never,
-      defaultModel: "deepseek/deepseek-v3.2",
+      defaultModel: "z-ai/glm-4.7",
       maxAttempts: 3,
       spec: DEFAULT_SUMMARY_PROGRAM_SPEC,
       testPrograms: {
@@ -95,7 +95,34 @@ describe("createAxSummaryGenerationService", () => {
 
     const service = createAxSummaryGenerationService({
       ai: {} as never,
-      defaultModel: "deepseek/deepseek-v3.2",
+      defaultModel: "z-ai/glm-4.7",
+      maxAttempts: 3,
+      spec: DEFAULT_SUMMARY_PROGRAM_SPEC,
+      testPrograms: {
+        onelinerProgram: onelinerStub.program,
+        topicProgram: topicStub.program,
+      },
+    });
+
+    const result = await service.generate(BASE_REQUEST);
+
+    expect(result.topics).toEqual(VALID_TOPIC_OUTPUT.topics);
+    expect(topicStub.getCallCount()).toBe(2);
+    expect(onelinerStub.getCallCount()).toBe(1);
+  });
+
+  test("retries when topics is not an array and succeeds later", async () => {
+    const topicStub = createProgramStub<TopicExtractionInput, TopicExtractionOutput>([
+      { topics: { title: "wrong-shape" } },
+      VALID_TOPIC_OUTPUT,
+    ]);
+    const onelinerStub = createProgramStub<OnelinerGenerationInput, OnelinerGenerationOutput>([
+      { oneliner: "Daily thread focused on launch risks and mitigations." },
+    ]);
+
+    const service = createAxSummaryGenerationService({
+      ai: {} as never,
+      defaultModel: "z-ai/glm-4.7",
       maxAttempts: 3,
       spec: DEFAULT_SUMMARY_PROGRAM_SPEC,
       testPrograms: {
@@ -121,7 +148,7 @@ describe("createAxSummaryGenerationService", () => {
 
     const service = createAxSummaryGenerationService({
       ai: {} as never,
-      defaultModel: "deepseek/deepseek-v3.2",
+      defaultModel: "z-ai/glm-4.7",
       maxAttempts: 3,
       spec: DEFAULT_SUMMARY_PROGRAM_SPEC,
       testPrograms: {
@@ -155,7 +182,7 @@ describe("createAxSummaryGenerationService", () => {
 
     const service = createAxSummaryGenerationService({
       ai: {} as never,
-      defaultModel: "deepseek/deepseek-v3.2",
+      defaultModel: "z-ai/glm-4.7",
       maxAttempts: 1,
       spec: DEFAULT_SUMMARY_PROGRAM_SPEC,
       testPrograms: {
@@ -180,7 +207,7 @@ describe("createAxSummaryGenerationService", () => {
 
     const service = createAxSummaryGenerationService({
       ai: {} as never,
-      defaultModel: "deepseek/deepseek-v3.2",
+      defaultModel: "z-ai/glm-4.7",
       maxAttempts: 3,
       spec: DEFAULT_SUMMARY_PROGRAM_SPEC,
       testPrograms: {
