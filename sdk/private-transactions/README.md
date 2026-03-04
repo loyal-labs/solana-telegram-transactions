@@ -1,6 +1,6 @@
 # @loyal-labs/private-transactions
 
-SDK for private SPL token deposits and transfers using MagicBlock Private Ephemeral Rollups (PER). This package wraps the `telegram-private-transfer` Anchor program and provides helpers for permissions, delegation, private transfers, claims, and undelegation.
+SDK for private SPL token deposits and transfers using [MagicBlock Private Ephemeral Rollups (PER)](https://docs.magicblock.gg/pages/private-ephemeral-rollups-pers/introduction/authorization). This package wraps the `telegram-private-transfer` Anchor program and provides helpers for permissions, delegation, private transfers, claims, and undelegation.
 
 ## Installation
 
@@ -38,6 +38,7 @@ const client = await LoyalPrivateTransactionsClient.fromConfig({
   commitment: "confirmed",
 });
 
+// Shield: move tokens into private deposit
 await client.initializeDeposit({
   tokenMint,
   user: signer.publicKey,
@@ -66,7 +67,7 @@ await client.delegateDeposit({
   validator: ER_VALIDATOR,
 });
 
-// Destination username deposit must already exist and be delegated.
+// Private transfer (on PER) — destination username deposit must already exist and be delegated
 await client.transferToUsernameDeposit({
   tokenMint,
   username: "alice_user",
@@ -76,6 +77,7 @@ await client.transferToUsernameDeposit({
   sessionToken: null,
 });
 
+// Unshield: commit PER state and withdraw tokens
 await client.undelegateDeposit({
   tokenMint,
   user: signer.publicKey,
@@ -84,13 +86,22 @@ await client.undelegateDeposit({
   magicProgram: MAGIC_PROGRAM_ID,
   magicContext: MAGIC_CONTEXT_ID,
 });
+
+await client.modifyBalance({
+  tokenMint,
+  user: signer.publicKey,
+  payer: signer.publicKey,
+  userTokenAccount: new PublicKey("<sender-ata>"),
+  amount: 1_000_000,
+  increase: false,
+});
 ```
 
 ## PER Authentication
 
-For hosted PER endpoints (`tee.magicblock.app`), the SDK can request auth tokens automatically.
+For hosted PER endpoints (`tee.magicblock.app`), the SDK acquires auth tokens automatically during `fromConfig`.
 
-If you need explicit control, fetch token externally and pass it through `authToken`:
+If you need explicit control, fetch the token externally and pass it through `authToken`:
 
 ```ts
 import { getAuthToken } from "@magicblock-labs/ephemeral-rollups-sdk";
@@ -116,29 +127,35 @@ const client = await LoyalPrivateTransactionsClient.fromConfig({
 
 - `fromConfig({ signer, baseRpcEndpoint, ephemeralRpcEndpoint, ... })`
 
-### Core Actions
+### Shield / Unshield
 
-- `initializeDeposit`
-- `initializeUsernameDeposit`
-- `modifyBalance`
-- `depositForUsername`
-- `claimUsernameDeposit`
-- `claimUsernameDepositToDeposit`
-- `createPermission`
-- `createUsernamePermission`
-- `delegateDeposit`
-- `delegateUsernameDeposit`
-- `transferDeposit`
-- `transferToUsernameDeposit`
-- `undelegateDeposit`
+- `initializeDeposit` — create deposit account (no-op if exists)
+- `modifyBalance` — deposit (`increase: true`) or withdraw (`increase: false`) real tokens
+- `createPermission` — set up PER access control (idempotent)
+- `delegateDeposit` — delegate to TEE validator
+
+### Private Transfers (on PER)
+
+- `transferDeposit` — transfer between user deposits
+- `transferToUsernameDeposit` — transfer to username deposit
+- `claimUsernameDepositToDeposit` — claim from username deposit with verified Telegram session
+
+### Username Deposits
+
+- `initializeUsernameDeposit` — create username deposit account
+- `createUsernamePermission` — PER access control for username deposit
+- `delegateUsernameDeposit` — delegate username deposit to PER
+- `undelegateUsernameDeposit` — commit and undelegate username deposit
+
+### Commit / Undelegate
+
+- `undelegateDeposit` — commit PER state, return deposit to base layer
 - `undelegateUsernameDeposit`
 
 ### Queries
 
-- `getBaseDeposit`
-- `getEphemeralDeposit`
-- `getBaseUsernameDeposit`
-- `getEphemeralUsernameDeposit`
+- `getBaseDeposit` / `getEphemeralDeposit`
+- `getBaseUsernameDeposit` / `getEphemeralUsernameDeposit`
 
 ### Accessors
 
@@ -152,6 +169,10 @@ const client = await LoyalPrivateTransactionsClient.fromConfig({
 - `findDepositPda`
 - `findUsernameDepositPda`
 - `findVaultPda`
+- `findPermissionPda`
+- `findDelegationRecordPda`
+- `findDelegationMetadataPda`
+- `findBufferPda`
 
 ## Development
 
