@@ -1,4 +1,5 @@
 import { communities, pushTokens } from "@loyal-labs/db-core/schema";
+import { LlmRetryExhaustedError } from "@loyal-labs/llm-core";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -32,8 +33,12 @@ type ActiveCommunityRecord = {
 type CommunityProcessingError = {
   chatId?: string;
   communityId?: string;
+  errorDetails?: Record<string, string>;
   error: string;
+  errorName?: string;
+  failureReasons?: string[];
   scope: "delivery" | "generation";
+  stack?: string;
   summaryId?: string;
 };
 
@@ -195,12 +200,15 @@ export async function runDailyCommunitySummaries(
       );
     } catch (error) {
       stats.errors += 1;
-      errors.push({
-        chatId: String(community.chatId),
+      const generationError = buildCommunityProcessingError({
+        chatId: community.chatId,
         communityId: community.id,
-        error: error instanceof Error ? error.message : String(error),
+        error,
         scope: "generation",
       });
+
+      errors.push(generationError);
+      logCommunityProcessingFailure(generationError);
       continue;
     }
 
@@ -258,13 +266,16 @@ export async function runDailyCommunitySummaries(
     } catch (error) {
       stats.deliveryFailed += 1;
       stats.errors += 1;
-      errors.push({
-        chatId: String(community.chatId),
+      const deliveryError = buildCommunityProcessingError({
+        chatId: community.chatId,
         communityId: community.id,
-        error: error instanceof Error ? error.message : String(error),
+        error,
         scope: "delivery",
         summaryId: generationResult.summaryId,
       });
+
+      errors.push(deliveryError);
+      logCommunityProcessingFailure(deliveryError);
     }
   }
 
@@ -304,4 +315,112 @@ function logQualityControlForwardFailure(
     sourceCommunityChatId: String(deliveredMessage.sourceCommunityChatId),
     summaryId,
   });
+}
+
+type BuildCommunityProcessingErrorOptions = {
+  chatId: bigint;
+  communityId: string;
+  error: unknown;
+  scope: CommunityProcessingError["scope"];
+  summaryId?: string;
+};
+
+function buildCommunityProcessingError(
+  options: BuildCommunityProcessingErrorOptions
+): CommunityProcessingError {
+  const baseError: CommunityProcessingError = {
+    chatId: String(options.chatId),
+    communityId: options.communityId,
+    error: options.error instanceof Error ? options.error.message : String(options.error),
+    scope: options.scope,
+    summaryId: options.summaryId,
+  };
+
+  if (!(options.error instanceof Error)) {
+    return baseError;
+  }
+
+  baseError.errorName = options.error.name;
+  if (options.error.stack) {
+    baseError.stack = options.error.stack.split("\n").slice(0, 6).join("\n");
+  }
+
+  const errorDetails = extractErrorDetails(options.error);
+  if (Object.keys(errorDetails).length > 0) {
+    baseError.errorDetails = errorDetails;
+  }
+
+  if (options.error instanceof LlmRetryExhaustedError) {
+    baseError.failureReasons = options.error.failureReasons;
+  }
+
+  return baseError;
+}
+
+function logCommunityProcessingFailure(error: CommunityProcessingError): void {
+  console.error("[cron/summaries] Community summary processing failed", error);
+}
+
+function extractErrorDetails(error: Error): Record<string, string> {
+  const details: Record<string, string> = {};
+  const errorRecord = error as Error & Record<string, unknown>;
+  const keys = ["code", "status", "statusCode", "type", "param", "requestId"];
+
+  for (const key of keys) {
+    const value = errorRecord[key];
+    if (value !== undefined) {
+      details[key] = stringifyErrorField(value);
+    }
+  }
+
+  const response = errorRecord.response;
+  if (response !== undefined) {
+    details.response = stringifyErrorField(response);
+  }
+
+  const cause = (error as Error & { cause?: unknown }).cause;
+  if (cause !== undefined) {
+    details.cause = stringifyErrorField(cause);
+  }
+
+  return details;
+}
+
+function stringifyErrorField(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint" ||
+    value === null
+  ) {
+    return String(value);
+  }
+
+  if (value === undefined) {
+    return "undefined";
+  }
+
+  try {
+    const seen = new WeakSet<object>();
+    return JSON.stringify(value, (_key, currentValue) => {
+      if (typeof currentValue === "bigint") {
+        return currentValue.toString();
+      }
+
+      if (typeof currentValue === "object" && currentValue !== null) {
+        if (seen.has(currentValue)) {
+          return "[Circular]";
+        }
+        seen.add(currentValue);
+      }
+
+      return currentValue;
+    });
+  } catch {
+    return String(value);
+  }
 }
