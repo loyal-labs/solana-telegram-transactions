@@ -12,6 +12,8 @@ export type ChatSummary = {
   messageCount?: number;
   createdAt?: string;
   oneliner?: string;
+  photoUrl?: string;
+  // Deprecated compatibility fields; remove after migration window.
   photoBase64?: string;
   photoMimeType?: string;
   topics: Topic[];

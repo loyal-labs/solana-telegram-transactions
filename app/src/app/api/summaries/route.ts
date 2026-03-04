@@ -5,6 +5,8 @@ import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/core/database";
 
 type CommunityPhotoSettings = {
+  photoUrl?: string;
+  // Deprecated compatibility fields; kept temporarily for clients still migrating.
   photoBase64?: string;
   photoMimeType?: string;
 };
@@ -47,6 +49,8 @@ export async function GET(req: Request): Promise<NextResponse> {
         title: item.chatTitle,
         messageCount: item.messageCount,
         oneliner: item.oneliner,
+        photoUrl: settings?.photoUrl,
+        // Deprecated compatibility fields; remove after migration window.
         photoBase64: settings?.photoBase64,
         photoMimeType: settings?.photoMimeType,
         topics: item.topics.map((topic, index) => ({

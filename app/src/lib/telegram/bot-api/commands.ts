@@ -4,6 +4,7 @@ import type { CommandContext, Context } from "grammy";
 import { Bot, InlineKeyboard } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
+import { captureCommunityPhotoToCdn } from "@/lib/telegram/community-photo-service";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
 
@@ -13,8 +14,6 @@ import {
   trackBotEvent,
 } from "./analytics";
 import { CA_COMMAND_CHAT_ID } from "./constants";
-import { getChat } from "./get-chat";
-import { downloadTelegramFile } from "./get-file";
 import { replyWithAutoCleanup } from "./helper-message-cleanup";
 import { evictActiveCommunityCache } from "./message-handlers";
 import { sendNotificationSettingsMessage } from "./notification-settings";
@@ -22,11 +21,6 @@ import { sendStartCarousel } from "./start-carousel";
 import { sendLatestSummary } from "./summaries";
 import type { HandleSummaryCommandOptions } from "./types";
 import { sendUserSettingsMessage } from "./user-settings";
-
-interface CommunityPhoto {
-  base64: string;
-  mimeType: string;
-}
 
 const SETTINGS_LOAD_ERROR_REPLY_TEXT =
   "Unable to load your settings right now. Please try again.";
@@ -49,29 +43,6 @@ function createCommandTrackingProperties(
     chatType: ctx.chat?.type,
     userId: ctx.from?.id,
   });
-}
-
-/**
- * Fetches community profile photo and converts to base64.
- * Returns undefined if photo is unavailable or fetch fails.
- */
-async function fetchCommunityPhoto(
-  chatId: number | string
-): Promise<CommunityPhoto | undefined> {
-  try {
-    const chatInfo = await getChat(chatId);
-    if (!chatInfo.photo?.small_file_id) {
-      return undefined;
-    }
-    const photo = await downloadTelegramFile(chatInfo.photo.small_file_id);
-    return {
-      base64: photo.body.toString("base64"),
-      mimeType: photo.contentType,
-    };
-  } catch (error) {
-    console.warn("Failed to fetch community photo:", error);
-    return undefined;
-  }
 }
 
 async function isWhitelistedAdmin(
@@ -149,10 +120,17 @@ function mergeCommunitySettings(
       ? (existingSettings as Record<string, unknown>)
       : {};
 
-  return {
+  const mergedSettings: Record<string, unknown> = {
     ...current,
     ...nextSettings,
   };
+
+  if (typeof nextSettings.photoUrl === "string" && nextSettings.photoUrl.length > 0) {
+    delete mergedSettings.photoBase64;
+    delete mergedSettings.photoMimeType;
+  }
+
+  return mergedSettings;
 }
 
 async function syncActivationForExistingCommunity(params: {
@@ -314,11 +292,10 @@ export async function handleActivateCommunityCommand(
     const chatId = BigInt(ctx.chat.id);
 
     // Fetch community photo (non-blocking on failure)
-    const photo = await fetchCommunityPhoto(ctx.chat.id);
-    const settings = photo
+    const photoUrl = await captureCommunityPhotoToCdn(ctx.chat.id);
+    const settings = photoUrl
       ? {
-          photoBase64: photo.base64,
-          photoMimeType: photo.mimeType,
+          photoUrl,
           photoUpdatedAt: new Date().toISOString(),
         }
       : {};

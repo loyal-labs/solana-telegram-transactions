@@ -139,6 +139,7 @@ export default function SummariesListScreen() {
           key={group.id}
           title={group.title}
           subtitle={group.subtitle}
+          photoUrl={group.photoUrl}
           photoBase64={group.photoBase64}
           photoMimeType={group.photoMimeType}
           onPress={() => handleGroupPress(group)}
