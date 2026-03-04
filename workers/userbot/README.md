@@ -23,6 +23,8 @@ Standalone worker package for Telegram userbot foundations.
 - `TELEGRAM_USERBOT_PHONE` (used by `auth:bootstrap` as default phone)
 - `TELEGRAM_USERBOT_BOT_TOKEN` (preferred bot auth token)
 - `ASKLOYAL_TGBOT_KEY` (fallback bot auth token, compatible with app env)
+- `TELEGRAM_SUMMARY_INLINE_BOT_USERNAME` (default: `askloyal_tgbot`)
+- `TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM` + `TELEGRAM_SUMMARY_PEER_OVERRIDE_TO` (optional summary source peer remap; both must be set together)
 
 ## Commands
 
@@ -34,6 +36,7 @@ bun run auth:bootstrap
 bun run auth:status
 bun run auth:clear
 bun run sync:once
+bun run summary:publish:once
 bun run start
 ```
 
@@ -54,6 +57,31 @@ bun run start
 Missing chats are inserted into `communities` with `parserType=userbot` and inactive defaults:
 `isActive=false`, `isPublic=false`, `summaryNotificationsEnabled=false`,
 `summaryNotificationTimeHours=null`, `summaryNotificationMessageCount=null`.
+
+`summary:publish:once` is delivery-only and reuses the existing bot inline query flow (`summary:<chatId>`):
+
+- Targets activated `parserType=userbot` communities with summary notifications enabled
+- Pulls inline summary results for each group and sends the latest result only
+- Optional `--chat-ids=-100123,-100456` filter scopes delivery to specific groups for safe retries
+- Requires user auth mode (not bot token mode)
+- Runs sequentially per community and uses bounded transient retries (max `3` attempts, base backoff `250ms`)
+- Records phase-specific failures with `scope="inline_query"` (fetch) or `scope="delivery"` (send)
+- Uses a crypto-backed Telegram `randomId` for `messages.sendInlineBotResult`
+- Returns exit code `1` when any delivery errors occur (`stats.errors > 0`), otherwise `0`
+
+`summary:publish:once` completion logs include deterministic stats:
+
+- `communitiesMatched`
+- `communitiesProcessed`
+- `deliveryAttempted` (incremented for every processed community)
+- `deliverySucceeded`
+- `deliveryFailed`
+- `skippedNoInlineResults`
+- `errors`
+- `retryCount`
+- `authMode`
+- `botUsername`
+- `chatIdFilterCount`
 
 ## Render operational flow
 

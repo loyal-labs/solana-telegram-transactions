@@ -8,6 +8,7 @@
     "auth:status": "bun run src/commands/auth-status.ts",
     "auth:clear": "bun run src/commands/auth-clear.ts",
     "sync:once": "bun run src/commands/sync-once.ts",
+    "summary:publish:once": "bun run src/commands/summary-publish-once.ts",
     "test": "bun test"
   },
   "dependencies": {
