@@ -48,6 +48,12 @@ bun run start
 - `--parser-types=bot,userbot` (include activated bot-parser communities)
 - `--lookback-days=2` (scan history for previous full UTC days)
 - `--chat-ids=-100123,-100456` (scope to specific chat IDs)
+- `--dialog-sync-only` (or `--dialogue-sync-only`) to run discovery/import only and skip message ingestion
+
+`sync:once` also auto-discovers group/supergroup dialogs when running in user auth mode.
+Missing chats are inserted into `communities` with `parserType=userbot` and inactive defaults:
+`isActive=false`, `isPublic=false`, `summaryNotificationsEnabled=false`,
+`summaryNotificationTimeHours=null`, `summaryNotificationMessageCount=null`.
 
 ## Render operational flow
 

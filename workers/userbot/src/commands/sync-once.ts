@@ -42,6 +42,7 @@ type SyncOnceDeps = {
 };
 
 type SyncOnceOptions = {
+  dialogSyncOnly?: boolean;
   chatIds?: bigint[];
   lookbackDays?: number | null;
   now?: Date;
@@ -49,6 +50,7 @@ type SyncOnceOptions = {
 };
 
 type ResolvedSyncOnceOptions = {
+  dialogSyncOnly: boolean;
   chatIds: bigint[] | null;
   lookbackDays: number | null;
   lookbackWindowEndExclusiveUtc: Date | null;
@@ -61,6 +63,11 @@ type ActiveSyncCommunity = {
   chatTitle: string;
   id: string;
   parserType: CommunityParserType;
+};
+
+type DiscoveredUserbotCommunity = {
+  chatId: bigint;
+  chatTitle: string;
 };
 
 type CommunitySyncError = {
@@ -87,12 +94,16 @@ export type SyncOnceStats = {
   duplicateMessages: number;
   insertedMemberships: number;
   insertedMessages: number;
+  missingUserbotCommunitiesDetected: number;
+  missingUserbotCommunitiesInserted: number;
   insertedUsers: number;
   retryCount: number;
   skippedNonText: number;
   skippedNonUserSender: number;
   skippedOldOrEqual: number;
   skippedUnsupportedShape: number;
+  telegramDialogsScanned: number;
+  telegramEligibleGroupDialogs: number;
   telegramMessagesConsidered: number;
   telegramMessagesFetched: number;
   userMetadataUpdates: number;
@@ -159,6 +170,7 @@ function resolveSyncOptions(options: SyncOnceOptions = {}): ResolvedSyncOnceOpti
 
   if (lookbackDays === null) {
     return {
+      dialogSyncOnly: options.dialogSyncOnly === true,
       chatIds: options.chatIds?.length ? options.chatIds : null,
       lookbackDays: null,
       lookbackWindowEndExclusiveUtc: null,
@@ -174,6 +186,7 @@ function resolveSyncOptions(options: SyncOnceOptions = {}): ResolvedSyncOnceOpti
   );
 
   return {
+    dialogSyncOnly: options.dialogSyncOnly === true,
     chatIds: options.chatIds?.length ? options.chatIds : null,
     lookbackDays,
     lookbackWindowEndExclusiveUtc,
@@ -226,6 +239,11 @@ function parseSyncOnceCliOptions(argv: string[]): SyncOnceOptions {
   const options: SyncOnceOptions = {};
 
   for (const arg of argv.slice(2)) {
+    if (arg === "--dialog-sync-only" || arg === "--dialogue-sync-only") {
+      options.dialogSyncOnly = true;
+      continue;
+    }
+
     if (arg.startsWith("--parser-types=")) {
       options.parserTypes = parseParserTypes(arg.slice("--parser-types=".length));
       continue;
@@ -287,12 +305,16 @@ function createInitialStats(
     duplicateMessages: 0,
     insertedMemberships: 0,
     insertedMessages: 0,
+    missingUserbotCommunitiesDetected: 0,
+    missingUserbotCommunitiesInserted: 0,
     insertedUsers: 0,
     retryCount: 0,
     skippedNonText: 0,
     skippedNonUserSender: 0,
     skippedOldOrEqual: 0,
     skippedUnsupportedShape: 0,
+    telegramDialogsScanned: 0,
+    telegramEligibleGroupDialogs: 0,
     telegramMessagesConsidered: 0,
     telegramMessagesFetched: 0,
     userMetadataUpdates: 0,
@@ -380,6 +402,153 @@ async function getLatestStoredMessageId(
   return latestStored?.telegramMessageId !== undefined
     ? Number(latestStored.telegramMessageId)
     : null;
+}
+
+function toBigIntId(value: unknown): bigint | null {
+  if (typeof value === "bigint") {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return BigInt(value);
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    try {
+      return BigInt(value);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function readStartedAccountId(account: unknown): bigint | null {
+  if (!account || typeof account !== "object") {
+    return null;
+  }
+
+  const id = (account as { id?: unknown }).id;
+  return toBigIntId(id);
+}
+
+function readDiscoveredCommunity(dialog: unknown): DiscoveredUserbotCommunity | null {
+  if (!dialog || typeof dialog !== "object") {
+    return null;
+  }
+
+  const peer = (dialog as { peer?: unknown }).peer;
+  if (!peer || typeof peer !== "object") {
+    return null;
+  }
+
+  const candidate = peer as {
+    chatType?: unknown;
+    id?: unknown;
+    isMember?: unknown;
+    title?: unknown;
+    type?: unknown;
+  };
+
+  if (candidate.type !== "chat") {
+    return null;
+  }
+
+  if (candidate.chatType !== "group" && candidate.chatType !== "supergroup") {
+    return null;
+  }
+
+  if (candidate.isMember !== true) {
+    return null;
+  }
+
+  const chatId = toBigIntId(candidate.id);
+  if (chatId === null) {
+    return null;
+  }
+
+  const chatTitle =
+    typeof candidate.title === "string" && candidate.title.trim().length > 0
+      ? candidate.title.trim()
+      : "Untitled";
+
+  return {
+    chatId,
+    chatTitle,
+  };
+}
+
+async function importMissingUserbotCommunities(params: {
+  accountTelegramId: bigint;
+  bundle: UserbotClientBundle;
+  db: UserbotDb;
+  stats: SyncOnceStats;
+}): Promise<void> {
+  const discoveredByChatId = new Map<string, DiscoveredUserbotCommunity>();
+
+  for await (const dialog of params.bundle.client.iterDialogs({
+    archived: "exclude",
+  })) {
+    params.stats.telegramDialogsScanned += 1;
+    const discoveredCommunity = readDiscoveredCommunity(dialog);
+    if (!discoveredCommunity) {
+      continue;
+    }
+
+    params.stats.telegramEligibleGroupDialogs += 1;
+    const chatIdKey = discoveredCommunity.chatId.toString();
+    if (discoveredByChatId.has(chatIdKey)) {
+      continue;
+    }
+
+    discoveredByChatId.set(chatIdKey, discoveredCommunity);
+  }
+
+  if (discoveredByChatId.size === 0) {
+    return;
+  }
+
+  const discoveredChatIds = [...discoveredByChatId.values()].map(
+    (community) => community.chatId
+  );
+  const existingCommunities = await params.db.query.communities.findMany({
+    columns: {
+      chatId: true,
+    },
+    where: inArray(communities.chatId, discoveredChatIds),
+  });
+  const existingChatIds = new Set(
+    existingCommunities.map((community) => community.chatId.toString())
+  );
+
+  const missingCommunities = [...discoveredByChatId.values()].filter(
+    (community) => !existingChatIds.has(community.chatId.toString())
+  );
+  params.stats.missingUserbotCommunitiesDetected = missingCommunities.length;
+
+  for (const missingCommunity of missingCommunities) {
+    const inserted = await params.db
+      .insert(communities)
+      .values({
+        activatedBy: params.accountTelegramId,
+        chatId: missingCommunity.chatId,
+        chatTitle: missingCommunity.chatTitle,
+        isActive: false,
+        isPublic: false,
+        parserType: "userbot",
+        settings: {},
+        summaryNotificationMessageCount: null,
+        summaryNotificationTimeHours: null,
+        summaryNotificationsEnabled: false,
+      })
+      .onConflictDoNothing()
+      .returning({ id: communities.id });
+
+    if (inserted.length > 0) {
+      params.stats.missingUserbotCommunitiesInserted += 1;
+    }
+  }
 }
 
 async function syncCommunityWithBotIdBatches(
@@ -600,6 +769,9 @@ export async function runSyncOnce(
       config.authMode === "bot" ? "getMessages-id-batch" : "history"
     }`
   );
+  if (resolvedOptions.dialogSyncOnly) {
+    deps.logger.info("[userbot] dialog sync only mode is enabled.");
+  }
   const sessionPath = resolveSessionSqlitePath(
     config.accountKey,
     config.storageDir
@@ -620,12 +792,49 @@ export async function runSyncOnce(
   const bundle = await deps.createClient(config);
   const userIdCache = new Map<string, string>();
   const membershipCache = new Set<string>();
+  const stats = createInitialStats(0, resolvedOptions, config);
 
   try {
-    await bundle.client.start(createNonInteractiveStartParams(config));
+    const account = await bundle.client.start(createNonInteractiveStartParams(config));
 
     const databaseUrl = deps.loadDatabaseUrl(deps.env);
     const db = deps.createDb(databaseUrl);
+
+    if (config.authMode === "user") {
+      const accountTelegramId = readStartedAccountId(account);
+      if (accountTelegramId === null) {
+        throw new Error(
+          "Failed to read authenticated account id for userbot community discovery."
+        );
+      }
+
+      await runWithRetry(
+        deps,
+        stats,
+        "discovering and importing userbot communities",
+        async () => {
+          await importMissingUserbotCommunities({
+            accountTelegramId,
+            bundle,
+            db,
+            stats,
+          });
+        }
+      );
+    } else {
+      deps.logger.info(
+        "[userbot] Skipping community discovery because authMode=bot."
+      );
+    }
+
+    if (resolvedOptions.dialogSyncOnly) {
+      const result = {
+        errors: [] as CommunitySyncError[],
+        stats,
+      };
+      deps.logger.info("[userbot] sync:once completed (dialog-sync-only)", result);
+      return result;
+    }
 
     const whereClauses = [
       eq(communities.isActive, true),
@@ -662,11 +871,7 @@ export async function runSyncOnce(
       return chatIdFilter.has(community.chatId.toString());
     });
 
-    const stats = createInitialStats(
-      selectedCommunities.length,
-      resolvedOptions,
-      config
-    );
+    stats.communitiesScanned = selectedCommunities.length;
     const errors: CommunitySyncError[] = [];
 
     for (const community of selectedCommunities) {

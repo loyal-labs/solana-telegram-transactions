@@ -72,10 +72,21 @@ Configure a Render cron job with:
 cd workers/userbot && bun install && bun run sync:once
 ```
 
+In user auth mode, `sync:once` first discovers active group/supergroup dialogs from
+the Telegram session and inserts missing communities as `parserType=userbot` with
+inactive defaults (`isActive=false`, `isPublic=false`, notifications disabled) so they
+can be configured manually in admin.
+
 Optional recovery flags for targeted backfill:
 
 ```bash
 cd workers/userbot && bun install && bun run sync:once --parser-types=bot,userbot --lookback-days=2
+```
+
+To only sync dialogs into communities (no message ingestion), run:
+
+```bash
+cd workers/userbot && bun install && bun run sync:once --dialog-sync-only
 ```
 
 ## Session Recovery Flow
