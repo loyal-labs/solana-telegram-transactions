@@ -17,20 +17,238 @@ fi
 echo "[pre-push] Running admin shared-schema guard..."
 bun run guard:admin-shared-schema
 
-echo "[pre-push] Running app lint..."
-(cd app && bun run lint)
+temp_dir="$(mktemp -d)"
+jobs_file="$temp_dir/jobs.tsv"
+results_file="$temp_dir/results.tsv"
+touch "$jobs_file" "$results_file"
+checks_completed=0
 
-echo "[pre-push] Running app build..."
-(cd app && bun run build)
+tab_char="$(printf '\t')"
 
-echo "[pre-push] Running admin lint..."
-(cd admin && bun run lint)
+is_non_negative_integer() {
+  case "$1" in
+  '' | *[!0-9]*)
+    return 1
+    ;;
+  *)
+    return 0
+    ;;
+  esac
+}
 
-echo "[pre-push] Running admin build..."
-(cd admin && bun run build)
+stop_running_jobs() {
+  if [ -f "$jobs_file" ]; then
+    while IFS="$tab_char" read -r _ _ pid _ _ _; do
+      [ -n "${pid:-}" ] || continue
+      if kill -0 "$pid" 2>/dev/null; then
+        kill "$pid" 2>/dev/null || true
+      fi
+    done <"$jobs_file"
 
-echo "[pre-push] Running frontend lint..."
-(cd frontend && bun run lint)
+    attempt=0
+    while [ "$attempt" -lt 3 ]; do
+      any_running=0
+      while IFS="$tab_char" read -r _ _ pid _ _ _; do
+        [ -n "${pid:-}" ] || continue
+        if kill -0 "$pid" 2>/dev/null; then
+          any_running=1
+          break
+        fi
+      done <"$jobs_file"
 
-echo "[pre-push] Running frontend build..."
-(cd frontend && bun run build)
+      [ "$any_running" -eq 0 ] && break
+      sleep 1
+      attempt=$((attempt + 1))
+    done
+
+    while IFS="$tab_char" read -r _ _ pid _ _ _; do
+      [ -n "${pid:-}" ] || continue
+      if kill -0 "$pid" 2>/dev/null; then
+        kill -KILL "$pid" 2>/dev/null || true
+      fi
+    done <"$jobs_file"
+  fi
+}
+
+cleanup() {
+  if [ "$checks_completed" -eq 0 ]; then
+    stop_running_jobs
+  fi
+  rm -rf "$temp_dir"
+}
+
+on_interrupt() {
+  echo "[pre-push] Interrupted. Stopping running checks..."
+  stop_running_jobs
+  checks_completed=1
+  exit 130
+}
+
+trap 'on_interrupt' INT TERM
+trap 'cleanup' EXIT
+
+start_workspace_pipeline() {
+  key="$1"
+  label="$2"
+  workspace_dir="$3"
+
+  start_ts="$(date +%s)"
+  log_file="$temp_dir/$key.log"
+  meta_file="$temp_dir/$key.meta"
+  : >"$log_file"
+  echo "[pre-push] Starting $label checks (lint -> build)..."
+
+  (
+    child_pid=""
+
+    write_meta() {
+      status_code="$1"
+      end_ts="$(date +%s)"
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$key" "$label" "$status_code" "$start_ts" "$end_ts" "$log_file" >"$meta_file"
+    }
+
+    terminate_child() {
+      if [ -n "${child_pid:-}" ] && kill -0 "$child_pid" 2>/dev/null; then
+        kill "$child_pid" 2>/dev/null || true
+        wait "$child_pid" 2>/dev/null || true
+      fi
+    }
+
+    on_runner_interrupt() {
+      terminate_child
+      write_meta 130
+      exit 130
+    }
+
+    trap 'on_runner_interrupt' INT TERM
+
+    if ! cd "$workspace_dir"; then
+      echo "[pre-push][$label] Failed to enter workspace directory: $workspace_dir" >>"$log_file"
+      write_meta 1
+      exit 1
+    fi
+
+    bun run lint >>"$log_file" 2>&1 &
+    child_pid="$!"
+    if wait "$child_pid"; then
+      lint_status=0
+    else
+      lint_status=$?
+    fi
+    child_pid=""
+
+    if [ "$lint_status" -ne 0 ]; then
+      write_meta "$lint_status"
+      exit "$lint_status"
+    fi
+
+    bun run build >>"$log_file" 2>&1 &
+    child_pid="$!"
+    if wait "$child_pid"; then
+      build_status=0
+    else
+      build_status=$?
+    fi
+    child_pid=""
+
+    if [ "$build_status" -ne 0 ]; then
+      write_meta "$build_status"
+      exit "$build_status"
+    fi
+
+    write_meta 0
+    exit 0
+  ) &
+
+  pid="$!"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$key" "$label" "$pid" "$start_ts" "$log_file" "$meta_file" >>"$jobs_file"
+}
+
+start_workspace_pipeline "app" "app" "app"
+start_workspace_pipeline "admin" "admin" "admin"
+start_workspace_pipeline "frontend" "frontend" "frontend"
+
+any_failed=0
+
+while IFS="$tab_char" read -r key label pid start_ts log_file meta_file; do
+  [ -n "${key:-}" ] || continue
+
+  if wait "$pid"; then
+    wait_status=0
+  else
+    wait_status=$?
+  fi
+
+  status_code=""
+  end_ts=""
+  if [ -f "$meta_file" ]; then
+    if IFS="$tab_char" read -r _ _ meta_status _ meta_end _ <"$meta_file"; then
+      status_code="$meta_status"
+      end_ts="$meta_end"
+    fi
+  fi
+
+  if ! is_non_negative_integer "$status_code"; then
+    status_code=""
+  fi
+
+  if [ -z "$status_code" ]; then
+    status_code="$wait_status"
+  fi
+
+  if [ "$wait_status" -ne 0 ] && [ "$status_code" -eq 0 ]; then
+    status_code="$wait_status"
+  fi
+
+  if ! is_non_negative_integer "$end_ts"; then
+    end_ts="$(date +%s)"
+  fi
+
+  if ! is_non_negative_integer "$start_ts"; then
+    start_ts="$end_ts"
+  fi
+
+  if [ "$end_ts" -lt "$start_ts" ]; then
+    duration=0
+  else
+    duration="$((end_ts - start_ts))"
+  fi
+
+  if [ "$status_code" -eq 0 ]; then
+    status="PASS"
+  else
+    status="FAIL"
+    any_failed=1
+  fi
+
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$key" "$label" "$status" "$duration" "$status_code" "$log_file" >>"$results_file"
+done <"$jobs_file"
+
+checks_completed=1
+
+echo "[pre-push] Summary:"
+while IFS="$tab_char" read -r key label status duration _ log_file; do
+  [ -n "${key:-}" ] || continue
+  printf '[pre-push] %-8s %s (%ss)\n' "$status" "$label" "$duration"
+done <"$results_file"
+
+if [ "$any_failed" -ne 0 ]; then
+  echo "[pre-push] One or more checks failed. Failed workspace logs:"
+  while IFS="$tab_char" read -r key label status _ _ log_file; do
+    [ -n "${key:-}" ] || continue
+    if [ "$status" = "FAIL" ]; then
+      echo "[pre-push][$label] ---- begin log ----"
+      if [ -f "$log_file" ]; then
+        cat "$log_file"
+      else
+        echo "[pre-push][$label] Log file missing: $log_file"
+      fi
+      echo "[pre-push][$label] ---- end log ----"
+    fi
+  done <"$results_file"
+  exit 1
+fi
+
+echo "[pre-push] All checks passed."
