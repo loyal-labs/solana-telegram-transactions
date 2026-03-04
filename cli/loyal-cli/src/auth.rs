@@ -122,6 +122,7 @@ pub(crate) fn get_auth_token(http: &HttpClient, rpc_url: &str, signer: &Keypair)
 
 pub(crate) fn get_delegation_status(
     http: &HttpClient,
+    per_rpc_url: &str,
     router_url: &str,
     account: &Pubkey,
 ) -> Result<Option<DelegationStatusResult>> {
@@ -133,7 +134,7 @@ pub(crate) fn get_delegation_status(
     });
 
     // Try TEE first
-    let tee_endpoint = crate::constants::DEFAULT_PER_RPC;
+    let tee_endpoint = per_rpc_url;
     debug!(
         "TEE delegation request: endpoint={}, payload={}",
         tee_endpoint,

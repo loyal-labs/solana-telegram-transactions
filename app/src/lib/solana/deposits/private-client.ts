@@ -12,8 +12,7 @@ import {
   getCloudValue,
   setCloudValue,
 } from "../../telegram/mini-app/cloud-storage";
-import { getEndpoints, getSolanaEnv } from "../rpc/connection";
-import { PER_RPC_ENDPOINT, PER_WS_ENDPOINT } from "../rpc/constants";
+import { getEndpoints, getPerEndpoints, getSolanaEnv } from "../rpc/connection";
 import { getWalletKeypair, getWalletPublicKey } from "../wallet/wallet-details";
 
 const AUTH_TOKEN_REFRESH_BUFFER_MS = 60_000;
@@ -53,9 +52,13 @@ const parseStoredPrivateAuthToken = (
   }
 };
 
-const isAuthTokenFresh = (token: StoredPrivateAuthToken): boolean =>
-  token.endpoint === PER_RPC_ENDPOINT &&
-  token.expiresAt > Date.now() + AUTH_TOKEN_REFRESH_BUFFER_MS;
+const isAuthTokenFresh = (token: StoredPrivateAuthToken): boolean => {
+  const { perRpcEndpoint } = getPerEndpoints(getSolanaEnv());
+  return (
+    token.endpoint === perRpcEndpoint &&
+    token.expiresAt > Date.now() + AUTH_TOKEN_REFRESH_BUFFER_MS
+  );
+};
 
 const getCachedAuthToken = async (
   publicKey: string
@@ -78,8 +81,9 @@ const getCachedAuthToken = async (
 };
 
 const verifyTeeIntegrity = (): void => {
+  const { perRpcEndpoint } = getPerEndpoints(getSolanaEnv());
   const t0 = performance.now();
-  verifyTeeRpcIntegrity(PER_RPC_ENDPOINT)
+  verifyTeeRpcIntegrity(perRpcEndpoint)
     .then((isVerified) => {
       console.log(
         `[private-client] verifyTeeRpcIntegrity: ${(
@@ -105,9 +109,10 @@ const fetchAndCacheAuthToken = async (
     const signMessage = (message: Uint8Array): Promise<Uint8Array> =>
       Promise.resolve(sign.detached(message, keypair.secretKey));
 
+    const { perRpcEndpoint } = getPerEndpoints(getSolanaEnv());
     const t1 = performance.now();
     const authToken = await getAuthToken(
-      PER_RPC_ENDPOINT,
+      perRpcEndpoint,
       keypair.publicKey,
       signMessage
     );
@@ -122,7 +127,7 @@ const fetchAndCacheAuthToken = async (
       storageKey,
       JSON.stringify({
         ...authToken,
-        endpoint: PER_RPC_ENDPOINT,
+        endpoint: perRpcEndpoint,
       })
     );
 
@@ -168,6 +173,8 @@ export const getPrivateClient = async ({
       const selectedSolanaEnv = getSolanaEnv();
       const { rpcEndpoint, websocketEndpoint } =
         getEndpoints(selectedSolanaEnv);
+      const { perRpcEndpoint, perWsEndpoint } =
+        getPerEndpoints(selectedSolanaEnv);
 
       const cachedAuthToken = await getCachedAuthToken(
         keypair.publicKey.toBase58()
@@ -178,8 +185,8 @@ export const getPrivateClient = async ({
         signer: keypair,
         baseRpcEndpoint: rpcEndpoint,
         baseWsEndpoint: websocketEndpoint,
-        ephemeralRpcEndpoint: PER_RPC_ENDPOINT,
-        ephemeralWsEndpoint: PER_WS_ENDPOINT,
+        ephemeralRpcEndpoint: perRpcEndpoint,
+        ephemeralWsEndpoint: perWsEndpoint,
         authToken: authToken ?? undefined,
       });
       return cachedPrivateClient;

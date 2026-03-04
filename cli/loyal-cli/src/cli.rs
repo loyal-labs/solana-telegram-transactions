@@ -2,7 +2,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::constants::{
     DEFAULT_ER_VALIDATOR_STR, DEFAULT_OWNER_WAIT_INTERVAL_SECONDS,
-    DEFAULT_OWNER_WAIT_TIMEOUT_SECONDS, DEFAULT_PER_RPC, DEFAULT_ROUTER_RPC, NATIVE_MINT_STR,
+    DEFAULT_OWNER_WAIT_TIMEOUT_SECONDS, DEFAULT_ROUTER_RPC, NATIVE_MINT_STR,
 };
 
 #[derive(Parser, Debug)]
@@ -23,8 +23,8 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) commitment: Option<String>,
 
-    #[arg(long, global = true, default_value = DEFAULT_PER_RPC)]
-    pub(crate) per_rpc: String,
+    #[arg(long, global = true)]
+    pub(crate) per_rpc: Option<String>,
 
     #[arg(long, global = true)]
     pub(crate) per_ws: Option<String>,
