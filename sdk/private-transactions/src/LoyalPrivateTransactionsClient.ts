@@ -1242,8 +1242,7 @@ export class LoyalPrivateTransactionsClient {
     };
 
     // Try TEE first — pick mainnet or devnet TEE based on ephemeral RPC URL
-    const ephemeralUrl =
-      this.ephemeralProgram.provider.connection.rpcEndpoint;
+    const ephemeralUrl = this.ephemeralProgram.provider.connection.rpcEndpoint;
     const teeBaseUrl = ephemeralUrl.includes("mainnet-tee")
       ? "https://mainnet-tee.magicblock.app/"
       : "https://tee.magicblock.app/";
@@ -1264,16 +1263,18 @@ export class LoyalPrivateTransactionsClient {
       }
     } catch (e) {
       console.error(
-        "[getDelegationStatus] TEE fetch failed, falling back to devnet-router:",
+        "[getDelegationStatus] TEE fetch failed, falling back to devnet-router: Options:",
+        options,
+        "Error:"
         e
       );
     }
 
     // Fallback to devnet-router
-    const res = await fetch(
-      "https://devnet-router.magicblock.app/getDelegationStatus",
-      options
-    );
+    const routerBaseUrl = ephemeralUrl.includes("mainnet-tee")
+      ? "https://router.magicblock.app/"
+      : "https://devnet-router.magicblock.app/";
+    const res = await fetch(routerBaseUrl, options);
     const routerData = (await res.json()) as DelegationStatusResponse;
 
     // WORKAROUND: devnet-router returns an error for accounts delegated to the
