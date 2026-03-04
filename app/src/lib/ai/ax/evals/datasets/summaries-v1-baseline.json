@@ -1,0 +1,9 @@
+{
+  "datasetId": "summaries-v1",
+  "minimumRates": {
+    "onelinerLengthComplianceRate": 1,
+    "sourceAttributionValidityRate": 1,
+    "structureValidityRate": 1,
+    "topicCountComplianceRate": 1
+  }
+}

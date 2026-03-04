@@ -17,7 +17,10 @@ import {
 import { type Bot } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
-import { chatCompletion } from "@/lib/redpill";
+import {
+  getSummaryGenerationService,
+  type SummaryGenerationService,
+} from "@/lib/telegram/bot-api/summary-generation";
 
 import { buildSummaryMessageWithPreview } from "./build-summary-og-url";
 import { buildSummaryVoteKeyboard, getSummaryVoteTotals } from "./summary-votes";
@@ -29,7 +32,6 @@ import type {
 
 export const MIN_MESSAGES_FOR_SUMMARY = 3;
 export const DAILY_SUMMARY_TRIGGER_TYPE = "daily";
-const SUMMARY_MODEL = "deepseek/deepseek-v3.2";
 const MAX_SUMMARY_INPUT_CHARS = 12_000;
 const MAX_SUMMARY_BULLET_COUNT = 5;
 const MAX_SUMMARY_BULLET_CONTENT_CHARS = 450;
@@ -38,11 +40,13 @@ const SUMMARY_BULLET_FALLBACK_CONTENT = "No detailed points available today.";
 const SUMMARY_BULLET_CUSTOM_EMOJI_ID = "5255883309841422076";
 const SUMMARY_BULLET_TAG = `<tg-emoji emoji-id="${SUMMARY_BULLET_CUSTOM_EMOJI_ID}">🔹</tg-emoji>`;
 
-export const SYSTEM_PROMPT = `You summarize group chat conversations into topics. Output JSON:
-{"topics":[{"title":"Topic Name","content":"Summary paragraph","sources":["Name1","Name2"]}]}
-Keep summaries concise. List 1-5 topics. Sources are participant names who contributed to each topic.`;
-
-export const ONELINER_PROMPT = `Given these discussion topics from a group chat, write a single catchy sentence (max 110 characters) that captures the essence of daily conversation. Output only the sentence, no quotes or formatting.`;
+type SummaryWithCommunity = Summary & {
+  community: {
+    chatId: bigint;
+    isActive: boolean;
+    summaryNotificationsEnabled: boolean;
+  };
+};
 
 export type SummaryRunContext = {
   dayEndUtc: Date;
@@ -56,12 +60,11 @@ export type GenerateOrGetSummaryForRunResult =
   | { status: "existing"; summaryId: string; messageCount: number }
   | { status: "not_enough_messages"; messageCount: number };
 
-type SummaryWithCommunity = Summary & {
-  community: {
-    chatId: bigint;
-    isActive: boolean;
-    summaryNotificationsEnabled: boolean;
-  };
+export type CreateSummariesServiceDeps = {
+  db?: ReturnType<typeof getDatabase>;
+  logger?: Pick<typeof console, "log">;
+  summaryGenerationService?: SummaryGenerationService;
+  summaryModelResolver?: () => string | undefined;
 };
 
 export type SummaryMessagePayload = {
@@ -73,257 +76,345 @@ export type SummaryMessagePayload = {
   messageText: string;
 };
 
-export async function generateOrGetSummaryForRun(input: {
-  chatTitle: string;
-  communityId: string;
-  run: SummaryRunContext;
-}): Promise<GenerateOrGetSummaryForRunResult> {
-  const db = getDatabase();
-  const triggerKey = buildDailySummaryTriggerKey(input.run.dayStartUtc);
-  const messageCount = await countMessagesInWindow(input.communityId, input.run);
+export function createSummariesService(deps?: CreateSummariesServiceDeps) {
+  const providedDb = deps?.db;
+  const logger = deps?.logger ?? console;
+  let summaryGenerationService = deps?.summaryGenerationService;
+  const summaryModelResolver = deps?.summaryModelResolver ?? (() => undefined);
 
-  if (messageCount < MIN_MESSAGES_FOR_SUMMARY) {
-    return { status: "not_enough_messages", messageCount };
-  }
+  async function generateOrGetSummaryForRun(input: {
+    chatTitle: string;
+    communityId: string;
+    run: SummaryRunContext;
+  }): Promise<GenerateOrGetSummaryForRunResult> {
+    const triggerKey = buildDailySummaryTriggerKey(input.run.dayStartUtc);
+    const messageCount = await countMessagesInWindow(input.communityId, input.run);
 
-  const existingSummary = await findExistingSummaryForRun(
-    input.communityId,
-    triggerKey,
-    input.run.dayStartUtc,
-    input.run.dayEndUtc
-  );
-  if (existingSummary) {
+    if (messageCount < MIN_MESSAGES_FOR_SUMMARY) {
+      return { status: "not_enough_messages", messageCount };
+    }
+
+    const existingSummary = await findExistingSummaryForRun(
+      input.communityId,
+      triggerKey,
+      input.run.dayStartUtc,
+      input.run.dayEndUtc
+    );
+    if (existingSummary) {
+      return {
+        status: "existing",
+        summaryId: existingSummary.id,
+        messageCount: existingSummary.messageCount,
+      };
+    }
+
+    const recentMessages = await getDb().query.messages.findMany({
+      where: and(
+        eq(messages.communityId, input.communityId),
+        gte(messages.createdAt, input.run.windowStart),
+        lte(messages.createdAt, input.run.windowEnd)
+      ),
+      with: { user: true },
+      orderBy: [asc(messages.telegramMessageId)],
+    });
+
+    if (recentMessages.length < MIN_MESSAGES_FOR_SUMMARY) {
+      return { status: "not_enough_messages", messageCount: recentMessages.length };
+    }
+
+    const formattedMessages = buildSummaryInput(recentMessages);
+    if (!formattedMessages) {
+      return { status: "not_enough_messages", messageCount: recentMessages.length };
+    }
+
+    const generatedSummary = await getOrCreateSummaryGenerationService().generate({
+      chatTitle: input.chatTitle,
+      dayKeyUtc: toUtcDayKey(input.run.dayStartUtc),
+      modelKey: summaryModelResolver(),
+      participants: recentMessages.map((message) => message.user.displayName),
+      transcript: formattedMessages,
+    });
+
+    const insertedSummary = await getDb()
+      .insert(summaries)
+      .values({
+        communityId: input.communityId,
+        chatTitle: input.chatTitle,
+        fromMessageId: recentMessages[0].telegramMessageId,
+        messageCount,
+        oneliner: generatedSummary.oneliner,
+        toMessageId: recentMessages[recentMessages.length - 1].telegramMessageId,
+        topics: generatedSummary.topics as Topic[],
+        triggerKey,
+        triggerType: DAILY_SUMMARY_TRIGGER_TYPE,
+      })
+      .onConflictDoNothing()
+      .returning({ id: summaries.id, messageCount: summaries.messageCount });
+
+    if (insertedSummary.length > 0) {
+      return {
+        status: "created",
+        summaryId: insertedSummary[0].id,
+        messageCount: insertedSummary[0].messageCount,
+      };
+    }
+
+    const conflictedSummary = await findSummaryByTriggerKey(input.communityId, triggerKey);
+    if (!conflictedSummary) {
+      throw new Error("Failed to create summary");
+    }
+
     return {
       status: "existing",
-      summaryId: existingSummary.id,
-      messageCount: existingSummary.messageCount,
+      summaryId: conflictedSummary.id,
+      messageCount: conflictedSummary.messageCount,
     };
   }
 
-  const recentMessages = await db.query.messages.findMany({
-    where: and(
-      eq(messages.communityId, input.communityId),
-      gte(messages.createdAt, input.run.windowStart),
-      lte(messages.createdAt, input.run.windowEnd)
-    ),
-    with: { user: true },
-    orderBy: [asc(messages.telegramMessageId)],
-  });
+  async function sendLatestSummary(
+    bot: Bot,
+    sourceChatId: bigint,
+    options?: SendLatestSummaryOptions
+  ): Promise<SendSummaryResult> {
+    const destinationChatId = options?.destinationChatId ?? sourceChatId;
+    const replyToMessageId = options?.replyToMessageId;
 
-  if (recentMessages.length < MIN_MESSAGES_FOR_SUMMARY) {
-    return { status: "not_enough_messages", messageCount: recentMessages.length };
+    const community = await getDb().query.communities.findFirst({
+      where: and(eq(communities.chatId, sourceChatId), eq(communities.isActive, true)),
+    });
+
+    if (!community) {
+      return { sent: false, reason: "not_activated" };
+    }
+
+    if (!community.summaryNotificationsEnabled) {
+      return { sent: false, reason: "notifications_disabled" };
+    }
+
+    const latestSummary = await getDb().query.summaries.findFirst({
+      where: eq(summaries.communityId, community.id),
+      orderBy: [desc(summaries.createdAt)],
+    });
+
+    if (!latestSummary) {
+      return { sent: false, reason: "no_summaries" };
+    }
+
+    const deliveredMessage = await sendSummaryToChat(
+      bot,
+      {
+        createdAt: latestSummary.createdAt,
+        id: latestSummary.id,
+        oneliner: latestSummary.oneliner,
+        topics: latestSummary.topics,
+      },
+      {
+        destinationChatId,
+        replyToMessageId,
+        sourceCommunityChatId: sourceChatId,
+      }
+    );
+
+    return { deliveredMessage, sent: true };
   }
 
-  const formattedMessages = buildSummaryInput(recentMessages);
-  if (!formattedMessages) {
-    return { status: "not_enough_messages", messageCount: recentMessages.length };
+  async function sendSummaryById(
+    bot: Bot,
+    summaryId: string,
+    options?: SendLatestSummaryOptions
+  ): Promise<SendSummaryResult> {
+    const summary = await getSummaryWithCommunity(summaryId);
+    if (!summary) {
+      return { sent: false, reason: "no_summaries" };
+    }
+
+    if (!summary.community.isActive) {
+      return { sent: false, reason: "not_activated" };
+    }
+
+    if (!summary.community.summaryNotificationsEnabled) {
+      return { sent: false, reason: "notifications_disabled" };
+    }
+
+    const deliveredMessage = await sendSummaryToChat(
+      bot,
+      {
+        createdAt: summary.createdAt,
+        id: summary.id,
+        oneliner: summary.oneliner,
+        topics: summary.topics,
+      },
+      {
+        destinationChatId: options?.destinationChatId ?? summary.community.chatId,
+        replyToMessageId: options?.replyToMessageId,
+        sourceCommunityChatId: summary.community.chatId,
+      }
+    );
+
+    return { deliveredMessage, sent: true };
   }
 
-  const response = await chatCompletion({
-    model: SUMMARY_MODEL,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `Summarize this chat:\n\n${formattedMessages}` },
-    ],
-    temperature: 0.3,
-  });
+  async function countMessagesInWindow(
+    communityId: string,
+    run: SummaryRunContext
+  ): Promise<number> {
+    const [result] = await getDb()
+      .select({ count: sql<number>`count(*)` })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.communityId, communityId),
+          gte(messages.createdAt, run.windowStart),
+          lte(messages.createdAt, run.windowEnd)
+        )
+      );
 
-  const summaryText = response.choices?.[0]?.message?.content;
-  if (!summaryText) {
-    throw new Error("Empty response from LLM");
+    return Number(result?.count ?? 0);
   }
 
-  const topics = parseAndValidateTopics(summaryText);
-  const oneliner = await generateOneliner(topics);
+  async function findSummaryByTriggerKey(
+    communityId: string,
+    triggerKey: string
+  ): Promise<Summary | null> {
+    return (
+      (await getDb().query.summaries.findFirst({
+        where: and(eq(summaries.communityId, communityId), eq(summaries.triggerKey, triggerKey)),
+        orderBy: [desc(summaries.createdAt)],
+      })) ?? null
+    );
+  }
 
-  const insertedSummary = await db
-    .insert(summaries)
-    .values({
-      communityId: input.communityId,
-      chatTitle: input.chatTitle,
-      fromMessageId: recentMessages[0].telegramMessageId,
-      toMessageId: recentMessages[recentMessages.length - 1].telegramMessageId,
-      messageCount,
-      oneliner,
-      topics,
-      triggerKey,
-      triggerType: DAILY_SUMMARY_TRIGGER_TYPE,
-    })
-    .onConflictDoNothing()
-    .returning({ id: summaries.id, messageCount: summaries.messageCount });
+  async function findExistingSummaryForRun(
+    communityId: string,
+    triggerKey: string,
+    dayStartUtc: Date,
+    dayEndUtc: Date
+  ): Promise<Summary | null> {
+    const byTriggerKey = await findSummaryByTriggerKey(communityId, triggerKey);
+    if (byTriggerKey) {
+      return byTriggerKey;
+    }
 
-  if (insertedSummary.length > 0) {
+    return (
+      (await getDb().query.summaries.findFirst({
+        where: and(
+          eq(summaries.communityId, communityId),
+          gte(summaries.createdAt, dayStartUtc),
+          lte(summaries.createdAt, dayEndUtc)
+        ),
+        orderBy: [desc(summaries.createdAt)],
+      })) ?? null
+    );
+  }
+
+  async function getSummaryWithCommunity(
+    summaryId: string
+  ): Promise<SummaryWithCommunity | null> {
+    return (
+      (await getDb().query.summaries.findFirst({
+        where: eq(summaries.id, summaryId),
+        with: {
+          community: {
+            columns: {
+              chatId: true,
+              isActive: true,
+              summaryNotificationsEnabled: true,
+            },
+          },
+        },
+      })) ?? null
+    );
+  }
+
+  async function sendSummaryToChat(
+    bot: Bot,
+    summary: Pick<Summary, "createdAt" | "id" | "oneliner" | "topics">,
+    options: {
+      destinationChatId: bigint;
+      sourceCommunityChatId: bigint;
+      replyToMessageId?: number;
+    }
+  ): Promise<SummaryDeliveredMessage> {
+    const messagePayload = await buildSummaryMessagePayload(
+      summary,
+      options.sourceCommunityChatId
+    );
+
+    const sentMessage = await sendSummaryMessage(bot, {
+      destinationChatId: options.destinationChatId,
+      messageOptions: messagePayload.messageOptions,
+      messageText: messagePayload.messageText,
+      replyToMessageId: options.replyToMessageId,
+    });
+
     return {
-      status: "created",
-      summaryId: insertedSummary[0].id,
-      messageCount: insertedSummary[0].messageCount,
+      destinationChatId: options.destinationChatId,
+      messageId: sentMessage.message_id,
+      sourceCommunityChatId: options.sourceCommunityChatId,
     };
   }
 
-  const conflictedSummary = await findSummaryByTriggerKey(input.communityId, triggerKey);
-  if (!conflictedSummary) {
-    throw new Error("Failed to create summary");
+  async function sendSummaryMessage(
+    bot: Bot,
+    params: {
+      destinationChatId: bigint;
+      messageOptions: {
+        parse_mode: "HTML";
+        link_preview_options: { prefer_large_media: boolean };
+        reply_markup: ReturnType<typeof buildSummaryVoteKeyboard>;
+      };
+      messageText: string;
+      replyToMessageId?: number;
+    }
+  ) {
+    if (params.replyToMessageId) {
+      try {
+        return await bot.api.sendMessage(
+          Number(params.destinationChatId),
+          params.messageText,
+          {
+            ...params.messageOptions,
+            reply_parameters: { message_id: params.replyToMessageId },
+          }
+        );
+      } catch (error) {
+        logger.log("Failed to send summary as reply, sending without reply", error);
+      }
+    }
+
+    return bot.api.sendMessage(
+      Number(params.destinationChatId),
+      params.messageText,
+      params.messageOptions
+    );
+  }
+
+  function getOrCreateSummaryGenerationService(): SummaryGenerationService {
+    if (summaryGenerationService) {
+      return summaryGenerationService;
+    }
+
+    summaryGenerationService = getSummaryGenerationService();
+    return summaryGenerationService;
+  }
+
+  function getDb(): ReturnType<typeof getDatabase> {
+    return providedDb ?? getDatabase();
   }
 
   return {
-    status: "existing",
-    summaryId: conflictedSummary.id,
-    messageCount: conflictedSummary.messageCount,
+    generateOrGetSummaryForRun,
+    sendLatestSummary,
+    sendSummaryById,
   };
 }
 
-export async function generateOneliner(topics: Topic[]): Promise<string> {
-  const topicsSummary = topics.map((t) => `${t.title}: ${t.content}`).join("\n");
+const defaultSummariesService = createSummariesService();
 
-  const response = await chatCompletion({
-    model: SUMMARY_MODEL,
-    messages: [
-      { role: "system", content: ONELINER_PROMPT },
-      { role: "user", content: topicsSummary },
-    ],
-    temperature: 0.5,
-  });
-
-  const oneliner = response.choices?.[0]?.message?.content?.trim() ?? "";
-  return oneliner.slice(0, 110);
-}
-
-export function parseAndValidateTopics(summaryText: string): Topic[] {
-  let parsed: { topics: unknown };
-  try {
-    parsed = JSON.parse(summaryText);
-  } catch {
-    throw new Error(`Invalid JSON from LLM: ${summaryText.slice(0, 100)}...`);
-  }
-
-  if (!parsed.topics || !Array.isArray(parsed.topics)) {
-    throw new Error("Invalid summary format: missing topics array");
-  }
-
-  for (const topic of parsed.topics) {
-    if (!isValidTopic(topic)) {
-      throw new Error("Invalid topic structure in summary");
-    }
-  }
-
-  return parsed.topics as Topic[];
-}
-
-function isValidTopic(topic: unknown): topic is Topic {
-  if (typeof topic !== "object" || topic === null) return false;
-  const t = topic as Record<string, unknown>;
-  return (
-    typeof t.title === "string" &&
-    typeof t.content === "string" &&
-    Array.isArray(t.sources)
-  );
-}
-
-export async function sendLatestSummary(
-  bot: Bot,
-  sourceChatId: bigint,
-  options?: SendLatestSummaryOptions
-): Promise<SendSummaryResult> {
-  const db = getDatabase();
-  const destinationChatId = options?.destinationChatId ?? sourceChatId;
-  const replyToMessageId = options?.replyToMessageId;
-
-  const community = await db.query.communities.findFirst({
-    where: and(
-      eq(communities.chatId, sourceChatId),
-      eq(communities.isActive, true)
-    ),
-  });
-
-  if (!community) {
-    return { sent: false, reason: "not_activated" };
-  }
-
-  if (!community.summaryNotificationsEnabled) {
-    return { sent: false, reason: "notifications_disabled" };
-  }
-
-  const latestSummary = await db.query.summaries.findFirst({
-    where: eq(summaries.communityId, community.id),
-    orderBy: [desc(summaries.createdAt)],
-  });
-
-  if (!latestSummary) {
-    return { sent: false, reason: "no_summaries" };
-  }
-
-  const deliveredMessage = await sendSummaryToChat(
-    bot,
-    {
-      createdAt: latestSummary.createdAt,
-      id: latestSummary.id,
-      oneliner: latestSummary.oneliner,
-      topics: latestSummary.topics,
-    },
-    {
-      destinationChatId,
-      sourceCommunityChatId: sourceChatId,
-      replyToMessageId,
-    }
-  );
-
-  return { deliveredMessage, sent: true };
-}
-
-export async function sendSummaryById(
-  bot: Bot,
-  summaryId: string,
-  options?: SendLatestSummaryOptions
-): Promise<SendSummaryResult> {
-  const summary = await getSummaryWithCommunity(summaryId);
-  if (!summary) {
-    return { sent: false, reason: "no_summaries" };
-  }
-
-  if (!summary.community.isActive) {
-    return { sent: false, reason: "not_activated" };
-  }
-
-  if (!summary.community.summaryNotificationsEnabled) {
-    return { sent: false, reason: "notifications_disabled" };
-  }
-
-  const deliveredMessage = await sendSummaryToChat(
-    bot,
-    {
-      createdAt: summary.createdAt,
-      id: summary.id,
-      oneliner: summary.oneliner,
-      topics: summary.topics,
-    },
-    {
-      destinationChatId: options?.destinationChatId ?? summary.community.chatId,
-      sourceCommunityChatId: summary.community.chatId,
-      replyToMessageId: options?.replyToMessageId,
-    }
-  );
-
-  return { deliveredMessage, sent: true };
-}
-
-async function countMessagesInWindow(
-  communityId: string,
-  run: SummaryRunContext
-): Promise<number> {
-  const db = getDatabase();
-  const [result] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(messages)
-    .where(
-      and(
-        eq(messages.communityId, communityId),
-        gte(messages.createdAt, run.windowStart),
-        lte(messages.createdAt, run.windowEnd)
-      )
-    );
-
-  return Number(result?.count ?? 0);
-}
+export const generateOrGetSummaryForRun =
+  defaultSummariesService.generateOrGetSummaryForRun;
+export const sendLatestSummary = defaultSummariesService.sendLatestSummary;
+export const sendSummaryById = defaultSummariesService.sendSummaryById;
 
 function toUtcDayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -331,63 +422,6 @@ function toUtcDayKey(date: Date): string {
 
 function buildDailySummaryTriggerKey(dayStartUtc: Date): string {
   return `${DAILY_SUMMARY_TRIGGER_TYPE}:${toUtcDayKey(dayStartUtc)}`;
-}
-
-async function findSummaryByTriggerKey(
-  communityId: string,
-  triggerKey: string
-): Promise<Summary | null> {
-  const db = getDatabase();
-  return (
-    (await db.query.summaries.findFirst({
-      where: and(eq(summaries.communityId, communityId), eq(summaries.triggerKey, triggerKey)),
-      orderBy: [desc(summaries.createdAt)],
-    })) ?? null
-  );
-}
-
-async function findExistingSummaryForRun(
-  communityId: string,
-  triggerKey: string,
-  dayStartUtc: Date,
-  dayEndUtc: Date
-): Promise<Summary | null> {
-  const byTriggerKey = await findSummaryByTriggerKey(communityId, triggerKey);
-  if (byTriggerKey) {
-    return byTriggerKey;
-  }
-
-  const db = getDatabase();
-  return (
-    (await db.query.summaries.findFirst({
-      where: and(
-        eq(summaries.communityId, communityId),
-        gte(summaries.createdAt, dayStartUtc),
-        lte(summaries.createdAt, dayEndUtc)
-      ),
-      orderBy: [desc(summaries.createdAt)],
-    })) ?? null
-  );
-}
-
-async function getSummaryWithCommunity(
-  summaryId: string
-): Promise<SummaryWithCommunity | null> {
-  const db = getDatabase();
-  return (
-    (await db.query.summaries.findFirst({
-      where: eq(summaries.id, summaryId),
-      with: {
-        community: {
-          columns: {
-            chatId: true,
-            isActive: true,
-            summaryNotificationsEnabled: true,
-          },
-        },
-      },
-    })) ?? null
-  );
 }
 
 function buildSummaryInput(
@@ -442,35 +476,6 @@ export async function buildSummaryMessagePayload(
     messageText: messageWithPreview,
   };
 }
-
-async function sendSummaryToChat(
-  bot: Bot,
-  summary: Pick<Summary, "createdAt" | "id" | "oneliner" | "topics">,
-  options: {
-    destinationChatId: bigint;
-    sourceCommunityChatId: bigint;
-    replyToMessageId?: number;
-  }
-): Promise<SummaryDeliveredMessage> {
-  const messagePayload = await buildSummaryMessagePayload(
-    summary,
-    options.sourceCommunityChatId
-  );
-
-  const sentMessage = await sendSummaryMessage(bot, {
-    destinationChatId: options.destinationChatId,
-    messageOptions: messagePayload.messageOptions,
-    messageText: messagePayload.messageText,
-    replyToMessageId: options.replyToMessageId,
-  });
-
-  return {
-    destinationChatId: options.destinationChatId,
-    messageId: sentMessage.message_id,
-    sourceCommunityChatId: options.sourceCommunityChatId,
-  };
-}
-
 function buildSummaryMessageBody(topics: Topic[]): {
   firstBulletContent: string;
   messageBody: string;
@@ -487,9 +492,7 @@ function buildSummaryMessageBody(topics: Topic[]): {
         content: truncateForBullet(firstSentence),
       };
     })
-    .filter((bullet): bullet is { content: string } =>
-      Boolean(bullet)
-    );
+    .filter((bullet): bullet is { content: string } => Boolean(bullet));
 
   if (normalizedBullets.length === 0) {
     return {
@@ -539,41 +542,6 @@ function extractFirstSentence(text: string): string {
 
   const match = normalized.match(/^.*?[.!?](?=\s|$)/);
   return match ? match[0] : normalized;
-}
-
-async function sendSummaryMessage(
-  bot: Bot,
-  params: {
-    destinationChatId: bigint;
-    messageOptions: {
-      parse_mode: "HTML";
-      link_preview_options: { prefer_large_media: boolean };
-      reply_markup: ReturnType<typeof buildSummaryVoteKeyboard>;
-    };
-    messageText: string;
-    replyToMessageId?: number;
-  }
-) {
-  if (params.replyToMessageId) {
-    try {
-      return await bot.api.sendMessage(
-        Number(params.destinationChatId),
-        params.messageText,
-        {
-          ...params.messageOptions,
-          reply_parameters: { message_id: params.replyToMessageId },
-        }
-      );
-    } catch (error) {
-      console.log("Failed to send summary as reply, sending without reply", error);
-    }
-  }
-
-  return bot.api.sendMessage(
-    Number(params.destinationChatId),
-    params.messageText,
-    params.messageOptions
-  );
 }
 
 function escapeTelegramHtml(text: string): string {

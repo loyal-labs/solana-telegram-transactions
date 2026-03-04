@@ -1,0 +1,11 @@
+{
+  "id": "summaries/rules/v1",
+  "version": "v1",
+  "rules": [
+    "Return 1-5 topics only.",
+    "Exclude greetings, command spam, and repetitive low-value chatter.",
+    "Write each topic content so the first sentence stands alone.",
+    "Use participant names in sources only when they materially contributed.",
+    "Keep wording factual, concise, and specific."
+  ]
+}

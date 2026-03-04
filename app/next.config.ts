@@ -36,7 +36,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname, ".."),
   },
-  transpilePackages: ["@loyal-labs/db-core", "@loyal-labs/db-adapter-neon"],
+  transpilePackages: [
+    "@loyal-labs/db-core",
+    "@loyal-labs/db-adapter-neon",
+    "@loyal-labs/llm-core",
+    "@loyal-labs/llm-server",
+  ],
   productionBrowserSourceMaps: Boolean(process.env.DATADOG_API_KEY),
   env: {
     NEXT_PUBLIC_GIT_COMMIT_HASH: commitHash,

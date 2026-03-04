@@ -33,6 +33,11 @@ const SERVER_ENV_KEYS = [
   "CLOUDFLARE_R2_BUCKET_NAME",
   "CLOUDFLARE_R2_S3_ENDPOINT",
   "CLOUDFLARE_R2_UPLOAD_PREFIX",
+  "SUMMARY_AX_MODEL",
+  "AX_SUMMARY_MODEL_DEFAULT",
+  "AX_SUMMARY_MAX_ATTEMPTS",
+  "AX_SUMMARY_EXAMPLES_VERSION",
+  "AX_SUMMARY_ENABLE_TELEMETRY",
 ] as const;
 
 function clearServerEnv(): void {
@@ -44,6 +49,11 @@ function clearServerEnv(): void {
 let serverEnv: {
   databaseUrl: string;
   redpillApiKey: string;
+  summaryAxModel: string | undefined;
+  axSummaryModelDefault: string;
+  axSummaryMaxAttempts: number;
+  axSummaryExamplesVersion: string;
+  axSummaryEnableTelemetry: boolean;
   jupiterApiKey: string;
   irysSolanaKey: string;
   messageEncryptionKey: string | undefined;
@@ -105,6 +115,40 @@ describe("server config", () => {
     expect(serverEnv.mixpanelToken).toBe("token");
     expect(serverEnv.cloudflareR2S3Endpoint).toBe("https://r2.example.com");
     expect(serverEnv.cloudflareR2UploadPrefix).toBe("uploads");
+  });
+
+  test("returns Ax summary defaults when env values are not set", () => {
+    expect(serverEnv.axSummaryModelDefault).toBe("deepseek/deepseek-v3.2");
+    expect(serverEnv.axSummaryMaxAttempts).toBe(3);
+    expect(serverEnv.axSummaryExamplesVersion).toBe("v1");
+    expect(serverEnv.axSummaryEnableTelemetry).toBe(true);
+    expect(serverEnv.summaryAxModel).toBeUndefined();
+  });
+
+  test("supports legacy and new Ax summary model envs", () => {
+    process.env.SUMMARY_AX_MODEL = "legacy/model";
+    expect(serverEnv.summaryAxModel).toBe("legacy/model");
+    expect(serverEnv.axSummaryModelDefault).toBe("legacy/model");
+
+    process.env.AX_SUMMARY_MODEL_DEFAULT = "new/model";
+    expect(serverEnv.axSummaryModelDefault).toBe("new/model");
+  });
+
+  test("parses Ax summary attempts and telemetry envs", () => {
+    process.env.AX_SUMMARY_MAX_ATTEMPTS = "5";
+    process.env.AX_SUMMARY_ENABLE_TELEMETRY = "false";
+    process.env.AX_SUMMARY_EXAMPLES_VERSION = "v2";
+
+    expect(serverEnv.axSummaryMaxAttempts).toBe(5);
+    expect(serverEnv.axSummaryEnableTelemetry).toBe(false);
+    expect(serverEnv.axSummaryExamplesVersion).toBe("v2");
+  });
+
+  test("throws for invalid AX_SUMMARY_MAX_ATTEMPTS", () => {
+    process.env.AX_SUMMARY_MAX_ATTEMPTS = "0";
+    expect(() => serverEnv.axSummaryMaxAttempts).toThrow(
+      "AX_SUMMARY_MAX_ATTEMPTS must be a positive integer"
+    );
   });
 
   test("returns null summary override when env vars are not set", () => {

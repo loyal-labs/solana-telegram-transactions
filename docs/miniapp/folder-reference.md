@@ -377,9 +377,40 @@ Note: On localnet, MagicBlock uses devnet as a fallback for price data.
 
 ---
 
+## `/ai`
+
+Ax-based program layer for summary generation and evaluation.
+
+### `/ai/ax/programs/summaries/`
+
+| File | Purpose |
+|------|---------|
+| `spec.ts` | Program spec: signatures, examples, assertions, model defaults |
+| `generate.ts` | `createAxSummaryGenerationService()` orchestration |
+| `types.ts` | Summary generation contracts and typed signature shapes |
+| `validation.ts` | Shared normalization and validation rules |
+| `assets/examples/v1.json` | Versioned few-shot examples |
+| `assets/rules/v1.json` | Versioned quality rules |
+
+### `/ai/ax/evals/`
+
+| File | Purpose |
+|------|---------|
+| `runner.ts` | Dataset/baseline regression runner (`bun run ai:eval:summaries`) |
+| `datasets/summaries-v1.json` | Eval dataset |
+| `datasets/summaries-v1-baseline.json` | Minimum metric thresholds |
+| `metrics/summaries.ts` | Structural/source/oneliner metric computation |
+
+### Runtime wiring
+
+- `telegram/bot-api/summary-generation/service.ts` wires Ax services with Redpill endpoint + env config.
+- `telegram/bot-api/summaries.ts` remains orchestration-only (idempotency, DB write, delivery).
+
+---
+
 ## `/redpill`
 
-AI/LLM integration via RedPill API for chat summarization.
+Redpill API primitives used by non-Ax flows and endpoint constants used by Ax client wiring.
 
 | Constant | Source |
 |----------|--------|
@@ -388,4 +419,4 @@ AI/LLM integration via RedPill API for chat summarization.
 
 **Key exports:** `chatCompletion()`, `chatCompletionStream()`
 
-Used in `telegram/bot-api/summaries.ts` for generating chat summaries.
+Used directly by `telegram/streaming-service.ts`. Summary generation now routes through Ax (`/ai/ax/...`).
