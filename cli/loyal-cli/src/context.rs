@@ -13,7 +13,10 @@ use std::{env, fs, str::FromStr, time::Duration};
 use crate::{
     auth::{get_auth_token, verify_tee_rpc_integrity},
     cli::{Cli, TargetArgs},
-    constants::{DEFAULT_PER_RPC_DEVNET, DEFAULT_PER_RPC_MAINNET},
+    constants::{
+        DEFAULT_PER_RPC_DEVNET, DEFAULT_PER_RPC_MAINNET, DEFAULT_ROUTER_RPC_DEVNET,
+        DEFAULT_ROUTER_RPC_MAINNET,
+    },
     pda::{find_deposit_pda, find_username_deposit_pda, validate_username},
     types::{AppContext, ResolvedSolanaConfig, SolanaCliConfigFile, Target},
 };
@@ -57,6 +60,17 @@ pub(crate) fn build_context(cli: &Cli) -> Result<AppContext> {
     } else {
         DEFAULT_PER_RPC_DEVNET
     };
+    let default_router_rpc = if solana_cfg.rpc_url.contains("mainnet") {
+        DEFAULT_ROUTER_RPC_MAINNET
+    } else {
+        DEFAULT_ROUTER_RPC_DEVNET
+    };
+
+    let router_url = cli
+        .router_url
+        .clone()
+        .unwrap_or_else(|| default_router_rpc.to_string());
+
     let per_rpc_resolved = cli.per_rpc.clone().unwrap_or_else(|| default_per_rpc.to_string());
     let mut per_rpc_url = per_rpc_resolved.clone();
     let mut per_ws_url = cli
@@ -65,7 +79,7 @@ pub(crate) fn build_context(cli: &Cli) -> Result<AppContext> {
         .unwrap_or_else(|| derive_ws_url(&per_rpc_resolved));
     debug!(
         "starting PER config: per_rpc={}, per_ws={}, router_url={}, validator={}",
-        per_rpc_url, per_ws_url, cli.router_url, cli.validator
+        per_rpc_url, per_ws_url, router_url, cli.validator
     );
 
     let has_inline_token = per_rpc_url.contains("token=") || per_ws_url.contains("token=");
@@ -109,7 +123,7 @@ pub(crate) fn build_context(cli: &Cli) -> Result<AppContext> {
         solana_config: solana_cfg,
         per_rpc_url,
         per_ws_url,
-        router_url: cli.router_url.clone(),
+        router_url,
         commitment,
         validator,
     })
