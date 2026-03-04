@@ -171,6 +171,12 @@ describe("generateOrGetSummaryForRun", () => {
       messageCount: 5,
     });
     expect(chatCompletionCalls).toHaveLength(2);
+    expect(chatCompletionCalls[0]).toMatchObject({
+      model: "deepseek/deepseek-v3.2",
+    });
+    expect(chatCompletionCalls[1]).toMatchObject({
+      model: "deepseek/deepseek-v3.2",
+    });
     expect(insertedSummaryValues).toHaveLength(1);
     expect(insertedSummaryValues[0]).toMatchObject({
       triggerKey: "daily:2026-02-13",

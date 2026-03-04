@@ -29,6 +29,7 @@ import type {
 
 export const MIN_MESSAGES_FOR_SUMMARY = 3;
 export const DAILY_SUMMARY_TRIGGER_TYPE = "daily";
+const SUMMARY_MODEL = "deepseek/deepseek-v3.2";
 const MAX_SUMMARY_INPUT_CHARS = 12_000;
 const MAX_SUMMARY_BULLET_COUNT = 5;
 const MAX_SUMMARY_BULLET_CONTENT_CHARS = 450;
@@ -110,7 +111,7 @@ export async function generateOrGetSummaryForRun(input: {
   }
 
   const response = await chatCompletion({
-    model: "phala/gpt-oss-120b",
+    model: SUMMARY_MODEL,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: `Summarize this chat:\n\n${formattedMessages}` },
@@ -166,7 +167,7 @@ export async function generateOneliner(topics: Topic[]): Promise<string> {
   const topicsSummary = topics.map((t) => `${t.title}: ${t.content}`).join("\n");
 
   const response = await chatCompletion({
-    model: "phala/gpt-oss-120b",
+    model: SUMMARY_MODEL,
     messages: [
       { role: "system", content: ONELINER_PROMPT },
       { role: "user", content: topicsSummary },
