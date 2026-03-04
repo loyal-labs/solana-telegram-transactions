@@ -13,7 +13,6 @@ type Logger = Pick<Console, "error" | "info" | "warn">;
 
 type Prompt = {
   ask(question: string): Promise<string>;
-  close(): void;
 };
 
 type AuthBootstrapDeps = {
@@ -30,18 +29,15 @@ function isDirectExecution(scriptName: string): boolean {
 }
 
 function createPrompt(): Prompt {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
   return {
     ask: async (question: string) => {
+      const rl = createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
       const answer = await rl.question(question);
-      return answer.trim();
-    },
-    close: () => {
       rl.close();
+      return answer.trim();
     },
   };
 }
@@ -116,17 +112,11 @@ export async function runAuthBootstrap(
 
       const phoneFromEnv = readBootstrapPhone(deps.env);
       const prompt = deps.createPrompt();
-      try {
-        return bundle.client.start({
-          code: async () => prompt.ask("Telegram code: "),
-          password: async () =>
-            prompt.ask("2FA password (if enabled): "),
-          phone: async () =>
-            phoneFromEnv ?? prompt.ask("Phone number (+...): "),
-        });
-      } finally {
-        prompt.close();
-      }
+      return bundle.client.start({
+        code: async () => prompt.ask("Telegram code: "),
+        password: async () => prompt.ask("2FA password (if enabled): "),
+        phone: async () => phoneFromEnv ?? prompt.ask("Phone number (+...): "),
+      });
     })();
 
     deps.logger.info(
