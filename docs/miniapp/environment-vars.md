@@ -14,7 +14,7 @@ Environment access is centralized in:
 | `NEXT_PUBLIC_SOLANA_ENV` | `solana/rpc/` | `"mainnet"`, `"testnet"`, `"devnet"`, or `"localnet"` (defaults to devnet) |
 | `ASKLOYAL_TGBOT_KEY` | `telegram/bot-api/` | Telegram bot token from BotFather (bot API only) |
 | `TELEGRAM_SETUP_SECRET` | `api/telegram/setup-commands` | Bearer token for `/api/telegram/setup-commands` |
-| `REDPILL_AI_API_KEY` | `redpill/` | API key for RedPill AI service |
+| `REDPILL_AI_API_KEY` | `redpill/`, `telegram/bot-api/summary-generation` | API key for Redpill AI service (raw chat + Ax summary generation) |
 | `DATABASE_URL` | `core/database.ts` | Neon PostgreSQL connection string |
 | `MESSAGE_ENCRYPTION_KEY` | `encryption/` | Base64-encoded 32-byte key for AES-256-GCM |
 
@@ -25,6 +25,11 @@ Environment access is centralized in:
 | `NEXT_PUBLIC_SERVER_HOST` | `core/api.ts` | Base URL for API endpoints |
 | `DEPLOYMENT_PK` | `solana/wallet/gasless-keypair.server.ts` | Gasless payer keypair (required for gasless claim flow) |
 | `NEXT_PUBLIC_GAS_PUBLIC_KEY` | `solana/wallet/` | Public key for gasless payer |
+| `AX_SUMMARY_MODEL_DEFAULT` | `core/config/server.ts` | Default Ax summary model (fallback: `SUMMARY_AX_MODEL`, then `deepseek/deepseek-v3.2`) |
+| `AX_SUMMARY_MAX_ATTEMPTS` | `core/config/server.ts` | Max bounded attempts for Ax summary generation (default: `3`) |
+| `AX_SUMMARY_EXAMPLES_VERSION` | `core/config/server.ts` | Version key for summary example/rule assets (default: `v1`) |
+| `AX_SUMMARY_ENABLE_TELEMETRY` | `core/config/server.ts` | Enables runtime telemetry logging for Ax summary runs (default: `true`) |
+| `SUMMARY_AX_MODEL` | `core/config/server.ts` | Legacy alias for summary model selection (kept for backward compatibility) |
 
 ## Cloudflare R2/CDN (Feature-specific)
 
@@ -65,6 +70,13 @@ NEXT_PUBLIC_SOLANA_ENV=devnet
 
 # AI
 REDPILL_AI_API_KEY=your_api_key
+# Optional - Ax summary runtime tuning
+# AX_SUMMARY_MODEL_DEFAULT=deepseek/deepseek-v3.2
+# AX_SUMMARY_MAX_ATTEMPTS=3
+# AX_SUMMARY_EXAMPLES_VERSION=v1
+# AX_SUMMARY_ENABLE_TELEMETRY=true
+# Legacy alias still supported
+# SUMMARY_AX_MODEL=deepseek/deepseek-v3.2
 
 # Database
 DATABASE_URL=postgresql://user:password@ep-xxx.aws.neon.tech/dbname?sslmode=require

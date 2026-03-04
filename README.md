@@ -13,7 +13,7 @@ the Loyal web frontend, shared packages/SDKs, and worker services.
 | [`admin/`](./admin) | Internal Next.js admin dashboard | [`admin/README.md`](./admin/README.md) |
 | [`programs/`](./programs) | Anchor smart contracts (`telegram-transfer`, `telegram-verification`, `telegram-private-transfer`) | [`programs/`](./programs) |
 | [`tests/`](./tests) | Anchor integration tests and fixtures | [`tests/`](./tests) |
-| [`packages/`](./packages) | Shared workspace libraries (`db-core`, `db-adapter-neon`) | [`packages/`](./packages) |
+| [`packages/`](./packages) | Shared workspace libraries (`db-core`, `db-adapter-neon`, `llm-core`, `llm-server`) | [`packages/`](./packages) |
 | [`sdk/`](./sdk) | Publishable SDKs for deposits and private transfers | [`sdk/transactions/README.md`](./sdk/transactions/README.md), [`sdk/private-transactions/README.md`](./sdk/private-transactions/README.md) |
 | [`workers/`](./workers) | Background workers and service runtimes | [`workers/userbot/README.md`](./workers/userbot/README.md) |
 | [`docs/`](./docs) | Internal engineering and operations documentation | [`docs/README.md`](./docs/README.md) |
@@ -48,8 +48,11 @@ For Vercel monorepo deploys, use separate projects with Root Directory set to `a
 bun run lint
 bun run lint:fix
 bun run build:db-packages
+bun run build:llm-packages
 bun run typecheck:db-packages
+bun run typecheck:llm-packages
 bun run guard:shared-boundaries
+bun run guard:llm-package-boundaries
 bun run guard:admin-shared-schema
 bun run admin:dev
 bun run admin:lint

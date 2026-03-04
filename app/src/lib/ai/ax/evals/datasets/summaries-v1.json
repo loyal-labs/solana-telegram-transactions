@@ -1,0 +1,39 @@
+{
+  "datasetId": "summaries-v1",
+  "version": "v1",
+  "cases": [
+    {
+      "id": "case-loyal-1",
+      "participants": ["chris", "Will", "Hexx"],
+      "output": {
+        "topics": [
+          {
+            "title": "PER model and docs",
+            "content": "The team explained PER execution and settlement with requests for clearer docs.",
+            "sources": ["chris", "Will"]
+          },
+          {
+            "title": "Launch readiness",
+            "content": "Members discussed wallet constraints and launch blockers.",
+            "sources": ["Will", "Hexx"]
+          }
+        ],
+        "oneliner": "Loyal focused on PER clarity and wallet readiness before launch."
+      }
+    },
+    {
+      "id": "case-loyal-2",
+      "participants": ["Mango", "alby", "INVESTORADESAM"],
+      "output": {
+        "topics": [
+          {
+            "title": "Partnership follow-up",
+            "content": "Partnership requests were acknowledged and moved to direct message follow-up.",
+            "sources": ["Mango", "INVESTORADESAM"]
+          }
+        ],
+        "oneliner": "Conversation centered on partnership routing and next-step follow-up."
+      }
+    }
+  ]
+}

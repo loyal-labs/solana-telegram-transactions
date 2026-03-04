@@ -13,7 +13,7 @@ type MessageRecord = {
   user: { displayName: string };
 };
 
-const chatCompletionCalls: unknown[] = [];
+const summaryGenerationCalls: unknown[] = [];
 const insertedSummaryValues: unknown[] = [];
 
 let countResult = 0;
@@ -52,29 +52,8 @@ mock.module("@/lib/core/database", () => ({
   }),
 }));
 
-mock.module("@/lib/redpill", () => ({
-  chatCompletion: async (payload: unknown) => {
-    chatCompletionCalls.push(payload);
-    if (chatCompletionCalls.length % 2 === 1) {
-      return {
-        choices: [
-          {
-            message: {
-              content:
-                '{"topics":[{"title":"Launch","content":"Team discussed launch scope","sources":["Alice","Bob"]}]}',
-            },
-          },
-        ],
-      };
-    }
-
-    return {
-      choices: [{ message: { content: "Launch scope tightened before ship date" } }],
-    };
-  },
-}));
-
-let generateOrGetSummaryForRun: typeof import("../summaries").generateOrGetSummaryForRun;
+let createSummariesService: typeof import("../summaries").createSummariesService;
+let summariesService: ReturnType<typeof createSummariesService>;
 
 const run = {
   dayEndUtc: new Date("2026-02-13T23:59:59.999Z"),
@@ -86,29 +65,55 @@ const run = {
 describe("generateOrGetSummaryForRun", () => {
   beforeAll(async () => {
     const loadedModule = await import("../summaries");
-    generateOrGetSummaryForRun = loadedModule.generateOrGetSummaryForRun;
+    createSummariesService = loadedModule.createSummariesService;
   });
 
   beforeEach(() => {
-    chatCompletionCalls.length = 0;
+    summaryGenerationCalls.length = 0;
     insertedSummaryValues.length = 0;
     countResult = 0;
     recentMessages = [];
     summariesFindFirstResults = [];
     insertReturningQueue = [[{ id: "summary-1", messageCount: 5 }]];
+
+    summariesService = createSummariesService({
+      summaryGenerationService: {
+        generate: async (payload) => {
+          summaryGenerationCalls.push(payload);
+          return {
+            diagnostics: {
+              attempts: 2,
+              failureReasons: [],
+              finalModel: "deepseek/deepseek-v3.2",
+              latencyMs: 120,
+              usedExampleSet: "summaries/examples/v1",
+            },
+            oneliner: "Launch scope tightened before ship date",
+            topics: [
+              {
+                content: "Team discussed launch scope",
+                sources: ["Alice", "Bob"],
+                title: "Launch",
+              },
+            ],
+          };
+        },
+      },
+      summaryModelResolver: () => "deepseek/deepseek-v3.2",
+    });
   });
 
   test("skips generation when fewer than minimum messages exist", async () => {
     countResult = 2;
 
-    const result = await generateOrGetSummaryForRun({
+    const result = await summariesService.generateOrGetSummaryForRun({
       chatTitle: "General",
       communityId: "community-1",
       run,
     });
 
     expect(result).toEqual({ status: "not_enough_messages", messageCount: 2 });
-    expect(chatCompletionCalls).toHaveLength(0);
+    expect(summaryGenerationCalls).toHaveLength(0);
     expect(insertedSummaryValues).toHaveLength(0);
   });
 
@@ -116,7 +121,7 @@ describe("generateOrGetSummaryForRun", () => {
     countResult = 9;
     summariesFindFirstResults = [{ id: "existing-1", messageCount: 9 }];
 
-    const result = await generateOrGetSummaryForRun({
+    const result = await summariesService.generateOrGetSummaryForRun({
       chatTitle: "General",
       communityId: "community-1",
       run,
@@ -127,7 +132,7 @@ describe("generateOrGetSummaryForRun", () => {
       summaryId: "existing-1",
       messageCount: 9,
     });
-    expect(chatCompletionCalls).toHaveLength(0);
+    expect(summaryGenerationCalls).toHaveLength(0);
     expect(insertedSummaryValues).toHaveLength(0);
   });
 
@@ -135,7 +140,7 @@ describe("generateOrGetSummaryForRun", () => {
     countResult = 9;
     summariesFindFirstResults = [null, { id: "existing-legacy", messageCount: 9 }];
 
-    const result = await generateOrGetSummaryForRun({
+    const result = await summariesService.generateOrGetSummaryForRun({
       chatTitle: "General",
       communityId: "community-1",
       run,
@@ -146,7 +151,7 @@ describe("generateOrGetSummaryForRun", () => {
       summaryId: "existing-legacy",
       messageCount: 9,
     });
-    expect(chatCompletionCalls).toHaveLength(0);
+    expect(summaryGenerationCalls).toHaveLength(0);
     expect(insertedSummaryValues).toHaveLength(0);
   });
 
@@ -159,7 +164,7 @@ describe("generateOrGetSummaryForRun", () => {
       user: { displayName: `User${index + 1}` },
     }));
 
-    const result = await generateOrGetSummaryForRun({
+    const result = await summariesService.generateOrGetSummaryForRun({
       chatTitle: "General",
       communityId: "community-1",
       run,
@@ -170,15 +175,15 @@ describe("generateOrGetSummaryForRun", () => {
       summaryId: "summary-1",
       messageCount: 5,
     });
-    expect(chatCompletionCalls).toHaveLength(2);
-    expect(chatCompletionCalls[0]).toMatchObject({
-      model: "deepseek/deepseek-v3.2",
-    });
-    expect(chatCompletionCalls[1]).toMatchObject({
-      model: "deepseek/deepseek-v3.2",
+    expect(summaryGenerationCalls).toHaveLength(1);
+    expect(summaryGenerationCalls[0]).toMatchObject({
+      dayKeyUtc: "2026-02-13",
+      modelKey: "deepseek/deepseek-v3.2",
+      participants: ["User1", "User2", "User3", "User4", "User5"],
     });
     expect(insertedSummaryValues).toHaveLength(1);
     expect(insertedSummaryValues[0]).toMatchObject({
+      oneliner: "Launch scope tightened before ship date",
       triggerKey: "daily:2026-02-13",
       triggerType: "daily",
     });
@@ -194,7 +199,7 @@ describe("generateOrGetSummaryForRun", () => {
       user: { displayName: `User${index + 1}` },
     }));
 
-    const result = await generateOrGetSummaryForRun({
+    const result = await summariesService.generateOrGetSummaryForRun({
       chatTitle: "General",
       communityId: "community-1",
       run,
@@ -205,7 +210,7 @@ describe("generateOrGetSummaryForRun", () => {
       summaryId: "summary-1",
       messageCount: 3,
     });
-    expect(chatCompletionCalls).toHaveLength(2);
+    expect(summaryGenerationCalls).toHaveLength(1);
     expect(insertedSummaryValues).toHaveLength(1);
   });
 
@@ -219,12 +224,12 @@ describe("generateOrGetSummaryForRun", () => {
       user: { displayName: `User${index + 1}` },
     }));
 
-    const firstRun = await generateOrGetSummaryForRun({
+    const firstRun = await summariesService.generateOrGetSummaryForRun({
       chatTitle: "General",
       communityId: "community-1",
       run,
     });
-    const secondRun = await generateOrGetSummaryForRun({
+    const secondRun = await summariesService.generateOrGetSummaryForRun({
       chatTitle: "General",
       communityId: "community-1",
       run,
@@ -253,7 +258,7 @@ describe("generateOrGetSummaryForRun", () => {
       user: { displayName: `User${index + 1}` },
     }));
 
-    const result = await generateOrGetSummaryForRun({
+    const result = await summariesService.generateOrGetSummaryForRun({
       chatTitle: "General",
       communityId: "community-1",
       run,

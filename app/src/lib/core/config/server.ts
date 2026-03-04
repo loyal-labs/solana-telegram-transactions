@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getOptionalEnv, getRequiredEnv } from "./shared";
+import { getOptionalEnv, getRequiredEnv, isStrictTrue } from "./shared";
 
 const CLOUDFLARE_CDN_BASE_URL_ENV_KEYS = [
   "CLOUDFLARE_CDN_BASE_URL",
@@ -73,6 +73,40 @@ export const serverEnv = {
   },
   get redpillApiKey(): string {
     return getRequiredEnv("REDPILL_AI_API_KEY");
+  },
+  get summaryAxModel(): string | undefined {
+    return getOptionalEnv("SUMMARY_AX_MODEL");
+  },
+  get axSummaryModelDefault(): string {
+    return (
+      getOptionalEnv("AX_SUMMARY_MODEL_DEFAULT") ??
+      getOptionalEnv("SUMMARY_AX_MODEL") ??
+      "deepseek/deepseek-v3.2"
+    );
+  },
+  get axSummaryMaxAttempts(): number {
+    const value = getOptionalEnv("AX_SUMMARY_MAX_ATTEMPTS");
+    if (!value) {
+      return 3;
+    }
+
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      throw new Error("AX_SUMMARY_MAX_ATTEMPTS must be a positive integer");
+    }
+
+    return parsed;
+  },
+  get axSummaryExamplesVersion(): string {
+    return getOptionalEnv("AX_SUMMARY_EXAMPLES_VERSION") ?? "v1";
+  },
+  get axSummaryEnableTelemetry(): boolean {
+    const value = getOptionalEnv("AX_SUMMARY_ENABLE_TELEMETRY");
+    if (value === undefined) {
+      return true;
+    }
+
+    return isStrictTrue(value);
   },
   get jupiterApiKey(): string {
     return getRequiredEnv("JUPITER_API_KEY");

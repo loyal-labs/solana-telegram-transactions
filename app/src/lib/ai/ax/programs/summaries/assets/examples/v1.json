@@ -1,0 +1,81 @@
+{
+  "id": "summaries/examples/v1",
+  "version": "v1",
+  "sourceDoc": "docs/workers/manual-summary-examples-2026-03-01-2026-03-02.md",
+  "createdAt": "2026-03-03",
+  "notes": "Seed examples curated for concise topic extraction and one-liner generation.",
+  "examples": [
+    {
+      "id": "loyal-2026-03-01",
+      "input": {
+        "chatTitle": "The Loyal Community",
+        "dayKeyUtc": "2026-03-01",
+        "participants": ["gemhunter", "Will", "chris"],
+        "transcript": "gemhunter: Happy new month and stay safe in hot zones.\nWill: Why is there no update yet?\ngemhunter: Daily summary appears after the day is complete.\nWill: Storage timing still feels unclear versus roadmap.\nchris: Storage is planned, but TEE-first milestones are ahead of it."
+      },
+      "expectedOutput": {
+        "topics": [
+          {
+            "title": "Daily summary timing clarified",
+            "content": "Members clarified that daily reports are generated after the day fully completes.",
+            "sources": ["Will", "gemhunter"]
+          },
+          {
+            "title": "Persistent storage versus launch sequencing",
+            "content": "Participants discussed storage timing, while the team reiterated TEE-first milestones before storage rollout.",
+            "sources": ["Will", "chris"]
+          }
+        ],
+        "oneliner": "New-month check-ins shifted into product talk on summary timing and storage priorities."
+      }
+    },
+    {
+      "id": "loyal-2026-03-02",
+      "input": {
+        "chatTitle": "The Loyal Community",
+        "dayKeyUtc": "2026-03-02",
+        "participants": ["chris", "Will", "Hexx"],
+        "transcript": "chris: Group summaries can run now without long-term storage.\nWill: Please clarify anonymity-set mechanics and docs.\nchris: Actions execute in PER, then final state settles to Solana.\nWill: Is shielding tied to one wallet right now?\nHexx: Multi-wallet support is needed before broader launch."
+      },
+      "expectedOutput": {
+        "topics": [
+          {
+            "title": "PER model and documentation clarity",
+            "content": "The team explained PER execution and Solana settlement while members requested clearer documentation on privacy mechanics.",
+            "sources": ["chris", "Will"]
+          },
+          {
+            "title": "Launch readiness and wallet UX limits",
+            "content": "Members raised launch questions around shielding behavior and multi-wallet support, and current constraints were clarified.",
+            "sources": ["Will", "Hexx", "chris"]
+          }
+        ],
+        "oneliner": "Roadmap day at Loyal: PER mechanics, storage sequencing, and wallet UX questions before launch."
+      }
+    },
+    {
+      "id": "turbine-2026-03-02",
+      "input": {
+        "chatTitle": "turbine.cash",
+        "dayKeyUtc": "2026-03-02",
+        "participants": ["INVESTORADESAM", "Mango", "alby"],
+        "transcript": "INVESTORADESAM: I want to discuss partnership options.\nMango: Replied in DMs, let's continue there.\nalby: Are you integrating with other projects soon?\nMango: Happy to scope it in DM."
+      },
+      "expectedOutput": {
+        "topics": [
+          {
+            "title": "Partnership inquiry triage",
+            "content": "A partnership request was acknowledged quickly, and follow-up moved to direct messages for specifics.",
+            "sources": ["INVESTORADESAM", "Mango"]
+          },
+          {
+            "title": "Integration interest from members",
+            "content": "A member asked about integrations and moderators invited direct follow-up to scope requirements.",
+            "sources": ["alby", "Mango"]
+          }
+        ],
+        "oneliner": "Quiet turbine.cash day focused on partnership routing and integration follow-ups."
+      }
+    }
+  ]
+}

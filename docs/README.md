@@ -9,6 +9,8 @@ This folder contains internal repository and engineering documentation for contr
 
 ## Internal Doc Index
 
+- `ai/README.md`
+- `ai/ax-backbone-v2.md`
 - `admin/README.md`
 - `ci-cd/README.md`
 - `miniapp/README.md`
