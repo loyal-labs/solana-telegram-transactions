@@ -142,7 +142,7 @@ Standard Solana accounts are fully public — anyone can read balances and trace
 When delegated, the deposit account's owner changes from the program to the MagicBlock delegation program. The SDK enforces this invariant:
 
 - **Base-only operations** (`modifyBalance`, `createPermission`) require the account to be **not delegated**
-- **PER operations** (`transferDeposit`, `claimUsernameDepositToDeposit`) require the account to be **delegated**
+- **PER operations** (`transferDeposit`, `transferToUsernameDeposit`, `claimUsernameDepositToDeposit`) require the account to be **delegated**
 
 ### Permissions
 

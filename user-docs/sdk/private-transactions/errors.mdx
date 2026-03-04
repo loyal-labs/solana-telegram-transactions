@@ -17,7 +17,7 @@ Triggered before transaction submission when username input is invalid:
 The SDK guards execution context for every operation:
 
 - `"Account is delegated to ER: ..."` — a base-layer operation (`modifyBalance`, `createPermission`, `initializeDeposit`) was attempted on a delegated account. Undelegate first.
-- `"Account is not delegated to ER: ..."` — a PER operation (`transferDeposit`, `claimUsernameDepositToDeposit`) was attempted before delegation. Delegate first.
+- `"Account is not delegated to ER: ..."` — a PER operation (`transferDeposit`, `transferToUsernameDeposit`, `claimUsernameDepositToDeposit`) was attempted before delegation. Delegate first.
 - `"Account is delegated on wrong validator: ..."` — delegation authority does not match the expected `ER_VALIDATOR`.
 
 ### Permission idempotency
