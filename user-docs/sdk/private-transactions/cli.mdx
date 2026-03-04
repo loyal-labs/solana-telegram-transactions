@@ -65,6 +65,18 @@ bun scripts/telegram-private-transfer.ts claim
 bun scripts/telegram-private-transfer.ts undelegate
 ```
 
+## Flow Mapping
+
+The CLI commands map to SDK operations as follows:
+
+| CLI Command | SDK Operations |
+|-------------|---------------|
+| `delegate` | `initializeDeposit` → `modifyBalance(increase)` → `initializeUsernameDeposit` → `createPermission` / `createUsernamePermission` → `delegateDeposit` / `delegateUsernameDeposit` |
+| `send` | `transferToUsernameDeposit` (on PER) |
+| `subscribe` | `getEphemeralUsernameDeposit` polling |
+| `claim` | `claimUsernameDepositToDeposit` (on PER) |
+| `undelegate` | `undelegateDeposit` / `undelegateUsernameDeposit` → `modifyBalance(decrease)` |
+
 ## Notes
 
 - `subscribe` listens for account changes and can auto-exit once `TARGET_AMOUNT` is reached.
