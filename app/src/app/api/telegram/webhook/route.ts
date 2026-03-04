@@ -14,7 +14,11 @@ import {
   handleUnhideCommunityCommand,
 } from "@/lib/telegram/bot-api/commands";
 import { handleBusinessConnection } from "@/lib/telegram/bot-api/handle-business-connection";
-import { handleInlineQuery } from "@/lib/telegram/bot-api/inline";
+import {
+  handleInlineQuery,
+  handleSummaryInlineQuery,
+  SUMMARY_INLINE_QUERY_REGEX,
+} from "@/lib/telegram/bot-api/inline";
 import {
   handleCommunityMessage,
   handleGLoyalReaction,
@@ -93,6 +97,10 @@ bot.command("summary", async (ctx: CommandContext<Context>) => {
 
 bot.command("notifications", async (ctx: CommandContext<Context>) => {
   await handleNotificationsCommand(ctx);
+});
+
+bot.inlineQuery(SUMMARY_INLINE_QUERY_REGEX, async (ctx) => {
+  await handleSummaryInlineQuery(ctx as InlineQueryContext<Context>);
 });
 
 bot.on("inline_query", async (ctx) => {

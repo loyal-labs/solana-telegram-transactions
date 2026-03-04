@@ -64,6 +64,15 @@ type SummaryWithCommunity = Summary & {
   };
 };
 
+export type SummaryMessagePayload = {
+  messageOptions: {
+    parse_mode: "HTML";
+    link_preview_options: { prefer_large_media: boolean };
+    reply_markup: ReturnType<typeof buildSummaryVoteKeyboard>;
+  };
+  messageText: string;
+};
+
 export async function generateOrGetSummaryForRun(input: {
   chatTitle: string;
   communityId: string;
@@ -403,15 +412,10 @@ function buildSummaryInput(
   return output;
 }
 
-async function sendSummaryToChat(
-  bot: Bot,
+export async function buildSummaryMessagePayload(
   summary: Pick<Summary, "createdAt" | "id" | "oneliner" | "topics">,
-  options: {
-    destinationChatId: bigint;
-    sourceCommunityChatId: bigint;
-    replyToMessageId?: number;
-  }
-): Promise<SummaryDeliveredMessage> {
+  sourceCommunityChatId: bigint
+): Promise<SummaryMessagePayload> {
   const { firstBulletContent, messageBody } = buildSummaryMessageBody(summary.topics);
   const ogText = buildSummaryOgText(summary.oneliner, firstBulletContent);
 
@@ -423,22 +427,40 @@ async function sendSummaryToChat(
 
   const voteTotals = await getSummaryVoteTotals(summary.id);
   const keyboard = buildSummaryVoteKeyboard(
-    options.sourceCommunityChatId,
+    sourceCommunityChatId,
     summary.id,
     voteTotals.likes,
     voteTotals.dislikes
   );
 
-  const messageOptions = {
-    parse_mode: "HTML" as const,
-    link_preview_options: { prefer_large_media: true },
-    reply_markup: keyboard,
+  return {
+    messageOptions: {
+      parse_mode: "HTML",
+      link_preview_options: { prefer_large_media: true },
+      reply_markup: keyboard,
+    },
+    messageText: messageWithPreview,
   };
+}
+
+async function sendSummaryToChat(
+  bot: Bot,
+  summary: Pick<Summary, "createdAt" | "id" | "oneliner" | "topics">,
+  options: {
+    destinationChatId: bigint;
+    sourceCommunityChatId: bigint;
+    replyToMessageId?: number;
+  }
+): Promise<SummaryDeliveredMessage> {
+  const messagePayload = await buildSummaryMessagePayload(
+    summary,
+    options.sourceCommunityChatId
+  );
 
   const sentMessage = await sendSummaryMessage(bot, {
     destinationChatId: options.destinationChatId,
-    messageOptions,
-    messageText: messageWithPreview,
+    messageOptions: messagePayload.messageOptions,
+    messageText: messagePayload.messageText,
     replyToMessageId: options.replyToMessageId,
   });
 
