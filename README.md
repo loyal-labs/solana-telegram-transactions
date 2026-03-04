@@ -152,7 +152,7 @@ We use Conventional Commits for commit messages and pull request titles.
 Enabled hooks:
 
 - `commit-msg`: validates Conventional Commit messages
-- `pre-push`: runs lint/build checks for `app`, `admin`, and `frontend` before push
+- `pre-push`: runs `app`, `admin`, and `frontend` lint->build pipelines in parallel before push
 - Temporary bypass when required: `SKIP_VERIFY=1 git push`
 - CI note: app build is intentionally not run in GitHub Actions; Vercel is the build/deploy gate
 
