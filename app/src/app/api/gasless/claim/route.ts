@@ -10,8 +10,12 @@ import {
 import { SYSVAR_INSTRUCTIONS_PUBKEY } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
-import { rpcEndpoint, websocketEndpoint } from "@/lib/solana/rpc/connection";
-import { PER_RPC_ENDPOINT, PER_WS_ENDPOINT } from "@/lib/solana/rpc/constants";
+import {
+  perRpcEndpoint,
+  perWsEndpoint,
+  rpcEndpoint,
+  websocketEndpoint,
+} from "@/lib/solana/rpc/connection";
 import {
   getSessionPda,
   getTelegramVerificationProgram,
@@ -45,8 +49,8 @@ export const getPrivateClient =
         signer: keypair,
         baseRpcEndpoint: rpcEndpoint,
         baseWsEndpoint: websocketEndpoint,
-        ephemeralRpcEndpoint: PER_RPC_ENDPOINT,
-        ephemeralWsEndpoint: PER_WS_ENDPOINT,
+        ephemeralRpcEndpoint: perRpcEndpoint,
+        ephemeralWsEndpoint: perWsEndpoint,
       }).then((client) => {
         cachedPrivateClient = client;
         return client;

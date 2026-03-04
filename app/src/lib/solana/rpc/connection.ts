@@ -5,6 +5,10 @@ import { publicEnv } from "@/lib/core/config/public";
 import {
   LOCALNET_RPC_URL,
   LOCALNET_RPC_WS,
+  PER_DEVNET_RPC_ENDPOINT,
+  PER_DEVNET_WS_ENDPOINT,
+  PER_MAINNET_RPC_ENDPOINT,
+  PER_MAINNET_WS_ENDPOINT,
   SECURE_DEVNET_RPC_URL,
   SECURE_DEVNET_RPC_WS,
   SECURE_MAINNET_RPC_URL,
@@ -58,9 +62,29 @@ export const getEndpoints = (
   }
 };
 
+export const getPerEndpoints = (
+  env: SolanaEnv
+): { perRpcEndpoint: string; perWsEndpoint: string } => {
+  switch (env) {
+    case "mainnet":
+      return {
+        perRpcEndpoint: PER_MAINNET_RPC_ENDPOINT,
+        perWsEndpoint: PER_MAINNET_WS_ENDPOINT,
+      };
+    case "devnet":
+    default:
+      return {
+        perRpcEndpoint: PER_DEVNET_RPC_ENDPOINT,
+        perWsEndpoint: PER_DEVNET_WS_ENDPOINT,
+      };
+  }
+};
+
 const selectedSolanaEnv = getSolanaEnv();
 export const { rpcEndpoint, websocketEndpoint } =
   getEndpoints(selectedSolanaEnv);
+export const { perRpcEndpoint, perWsEndpoint } =
+  getPerEndpoints(selectedSolanaEnv);
 
 let cachedConnection: Connection | null = null;
 let cachedWebsocketConnection: Connection | null = null;

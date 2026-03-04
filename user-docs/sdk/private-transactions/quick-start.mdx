@@ -37,8 +37,10 @@ const signer = Keypair.fromSecretKey(Uint8Array.from([...secretBytes]));
 const client = await LoyalPrivateTransactionsClient.fromConfig({
   signer,
   baseRpcEndpoint: "https://api.devnet.solana.com",
-  ephemeralRpcEndpoint: "https://tee.magicblock.app",
-  ephemeralWsEndpoint: "wss://tee.magicblock.app",
+  // Mainnet: https://mainnet-tee.magicblock.app
+  // Devnet: https://tee.magicblock.app
+  ephemeralRpcEndpoint: "https://mainnet-tee.magicblock.app",
+  ephemeralWsEndpoint: "wss://mainnet-tee.magicblock.app",
   commitment: "confirmed",
 });
 

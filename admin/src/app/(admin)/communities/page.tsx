@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CommunityActiveCheckbox } from "./community-active-checkbox";
 
 export const dynamic = "force-dynamic";
 
@@ -315,11 +316,11 @@ export default async function Home({ searchParams }: HomePageProps) {
                   </TableCell>
                   <TableCell>{String(community.chatId)}</TableCell>
                   <TableCell>
-                    {community.isActive ? (
-                      <CheckIcon aria-label="Active" className="size-4 text-foreground" />
-                    ) : (
-                      <XIcon aria-label="Inactive" className="size-4 text-muted-foreground" />
-                    )}
+                    <CommunityActiveCheckbox
+                      communityId={community.id}
+                      initialChecked={community.isActive}
+                      ariaLabel={`Set ${community.chatTitle} active`}
+                    />
                   </TableCell>
                   <TableCell>
                     {community.summaryNotificationsEnabled ? (
