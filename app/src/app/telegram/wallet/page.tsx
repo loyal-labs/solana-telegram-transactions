@@ -971,7 +971,7 @@ export default function Home() {
         />
       )}
       <main
-        className="min-h-screen font-sans overflow-hidden relative flex flex-col"
+        className="min-h-screen font-sans overflow-hidden relative flex flex-col max-w-md mx-auto w-full"
         style={{ background: "#fff" }}
       >
         <StickyBalancePill
