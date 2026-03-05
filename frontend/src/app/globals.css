@@ -622,7 +622,7 @@
 
   /* Streamdown Code Block - Container */
   [data-streamdown="code-block"] {
-    background: rgba(0, 0, 0, 0.4) !important;
+    background: rgba(0, 0, 0, 0.04) !important;
     border: none !important;
     border-radius: 16px !important;
     overflow: hidden !important;
@@ -643,14 +643,14 @@
     font-family: "Geist Mono", monospace !important;
     font-size: 13px !important;
     line-height: 20px !important;
-    color: rgba(255, 255, 255, 0.6) !important;
+    color: rgba(60, 60, 67, 0.6) !important;
   }
 
   [data-streamdown="code-block-header"] button {
     font-family: "Geist", sans-serif !important;
     font-size: 13px !important;
     line-height: 20px !important;
-    color: rgba(255, 255, 255, 0.6) !important;
+    color: rgba(60, 60, 67, 0.6) !important;
     background: transparent !important;
     border: none !important;
     cursor: pointer !important;
@@ -661,7 +661,7 @@
   }
 
   [data-streamdown="code-block-header"] button:hover {
-    color: rgba(255, 255, 255, 0.8) !important;
+    color: rgba(60, 60, 67, 0.8) !important;
   }
 
   [data-streamdown="code-block-header"] svg {
@@ -687,15 +687,32 @@
     line-height: 22px !important;
   }
 
+  /* Blockquote */
+  blockquote {
+    border-left: 3px solid rgba(0, 0, 0, 0.2) !important;
+    color: rgba(0, 0, 0, 0.7) !important;
+  }
+
+  /* Links (scoped to streamdown markdown content) */
+  [data-streamdown] a {
+    color: #000 !important;
+    text-decoration: underline !important;
+    text-underline-offset: 2px !important;
+  }
+
+  [data-streamdown] a:hover {
+    color: #3C3C43 !important;
+  }
+
   /* Inline code */
   code:not(pre code):not([data-streamdown] code) {
     font-family: "Geist Mono", monospace !important;
-    background: rgba(255, 255, 255, 0.1) !important;
+    background: rgba(0, 0, 0, 0.04) !important;
     border: none !important;
     border-radius: 4px !important;
     padding: 2px 6px !important;
     font-size: 14px !important;
-    color: #fff !important;
+    color: #000 !important;
   }
 
   /* Streamdown Table Styles - Matching Figma design */
@@ -721,7 +738,7 @@
   }
 
   [data-streamdown="table"] thead tr {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
   }
 
   [data-streamdown="table"] th {
@@ -731,7 +748,7 @@
     font-weight: 500 !important;
     font-size: 14px !important;
     line-height: 20px !important;
-    color: #fff !important;
+    color: #000 !important;
     border: none !important;
     height: 36px !important;
     vertical-align: middle !important;
@@ -742,7 +759,7 @@
   }
 
   [data-streamdown="table"] tbody tr {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
     height: 36px !important;
   }
 
@@ -756,7 +773,7 @@
     font-weight: 400 !important;
     font-size: 14px !important;
     line-height: 20px !important;
-    color: #fff !important;
+    color: #000 !important;
     border: none !important;
     height: 36px !important;
     vertical-align: middle !important;

@@ -1,5 +1,5 @@
 "use client";
-
+// light theme v1
 import { useChat } from "@ai-sdk/react";
 import { useAccounts, useModal, usePhantom } from "@phantom/react-sdk";
 import { DefaultChatTransport, type UIMessage } from "ai";
@@ -704,7 +704,7 @@ export default function LandingPage() {
         margin: 0,
         minHeight: "100vh",
         width: "100%",
-        backgroundColor: "#000",
+        backgroundColor: "#fff",
         overflow: isChatMode ? "hidden" : "auto",
       }}
     >
@@ -720,13 +720,12 @@ export default function LandingPage() {
       >
         {/* First section */}
         <div style={{ position: "relative", width: "100%", height: "100vh" }}>
-          {/* Dark overlay for chat mode */}
+          {/* Light overlay for chat mode */}
           <div
             style={{
               position: "absolute",
               inset: 0,
-              backgroundColor: "rgba(22, 22, 26, 0.95)",
-              backdropFilter: isChatMode ? "blur(40px)" : "blur(10px)",
+              backgroundColor: "#fff",
               opacity: isChatMode ? 1 : 0,
               transition: "all 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
               pointerEvents: isChatMode ? "auto" : "none",
@@ -745,13 +744,10 @@ export default function LandingPage() {
                 transform: "translateX(-50%)",
                 alignItems: "center",
                 gap: "1.5rem",
-                background: "rgba(38, 38, 38, 0.7)",
+                background: "rgba(241, 241, 241, 0.7)",
                 backdropFilter: "blur(48px)",
                 borderRadius: "60px",
                 padding: "4px",
-                boxShadow:
-                  "0px 0px 8px 0px rgba(0, 0, 0, 0.1), 0px 16px 16px 0px rgba(0, 0, 0, 0.2)",
-                mixBlendMode: "luminosity",
                 zIndex: 60,
               }}
             >
@@ -779,8 +775,7 @@ export default function LandingPage() {
                           navItemRefs.current[hoveredNavIndex]?.offsetHeight ||
                           0,
                         transform: "translateY(-50%)",
-                        background: "rgba(255, 255, 255, 0.1)",
-                        mixBlendMode: "lighten",
+                        background: "rgba(0, 0, 0, 0.04)",
                         backdropFilter: "blur(48px)",
                         borderRadius: "9999px",
                         boxShadow:
@@ -848,7 +843,7 @@ export default function LandingPage() {
                     }}
                     style={{
                       position: "relative",
-                      color: "#fff",
+                      color: "#000",
                       fontSize: "1rem",
                       fontWeight: 400,
                       padding: "0.5rem 1rem",
@@ -868,7 +863,7 @@ export default function LandingPage() {
                         (item.isRoadmap && isScrolledToRoadmap) ||
                         (item.isBlog && isScrolledToBlog) ||
                         (item.isLinks && isScrolledToLinks)
-                          ? "drop-shadow(0 0 8px rgba(255, 255, 255, 0.6))"
+                          ? "drop-shadow(0 0 8px rgba(0, 0, 0, 0.3))"
                           : "none",
                       overflow: "hidden",
                     }}
@@ -1002,16 +997,12 @@ export default function LandingPage() {
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    background: "rgba(255, 255, 255, 0.06)",
-                    backdropFilter: "blur(48px)",
+                    background: "rgba(0, 0, 0, 0.04)",
                     border: "none",
                     borderRadius: "9999px",
                     cursor: "pointer",
                     transition: "all 0.2s ease",
-                    boxShadow:
-                      "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
-                    mixBlendMode: "lighten",
-                    color: "#fff",
+                    color: "#3C3C43",
                   }}
                   title="Open menu"
                 >
@@ -1040,16 +1031,12 @@ export default function LandingPage() {
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    background: "rgba(255, 255, 255, 0.06)",
-                    backdropFilter: "blur(48px)",
+                    background: "rgba(0, 0, 0, 0.04)",
                     border: "none",
                     borderRadius: "9999px",
                     cursor: "pointer",
                     transition: "all 0.2s ease",
-                    boxShadow:
-                      "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
-                    mixBlendMode: "lighten",
-                    color: "#fff",
+                    color: "#3C3C43",
                   }}
                   title="New chat"
                 >
@@ -1075,16 +1062,12 @@ export default function LandingPage() {
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    background: "rgba(255, 255, 255, 0.06)",
-                    backdropFilter: "blur(48px)",
+                    background: "rgba(0, 0, 0, 0.04)",
                     border: "none",
                     borderRadius: "9999px",
                     cursor: "pointer",
                     transition: "all 0.2s ease",
-                    boxShadow:
-                      "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
-                    mixBlendMode: "lighten",
-                    color: "#fff",
+                    color: "#3C3C43",
                   }}
                   title="Feedback and support"
                 >
@@ -1092,38 +1075,6 @@ export default function LandingPage() {
                 </button>
               </div>
 
-              {/* Wallet Button - Bottom (only visible in chat mode when connected, hidden on mobile) */}
-              {isChatMode && isConnected && (
-                <button
-                  className="sidebar-icon-btn sidebar-wallet-btn"
-                  onClick={() => open()}
-                  style={{
-                    width: "36px",
-                    height: "36px",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    background: "rgba(255, 255, 255, 0.06)",
-                    backdropFilter: "blur(48px)",
-                    border: "none",
-                    borderRadius: "9999px",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    boxShadow:
-                      "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
-                    mixBlendMode: "lighten",
-                    padding: "4px",
-                  }}
-                  title={truncatedAddress || "Wallet"}
-                >
-                  <img
-                    alt="Wallet"
-                    height={28}
-                    src="/Wallet-Icon.svg"
-                    width={28}
-                  />
-                </button>
-              )}
             </div>
 
             {/* Expanded Sidebar Panel */}
@@ -1131,12 +1082,8 @@ export default function LandingPage() {
               style={{
                 width: "298px",
                 height: "100%",
-                background: "rgba(38, 38, 38, 0.7)",
-                backdropFilter: "blur(48px)",
+                background: "#F5F5F5",
                 borderRadius: "16px",
-                boxShadow:
-                  "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
-                mixBlendMode: "luminosity",
                 display: "flex",
                 flexDirection: "column",
                 overflow: "hidden",
@@ -1168,16 +1115,12 @@ export default function LandingPage() {
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    background: "rgba(255, 255, 255, 0.06)",
-                    backdropFilter: "blur(48px)",
+                    background: "rgba(0, 0, 0, 0.04)",
                     border: "none",
                     borderRadius: "9999px",
                     cursor: "pointer",
                     transition: "all 0.2s ease",
-                    boxShadow:
-                      "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
-                    mixBlendMode: "lighten",
-                    color: "#fff",
+                    color: "#3C3C43",
                   }}
                 >
                   <X size={24} />
@@ -1198,16 +1141,12 @@ export default function LandingPage() {
                     display: "flex",
                     alignItems: "center",
                     gap: "6px",
-                    background: "rgba(255, 255, 255, 0.06)",
-                    backdropFilter: "blur(48px)",
+                    background: "rgba(0, 0, 0, 0.04)",
                     border: "none",
                     borderRadius: "9999px",
                     cursor: "pointer",
                     transition: "all 0.2s ease",
-                    boxShadow:
-                      "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
-                    mixBlendMode: "lighten",
-                    color: "#fff",
+                    color: "#3C3C43",
                     padding: "6px 16px 6px 6px",
                   }}
                 >
@@ -1220,8 +1159,9 @@ export default function LandingPage() {
                   <span
                     style={{
                       fontSize: "14px",
-                      fontWeight: 500,
+                      fontWeight: 400,
                       lineHeight: "20px",
+                      color: "#000",
                     }}
                   >
                     New Chat
@@ -1250,7 +1190,7 @@ export default function LandingPage() {
                       fontSize: "16px",
                       fontWeight: 500,
                       lineHeight: "20px",
-                      color: "#fff",
+                      color: "#000",
                       letterSpacing: "-0.176px",
                     }}
                   >
@@ -1276,10 +1216,7 @@ export default function LandingPage() {
                         padding: "0 12px",
                         borderRadius: "9999px",
                         cursor: "pointer",
-                        background: "rgba(255, 255, 255, 0.06)",
-                        boxShadow:
-                          "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
-                        mixBlendMode: "lighten",
+                        background: "rgba(0, 0, 0, 0.04)",
                       }}
                     >
                       <span
@@ -1287,7 +1224,7 @@ export default function LandingPage() {
                           fontSize: "14px",
                           fontWeight: 400,
                           lineHeight: "20px",
-                          color: "#fff",
+                          color: "#000",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -1315,7 +1252,7 @@ export default function LandingPage() {
                       key={chat.id}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background =
-                          "rgba(255, 255, 255, 0.06)";
+                          "rgba(0, 0, 0, 0.04)";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "transparent";
@@ -1335,7 +1272,7 @@ export default function LandingPage() {
                           fontSize: "14px",
                           fontWeight: 400,
                           lineHeight: "20px",
-                          color: "#fff",
+                          color: "#000",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -1362,15 +1299,11 @@ export default function LandingPage() {
                       display: "flex",
                       alignItems: "center",
                       gap: "8px",
-                      background: "rgba(255, 255, 255, 0.06)",
-                      backdropFilter: "blur(48px)",
+                      background: "rgba(0, 0, 0, 0.04)",
                       border: "none",
                       borderRadius: "32px",
                       cursor: "pointer",
                       transition: "all 0.2s ease",
-                      boxShadow:
-                        "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
-                      mixBlendMode: "lighten",
                       padding: "4px",
                     }}
                   >
@@ -1388,7 +1321,7 @@ export default function LandingPage() {
                         fontSize: "14px",
                         fontWeight: 400,
                         lineHeight: "20px",
-                        color: "#fff",
+                        color: "#000",
                         paddingRight: "12px",
                       }}
                     >
@@ -1506,8 +1439,8 @@ export default function LandingPage() {
                             position: "relative",
                             padding: "8px 16px",
                             borderRadius: "20px 20px 4px 20px",
-                            background: "rgba(255, 255, 255, 0.12)",
-                            color: "#fff",
+                            background: "#F2F2F2",
+                            color: "#000",
                             fontSize: "16px",
                             lineHeight: "24px",
                             maxWidth: "464px",
@@ -1524,7 +1457,7 @@ export default function LandingPage() {
                         <div
                           style={{
                             width: "100%",
-                            color: "#fff",
+                            color: "#000",
                             fontSize: "16px",
                             lineHeight: "28px",
                             fontFamily: "var(--font-geist-sans), sans-serif",
@@ -1561,7 +1494,7 @@ export default function LandingPage() {
                                 color:
                                   copiedMessageId === message.id
                                     ? "#22c55e"
-                                    : "rgba(255, 255, 255, 1)",
+                                    : "#3C3C43",
                               }}
                               title={
                                 copiedMessageId === message.id
@@ -1622,7 +1555,7 @@ export default function LandingPage() {
                                   color:
                                     copiedMessageId === message.id
                                       ? "#22c55e"
-                                      : "rgba(255, 255, 255, 1)",
+                                      : "#3C3C43",
                                 }}
                                 title={
                                   copiedMessageId === message.id
@@ -1681,7 +1614,7 @@ export default function LandingPage() {
                         fontSize: "16px",
                         lineHeight: "28px",
                         backgroundImage:
-                          "linear-gradient(90deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 1) 50%, rgba(255, 255, 255, 0.4) 100%)",
+                          "linear-gradient(90deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.8) 50%, rgba(0, 0, 0, 0.3) 100%)",
                         backgroundSize: "200% 100%",
                         backgroundClip: "text",
                         WebkitBackgroundClip: "text",
@@ -1708,36 +1641,28 @@ export default function LandingPage() {
                   if (showScrollButton) {
                     e.currentTarget.style.transform = "scale(1.05)";
                     e.currentTarget.style.background =
-                      "rgba(255, 255, 255, 0.12)";
-                    e.currentTarget.style.border =
-                      "1px solid rgba(255, 255, 255, 0.25)";
+                      "rgba(0, 0, 0, 0.08)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (showScrollButton) {
                     e.currentTarget.style.transform = "scale(1)";
                     e.currentTarget.style.background =
-                      "rgba(255, 255, 255, 0.08)";
-                    e.currentTarget.style.border =
-                      "1px solid rgba(255, 255, 255, 0.15)";
+                      "rgba(0, 0, 0, 0.04)";
                   }
                 }}
                 style={{
                   position: "absolute",
-                  bottom: "7rem", // Positioned above the input field with more space
+                  bottom: "7rem",
                   right: "2rem",
-                  width: "2.5rem",
-                  height: "2.5rem",
+                  width: "32px",
+                  height: "32px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  background: "rgba(255, 255, 255, 0.08)",
-                  backdropFilter: "blur(20px)",
-                  WebkitBackdropFilter: "blur(20px)", // Safari support
-                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  background: "rgba(0, 0, 0, 0.04)",
+                  border: "none",
                   borderRadius: "50%",
-                  boxShadow:
-                    "0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 1px 1px rgba(255, 255, 255, 0.1)",
                   cursor: "pointer",
                   transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
                   transform: showScrollButton ? "scale(1)" : "scale(0.8)",
@@ -1750,10 +1675,9 @@ export default function LandingPage() {
               >
                 <ArrowDownIcon
                   style={{
-                    width: "1.125rem",
-                    height: "1.125rem",
-                    color: "#fff",
-                    filter: "drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3))",
+                    width: "20px",
+                    height: "20px",
+                    color: "#3C3C43",
                   }}
                 />
               </button>
@@ -1792,43 +1716,41 @@ export default function LandingPage() {
                     : "transform 0.3s ease-out",
               }}
             >
-              {/* Ask Loyal logo - only visible when not in chat mode */}
+              {/* Logo + Ask loyal title - only visible when not in chat mode */}
               {!(isChatMode || isInputStuckToBottom) && (
-                <Image
-                  alt="Ask Loyal"
-                  height={64}
-                  src="/Askloyal.svg"
+                <div
                   style={{
-                    marginBottom: "32px",
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: "16px",
+                    marginBottom: "48px",
                     pointerEvents: "none",
                   }}
-                  width={307}
-                />
-              )}
-
-              {/* "Use skills" link - scrolls to top where TransactionWidget lives */}
-              {skillsEnabled && !isChatMode && isInputStuckToBottom && (
-                <button
-                  onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                  style={{
-                    pointerEvents: "auto",
-                    marginBottom: "8px",
-                    background: "none",
-                    border: "none",
-                    padding: "4px 0",
-                    cursor: "pointer",
-                    fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    color: "rgba(255, 255, 255, 0.4)",
-                    transition: "color 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255, 255, 255, 0.4)"; }}
-                  type="button"
                 >
-                  ↑ Use skills
-                </button>
+                  <Image
+                    alt="Loyal"
+                    height={48}
+                    src="/logo-web.svg"
+                    style={{ flexShrink: 0 }}
+                    width={60}
+                  />
+                  <h1
+                    style={{
+                      fontFamily: "var(--font-geist-sans), sans-serif",
+                      fontSize: "48px",
+                      fontWeight: 600,
+                      lineHeight: "none",
+                      letterSpacing: "-1.92px",
+                      color: "#000",
+                      whiteSpace: "nowrap",
+                      margin: 0,
+                      flexShrink: 0,
+                    }}
+                  >
+                    Ask loyal
+                  </h1>
+                </div>
               )}
 
               {/* Input form - liquid glass style with integrated send button */}
@@ -1848,12 +1770,10 @@ export default function LandingPage() {
                     position: "relative",
                     display: "flex",
                     flexDirection: "column",
-                    background: "rgba(38, 38, 38, 0.5)",
+                    background: "rgba(241, 241, 241, 0.7)",
                     backdropFilter: "blur(24px) saturate(180%)",
                     WebkitBackdropFilter: "blur(24px) saturate(180%)",
                     borderRadius: "32px",
-                    boxShadow:
-                      "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
                     overflow: "hidden",
                   }}
                 >
@@ -1919,7 +1839,7 @@ export default function LandingPage() {
                           padding: "2px 0",
                           background: "transparent",
                           border: "none",
-                          color: "white",
+                          color: "#000",
                           fontSize: "16px",
                           fontFamily: "var(--font-geist-sans), sans-serif",
                           lineHeight: "24px",
@@ -1957,10 +1877,9 @@ export default function LandingPage() {
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          background:
-                            hasUsableInput || isLoading
-                              ? "rgba(255, 255, 255, 0.06)"
-                              : "rgba(0, 0, 0, 0.3)",
+                          background: "#F9363C",
+                          opacity:
+                            hasUsableInput || isLoading ? 1 : 0.4,
                           border: "none",
                           borderRadius: "9999px",
                           cursor:
@@ -1973,8 +1892,7 @@ export default function LandingPage() {
                             hasUsableInput || isLoading
                               ? "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)"
                               : "none",
-                          mixBlendMode:
-                            hasUsableInput || isLoading ? "lighten" : "normal",
+                          mixBlendMode: "normal",
                         }}
                         type="button"
                       >
@@ -2007,7 +1925,7 @@ export default function LandingPage() {
               </form>
 
               {/* Transaction widget - drag & drop tokens below input when not scrolled */}
-              {skillsEnabled && !isChatMode && !isInputStuckToBottom && (
+              {/* {skillsEnabled && !isChatMode && !isInputStuckToBottom && (
                 <div
                   className="mt-4"
                   style={{
@@ -2020,7 +1938,7 @@ export default function LandingPage() {
                     onTransactionComplete={handleTransactionWidgetComplete}
                   />
                 </div>
-              )}
+              )} */}
             </div>
           </div>
         </div>
@@ -2358,7 +2276,7 @@ export default function LandingPage() {
           border: none;
           border-radius: 9999px;
           cursor: pointer;
-          color: rgba(255, 255, 255, 1);
+          color: #3C3C43;
           transition: all 0.2s ease;
           display: flex;
           align-items: center;
@@ -2366,15 +2284,11 @@ export default function LandingPage() {
         }
 
         .message-action-btn:hover {
-          background: rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(48px);
-          box-shadow: 0px 4px 8px 0px rgba(0, 0, 0, 0.04),
-            0px 2px 4px 0px rgba(0, 0, 0, 0.02);
-          mix-blend-mode: lighten;
+          background: rgba(0, 0, 0, 0.04);
         }
 
         .sidebar-icon-btn:hover {
-          background: rgba(255, 255, 255, 0.12) !important;
+          background: rgba(0, 0, 0, 0.08) !important;
         }
 
         @keyframes subtlePulse {
@@ -2402,7 +2316,7 @@ export default function LandingPage() {
 
         input::placeholder,
         textarea::placeholder {
-          color: rgba(255, 255, 255, 0.6);
+          color: rgba(0, 0, 0, 0.4);
         }
 
         /* Custom scrollbar for textarea */
@@ -2413,16 +2327,16 @@ export default function LandingPage() {
           background: transparent;
         }
         textarea::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.2);
+          background: rgba(0, 0, 0, 0.15);
           border-radius: 12px;
           opacity: 0.48;
         }
         textarea::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.3);
+          background: rgba(0, 0, 0, 0.25);
         }
         textarea {
           scrollbar-width: thin;
-          scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+          scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
         }
 
         /* Custom scrollbar for chat messages */
@@ -2431,26 +2345,24 @@ export default function LandingPage() {
         }
 
         .chat-messages-container::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.05);
+          background: transparent;
           border-radius: 10px;
           margin: 10px 0;
         }
 
         .chat-messages-container::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.2);
+          background: rgba(0, 0, 0, 0.15);
           border-radius: 10px;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(10px);
         }
 
         .chat-messages-container::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.3);
+          background: rgba(0, 0, 0, 0.25);
         }
 
         /* Firefox custom scrollbar */
         .chat-messages-container {
           scrollbar-width: thin;
-          scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);
+          scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
         }
 
         /* Mobile styles for chat */
