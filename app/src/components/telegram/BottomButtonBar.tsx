@@ -49,7 +49,7 @@ export function BottomButtonBar() {
   return createPortal(
     <div
       id={BUTTON_BAR_ID}
-      className="pointer-events-none fixed bottom-0 left-0 right-0 z-[10000]"
+      className="pointer-events-none fixed bottom-0 left-0 right-0 z-[10000] max-w-md mx-auto"
       style={{ display: hasButtons ? "flex" : "none" }}
     >
       <div
