@@ -40,37 +40,27 @@ export function Header() {
             display: "flex",
             alignItems: "center",
             gap: "8px",
-            background: "rgba(255, 255, 255, 0.06)",
-            backdropFilter: "blur(48px)",
+            background: "rgba(0, 0, 0, 0.04)",
             border: "none",
             borderRadius: "32px",
             cursor: "pointer",
             transition: "all 0.2s ease",
-            boxShadow:
-              "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
-            mixBlendMode: "lighten",
             padding: "4px",
           }}
         >
-          <div
-            style={{
-              width: "36px",
-              height: "36px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "rgba(255, 255, 255, 0.06)",
-              borderRadius: "9999px",
-            }}
-          >
-            <img alt="Wallet" height={28} src="/Wallet-Icon.svg" width={28} />
-          </div>
+          <img
+            alt="Wallet"
+            height={28}
+            src="/Wallet-Icon.svg"
+            style={{ borderRadius: "9999px" }}
+            width={28}
+          />
           <span
             style={{
-              fontSize: "16px",
+              fontSize: "14px",
               fontWeight: 400,
               lineHeight: "20px",
-              color: "#fff",
+              color: "#000",
               paddingRight: "12px",
             }}
           >
