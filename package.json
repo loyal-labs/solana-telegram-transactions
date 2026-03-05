@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
+    "@sqds/grid": "^3.1.1",
     "lightningcss": "^1.30.2"
   },
   "devDependencies": {
