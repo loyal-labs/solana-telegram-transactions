@@ -24,7 +24,7 @@ import {
   PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
-  ER_VALIDATOR,
+  getErValidatorForRpcEndpoint,
 } from "./constants";
 import {
   findDepositPda,
@@ -234,6 +234,22 @@ export class LoyalPrivateTransactionsClient {
     this.baseProgram = baseProgram;
     this.ephemeralProgram = ephemeralProgram;
     this.wallet = wallet;
+  }
+
+  private getExpectedErValidator(): PublicKey {
+    return getErValidatorForRpcEndpoint(
+      this.ephemeralProgram.provider.connection.rpcEndpoint
+    );
+  }
+
+  getExpectedValidator(): PublicKey {
+    return this.getExpectedErValidator();
+  }
+
+  async getAccountDelegationStatus(
+    account: PublicKey
+  ): Promise<DelegationStatusResponse> {
+    return this.getDelegationStatus(account);
   }
 
   // ============================================================
@@ -1147,8 +1163,9 @@ export class LoyalPrivateTransactionsClient {
         prettyStringify(ephemeralAccountInfo)
       );
 
+      const expectedValidator = this.getExpectedErValidator();
       const authority = delegationStatus.result?.delegationRecord?.authority;
-      if (authority && authority !== ER_VALIDATOR.toString()) {
+      if (authority && authority !== expectedValidator.toString()) {
         console.error(
           `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${authority}`
         );
@@ -1201,7 +1218,7 @@ export class LoyalPrivateTransactionsClient {
     } else if (
       !skipValidatorCheck &&
       delegationStatus.result.delegationRecord.authority !==
-        ER_VALIDATOR.toString()
+        this.getExpectedErValidator().toString()
     ) {
       console.error(
         `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${
@@ -1241,6 +1258,8 @@ export class LoyalPrivateTransactionsClient {
       body,
     };
 
+    const expectedValidator = this.getExpectedErValidator();
+
     // Try TEE first — pick mainnet or devnet TEE based on ephemeral RPC URL
     const ephemeralUrl = this.ephemeralProgram.provider.connection.rpcEndpoint;
     const teeBaseUrl = ephemeralUrl.includes("mainnet-tee")
@@ -1256,7 +1275,7 @@ export class LoyalPrivateTransactionsClient {
           result: {
             ...teeData.result,
             delegationRecord: {
-              authority: ER_VALIDATOR.toString(),
+              authority: expectedValidator.toString(),
             },
           },
         };
@@ -1281,13 +1300,13 @@ export class LoyalPrivateTransactionsClient {
     // PER validator it doesn't recognize, e.g.:
     //   {"error":{"code":-32604,"message":"account has been delegated to unknown ER node: FnE6..."}}
     // Treat as valid delegation if it mentions our PER validator.
-    if (routerData.error?.message?.includes(ER_VALIDATOR.toString())) {
+    if (routerData.error?.message?.includes(expectedValidator.toString())) {
       return {
         ...routerData,
         result: {
           isDelegated: true,
           delegationRecord: {
-            authority: ER_VALIDATOR.toString(),
+            authority: expectedValidator.toString(),
           },
         },
       };

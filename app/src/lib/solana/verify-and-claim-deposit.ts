@@ -1,9 +1,9 @@
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import {
   DELEGATION_PROGRAM_ID,
-  ER_VALIDATOR,
   findDepositPda,
   findUsernameDepositPda,
+  getErValidatorForSolanaEnv,
   waitForAccountOwnerChange,
 } from "@loyal-labs/private-transactions";
 import {
@@ -16,6 +16,7 @@ import { PublicKey, Transaction } from "@solana/web3.js";
 import { resolveEndpoint } from "../core/api";
 import { prettyStringify, waitForAccount } from "./deposits/loyal-deposits";
 import { getPrivateClient } from "./deposits/private-client";
+import { getSolanaEnv } from "./rpc/connection";
 import {
   getSessionPda,
   getTelegramVerificationProgram,
@@ -68,6 +69,7 @@ export async function claimTokens(params: {
   const startTime = Date.now();
   console.log("> claimTokens");
   const client = await getPrivateClient();
+  const validator = getErValidatorForSolanaEnv(getSolanaEnv());
   const { tokenMint, amount, username, destination, session } = params;
 
   const [usernameDepositPda] = findUsernameDepositPda(username, tokenMint);
@@ -106,7 +108,7 @@ export async function claimTokens(params: {
         tokenMint,
         username,
         payer: keypair.publicKey,
-        validator: ER_VALIDATOR,
+        validator,
       });
       console.log("delegateUsernameDeposit sig", delegateUsernameDepositSig);
       console.log("waiting for usernameDeposit to be delegated...");
@@ -166,7 +168,7 @@ export async function claimTokens(params: {
         user: destination,
         tokenMint,
         payer: keypair.publicKey,
-        validator: ER_VALIDATOR,
+        validator,
       });
       console.log("delegateDepositSig sig", delegateDepositSig);
       console.log("waiting for deposit to be delegated...");

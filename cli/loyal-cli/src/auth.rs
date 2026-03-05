@@ -125,6 +125,7 @@ pub(crate) fn get_delegation_status(
     per_rpc_url: &str,
     router_url: &str,
     account: &Pubkey,
+    expected_validator: &str,
 ) -> Result<Option<DelegationStatusResult>> {
     let payload = json!({
         "jsonrpc": "2.0",
@@ -140,13 +141,13 @@ pub(crate) fn get_delegation_status(
         tee_endpoint,
         serde_json::to_string(&payload)?
     );
-    match fetch_delegation_status(http, tee_endpoint, &payload) {
+    match fetch_delegation_status(http, tee_endpoint, &payload, expected_validator) {
         Ok(Some(mut result)) if result.is_delegated => {
             debug!("TEE reports account {} is delegated", account);
             // TEE confirmed delegation — synthesize authority so validator checks pass
             if result.delegation_record.is_none() {
                 result.delegation_record = Some(crate::types::DelegationRecord {
-                    authority: crate::constants::DEFAULT_ER_VALIDATOR_STR.to_string(),
+                    authority: expected_validator.to_string(),
                     owner: None,
                     delegation_slot: None,
                     lamports: None,
@@ -179,13 +180,14 @@ pub(crate) fn get_delegation_status(
         router_endpoint,
         serde_json::to_string(&payload)?
     );
-    fetch_delegation_status(http, &router_endpoint, &payload)
+    fetch_delegation_status(http, &router_endpoint, &payload, expected_validator)
 }
 
 fn fetch_delegation_status(
     http: &HttpClient,
     endpoint: &str,
     payload: &Value,
+    expected_validator: &str,
 ) -> Result<Option<DelegationStatusResult>> {
     let response = http
         .post(endpoint)
@@ -222,12 +224,12 @@ fn fetch_delegation_status(
         //   {"error":{"code":-32604,"message":"account has been delegated to unknown ER node: FnE6..."}}
         // Treat as valid delegation if it mentions our PER validator.
         if let Some(msg) = error.get("message").and_then(|m| m.as_str()) {
-            if msg.contains(crate::constants::DEFAULT_ER_VALIDATOR_STR) {
+            if msg.contains(expected_validator) {
                 return Ok(Some(crate::types::DelegationStatusResult {
                     is_delegated: true,
                     fqdn: None,
                     delegation_record: Some(crate::types::DelegationRecord {
-                        authority: crate::constants::DEFAULT_ER_VALIDATOR_STR.to_string(),
+                        authority: expected_validator.to_string(),
                         owner: None,
                         delegation_slot: None,
                         lamports: None,

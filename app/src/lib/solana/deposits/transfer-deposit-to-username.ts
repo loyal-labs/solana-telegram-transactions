@@ -1,10 +1,11 @@
 import {
   DELEGATION_PROGRAM_ID,
-  ER_VALIDATOR,
   findUsernameDepositPda,
+  getErValidatorForSolanaEnv,
 } from "@loyal-labs/private-transactions";
 import { PublicKey } from "@solana/web3.js";
 
+import { getSolanaEnv } from "../rpc/connection";
 import { getWalletKeypair } from "../wallet/wallet-details";
 import { waitForAccount } from "./loyal-deposits";
 import { getPrivateClient } from "./private-client";
@@ -18,6 +19,7 @@ export async function transferTokensToUsername(params: {
   console.log("> transferTokensToUsername");
   const keypair = await getWalletKeypair();
   const client = await getPrivateClient();
+  const validator = getErValidatorForSolanaEnv(getSolanaEnv());
   const { tokenMint, amount, destinationUsername } = params;
 
   const existingBaseUsernameDeposit = await client.getBaseUsernameDeposit(
@@ -52,7 +54,7 @@ export async function transferTokensToUsername(params: {
       tokenMint,
       username: destinationUsername,
       payer: keypair.publicKey,
-      validator: ER_VALIDATOR,
+      validator,
     });
     console.log("delegateUsernameDeposit sig", delegateUsernameDepositSig);
   }

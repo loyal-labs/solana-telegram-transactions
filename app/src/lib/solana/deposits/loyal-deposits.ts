@@ -1,7 +1,7 @@
 import {
   DELEGATION_PROGRAM_ID,
-  ER_VALIDATOR,
   findDepositPda,
+  getErValidatorForSolanaEnv,
   LoyalPrivateTransactionsClient,
   MAGIC_CONTEXT_ID,
   MAGIC_PROGRAM_ID,
@@ -13,7 +13,7 @@ import {
 } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 
-import { getWebsocketConnection } from "../rpc/connection";
+import { getSolanaEnv, getWebsocketConnection } from "../rpc/connection";
 import { getWalletKeypair } from "../wallet/wallet-details";
 import { getPrivateClient } from "./private-client";
 import { closeWsolAta, wrapSolToWSol } from "./wsol-utils";
@@ -46,6 +46,35 @@ export function prettyStringify(obj: unknown): string {
     const items = inner.split(/,\s*/).map((s: string) => s.trim());
     return `[${items.join(", ")}]`;
   });
+}
+
+async function warnIfDelegatedOnUnexpectedValidator(params: {
+  client: LoyalPrivateTransactionsClient;
+  depositPda: PublicKey;
+  expectedValidator: PublicKey;
+  flow: "shield" | "unshield";
+}): Promise<void> {
+  const { client, depositPda, expectedValidator, flow } = params;
+  try {
+    const delegationStatus = await client.getAccountDelegationStatus(depositPda);
+    const authority = delegationStatus.result?.delegationRecord?.authority;
+    if (authority && authority !== expectedValidator.toBase58()) {
+      console.warn(
+        `[${flow}] Deposit is delegated to unexpected validator.`,
+        prettyStringify({
+          deposit: depositPda,
+          delegatedAuthority: authority,
+          expectedAuthority: expectedValidator,
+          note: "Unshield/undelegate on current PER endpoint can fail until account is undelegated from the current authority.",
+        })
+      );
+    }
+  } catch (error) {
+    console.warn(
+      `[${flow}] Failed to fetch delegation status before undelegate`,
+      error
+    );
+  }
 }
 
 /**
@@ -151,6 +180,7 @@ export async function shieldTokens(params: {
   const keypair = await getWalletKeypair();
   const client = await getPrivateClient();
   const { tokenMint, amount } = params;
+  const validator = getErValidatorForSolanaEnv(getSolanaEnv());
 
   // 1. Initialize deposit if it doesn't exist yet
   const existingDeposit = await client.getBaseDeposit(
@@ -198,6 +228,12 @@ export async function shieldTokens(params: {
   const depositAccountInfo =
     await client.baseProgram.provider.connection.getAccountInfo(depositPda);
   if (depositAccountInfo?.owner.equals(DELEGATION_PROGRAM_ID)) {
+    await warnIfDelegatedOnUnexpectedValidator({
+      client,
+      depositPda,
+      expectedValidator: validator,
+      flow: "shield",
+    });
     console.log("undelegateDeposit (deposit is delegated, undelegating first)");
     const undelegateSig = await client.undelegateDeposit({
       tokenMint,
@@ -252,7 +288,7 @@ export async function shieldTokens(params: {
       tokenMint,
       user: keypair.publicKey,
       payer: keypair.publicKey,
-      validator: ER_VALIDATOR,
+      validator,
     });
     console.log("delegateDeposit sig", delegateDepositSig);
   } catch {
@@ -276,6 +312,7 @@ export async function unshieldTokens(params: {
   console.log("> unshieldTokens");
 
   const { tokenMint, amount } = params;
+  const validator = getErValidatorForSolanaEnv(getSolanaEnv());
 
   const keypair = await getWalletKeypair();
   const client = await getPrivateClient();
@@ -286,6 +323,12 @@ export async function unshieldTokens(params: {
   const depositAccountInfo =
     await client.baseProgram.provider.connection.getAccountInfo(depositPda);
   if (depositAccountInfo?.owner.equals(DELEGATION_PROGRAM_ID)) {
+    await warnIfDelegatedOnUnexpectedValidator({
+      client,
+      depositPda,
+      expectedValidator: validator,
+      flow: "unshield",
+    });
     console.log("undelegateDeposit");
     const undelegateDepositSig = await client.undelegateDeposit({
       tokenMint,
@@ -350,7 +393,7 @@ export async function unshieldTokens(params: {
       tokenMint,
       user: keypair.publicKey,
       payer: keypair.publicKey,
-      validator: ER_VALIDATOR,
+      validator,
     });
     console.log("delegateDeposit sig", delegateDepositSig);
   }

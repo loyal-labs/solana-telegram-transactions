@@ -9,6 +9,7 @@
  * import { Keypair, PublicKey } from "@solana/web3.js";
  * import {
  *   ER_VALIDATOR,
+ *   ER_VALIDATOR_MAINNET,
  *   LoyalPrivateTransactionsClient,
  *   MAGIC_CONTEXT_ID,
  *   MAGIC_PROGRAM_ID,
@@ -25,14 +26,14 @@
  * });
  *
  * await client.createPermission({ user: signer.publicKey, tokenMint, payer: signer.publicKey });
- * await client.delegateDeposit({ user: signer.publicKey, tokenMint, payer: signer.publicKey, validator: ER_VALIDATOR });
+ * await client.delegateDeposit({ user: signer.publicKey, tokenMint, payer: signer.publicKey, validator: ER_VALIDATOR_MAINNET });
  * await client.transferToUsernameDeposit({ username: "alice_user", tokenMint, amount: 100_000, user: signer.publicKey, payer: signer.publicKey, sessionToken: null });
  * await client.undelegateDeposit({ user: signer.publicKey, tokenMint, payer: signer.publicKey, sessionToken: null, magicProgram: MAGIC_PROGRAM_ID, magicContext: MAGIC_CONTEXT_ID });
  */
 export { LoyalPrivateTransactionsClient, waitForAccountOwnerChange, } from "./src/LoyalPrivateTransactionsClient";
 export type { WalletSigner, WalletLike, RpcOptions, ClientConfig, DepositData, UsernameDepositData, InitializeDepositParams, ModifyBalanceParams, ModifyBalanceResult, CreatePermissionParams, CreateUsernamePermissionParams, DelegateDepositParams, DelegateUsernameDepositParams, UndelegateDepositParams, UndelegateUsernameDepositParams, TransferDepositParams, TransferToUsernameDepositParams, DelegationRecord, DelegationStatusResult, DelegationStatusResponse, } from "./src/types";
 export { isKeypair, isAnchorProvider, isWalletLike } from "./src/types";
-export { ER_VALIDATOR, PROGRAM_ID, DELEGATION_PROGRAM_ID, PERMISSION_PROGRAM_ID, MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID, DEPOSIT_SEED, DEPOSIT_SEED_BYTES, USERNAME_DEPOSIT_SEED, USERNAME_DEPOSIT_SEED_BYTES, VAULT_SEED, VAULT_SEED_BYTES, PERMISSION_SEED, PERMISSION_SEED_BYTES, LAMPORTS_PER_SOL, solToLamports, lamportsToSol, } from "./src/constants";
+export { ER_VALIDATOR, ER_VALIDATOR_DEVNET, ER_VALIDATOR_MAINNET, getErValidatorForSolanaEnv, getErValidatorForRpcEndpoint, PROGRAM_ID, DELEGATION_PROGRAM_ID, PERMISSION_PROGRAM_ID, MAGIC_PROGRAM_ID, MAGIC_CONTEXT_ID, DEPOSIT_SEED, DEPOSIT_SEED_BYTES, USERNAME_DEPOSIT_SEED, USERNAME_DEPOSIT_SEED_BYTES, VAULT_SEED, VAULT_SEED_BYTES, PERMISSION_SEED, PERMISSION_SEED_BYTES, LAMPORTS_PER_SOL, solToLamports, lamportsToSol, } from "./src/constants";
 export { findDepositPda, findUsernameDepositPda, findVaultPda, findPermissionPda, findDelegationRecordPda, findDelegationMetadataPda, findBufferPda, } from "./src/pda";
 export declare const IDL: {
     address: string;

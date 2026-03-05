@@ -26,7 +26,7 @@ export const TELEGRAM_PUBLIC_KEYS = [
   TELEGRAM_PUBLIC_KEY_PROD,
 ];
 
-export const DEPOSIT_SEED = "deposit";
+export const DEPOSIT_SEED = "deposit_v2";
 export const DEPOSIT_SEED_BYTES = Buffer.from(DEPOSIT_SEED);
 
 export const VAULT_SEED = "vault";

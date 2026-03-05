@@ -20533,7 +20533,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -20611,7 +20614,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -20892,7 +20898,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -21188,7 +21197,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -21358,7 +21370,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -21668,7 +21683,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -21698,7 +21716,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -21780,7 +21801,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -21898,7 +21922,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -22279,13 +22306,21 @@ var telegram_private_transfer_default = {
 
 // src/constants.ts
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-var ER_VALIDATOR = new PublicKey("FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA");
+var ER_VALIDATOR_DEVNET = new PublicKey("FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA");
+var ER_VALIDATOR_MAINNET = new PublicKey("MTEWGuqxUpYZGFJQcp8tLN7x5v9BSeoFHYWQQ3n3xzo");
+var ER_VALIDATOR = ER_VALIDATOR_DEVNET;
+function getErValidatorForSolanaEnv(env) {
+  return env === "mainnet" ? ER_VALIDATOR_MAINNET : ER_VALIDATOR_DEVNET;
+}
+function getErValidatorForRpcEndpoint(rpcEndpoint) {
+  return rpcEndpoint.includes("mainnet-tee") ? ER_VALIDATOR_MAINNET : ER_VALIDATOR_DEVNET;
+}
 var PROGRAM_ID = new PublicKey("97FzQdWi26mFNR21AbQNg4KqofiCLqQydQfAvRQMcXhV");
 var DELEGATION_PROGRAM_ID = new PublicKey("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
 var PERMISSION_PROGRAM_ID = new PublicKey("ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1");
 var MAGIC_PROGRAM_ID = new PublicKey("Magic11111111111111111111111111111111111111");
 var MAGIC_CONTEXT_ID = new PublicKey("MagicContext1111111111111111111111111111111");
-var DEPOSIT_SEED = "deposit";
+var DEPOSIT_SEED = "deposit_v2";
 var DEPOSIT_SEED_BYTES = Buffer.from(DEPOSIT_SEED);
 var USERNAME_DEPOSIT_SEED = "username_deposit";
 var USERNAME_DEPOSIT_SEED_BYTES = Buffer.from(USERNAME_DEPOSIT_SEED);
@@ -22475,6 +22510,15 @@ class LoyalPrivateTransactionsClient {
     this.baseProgram = baseProgram;
     this.ephemeralProgram = ephemeralProgram;
     this.wallet = wallet;
+  }
+  getExpectedErValidator() {
+    return getErValidatorForRpcEndpoint(this.ephemeralProgram.provider.connection.rpcEndpoint);
+  }
+  getExpectedValidator() {
+    return this.getExpectedErValidator();
+  }
+  async getAccountDelegationStatus(account) {
+    return this.getDelegationStatus(account);
   }
   static async fromConfig(config) {
     const {
@@ -22974,8 +23018,9 @@ class LoyalPrivateTransactionsClient {
       console.error("/getDelegationStatus", JSON.stringify(delegationStatus, null, 2));
       console.error("baseAccountInfo", prettyStringify(baseAccountInfo));
       console.error("ephemeralAccountInfo", prettyStringify(ephemeralAccountInfo));
+      const expectedValidator = this.getExpectedErValidator();
       const authority = delegationStatus.result?.delegationRecord?.authority;
-      if (authority && authority !== ER_VALIDATOR.toString()) {
+      if (authority && authority !== expectedValidator.toString()) {
         console.error(`Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${authority}`);
       }
       throw new Error(`Account is delegated to ER: ${displayName}${account.toString()}`);
@@ -22997,7 +23042,7 @@ class LoyalPrivateTransactionsClient {
       console.error("baseAccountInfo", prettyStringify(baseAccountInfo));
       console.error("ephemeralAccountInfo", prettyStringify(ephemeralAccountInfo));
       throw new Error(`Account is not delegated to ER: ${displayName}${account.toString()}`);
-    } else if (!skipValidatorCheck && delegationStatus.result.delegationRecord.authority !== ER_VALIDATOR.toString()) {
+    } else if (!skipValidatorCheck && delegationStatus.result.delegationRecord.authority !== this.getExpectedErValidator().toString()) {
       console.error(`Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${delegationStatus.result.delegationRecord.authority}`);
       console.error("/getDelegationStatus:", JSON.stringify(delegationStatus, null, 2));
       console.error("baseAccountInfo", prettyStringify(baseAccountInfo));
@@ -23017,6 +23062,7 @@ class LoyalPrivateTransactionsClient {
       headers: { "Content-Type": "application/json" },
       body
     };
+    const expectedValidator = this.getExpectedErValidator();
     const ephemeralUrl = this.ephemeralProgram.provider.connection.rpcEndpoint;
     const teeBaseUrl = ephemeralUrl.includes("mainnet-tee") ? "https://mainnet-tee.magicblock.app/" : "https://tee.magicblock.app/";
     try {
@@ -23028,7 +23074,7 @@ class LoyalPrivateTransactionsClient {
           result: {
             ...teeData.result,
             delegationRecord: {
-              authority: ER_VALIDATOR.toString()
+              authority: expectedValidator.toString()
             }
           }
         };
@@ -23039,13 +23085,13 @@ class LoyalPrivateTransactionsClient {
     const routerBaseUrl = ephemeralUrl.includes("mainnet-tee") ? "https://router.magicblock.app/" : "https://devnet-router.magicblock.app/";
     const res = await fetch(routerBaseUrl, options);
     const routerData = await res.json();
-    if (routerData.error?.message?.includes(ER_VALIDATOR.toString())) {
+    if (routerData.error?.message?.includes(expectedValidator.toString())) {
       return {
         ...routerData,
         result: {
           isDelegated: true,
           delegationRecord: {
-            authority: ER_VALIDATOR.toString()
+            authority: expectedValidator.toString()
           }
         }
       };
@@ -23062,6 +23108,8 @@ export {
   isWalletLike,
   isKeypair,
   isAnchorProvider,
+  getErValidatorForSolanaEnv,
+  getErValidatorForRpcEndpoint,
   findVaultPda,
   findUsernameDepositPda,
   findPermissionPda,
@@ -23082,6 +23130,8 @@ export {
   LoyalPrivateTransactionsClient,
   LAMPORTS_PER_SOL,
   IDL,
+  ER_VALIDATOR_MAINNET,
+  ER_VALIDATOR_DEVNET,
   ER_VALIDATOR,
   DEPOSIT_SEED_BYTES,
   DEPOSIT_SEED,

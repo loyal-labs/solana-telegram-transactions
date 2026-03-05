@@ -55,7 +55,13 @@ pub(crate) fn cmd_display(ctx: &AppContext, args: &TargetArgs) -> Result<()> {
         .map(|a| a.owner == delegation_program_id())
         .unwrap_or(false);
 
-    let delegation_status = get_delegation_status(&ctx.http_client, &ctx.per_rpc_url, &ctx.router_url, &account)?;
+    let delegation_status = get_delegation_status(
+        &ctx.http_client,
+        &ctx.per_rpc_url,
+        &ctx.router_url,
+        &account,
+        &ctx.validator.to_string(),
+    )?;
 
     let result = DisplayResult {
         target_type,
@@ -100,6 +106,12 @@ pub(crate) fn cmd_display(ctx: &AppContext, args: &TargetArgs) -> Result<()> {
                 println!("Router Delegated: {}", status.is_delegated);
                 if let Some(record) = &status.delegation_record {
                     println!("Router Authority: {}", record.authority);
+                    if record.authority != ctx.validator.to_string() {
+                        eprintln!(
+                            "Warning: delegation authority {} differs from selected validator {}",
+                            record.authority, ctx.validator
+                        );
+                    }
                     println!("Router Delegation Owner: {}", record.owner.as_deref().unwrap_or("<missing>"));
                     println!("Router Delegation Slot: {}", record.delegation_slot.map_or("<missing>".to_string(), |v| v.to_string()));
                     println!("Router Delegation Lamports: {}", record.lamports.map_or("<missing>".to_string(), |v| v.to_string()));

@@ -88,7 +88,10 @@ export type TelegramPrivateTransfer = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -166,7 +169,10 @@ export type TelegramPrivateTransfer = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -447,7 +453,10 @@ export type TelegramPrivateTransfer = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -743,7 +752,10 @@ export type TelegramPrivateTransfer = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -913,7 +925,10 @@ export type TelegramPrivateTransfer = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -1223,7 +1238,10 @@ export type TelegramPrivateTransfer = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -1253,7 +1271,10 @@ export type TelegramPrivateTransfer = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -1335,7 +1356,10 @@ export type TelegramPrivateTransfer = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -1453,7 +1477,10 @@ export type TelegramPrivateTransfer = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
