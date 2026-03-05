@@ -212,7 +212,7 @@ export type TelegramPrivateTransfer = {
                         seeds: [
                             {
                                 kind: "const";
-                                value: [100, 101, 112, 111, 115, 105, 116];
+                                value: [100, 101, 112, 111, 115, 105, 116, 95, 118, 50];
                             },
                             {
                                 kind: "account";
@@ -447,7 +447,7 @@ export type TelegramPrivateTransfer = {
                         seeds: [
                             {
                                 kind: "const";
-                                value: [100, 101, 112, 111, 115, 105, 116];
+                                value: [100, 101, 112, 111, 115, 105, 116, 95, 118, 50];
                             },
                             {
                                 kind: "arg";
@@ -895,7 +895,7 @@ export type TelegramPrivateTransfer = {
                         seeds: [
                             {
                                 kind: "const";
-                                value: [100, 101, 112, 111, 115, 105, 116];
+                                value: [100, 101, 112, 111, 115, 105, 116, 95, 118, 50];
                             },
                             {
                                 kind: "account";
@@ -966,7 +966,7 @@ export type TelegramPrivateTransfer = {
                         seeds: [
                             {
                                 kind: "const";
-                                value: [100, 101, 112, 111, 115, 105, 116];
+                                value: [100, 101, 112, 111, 115, 105, 116, 95, 118, 50];
                             },
                             {
                                 kind: "account";
@@ -1246,7 +1246,7 @@ export type TelegramPrivateTransfer = {
                         seeds: [
                             {
                                 kind: "const";
-                                value: [100, 101, 112, 111, 115, 105, 116];
+                                value: [100, 101, 112, 111, 115, 105, 116, 95, 118, 50];
                             },
                             {
                                 kind: "account";
@@ -1268,7 +1268,7 @@ export type TelegramPrivateTransfer = {
                         seeds: [
                             {
                                 kind: "const";
-                                value: [100, 101, 112, 111, 115, 105, 116];
+                                value: [100, 101, 112, 111, 115, 105, 116, 95, 118, 50];
                             },
                             {
                                 kind: "account";
@@ -1328,7 +1328,7 @@ export type TelegramPrivateTransfer = {
                         seeds: [
                             {
                                 kind: "const";
-                                value: [100, 101, 112, 111, 115, 105, 116];
+                                value: [100, 101, 112, 111, 115, 105, 116, 95, 118, 50];
                             },
                             {
                                 kind: "account";
@@ -1426,7 +1426,7 @@ export type TelegramPrivateTransfer = {
                         seeds: [
                             {
                                 kind: "const";
-                                value: [100, 101, 112, 111, 115, 105, 116];
+                                value: [100, 101, 112, 111, 115, 105, 116, 95, 118, 50];
                             },
                             {
                                 kind: "account";

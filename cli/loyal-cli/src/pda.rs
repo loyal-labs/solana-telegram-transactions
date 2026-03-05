@@ -265,7 +265,7 @@ pub(crate) fn validate_username(username: &str) -> Result<()> {
 }
 
 pub(crate) fn find_deposit_pda(user: &Pubkey, mint: &Pubkey) -> Pubkey {
-    Pubkey::find_program_address(&[b"deposit", user.as_ref(), mint.as_ref()], &program_id()).0
+    Pubkey::find_program_address(&[b"deposit_v2", user.as_ref(), mint.as_ref()], &program_id()).0
 }
 
 pub(crate) fn find_username_deposit_pda(username: &str, mint: &Pubkey) -> Pubkey {

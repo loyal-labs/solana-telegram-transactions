@@ -11,7 +11,7 @@ use telegram_verification::TelegramSession;
 declare_id!("97FzQdWi26mFNR21AbQNg4KqofiCLqQydQfAvRQMcXhV");
 
 // Seed constants
-pub const DEPOSIT_PDA_SEED: &[u8] = b"deposit";
+pub const DEPOSIT_PDA_SEED: &[u8] = b"deposit_v2";
 pub const USERNAME_DEPOSIT_PDA_SEED: &[u8] = b"username_deposit";
 pub const VAULT_PDA_SEED: &[u8] = b"vault";
 

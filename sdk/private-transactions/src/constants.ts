@@ -62,7 +62,7 @@ export const MAGIC_CONTEXT_ID = new PublicKey(
 /**
  * PDA seed for deposit accounts
  */
-export const DEPOSIT_SEED = "deposit";
+export const DEPOSIT_SEED = "deposit_v2";
 export const DEPOSIT_SEED_BYTES = Buffer.from(DEPOSIT_SEED);
 
 /**

@@ -19828,7 +19828,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -19858,7 +19861,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -19936,7 +19942,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -20012,7 +20021,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -20217,7 +20229,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -20434,7 +20449,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -20513,7 +20531,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -20582,7 +20603,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -20683,7 +20707,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -20993,7 +21020,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -21023,7 +21053,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -21105,7 +21138,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -21144,7 +21180,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -21223,7 +21262,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -21297,7 +21339,10 @@ var telegram_private_transfer_default = {
                   111,
                   115,
                   105,
-                  116
+                  116,
+                  95,
+                  118,
+                  50
                 ]
               },
               {
@@ -21618,7 +21663,7 @@ var DELEGATION_PROGRAM_ID = new PublicKey("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMA
 var PERMISSION_PROGRAM_ID = new PublicKey("ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1");
 var MAGIC_PROGRAM_ID = new PublicKey("Magic11111111111111111111111111111111111111");
 var MAGIC_CONTEXT_ID = new PublicKey("MagicContext1111111111111111111111111111111");
-var DEPOSIT_SEED = "deposit";
+var DEPOSIT_SEED = "deposit_v2";
 var DEPOSIT_SEED_BYTES = Buffer.from(DEPOSIT_SEED);
 var USERNAME_DEPOSIT_SEED = "username_deposit";
 var USERNAME_DEPOSIT_SEED_BYTES = Buffer.from(USERNAME_DEPOSIT_SEED);
