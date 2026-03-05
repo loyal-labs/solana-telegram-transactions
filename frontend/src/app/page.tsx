@@ -1075,58 +1075,6 @@ export default function LandingPage() {
                 </button>
               </div>
 
-              {/* Wallet Button - Bottom (hidden on mobile in chat mode) */}
-              {isConnected ? (
-                <button
-                  className="sidebar-icon-btn sidebar-wallet-btn"
-                  onClick={() => open()}
-                  style={{
-                    width: "36px",
-                    height: "36px",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    background: "rgba(0, 0, 0, 0.04)",
-                    border: "none",
-                    borderRadius: "9999px",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    padding: "4px",
-                  }}
-                  title={truncatedAddress || "Wallet"}
-                >
-                  <img
-                    alt="Wallet"
-                    height={28}
-                    src="/Wallet-Icon.svg"
-                    width={28}
-                  />
-                </button>
-              ) : (
-                <button
-                  className="sidebar-icon-btn"
-                  onClick={() => open()}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "#000",
-                    border: "none",
-                    borderRadius: "9999px",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    padding: "8px 16px",
-                    color: "#fff",
-                    fontSize: "16px",
-                    fontWeight: 400,
-                    fontFamily: "var(--font-geist-sans), sans-serif",
-                    lineHeight: "20px",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Sign In
-                </button>
-              )}
             </div>
 
             {/* Expanded Sidebar Panel */}

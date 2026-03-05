@@ -64,7 +64,7 @@ export function Header() {
               paddingRight: "12px",
             }}
           >
-            {isConnected && truncatedAddress ? truncatedAddress : "Sign in"}
+            {isConnected && truncatedAddress ? truncatedAddress : "Sign In"}
           </span>
         </button>
       </header>
