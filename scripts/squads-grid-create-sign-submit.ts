@@ -1,6 +1,7 @@
 import { GridClient } from "@sqds/grid";
 import {
   Connection,
+  Keypair,
   PublicKey,
   SystemProgram,
   TransactionMessage,
@@ -21,6 +22,7 @@ type CliOptions = {
   baseUrl: string;
   feeCurrency: "sol" | "usdc" | "usdt" | "pyusd" | "eurc";
   feePayer?: string;
+  perSignerKeypair?: string;
   selfManagedFees: boolean;
   skipSubmit: boolean;
 };
@@ -46,6 +48,7 @@ Options:
   --base-url <url>           Squads Grid base URL (default: https://grid.squads.xyz)
   --fee-currency <currency>  sol|usdc|usdt|pyusd|eurc (default: sol)
   --fee-payer <pubkey>       Fee payer address (default: created account address)
+  --per-signer-keypair <path>  Local JSON keypair file used to sign for PER before Squads sign
   --self-managed-fees        Include selfManagedFees=true in fee config
   --skip-submit              Only sign (do not call submit/send)
   --help                     Show this help
@@ -53,6 +56,7 @@ Options:
 Env loading:
   - Reads SQUADS_GRID_API_KEY from app/.env first, then process.env.
   - If present, NEXT_PUBLIC_SOLANA_RPC_URL in app/.env is used as default RPC.
+  - Optional PER_SIGNER_KEYPAIR points to a local JSON keypair file.
 `);
 };
 
@@ -163,6 +167,9 @@ const parseArgs = (argv: string[]): CliOptions | null => {
       case "--fee-payer":
         options.feePayer = argv[++i];
         break;
+      case "--per-signer-keypair":
+        options.perSignerKeypair = argv[++i];
+        break;
       case "--self-managed-fees":
         options.selfManagedFees = true;
         break;
@@ -183,6 +190,27 @@ const parseArgs = (argv: string[]): CliOptions | null => {
   }
 
   return options;
+};
+
+const resolvePath = (filePath: string): string => {
+  if (!filePath.startsWith("~")) {
+    return filePath;
+  }
+
+  const homeDir = process.env.HOME ?? process.env.USERPROFILE;
+  if (!homeDir) {
+    throw new Error(
+      `Cannot resolve "~" in path "${filePath}" because HOME is not set`
+    );
+  }
+
+  return path.join(homeDir, filePath.slice(1));
+};
+
+const loadKeypair = (filePath: string): Keypair => {
+  const resolvedPath = resolvePath(filePath);
+  const raw = JSON.parse(fs.readFileSync(resolvedPath, "utf8")) as number[];
+  return Keypair.fromSecretKey(Uint8Array.from(raw));
 };
 
 const getErrorMessage = (error: unknown): string => {
@@ -244,6 +272,13 @@ const buildUnsignedTransferBase64 = async (
   return Buffer.from(tx.serialize()).toString("base64");
 };
 
+const getRequiredSignerAddresses = (tx: VersionedTransaction): string[] => {
+  const requiredSignatures = tx.message.header.numRequiredSignatures;
+  return tx.message.staticAccountKeys
+    .slice(0, requiredSignatures)
+    .map((key) => key.toBase58());
+};
+
 const run = async (): Promise<void> => {
   const options = parseArgs(process.argv.slice(2));
   if (!options) {
@@ -272,6 +307,13 @@ const run = async (): Promise<void> => {
     (options.environment === "production"
       ? DEFAULT_PRODUCTION_RPC
       : DEFAULT_SANDBOX_RPC);
+  const perSignerPath =
+    options.perSignerKeypair ??
+    process.env.PER_SIGNER_KEYPAIR ??
+    appEnv.PER_SIGNER_KEYPAIR;
+  const perSigner = perSignerPath ? loadKeypair(perSignerPath) : undefined;
+  const perSignerAddress = perSigner?.publicKey.toBase58();
+  const totalSteps = perSigner ? 7 : 6;
 
   const grid = new GridClient({
     apiKey,
@@ -280,7 +322,7 @@ const run = async (): Promise<void> => {
   });
 
   console.log(
-    `[1/6] Generating session secrets (${options.environment}) and requesting OTP for ${email}`
+    `[1/${totalSteps}] Generating session secrets (${options.environment}) and requesting OTP for ${email}`
   );
   const sessionSecrets = await grid.generateSessionSecrets();
 
@@ -312,7 +354,7 @@ const run = async (): Promise<void> => {
   let accountAddress: string;
   let authentication: unknown[];
   if (authMode === "create") {
-    console.log("[2/6] Completing auth + creating account");
+    console.log(`[2/${totalSteps}] Completing auth + creating account`);
     const createdAccount = await grid.completeAuthAndCreateAccount({
       otpCode,
       user: { email },
@@ -322,7 +364,7 @@ const run = async (): Promise<void> => {
     authentication = createdAccount.data.authentication;
     console.log(`Created account: ${accountAddress}`);
   } else {
-    console.log("[2/6] Completing auth for existing account");
+    console.log(`[2/${totalSteps}] Completing auth for existing account`);
     const existingAccount = await grid.completeAuth({
       otpCode,
       user: {
@@ -339,9 +381,12 @@ const run = async (): Promise<void> => {
 
   const recipient = options.to ?? accountAddress;
   const feePayer = options.feePayer ?? accountAddress;
+  const accountSigners = perSignerAddress
+    ? [accountAddress, perSignerAddress]
+    : [accountAddress];
 
   console.log(
-    `[3/6] Building unsigned transfer transaction (lamports=${options.lamports}, to=${recipient})`
+    `[3/${totalSteps}] Building unsigned transfer transaction (lamports=${options.lamports}, to=${recipient})`
   );
   const unsignedBase64 = await buildUnsignedTransferBase64(
     accountAddress,
@@ -350,10 +395,12 @@ const run = async (): Promise<void> => {
     rpcUrl
   );
 
-  console.log("[4/6] Preparing transaction payload with Squads Grid");
+  console.log(
+    `[4/${totalSteps}] Preparing transaction payload with Squads Grid`
+  );
   const prepared = await grid.prepareArbitraryTransaction(accountAddress, {
     transaction: unsignedBase64,
-    accountSigners: [accountAddress],
+    accountSigners,
     feeConfig: {
       currency: options.feeCurrency,
       payerAddress: feePayer,
@@ -361,11 +408,36 @@ const run = async (): Promise<void> => {
     },
   });
 
-  console.log("[5/6] Signing transaction with Squads");
+  let payloadForGridSign = prepared.data;
+  if (perSigner) {
+    console.log("[5/7] Signing transaction locally for PER");
+    const signableTransaction = grid.extractSignableTransaction(prepared.data);
+    const requiredSigners = getRequiredSignerAddresses(signableTransaction);
+    if (!perSignerAddress || !requiredSigners.includes(perSignerAddress)) {
+      throw new Error(
+        `PER signer ${perSignerAddress} is not required by the prepared transaction. Required signers: ${requiredSigners.join(
+          ", "
+        )}`
+      );
+    }
+
+    signableTransaction.sign([perSigner]);
+    payloadForGridSign = grid.setExternallySignedTransaction(
+      prepared.data,
+      signableTransaction
+    );
+    console.log(`Applied local PER signature: ${perSignerAddress}`);
+  }
+
+  console.log(
+    perSigner
+      ? "[6/7] Signing transaction with Squads"
+      : "[5/6] Signing transaction with Squads"
+  );
   const signed = await grid.sign({
     sessionSecrets,
     session: authentication,
-    transactionPayload: prepared.data,
+    transactionPayload: payloadForGridSign,
   });
   console.log(`Signed payload providers: ${signed.kmsPayloads.length}`);
 
@@ -376,7 +448,11 @@ const run = async (): Promise<void> => {
     return;
   }
 
-  console.log("[6/6] Submitting transaction with Squads submit endpoint");
+  console.log(
+    perSigner
+      ? "[7/7] Submitting transaction with Squads submit endpoint"
+      : "[6/6] Submitting transaction with Squads submit endpoint"
+  );
   const submitted = await grid.send({
     address: accountAddress,
     signedTransactionPayload: signed,
