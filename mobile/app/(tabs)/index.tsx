@@ -12,6 +12,8 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { RefreshControl, StyleSheet } from "react-native";
 
+const TAB_BAR_HEIGHT = 90;
+
 function GroupsTab({ count }: { count: number }) {
   return (
     <View style={styles.tabContainer}>
@@ -74,6 +76,7 @@ export default function SummariesListScreen() {
       <ScrollView
         className="flex-1 bg-white"
         contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ paddingBottom: TAB_BAR_HEIGHT }}
       >
         <LogoHeader />
         <Text style={styles.title}>Chat Highlights</Text>
@@ -105,6 +108,7 @@ export default function SummariesListScreen() {
       <ScrollView
         className="flex-1 bg-white"
         contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={{ paddingBottom: TAB_BAR_HEIGHT }}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
         }
@@ -122,6 +126,7 @@ export default function SummariesListScreen() {
     <ScrollView
       className="flex-1 bg-white"
       contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={{ paddingBottom: TAB_BAR_HEIGHT }}
       refreshControl={
         <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
       }

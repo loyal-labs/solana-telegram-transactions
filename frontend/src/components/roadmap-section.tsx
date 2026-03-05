@@ -1,32 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion, type PanInfo } from "motion/react";
-import { IBM_Plex_Sans } from "next/font/google";
-import localFont from "next/font/local";
 import { memo, useState } from "react";
 import { roadmapEvents } from "@/data/roadmap";
 
-const instrumentSerif = localFont({
-  src: [
-    {
-      path: "../../public/fonts/InstrumentSerif-Regular.woff2",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "../../public/fonts/InstrumentSerif-Italic.woff2",
-      weight: "400",
-      style: "italic",
-    },
-  ],
-  display: "swap",
-});
-
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  display: "swap",
-});
+const GEIST = "var(--font-geist-sans), sans-serif";
 
 function RoadmapSectionComponent() {
   const q1_2026Index = roadmapEvents.findIndex(
@@ -53,14 +31,18 @@ function RoadmapSectionComponent() {
     if (item.isChecked) {
       return {
         label: "Completed",
-        color: "rgba(34, 197, 94, 0.8)",
+        dotColor: "#34C759",
+        textColor: "#34C759",
+        bgColor: "rgba(52, 199, 89, 0.08)",
       };
     }
 
     if (item.isActive) {
       return {
         label: "In progress",
-        color: "rgba(249, 115, 22, 0.8)",
+        dotColor: "#F9363C",
+        textColor: "#F9363C",
+        bgColor: "rgba(249, 54, 60, 0.08)",
       };
     }
 
@@ -69,13 +51,17 @@ function RoadmapSectionComponent() {
     if (hasCompletedEvents) {
       return {
         label: "In progress",
-        color: "rgba(249, 115, 22, 0.8)",
+        dotColor: "#F9363C",
+        textColor: "#F9363C",
+        bgColor: "rgba(249, 54, 60, 0.08)",
       };
     }
 
     return {
       label: "Planned",
-      color: "rgba(156, 163, 175, 0.5)",
+      dotColor: "rgba(60, 60, 67, 0.6)",
+      textColor: "rgba(60, 60, 67, 0.6)",
+      bgColor: "rgba(0, 0, 0, 0.04)",
     };
   };
 
@@ -122,55 +108,58 @@ function RoadmapSectionComponent() {
       zIndex: 10,
     },
     inactive: {
-      scale: 0.9,
-      opacity: 0.5,
+      scale: 1,
+      opacity: 0.4,
       zIndex: 2,
     },
   };
 
-  const cardTransition = { duration: 0.3, ease: [0.4, 0, 0.2, 1] };
+  const cardTransition = { duration: 0.3, ease: "easeInOut" as const };
 
   return (
     <section
       id="roadmap-section"
       style={{
-        padding: "4rem 1rem",
-        background: "#000",
+        padding: "64px 16px",
+        background: "#FFFFFF",
         position: "relative",
         overflowX: "hidden",
+        fontFamily: GEIST,
       }}
     >
       <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
         <h2
-          className={instrumentSerif.className}
           style={{
-            fontSize: "3.5rem",
-            fontWeight: 400,
-            color: "#fff",
+            fontFamily: GEIST,
+            fontSize: "48px",
+            fontWeight: 600,
+            color: "#000",
             textAlign: "center",
-            marginBottom: "1rem",
+            marginBottom: "20px",
+            letterSpacing: "-0.96px",
+            lineHeight: "48px",
           }}
         >
           Roadmap
         </h2>
         <p
-          className={instrumentSerif.className}
           style={{
-            fontSize: "1.5rem",
+            fontFamily: GEIST,
+            fontSize: "24px",
             fontWeight: 400,
-            color: "rgba(255, 255, 255, 0.8)",
+            color: "rgba(60, 60, 67, 0.6)",
             textAlign: "center",
-            marginBottom: "3rem",
+            marginBottom: "64px",
             maxWidth: "800px",
-            margin: "0 auto 4rem",
-            lineHeight: 1.45,
+            margin: "0 auto 64px",
+            lineHeight: "28px",
           }}
         >
           Our journey to building the most private AI assistant
         </p>
 
         <div style={{ position: "relative" }}>
-          {/* Navigation buttons - inside relative container for proper positioning */}
+          {/* Navigation buttons */}
           <button
             className="desktop-nav-btn"
             onClick={(e) => {
@@ -178,41 +167,34 @@ function RoadmapSectionComponent() {
               e.stopPropagation();
               prevSlide();
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
-            }}
             style={{
               position: "absolute",
-              left: "-4rem",
+              left: "-60px",
               top: "50%",
               transform: "translateY(-50%)",
               zIndex: 100,
-              background: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: "50%",
-              width: "3rem",
-              height: "3rem",
+              background: "rgba(0, 0, 0, 0.04)",
+              border: "none",
+              borderRadius: "9999px",
+              width: "48px",
+              height: "48px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
-              transition: "all 0.2s ease",
-              pointerEvents: "auto",
+              transition: "background 0.2s ease",
             }}
             type="button"
           >
             <svg
               fill="none"
-              height="24"
+              height="20"
               style={{
                 transform: "rotate(180deg)",
-                color: "rgba(255, 255, 255, 0.7)",
+                color: "#3C3C43",
               }}
               viewBox="0 0 24 24"
-              width="24"
+              width="20"
               xmlns="http://www.w3.org/2000/svg"
             >
               <path
@@ -231,38 +213,31 @@ function RoadmapSectionComponent() {
               e.stopPropagation();
               nextSlide();
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
-            }}
             style={{
               position: "absolute",
-              right: "-4rem",
+              right: "-60px",
               top: "50%",
               transform: "translateY(-50%)",
               zIndex: 100,
-              background: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: "50%",
-              width: "3rem",
-              height: "3rem",
+              background: "rgba(0, 0, 0, 0.04)",
+              border: "none",
+              borderRadius: "9999px",
+              width: "48px",
+              height: "48px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
-              transition: "all 0.2s ease",
-              pointerEvents: "auto",
+              transition: "background 0.2s ease",
             }}
             type="button"
           >
             <svg
               fill="none"
-              height="24"
-              style={{ color: "rgba(255, 255, 255, 0.7)" }}
+              height="20"
+              style={{ color: "#3C3C43" }}
               viewBox="0 0 24 24"
-              width="24"
+              width="20"
               xmlns="http://www.w3.org/2000/svg"
             >
               <path
@@ -280,11 +255,11 @@ function RoadmapSectionComponent() {
             style={{
               position: "relative",
               overflow: "hidden",
-              height: "30rem",
+              height: "400px",
               touchAction: "pan-y",
             }}
           >
-            {/* Fade overlays with mobile navigation */}
+            {/* Edge fade gradients */}
             <div
               onClick={prevSlide}
               style={{
@@ -292,9 +267,9 @@ function RoadmapSectionComponent() {
                 left: 0,
                 top: 0,
                 bottom: 0,
-                width: "8rem",
+                width: "96px",
                 background:
-                  "linear-gradient(to right, #000 0%, transparent 100%)",
+                  "linear-gradient(to right, #FFFFFF 0%, rgba(255, 255, 255, 0) 100%)",
                 zIndex: 5,
                 cursor: "pointer",
                 display: "flex",
@@ -303,13 +278,12 @@ function RoadmapSectionComponent() {
                 paddingLeft: "0.75rem",
               }}
             >
-              {/* Mobile chevron - hidden on desktop via media query */}
               <svg
                 className="mobile-nav-chevron"
                 fill="none"
                 height="32"
                 style={{
-                  color: "rgba(255, 255, 255, 0.5)",
+                  color: "rgba(60, 60, 67, 0.6)",
                   transform: "rotate(180deg)",
                 }}
                 viewBox="0 0 24 24"
@@ -332,9 +306,9 @@ function RoadmapSectionComponent() {
                 right: 0,
                 top: 0,
                 bottom: 0,
-                width: "8rem",
+                width: "96px",
                 background:
-                  "linear-gradient(to left, #000 0%, transparent 100%)",
+                  "linear-gradient(to left, #FFFFFF 0%, rgba(255, 255, 255, 0) 100%)",
                 zIndex: 5,
                 cursor: "pointer",
                 display: "flex",
@@ -343,13 +317,12 @@ function RoadmapSectionComponent() {
                 paddingRight: "0.75rem",
               }}
             >
-              {/* Mobile chevron - hidden on desktop via media query */}
               <svg
                 className="mobile-nav-chevron"
                 fill="none"
                 height="32"
                 style={{
-                  color: "rgba(255, 255, 255, 0.5)",
+                  color: "rgba(60, 60, 67, 0.6)",
                 }}
                 viewBox="0 0 24 24"
                 width="32"
@@ -384,6 +357,7 @@ function RoadmapSectionComponent() {
                 height: "100%",
                 alignItems: "center",
                 justifyContent: "center",
+                gap: "20px",
               }}
             >
               {roadmapEvents.map((item, index) => {
@@ -405,107 +379,34 @@ function RoadmapSectionComponent() {
                     onDragEnd={(e, info) => handleDragEnd(e, info, index)}
                     style={{
                       position: "absolute",
-                      width: "18rem",
-                      x: `${Math.round((index - currentIndex) * 300)}px`,
+                      width: "288px",
+                      x: `${Math.round((index - currentIndex) * 308)}px`,
                       willChange: "transform",
                       transform: "translateZ(0)",
                       cursor: index !== currentIndex ? "pointer" : "default",
                     }}
+                    transition={cardTransition}
                     variants={cardVariants}
                   >
-                    {/* Card */}
                     <motion.div
                       layout
                       style={{ width: "100%" }}
                       transition={{ duration: 0.3, ease: "easeInOut" }}
                     >
                       <div
-                        className={ibmPlexSans.className}
                         style={{
                           position: "relative",
-                          background: "rgba(38, 38, 38, 0.5)",
-                          backdropFilter: "blur(24px) saturate(180%)",
-                          WebkitBackdropFilter: "blur(24px) saturate(180%)",
-                          border: "1px solid rgba(255, 255, 255, 0.08)",
+                          background: "#F5F5F5",
                           borderRadius: "24px",
-                          overflow: "visible",
-                          boxShadow:
-                            "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
+                          overflow: "hidden",
+                          fontFamily: GEIST,
                         }}
                       >
-                        {/* Red dot indicator on active card */}
-                        <motion.div
-                          animate={{
-                            scale: index === currentIndex ? [0, 1.4, 1] : 0,
-                            opacity: index === currentIndex ? 1 : 0,
-                          }}
-                          initial={false}
-                          style={{
-                            position: "absolute",
-                            top: "-8px",
-                            left: "calc(50% - 8px)",
-                            width: "16px",
-                            height: "16px",
-                            borderRadius: "50%",
-                            background: "#ef4444",
-                            zIndex: 10,
-                          }}
-                          transition={{
-                            scale: {
-                              duration: 0.4,
-                              ease: [0.34, 1.56, 0.64, 1],
-                              delay: index === currentIndex ? 0.2 : 0,
-                            },
-                            opacity: {
-                              duration: 0.15,
-                              delay: index === currentIndex ? 0.2 : 0,
-                            },
-                          }}
-                        />
-                        {/* Red glow clipped to card surface */}
-                        <div
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            overflow: "hidden",
-                            borderRadius: "24px",
-                            pointerEvents: "none",
-                          }}
-                        >
-                          <motion.div
-                            animate={{
-                              opacity: index === currentIndex ? 1 : 0,
-                              scale: index === currentIndex ? 1 : 0.5,
-                            }}
-                            initial={false}
-                            style={{
-                              position: "absolute",
-                              top: "-50px",
-                              left: "calc(50% - 80px)",
-                              width: "160px",
-                              height: "100px",
-                              background:
-                                "radial-gradient(ellipse at center top, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.15) 40%, transparent 70%)",
-                              pointerEvents: "none",
-                            }}
-                            transition={{
-                              opacity: {
-                                duration: 0.4,
-                                delay: index === currentIndex ? 0.2 : 0,
-                              },
-                              scale: {
-                                duration: 0.4,
-                                ease: [0.34, 1.56, 0.64, 1],
-                                delay: index === currentIndex ? 0.2 : 0,
-                              },
-                            }}
-                          />
-                        </div>
                         {/* Card header */}
                         <div
                           onClick={() => toggleExpand(index)}
                           style={{
-                            padding: "1.5rem",
+                            padding: "32px 16px",
                             display: "flex",
                             flexDirection: "column",
                             alignItems: "center",
@@ -514,53 +415,50 @@ function RoadmapSectionComponent() {
                               index === currentIndex ? "pointer" : "default",
                           }}
                         >
-                          {/* Period badge */}
-                          <div
-                            style={{
-                              padding: "0.375rem 0.875rem",
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              color: "rgba(255, 255, 255, 0.7)",
-                              background: "rgba(255, 255, 255, 0.06)",
-                              border: "1px solid rgba(255, 255, 255, 0.1)",
-                              borderRadius: "999px",
-                              marginBottom: "0.75rem",
-                            }}
-                          >
-                            {item.year}
-                          </div>
-
+                          {/* Quarter label */}
                           <h3
                             style={{
-                              fontSize: "1.25rem",
+                              fontSize: "20px",
                               fontWeight: 600,
-                              color: "rgba(255, 255, 255, 0.95)",
-                              marginBottom: "0.5rem",
+                              lineHeight: "24px",
+                              color: "#000",
+                              marginBottom: "12px",
+                              whiteSpace: "nowrap",
                             }}
                           >
-                            {`${formatPeriod(item)} Goals`}
+                            {formatPeriod(item)}
                           </h3>
 
-                          {/* Status */}
+                          {/* Status badge */}
                           <div
                             style={{
-                              display: "flex",
+                              display: "inline-flex",
                               alignItems: "center",
-                              fontSize: "0.875rem",
-                              color: "rgba(255, 255, 255, 0.6)",
-                              marginTop: "0.5rem",
+                              gap: "6px",
+                              padding: "4px 12px 4px 8px",
+                              borderRadius: "100px",
+                              background: status.bgColor,
                             }}
                           >
                             <div
                               style={{
-                                width: "0.5rem",
-                                height: "0.5rem",
-                                marginRight: "0.5rem",
+                                width: "8px",
+                                height: "8px",
                                 borderRadius: "50%",
-                                background: status.color,
+                                background: status.dotColor,
+                                flexShrink: 0,
                               }}
                             />
-                            {status.label}
+                            <span
+                              style={{
+                                fontSize: "14px",
+                                fontWeight: 400,
+                                lineHeight: "20px",
+                                color: status.textColor,
+                              }}
+                            >
+                              {status.label}
+                            </span>
                           </div>
 
                           {/* Expand indicator */}
@@ -569,13 +467,13 @@ function RoadmapSectionComponent() {
                               animate={{
                                 rotate: isDetailsExpanded ? 180 : 0,
                               }}
-                              style={{ marginTop: "0.75rem" }}
+                              style={{ marginTop: "12px" }}
                               transition={{ duration: 0.3 }}
                             >
                               <svg
                                 fill="none"
                                 height="20"
-                                style={{ color: "rgba(255, 255, 255, 0.4)" }}
+                                style={{ color: "rgba(60, 60, 67, 0.6)" }}
                                 viewBox="0 0 24 24"
                                 width="20"
                                 xmlns="http://www.w3.org/2000/svg"
@@ -607,19 +505,16 @@ function RoadmapSectionComponent() {
                             >
                               <div
                                 style={{
-                                  padding: "0 1.5rem 1.5rem",
-                                  borderTop:
-                                    "1px solid rgba(255, 255, 255, 0.06)",
-                                  paddingTop: "1rem",
+                                  padding: "0 20px 20px 20px",
                                 }}
                               >
                                 <h4
                                   style={{
-                                    fontSize: "0.875rem",
+                                    fontSize: "14px",
                                     fontWeight: 600,
-                                    color: "rgba(255, 255, 255, 0.8)",
-                                    textAlign: "center",
-                                    marginBottom: "1rem",
+                                    lineHeight: "20px",
+                                    color: "#000",
+                                    marginBottom: "12px",
                                   }}
                                 >
                                   Events
@@ -627,7 +522,10 @@ function RoadmapSectionComponent() {
                                 <ul
                                   style={{
                                     display: "grid",
-                                    gap: "0.75rem",
+                                    gap: "8px",
+                                    listStyle: "none",
+                                    margin: 0,
+                                    padding: 0,
                                   }}
                                 >
                                   {item.events.map((event, i) => (
@@ -638,6 +536,7 @@ function RoadmapSectionComponent() {
                                       style={{
                                         display: "flex",
                                         alignItems: "flex-start",
+                                        gap: "8px",
                                       }}
                                       transition={{
                                         duration: 0.3,
@@ -647,22 +546,31 @@ function RoadmapSectionComponent() {
                                     >
                                       <div
                                         style={{
-                                          width: "0.5rem",
-                                          height: "0.5rem",
-                                          marginRight: "0.75rem",
-                                          marginTop: "0.35rem",
+                                          width: "8px",
+                                          height: "20px",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
                                           flexShrink: 0,
-                                          borderRadius: "50%",
-                                          background: event.isChecked
-                                            ? "rgba(34, 197, 94, 0.8)"
-                                            : "rgba(156, 163, 175, 0.5)",
                                         }}
-                                      />
+                                      >
+                                        <div
+                                          style={{
+                                            width: "6px",
+                                            height: "6px",
+                                            borderRadius: "50%",
+                                            background: event.isChecked
+                                              ? "#34C759"
+                                              : "#F9363C",
+                                          }}
+                                        />
+                                      </div>
                                       <span
                                         style={{
-                                          fontSize: "0.875rem",
-                                          color: "rgba(255, 255, 255, 0.7)",
-                                          lineHeight: 1.5,
+                                          fontSize: "14px",
+                                          fontWeight: 400,
+                                          lineHeight: "20px",
+                                          color: "rgba(60, 60, 67, 0.6)",
                                         }}
                                       >
                                         {event.title}
@@ -687,8 +595,8 @@ function RoadmapSectionComponent() {
             style={{
               display: "flex",
               justifyContent: "center",
-              marginTop: "2rem",
-              gap: "0.5rem",
+              paddingTop: "32px",
+              gap: "8px",
             }}
           >
             {roadmapEvents.map((_, index) => (
@@ -697,16 +605,15 @@ function RoadmapSectionComponent() {
                 key={index}
                 onClick={() => goToSlide(index)}
                 style={{
-                  width: index === currentIndex ? "1.5rem" : "0.375rem",
-                  height: "0.375rem",
-                  borderRadius: "999px",
-                  background:
-                    index === currentIndex
-                      ? "rgba(255, 255, 255, 0.6)"
-                      : "rgba(255, 255, 255, 0.15)",
+                  width: index === currentIndex ? "24px" : "6px",
+                  height: "6px",
+                  borderRadius: "100px",
+                  background: "#F9363C",
+                  opacity: index === currentIndex ? 0.6 : 0.14,
                   border: "none",
                   cursor: "pointer",
                   transition: "all 0.3s ease",
+                  padding: 0,
                 }}
                 type="button"
               />

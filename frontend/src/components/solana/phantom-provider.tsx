@@ -2,7 +2,7 @@
 
 import {
   AddressType,
-  darkTheme,
+  lightTheme,
   PhantomProvider as PhantomSdkProvider,
 } from "@phantom/react-sdk";
 import { Connection } from "@solana/web3.js";
@@ -74,7 +74,7 @@ export const PhantomWalletProvider: FC<PhantomWalletProviderProps> = ({
           redirectUrl,
         },
       }}
-      theme={darkTheme}
+      theme={lightTheme}
     >
       <ConnectionContext.Provider value={connectionValue}>
         {children}

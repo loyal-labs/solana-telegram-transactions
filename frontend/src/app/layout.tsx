@@ -39,9 +39,9 @@ export const metadata: Metadata = {
       "True private intelligence network: open-source privacy-preserving AI with confidential compute in TEE and attested runtimes.",
     images: [
       {
-        url: "/card1.jpg",
-        width: 1033,
-        height: 542,
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
         alt: "Loyal network visual",
       },
     ],
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
       "True private intelligence network: open-source privacy-preserving AI with confidential compute in TEE and attested runtimes.",
     images: [
       {
-        url: "/card2.jpg",
+        url: "/og-image.png",
         alt: "Loyal private intelligence preview",
       },
     ],

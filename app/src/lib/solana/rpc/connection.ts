@@ -17,6 +17,7 @@ import {
   TESTNET_RPC_WS,
 } from "./constants";
 import type { SolanaEnv } from "./types";
+import { attachWsDebugLogging } from "./ws-debug";
 
 export const getSolanaEnv = (): SolanaEnv => {
   if (typeof window !== "undefined") {
@@ -93,6 +94,7 @@ const connectionConfig = { commitment: "confirmed" as const };
 export const getConnection = (): Connection => {
   if (cachedConnection) return cachedConnection;
   cachedConnection = new Connection(rpcEndpoint, connectionConfig);
+  attachWsDebugLogging(cachedConnection, "app:solana:rpc");
   return cachedConnection;
 };
 
@@ -102,5 +104,6 @@ export const getWebsocketConnection = (): Connection => {
     ...connectionConfig,
     wsEndpoint: websocketEndpoint,
   });
+  attachWsDebugLogging(cachedWebsocketConnection, "app:solana:websocket");
   return cachedWebsocketConnection;
 };
