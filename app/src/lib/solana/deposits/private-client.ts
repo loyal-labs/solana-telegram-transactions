@@ -211,9 +211,17 @@ export const getPrivateClient = async ({
       const prevEphemeralOnError = ephemeralConn._wsOnError?.bind(
         cachedPrivateClient.ephemeralProgram.provider.connection
       );
+      // One-shot flag: prevents the stale handler on the old connection from
+      // firing invalidatePrivateClient() a second time if @solana/web3.js
+      // retries the WebSocket internally and receives another auth error.
+      let invalidationScheduled = false;
       ephemeralConn._wsOnError = (err: Error) => {
         prevEphemeralOnError?.(err);
-        if (/401|unauthorized|forbidden/i.test(err.message)) {
+        if (
+          !invalidationScheduled &&
+          /401|unauthorized|forbidden/i.test(err.message)
+        ) {
+          invalidationScheduled = true;
           void invalidatePrivateClient();
         }
       };
