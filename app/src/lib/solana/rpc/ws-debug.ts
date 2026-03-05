@@ -59,6 +59,7 @@ export const attachWsDebugLogging = (
   const originalOnClose = conn._wsOnClose?.bind(conn);
 
   if (!originalOnOpen && !originalOnError && !originalOnClose) {
+    conn.__wsDebugPatched = true;
     return;
   }
 
