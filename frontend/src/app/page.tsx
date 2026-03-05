@@ -1,5 +1,5 @@
 "use client";
-
+// light theme v1
 import { useChat } from "@ai-sdk/react";
 import { useAccounts, useModal, usePhantom } from "@phantom/react-sdk";
 import { DefaultChatTransport, type UIMessage } from "ai";
