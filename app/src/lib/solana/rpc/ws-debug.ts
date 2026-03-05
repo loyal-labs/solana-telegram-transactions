@@ -53,43 +53,35 @@ export const attachWsDebugLogging = (
   if (conn.__wsDebugPatched) {
     return;
   }
+  conn.__wsDebugPatched = true;
 
+  // Capture originals before overwriting — may be undefined at construction
+  // time since @solana/web3.js assigns them lazily on first _connect() call.
+  // We install wrappers unconditionally so they are in place before connect.
   const originalOnOpen = conn._wsOnOpen?.bind(conn);
   const originalOnError = conn._wsOnError?.bind(conn);
   const originalOnClose = conn._wsOnClose?.bind(conn);
 
-  if (!originalOnOpen && !originalOnError && !originalOnClose) {
-    conn.__wsDebugPatched = true;
-    return;
-  }
+  conn._wsOnOpen = () => {
+    console.log("[WS_DEBUG_OPEN]", getPayload(conn));
+    originalOnOpen?.();
+  };
 
-  conn.__wsDebugPatched = true;
+  conn._wsOnError = (error: Error) => {
+    console.error("[WS_DEBUG_ERROR]", {
+      ...getPayload(conn),
+      errorName: error?.name ?? "unknown",
+      errorMessage: getErrorMessage(error),
+      stack: error?.stack,
+    });
+    originalOnError?.(error);
+  };
 
-  if (originalOnOpen) {
-    conn._wsOnOpen = () => {
-      console.log("[WS_DEBUG_OPEN]", getPayload(conn));
-      originalOnOpen();
-    };
-  }
-
-  if (originalOnError) {
-    conn._wsOnError = (error: Error) => {
-      console.error("[WS_DEBUG_ERROR]", {
-        ...getPayload(conn),
-        errorName: error?.name ?? "unknown",
-        errorMessage: getErrorMessage(error),
-      });
-      originalOnError(error);
-    };
-  }
-
-  if (originalOnClose) {
-    conn._wsOnClose = (code: number) => {
-      console.warn("[WS_DEBUG_CLOSE]", {
-        ...getPayload(conn),
-        code,
-      });
-      originalOnClose(code);
-    };
-  }
+  conn._wsOnClose = (code: number) => {
+    console.warn("[WS_DEBUG_CLOSE]", {
+      ...getPayload(conn),
+      code,
+    });
+    originalOnClose?.(code);
+  };
 };

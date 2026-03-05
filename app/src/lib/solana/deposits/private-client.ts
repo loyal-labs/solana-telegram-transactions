@@ -199,9 +199,11 @@ export const getPrivateClient = async ({
         "app:private-client:ephemeral"
       );
 
-      // Invalidate the cached client when the ephemeral WebSocket errors
-      // (e.g. 401 from an expired token), so the next getPrivateClient() call
-      // re-fetches a fresh token and creates a new connection.
+      // Invalidate the cached client when the ephemeral WebSocket encounters an
+      // auth error (e.g. 401 from an expired token), so the next
+      // getPrivateClient() call re-fetches a fresh token and creates a new
+      // connection. Transient network errors are intentionally excluded to
+      // avoid unnecessary token-refresh churn during brief connectivity drops.
       const ephemeralConn = cachedPrivateClient.ephemeralProgram.provider
         .connection as unknown as {
         _wsOnError?: (err: Error) => void;
@@ -211,7 +213,9 @@ export const getPrivateClient = async ({
       );
       ephemeralConn._wsOnError = (err: Error) => {
         prevEphemeralOnError?.(err);
-        void invalidatePrivateClient();
+        if (/401|unauthorized|forbidden/i.test(err.message)) {
+          void invalidatePrivateClient();
+        }
       };
 
       return cachedPrivateClient;
