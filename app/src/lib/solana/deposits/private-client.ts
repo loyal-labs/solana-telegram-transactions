@@ -209,12 +209,10 @@ export const getPrivateClient = async ({
       const prevEphemeralOnError = ephemeralConn._wsOnError?.bind(
         cachedPrivateClient.ephemeralProgram.provider.connection
       );
-      if (prevEphemeralOnError) {
-        ephemeralConn._wsOnError = (err: Error) => {
-          prevEphemeralOnError(err);
-          void invalidatePrivateClient();
-        };
-      }
+      ephemeralConn._wsOnError = (err: Error) => {
+        prevEphemeralOnError?.(err);
+        void invalidatePrivateClient();
+      };
 
       return cachedPrivateClient;
     })();
