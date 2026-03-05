@@ -1,11 +1,28 @@
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 /**
- * TEE ER Validator
+ * TEE ER Validators
  */
-export const ER_VALIDATOR = new PublicKey(
+export const ER_VALIDATOR_DEVNET = new PublicKey(
   "FnE6VJT5QNZdedZPnCoLsARgBwoE6DeJNjBs2H1gySXA"
 );
+export const ER_VALIDATOR_MAINNET = new PublicKey(
+  "MTEWGuqxUpYZGFJQcp8tLN7x5v9BSeoFHYWQQ3n3xzo"
+);
+/**
+ * Backward-compatible alias (defaults to devnet validator).
+ */
+export const ER_VALIDATOR = ER_VALIDATOR_DEVNET;
+
+export function getErValidatorForSolanaEnv(env: string): PublicKey {
+  return env === "mainnet" ? ER_VALIDATOR_MAINNET : ER_VALIDATOR_DEVNET;
+}
+
+export function getErValidatorForRpcEndpoint(rpcEndpoint: string): PublicKey {
+  return rpcEndpoint.includes("mainnet-tee")
+    ? ER_VALIDATOR_MAINNET
+    : ER_VALIDATOR_DEVNET;
+}
 
 /**
  * Telegram Private Transfer program ID
