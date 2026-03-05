@@ -13,6 +13,7 @@ import {
   setCloudValue,
 } from "../../telegram/mini-app/cloud-storage";
 import { getEndpoints, getPerEndpoints, getSolanaEnv } from "../rpc/connection";
+import { attachWsDebugLogging } from "../rpc/ws-debug";
 import { getWalletKeypair, getWalletPublicKey } from "../wallet/wallet-details";
 
 const AUTH_TOKEN_REFRESH_BUFFER_MS = 60_000;
@@ -189,6 +190,32 @@ export const getPrivateClient = async ({
         ephemeralWsEndpoint: perWsEndpoint,
         authToken: authToken ?? undefined,
       });
+      attachWsDebugLogging(
+        cachedPrivateClient.baseProgram.provider.connection,
+        "app:private-client:base"
+      );
+      attachWsDebugLogging(
+        cachedPrivateClient.ephemeralProgram.provider.connection,
+        "app:private-client:ephemeral"
+      );
+
+      // Invalidate the cached client when the ephemeral WebSocket errors
+      // (e.g. 401 from an expired token), so the next getPrivateClient() call
+      // re-fetches a fresh token and creates a new connection.
+      const ephemeralConn = cachedPrivateClient.ephemeralProgram.provider
+        .connection as unknown as {
+        _wsOnError?: (err: Error) => void;
+      };
+      const prevEphemeralOnError = ephemeralConn._wsOnError?.bind(
+        cachedPrivateClient.ephemeralProgram.provider.connection
+      );
+      if (prevEphemeralOnError) {
+        ephemeralConn._wsOnError = (err: Error) => {
+          prevEphemeralOnError(err);
+          void invalidatePrivateClient();
+        };
+      }
+
       return cachedPrivateClient;
     })();
   }
