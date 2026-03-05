@@ -1768,43 +1768,41 @@ export default function LandingPage() {
                     : "transform 0.3s ease-out",
               }}
             >
-              {/* Ask Loyal logo - only visible when not in chat mode */}
+              {/* Logo + Ask loyal title - only visible when not in chat mode */}
               {!(isChatMode || isInputStuckToBottom) && (
-                <Image
-                  alt="Ask Loyal"
-                  height={64}
-                  src="/Askloyal.svg"
+                <div
                   style={{
-                    marginBottom: "32px",
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: "16px",
+                    marginBottom: "48px",
                     pointerEvents: "none",
                   }}
-                  width={307}
-                />
-              )}
-
-              {/* "Use skills" link - scrolls to top where TransactionWidget lives */}
-              {skillsEnabled && !isChatMode && isInputStuckToBottom && (
-                <button
-                  onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                  style={{
-                    pointerEvents: "auto",
-                    marginBottom: "8px",
-                    background: "none",
-                    border: "none",
-                    padding: "4px 0",
-                    cursor: "pointer",
-                    fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    color: "rgba(0, 0, 0, 0.4)",
-                    transition: "color 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(0, 0, 0, 0.7)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(0, 0, 0, 0.4)"; }}
-                  type="button"
                 >
-                  ↑ Use skills
-                </button>
+                  <Image
+                    alt="Loyal"
+                    height={48}
+                    src="/logo-web.svg"
+                    style={{ flexShrink: 0 }}
+                    width={60}
+                  />
+                  <h1
+                    style={{
+                      fontFamily: "var(--font-geist-sans), sans-serif",
+                      fontSize: "48px",
+                      fontWeight: 600,
+                      lineHeight: "none",
+                      letterSpacing: "-1.92px",
+                      color: "#000",
+                      whiteSpace: "nowrap",
+                      margin: 0,
+                      flexShrink: 0,
+                    }}
+                  >
+                    Ask loyal
+                  </h1>
+                </div>
               )}
 
               {/* Input form - liquid glass style with integrated send button */}

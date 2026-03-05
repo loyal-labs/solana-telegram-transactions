@@ -1,6 +1,5 @@
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
-import { GlowingEffect } from "./glowing-effect";
 
 export const BentoGrid = ({
   className,
@@ -11,7 +10,7 @@ export const BentoGrid = ({
 }) => (
   <div
     className={cn(
-      "mx-auto grid max-w-7xl grid-cols-1 gap-4 md:auto-rows-[18rem] md:grid-cols-3",
+      "mx-auto grid max-w-7xl grid-cols-1 gap-5 md:auto-rows-[360px] md:grid-cols-3",
       className
     )}
   >
@@ -24,7 +23,6 @@ export const BentoGridItem = ({
   title,
   description,
   header,
-  icon,
   animationDelay = 0,
 }: {
   className?: string;
@@ -45,31 +43,45 @@ export const BentoGridItem = ({
       ease: [0.4, 0, 0.2, 1],
     }}
   >
-    <div className="relative h-full rounded-2xl">
-      <GlowingEffect
-        blur={0}
-        borderWidth={3}
-        disabled={true}
-        glow={true}
-        inactiveZone={0.01}
-        proximity={64}
-        spread={40}
-      />
+    <div
+      className="flex h-full flex-col overflow-hidden"
+      style={{
+        background: "#F5F5F5",
+        borderRadius: "20px",
+      }}
+    >
+      {/* Placeholder area for future animated images */}
+      <div className="flex-1">{header}</div>
+      {/* Text content at the bottom */}
       <div
-        className="relative flex h-full flex-col justify-between space-y-4 overflow-hidden rounded-2xl p-4 transition duration-200"
         style={{
-          background: "rgba(255, 255, 255, 0.02)",
+          padding: "20px 32px 20px 20px",
         }}
       >
-        {header}
-        <div className="transition duration-200 group-hover/bento:translate-x-2">
-          {icon}
-          <div className="mt-2 mb-2 font-medium font-sans text-white/90">
-            {title}
-          </div>
-          <div className="font-normal font-sans text-white/50 text-xs">
-            {description}
-          </div>
+        <div
+          style={{
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "20px",
+            fontWeight: 500,
+            lineHeight: "24px",
+            color: "#000",
+            fontFeatureSettings: "'liga' off, 'clig' off",
+            marginBottom: "8px",
+          }}
+        >
+          {title}
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "16px",
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: "rgba(60, 60, 67, 0.6)",
+            fontFeatureSettings: "'liga' off, 'clig' off",
+          }}
+        >
+          {description}
         </div>
       </div>
     </div>

@@ -1,31 +1,7 @@
 "use client";
 
-import { IBM_Plex_Sans } from "next/font/google";
-import localFont from "next/font/local";
 import Image from "next/image";
 import { memo, useEffect, useState } from "react";
-
-const instrumentSerif = localFont({
-  src: [
-    {
-      path: "../../public/fonts/InstrumentSerif-Regular.woff2",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "../../public/fonts/InstrumentSerif-Italic.woff2",
-      weight: "400",
-      style: "italic",
-    },
-  ],
-  display: "swap",
-});
-
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  display: "swap",
-});
 
 interface BlogPost {
   title: string;
@@ -69,35 +45,37 @@ function BlogSectionComponent() {
     <section
       id="blog-section"
       style={{
-        padding: "4rem 1rem",
-        background: "#000",
+        padding: "64px 16px",
+        background: "#FFFFFF",
         position: "relative",
       }}
     >
       <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
         <h2
-          className={instrumentSerif.className}
           style={{
-            fontSize: "3.5rem",
-            fontWeight: 400,
-            color: "#fff",
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "48px",
+            fontWeight: 600,
+            lineHeight: "48px",
+            letterSpacing: "-0.96px",
+            color: "#000",
             textAlign: "center",
-            marginBottom: "1rem",
+            marginBottom: "20px",
           }}
         >
           Blog
         </h2>
         <p
-          className={instrumentSerif.className}
           style={{
-            fontSize: "1.5rem",
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "24px",
             fontWeight: 400,
-            color: "rgba(255, 255, 255, 0.8)",
+            lineHeight: "28px",
+            color: "rgba(60, 60, 67, 0.6)",
             textAlign: "center",
-            marginBottom: "3rem",
-            maxWidth: "800px",
-            margin: "0 auto 4rem",
-            lineHeight: 1.45,
+            maxWidth: "500px",
+            margin: "0 auto",
+            marginBottom: "48px",
           }}
         >
           Latest from our team
@@ -108,47 +86,42 @@ function BlogSectionComponent() {
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(3, 1fr)",
-            gap: "1.5rem",
+            gap: "20px",
           }}
         >
           {isLoading
             ? SKELETON_KEYS.map((key) => (
                 <div
-                  className={ibmPlexSans.className}
                   key={key}
                   style={{
-                    background: "rgba(38, 38, 38, 0.5)",
-                    backdropFilter: "blur(24px) saturate(180%)",
-                    WebkitBackdropFilter: "blur(24px) saturate(180%)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: "24px",
                     overflow: "hidden",
                   }}
                 >
                   <div
                     style={{
                       width: "100%",
-                      aspectRatio: "16 / 9",
-                      background: "rgba(255, 255, 255, 0.04)",
+                      aspectRatio: "386.67 / 242",
+                      background: "#F5F5F5",
+                      borderRadius: "24px",
                       animation: "pulse 2s ease-in-out infinite",
                     }}
                   />
-                  <div style={{ padding: "1.25rem" }}>
+                  <div style={{ padding: "20px 32px 16px 0" }}>
                     <div
                       style={{
-                        height: "1rem",
-                        width: "60%",
-                        background: "rgba(255, 255, 255, 0.06)",
+                        height: "20px",
+                        width: "80%",
+                        background: "#F5F5F5",
                         borderRadius: "8px",
-                        marginBottom: "0.75rem",
+                        marginBottom: "12px",
                         animation: "pulse 2s ease-in-out infinite",
                       }}
                     />
                     <div
                       style={{
-                        height: "0.75rem",
+                        height: "16px",
                         width: "35%",
-                        background: "rgba(255, 255, 255, 0.04)",
+                        background: "#F5F5F5",
                         borderRadius: "6px",
                         animation: "pulse 2s ease-in-out infinite",
                       }}
@@ -165,11 +138,6 @@ function BlogSectionComponent() {
                   style={{
                     display: "block",
                     textDecoration: "none",
-                    background: "rgba(38, 38, 38, 0.5)",
-                    backdropFilter: "blur(24px) saturate(180%)",
-                    WebkitBackdropFilter: "blur(24px) saturate(180%)",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderRadius: "24px",
                     overflow: "hidden",
                     transition: "all 0.3s ease",
                     cursor: "pointer",
@@ -180,9 +148,11 @@ function BlogSectionComponent() {
                     <div
                       style={{
                         width: "100%",
-                        aspectRatio: "16 / 9",
+                        aspectRatio: "386.67 / 242",
                         overflow: "hidden",
                         position: "relative",
+                        borderRadius: "24px",
+                        border: "1px solid rgba(0, 0, 0, 0.08)",
                       }}
                     >
                       <Image
@@ -199,29 +169,38 @@ function BlogSectionComponent() {
                     </div>
                   )}
                   <div
-                    className={ibmPlexSans.className}
-                    style={{ padding: "1.25rem" }}
+                    style={{
+                      padding: "20px 32px 16px 0",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px",
+                    }}
                   >
                     <h3
                       style={{
-                        fontSize: "1.05rem",
-                        fontWeight: 600,
-                        color: "rgba(255, 255, 255, 0.95)",
-                        lineHeight: 1.4,
-                        marginBottom: "0.625rem",
+                        fontFamily: "var(--font-geist-sans), sans-serif",
+                        fontSize: "20px",
+                        fontWeight: 500,
+                        lineHeight: "24px",
+                        color: "#000",
+                        fontFeatureSettings: "'liga' off, 'clig' off",
                         display: "-webkit-box",
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: "vertical",
                         overflow: "hidden",
+                        margin: 0,
                       }}
                     >
                       {post.title}
                     </h3>
                     <span
                       style={{
-                        fontSize: "0.8125rem",
+                        fontFamily: "var(--font-geist-sans), sans-serif",
+                        fontSize: "16px",
                         fontWeight: 400,
-                        color: "rgba(255, 255, 255, 0.45)",
+                        lineHeight: "20px",
+                        color: "rgba(60, 60, 67, 0.6)",
+                        fontFeatureSettings: "'liga' off, 'clig' off",
                       }}
                     >
                       {formatDate(post.pubDate)}
@@ -237,7 +216,6 @@ function BlogSectionComponent() {
           50% { opacity: 0.5; }
         }
         .blog-card:hover {
-          border-color: rgba(255, 255, 255, 0.15) !important;
           transform: translateY(-4px);
         }
         .blog-card:hover img {
@@ -246,7 +224,7 @@ function BlogSectionComponent() {
         @media (max-width: 767px) {
           .blog-grid {
             grid-template-columns: 1fr !important;
-            gap: 1rem !important;
+            gap: 16px !important;
           }
         }
         @media (min-width: 768px) and (max-width: 1023px) {

@@ -693,14 +693,14 @@
     color: rgba(0, 0, 0, 0.7) !important;
   }
 
-  /* Links */
-  a {
+  /* Links (scoped to streamdown markdown content) */
+  [data-streamdown] a {
     color: #000 !important;
     text-decoration: underline !important;
     text-underline-offset: 2px !important;
   }
 
-  a:hover {
+  [data-streamdown] a:hover {
     color: #3C3C43 !important;
   }
 
