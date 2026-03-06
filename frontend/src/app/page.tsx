@@ -1716,7 +1716,7 @@ export default function LandingPage() {
                     : "transform 0.3s ease-out",
               }}
             >
-              {/* Logo + Ask loyal title - only visible when not in chat mode */}
+              {/* Logo + Loyal title - only visible when not in chat mode */}
               {!(isChatMode || isInputStuckToBottom) && (
                 <div
                   style={{
@@ -1748,7 +1748,7 @@ export default function LandingPage() {
                       flexShrink: 0,
                     }}
                   >
-                    Ask loyal
+                    Loyal
                   </h1>
                 </div>
               )}
@@ -1829,7 +1829,7 @@ export default function LandingPage() {
                           isOnline
                             ? isChatMode && !isConnected
                               ? "Please reconnect wallet to continue..."
-                              : "Ask anything"
+                              : "Ask Loyal anything"
                             : "No internet connection..."
                         }
                         ref={inputRef}
