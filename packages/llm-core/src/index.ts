@@ -20,6 +20,11 @@ export type {
   RetryPolicy,
 } from "./types";
 export {
+  resolveLlmProviderConfig,
+  type ResolvedLlmProviderConfig,
+  type ResolveLlmProviderConfigParams,
+} from "./provider-config";
+export {
   assertValidationResult,
   getErrorMessage,
   normalizeWhitespace,

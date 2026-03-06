@@ -1,22 +1,16 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { resolveLlmProviderConfig } from "@loyal-labs/llm-core";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
-const customProvider = createOpenAICompatible({
-  baseURL: "https://api.redpill.ai/v1/",
-  name: "loyal-oracle",
-  headers: {
-    Authorization: `Bearer ${process.env.PHALA_API_KEY}`,
-  },
-});
-
-const MODEL_ID = process.env.PHALA_MODEL_ID?.trim() || "loyal-oracle";
-const loyalOracleModel = customProvider.languageModel(MODEL_ID);
+const DEFAULT_MODEL_ID = "loyal-oracle";
+const LOYAL_ORACLE_PROVIDER_NAME = "loyal-oracle";
+const REDPILL_API_BASE_URL = "https://api.redpill.ai/v1/";
 
 export async function POST(req: Request) {
-  if (!process.env.PHALA_API_KEY) {
+  if (!process.env.PHALA_API_KEY?.trim()) {
     console.error("Missing PHALA_API_KEY environment variable.");
     return new Response("Server misconfiguration", { status: 500 });
   }
@@ -26,8 +20,31 @@ export async function POST(req: Request) {
     return new Response("Invalid request payload", { status: 400 });
   }
 
+  const { config, model } = resolveLlmProviderConfig({
+    defaults: {
+      apiKey: process.env.PHALA_API_KEY,
+      model: DEFAULT_MODEL_ID,
+    },
+    overrides: {
+      model: process.env.PHALA_MODEL_ID,
+    },
+    provider: {
+      apiURL: REDPILL_API_BASE_URL,
+      name: "openai",
+    },
+  });
+
+  const customProvider = createOpenAICompatible({
+    baseURL: config.apiURL,
+    name: LOYAL_ORACLE_PROVIDER_NAME,
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      ...(config.headers ?? {}),
+    },
+  });
+
   const result = streamText({
-    model: loyalOracleModel,
+    model: customProvider.languageModel(model),
     system:
       "You are a helpful AI assistant for Loyal, a private intelligence platform.",
     messages: convertToModelMessages(messages),
