@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "generate-grpc": "buf generate src/lib/proto",
+    "prebuild": "bun run --cwd .. build:llm-packages",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
