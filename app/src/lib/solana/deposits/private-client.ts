@@ -25,8 +25,10 @@ type StoredPrivateAuthToken = {
   endpoint: string;
 };
 
-const getPrivateAuthTokenStorageKey = (publicKey: string): string =>
-  `${PRIVATE_AUTH_TOKEN_STORAGE_KEY_PREFIX}_${publicKey}`;
+const getPrivateAuthTokenStorageKey = (
+  publicKey: string,
+  solanaEnv: SolanaEnv,
+): string => `${PRIVATE_AUTH_TOKEN_STORAGE_KEY_PREFIX}_${publicKey}_${solanaEnv}`;
 
 const parseStoredPrivateAuthToken = (
   value: string,
@@ -54,8 +56,11 @@ const parseStoredPrivateAuthToken = (
   }
 };
 
-const isAuthTokenFresh = (token: StoredPrivateAuthToken): boolean => {
-  const { perRpcEndpoint } = getPerEndpoints(getSolanaEnv());
+const isAuthTokenFresh = (
+  token: StoredPrivateAuthToken,
+  solanaEnv: SolanaEnv,
+): boolean => {
+  const { perRpcEndpoint } = getPerEndpoints(solanaEnv);
   return (
     token.endpoint === perRpcEndpoint &&
     token.expiresAt > Date.now() + AUTH_TOKEN_REFRESH_BUFFER_MS
@@ -64,8 +69,9 @@ const isAuthTokenFresh = (token: StoredPrivateAuthToken): boolean => {
 
 const getCachedAuthToken = async (
   publicKey: string,
+  solanaEnv: SolanaEnv,
 ): Promise<{ token: string; expiresAt: number } | null> => {
-  const storageKey = getPrivateAuthTokenStorageKey(publicKey);
+  const storageKey = getPrivateAuthTokenStorageKey(publicKey, solanaEnv);
   const cachedValue = await getCloudValue(storageKey);
 
   if (typeof cachedValue !== "string" || !cachedValue) {
@@ -74,7 +80,7 @@ const getCachedAuthToken = async (
 
   const parsedToken = parseStoredPrivateAuthToken(cachedValue);
   if (!parsedToken) return null;
-  if (!isAuthTokenFresh(parsedToken)) return null;
+  if (!isAuthTokenFresh(parsedToken, solanaEnv)) return null;
 
   return {
     token: parsedToken.token,
@@ -82,8 +88,8 @@ const getCachedAuthToken = async (
   };
 };
 
-const verifyTeeIntegrity = (): void => {
-  const { perRpcEndpoint } = getPerEndpoints(getSolanaEnv());
+const verifyTeeIntegrity = (solanaEnv: SolanaEnv): void => {
+  const { perRpcEndpoint } = getPerEndpoints(solanaEnv);
   const t0 = performance.now();
   verifyTeeRpcIntegrity(perRpcEndpoint)
     .then((isVerified) => {
@@ -103,15 +109,16 @@ const verifyTeeIntegrity = (): void => {
 
 const fetchAndCacheAuthToken = async (
   keypair: Keypair,
+  solanaEnv: SolanaEnv,
 ): Promise<{ token: string; expiresAt: number } | null> => {
   try {
     // Fire-and-forget TEE integrity check; logs result but does not block callers
-    setTimeout(verifyTeeIntegrity, 10_000);
+    setTimeout(() => verifyTeeIntegrity(solanaEnv), 10_000);
 
     const signMessage = (message: Uint8Array): Promise<Uint8Array> =>
       Promise.resolve(sign.detached(message, keypair.secretKey));
 
-    const { perRpcEndpoint } = getPerEndpoints(getSolanaEnv());
+    const { perRpcEndpoint } = getPerEndpoints(solanaEnv);
     const t1 = performance.now();
     const authToken = await getAuthToken(
       perRpcEndpoint,
@@ -124,6 +131,7 @@ const fetchAndCacheAuthToken = async (
 
     const storageKey = getPrivateAuthTokenStorageKey(
       keypair.publicKey.toBase58(),
+      solanaEnv,
     );
     const persisted = await setCloudValue(
       storageKey,
@@ -156,6 +164,10 @@ const cachedPrivateClientPromises = new Map<
 export const invalidatePrivateClient = async (
   solanaEnv?: SolanaEnv,
 ): Promise<void> => {
+  const envsToInvalidate: SolanaEnv[] = solanaEnv
+    ? [solanaEnv]
+    : [...cachedPrivateClients.keys(), ...cachedPrivateClientPromises.keys()];
+
   if (solanaEnv) {
     cachedPrivateClients.delete(solanaEnv);
     cachedPrivateClientPromises.delete(solanaEnv);
@@ -166,8 +178,13 @@ export const invalidatePrivateClient = async (
 
   try {
     const publicKey = await getWalletPublicKey();
-    const storageKey = getPrivateAuthTokenStorageKey(publicKey.toBase58());
-    await deleteCloudValue(storageKey);
+    const pubKeyStr = publicKey.toBase58();
+    const uniqueEnvs = [...new Set(envsToInvalidate)];
+    await Promise.all(
+      uniqueEnvs.map((env) =>
+        deleteCloudValue(getPrivateAuthTokenStorageKey(pubKeyStr, env)),
+      ),
+    );
   } catch {
     // Best-effort: cloud storage clear may fail if wallet isn't available yet
   }
@@ -198,9 +215,10 @@ export const getPrivateClient = async ({
 
     const cachedAuthToken = await getCachedAuthToken(
       keypair.publicKey.toBase58(),
+      selectedSolanaEnv,
     );
     const authToken =
-      cachedAuthToken ?? (await fetchAndCacheAuthToken(keypair));
+      cachedAuthToken ?? (await fetchAndCacheAuthToken(keypair, selectedSolanaEnv));
     const privateClient = await LoyalPrivateTransactionsClient.fromConfig({
       signer: keypair,
       baseRpcEndpoint: rpcEndpoint,
