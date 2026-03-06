@@ -13,8 +13,8 @@ import {
   setCloudValue,
 } from "../../telegram/mini-app/cloud-storage";
 import { getEndpoints, getPerEndpoints, getSolanaEnv } from "../rpc/connection";
-import { attachWsDebugLogging } from "../rpc/ws-debug";
 import type { SolanaEnv } from "../rpc/types";
+import { attachWsDebugLogging } from "../rpc/ws-debug";
 import { getWalletKeypair, getWalletPublicKey } from "../wallet/wallet-details";
 
 const AUTH_TOKEN_REFRESH_BUFFER_MS = 60_000;
