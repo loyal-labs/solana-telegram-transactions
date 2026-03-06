@@ -18,7 +18,7 @@
         "tab": "Developers",
         "groups": [
           {
-            "group": "Private Transactions SDK",
+            "group": "Private Transactions",
             "pages": [
               "sdk/private-transactions/quick-start",
               "sdk/private-transactions/how-it-works",

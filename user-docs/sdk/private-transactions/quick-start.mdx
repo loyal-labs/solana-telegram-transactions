@@ -3,8 +3,6 @@ title: "Quick Start"
 description: "Quick start guide for Loyal's Private Transactions SDK"
 ---
 
-`@loyal-labs/private-transactions` is the SDK for private SPL token transfer flows backed by the `telegram-private-transfer` program and [MagicBlock Private Ephemeral Rollups (PER)](https://docs.magicblock.gg/pages/private-ephemeral-rollups-pers/introduction/authorization).
-
 ## Installation
 
 ```bash
@@ -86,7 +84,7 @@ await client.delegateDeposit({
 
 Your deposit is now private — only you can see it inside PER.
 
-## Private Transfer on PER
+## Private Transfers
 
 Transfer to another user by Telegram username. The destination username deposit must already exist and be delegated.
 
@@ -158,4 +156,4 @@ await client.modifyBalance({
 
 - Read [How It Works](/sdk/private-transactions/how-it-works) for the full base-layer + PER lifecycle and smart contract details.
 - See [API Reference](/sdk/private-transactions/reference) for all method signatures and types.
-- Use [CLI Guide](/sdk/private-transactions/cli) to execute the same flow via `bun scripts/telegram-private-transfer.ts`.
+- Use [CLI](/sdk/private-transactions/cli) to execute the same flow via `bun scripts/telegram-private-transfer.ts`.

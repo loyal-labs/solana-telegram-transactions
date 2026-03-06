@@ -11,6 +11,22 @@ The flow spans two execution domains:
 2. **MagicBlock PER** — execute private balance updates (transfers, claims) with sub-second latency inside TEE.
 3. **Commit back to base** — undelegate to finalize PER state on the base chain.
 
+## Lifecycle Diagram
+
+```
+┌─────────────── Base Solana ────────────────┐     ┌────── MagicBlock PER (TEE) ──────┐
+│                                            │     │                                   │
+│  1. initializeDeposit                      │     │                                   │
+│  2. modifyBalance (tokens → vault)         │     │                                   │
+│  3. createPermission                       │     │                                   │
+│  4. delegate ─────────────────────────────────►  │  5. transferDeposit               │
+│                                            │     │     transferToUsernameDeposit     │
+│                                            │     │     claimUsernameDepositToDeposit │
+│  7. modifyBalance (vault → tokens)   ◄────────── │  6. undelegate (commit)           │
+│                                            │     │                                   │
+└────────────────────────────────────────────┘     └───────────────────────────────────┘
+```
+
 ## Source of Truth
 
 | Component | Location |
@@ -109,22 +125,6 @@ All transfer operations happen on delegated accounts inside PER:
 - **Claim**: `claimUsernameDepositToDeposit` — recipient proves Telegram identity and claims to their deposit
 
 These only update `amount` fields — no actual token movement occurs until unshield.
-
-## Lifecycle Diagram
-
-```
-┌─────────────── Base Solana ────────────────┐     ┌────── MagicBlock PER (TEE) ──────┐
-│                                            │     │                                   │
-│  1. initializeDeposit                      │     │                                   │
-│  2. modifyBalance (tokens → vault)         │     │                                   │
-│  3. createPermission                       │     │                                   │
-│  4. delegate ─────────────────────────────────►  │  5. transferDeposit               │
-│                                            │     │     transferToUsernameDeposit     │
-│                                            │     │     claimUsernameDepositToDeposit │
-│  7. modifyBalance (vault → tokens)   ◄────────── │  6. undelegate (commit)           │
-│                                            │     │                                   │
-└────────────────────────────────────────────┘     └───────────────────────────────────┘
-```
 
 ## MagicBlock PER Integration
 
