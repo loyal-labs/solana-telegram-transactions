@@ -1748,7 +1748,7 @@ export default function LandingPage() {
                       flexShrink: 0,
                     }}
                   >
-                    Loyal
+                    loyal
                   </h1>
                 </div>
               )}
