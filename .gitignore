@@ -2,6 +2,7 @@
 
 # local-only config
 .superset/
+.planning/
 .mcp.json
 
 # dependencies
