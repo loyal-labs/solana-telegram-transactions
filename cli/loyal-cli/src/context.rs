@@ -142,6 +142,8 @@ pub(crate) fn build_context(cli: &Cli) -> Result<AppContext> {
         router_url,
         commitment,
         validator,
+        simulate: cli.simulate || cli.simulate_only,
+        simulate_only: cli.simulate_only,
     })
 }
 

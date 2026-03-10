@@ -43,6 +43,14 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) debug: bool,
 
+    /// Simulate the transaction before sending.
+    #[arg(long, global = true, conflicts_with = "simulate_only")]
+    pub(crate) simulate: bool,
+
+    /// Simulate only — do not send the transaction.
+    #[arg(long, global = true, conflicts_with = "simulate")]
+    pub(crate) simulate_only: bool,
+
     #[command(subcommand)]
     pub(crate) command: Command,
 }

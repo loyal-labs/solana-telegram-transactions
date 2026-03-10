@@ -24,7 +24,7 @@ use crate::{
     solana_ops::{
         account_owner_is, close_wsol_ata, ensure_ata_exists, fetch_deposit_amount,
         fetch_username_deposit_amount, get_account_opt, print_signature, send_ix,
-        wait_for_account_exists, wait_for_owner, wrap_sol_to_wsol,
+        send_ix_with_opts, wait_for_account_exists, wait_for_owner, wrap_sol_to_wsol,
     },
     types::{AppContext, DisplayResult, Target},
 };
@@ -141,7 +141,7 @@ pub(crate) fn cmd_delegate(ctx: &mut AppContext, args: &TargetArgs) -> Result<()
         } => {
             let ix =
                 build_delegate_deposit_ix(ctx.signer_pubkey, user, mint, deposit, ctx.validator);
-            send_ix(&ctx.base_client, &ctx.signer, ix)?
+            send_ix_with_opts(&ctx.base_client, &ctx.signer, ix, ctx.simulate, ctx.simulate_only)?
         }
         Target::UsernameDeposit {
             username,
@@ -155,7 +155,7 @@ pub(crate) fn cmd_delegate(ctx: &mut AppContext, args: &TargetArgs) -> Result<()
                 deposit,
                 ctx.validator,
             );
-            send_ix(&ctx.base_client, &ctx.signer, ix)?
+            send_ix_with_opts(&ctx.base_client, &ctx.signer, ix, ctx.simulate, ctx.simulate_only)?
         }
     };
 
@@ -173,7 +173,7 @@ pub(crate) fn cmd_undelegate(ctx: &mut AppContext, args: &UndelegateArgs) -> Res
             deposit,
         } => {
             let ix = build_undelegate_deposit_ix(ctx.signer_pubkey, user, deposit);
-            send_ix(&ctx.per_client, &ctx.signer, ix)?
+            send_ix_with_opts(&ctx.per_client, &ctx.signer, ix, ctx.simulate, ctx.simulate_only)?
         }
         Target::UsernameDeposit {
             username,
@@ -192,7 +192,7 @@ pub(crate) fn cmd_undelegate(ctx: &mut AppContext, args: &UndelegateArgs) -> Res
                 mint,
                 deposit,
             );
-            send_ix(&ctx.per_client, &ctx.signer, ix)?
+            send_ix_with_opts(&ctx.per_client, &ctx.signer, ix, ctx.simulate, ctx.simulate_only)?
         }
     };
 
