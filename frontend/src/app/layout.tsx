@@ -87,27 +87,6 @@ export default function RootLayout({
           strategy="afterInteractive"
         />
 
-        {/* Productlane Widget */}
-        <Script id="productlane-init" strategy="afterInteractive">
-          {`
-            (function(w){
-              const P=(w.Productlane={queue:{}});
-              ["set","open","close","toggle","on","off","init","enable","disable"].forEach(m=>{
-                P[m]=(n=>function(){P.queue[n]={args:arguments}})(m)
-              })
-            })(window);
-
-            Productlane.init({
-              widgetKey: "a1926941-a6d8-47b8-baa8-794d3f75303d",
-              position: "left"
-            });
-          `}
-        </Script>
-        <Script
-          crossOrigin="anonymous"
-          src="https://widget.productlane.com/latest.productlane-widget.min.js"
-          strategy="lazyOnload"
-        />
       </body>
     </html>
   );
