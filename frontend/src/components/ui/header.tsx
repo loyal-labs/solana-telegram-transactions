@@ -39,29 +39,20 @@ export function Header() {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "8px",
             background: "rgba(0, 0, 0, 0.04)",
             border: "none",
             borderRadius: "32px",
             cursor: "pointer",
             transition: "all 0.2s ease",
-            padding: "4px",
+            padding: "8px 16px",
           }}
         >
-          <img
-            alt="Wallet"
-            height={28}
-            src="/Wallet-Icon.svg"
-            style={{ borderRadius: "9999px" }}
-            width={28}
-          />
           <span
             style={{
               fontSize: "14px",
               fontWeight: 400,
               lineHeight: "20px",
               color: "#000",
-              paddingRight: "12px",
             }}
           >
             {isConnected && truncatedAddress ? truncatedAddress : "Sign In"}

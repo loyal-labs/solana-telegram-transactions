@@ -8,7 +8,6 @@ import {
   ArrowUpToLine,
   MoreHorizontal,
   RefreshCw,
-  ShieldQuestionMark,
   X,
 } from "lucide-react";
 import { IBM_Plex_Sans, Plus_Jakarta_Sans } from "next/font/google";
@@ -816,14 +815,6 @@ export default function LandingPage() {
                     isLinks: true,
                   },
                   { label: "Docs", href: "https://docs.askloyal.com/" },
-                  {
-                    label: "Changelog",
-                    onClick: () => {
-                      if (typeof window !== "undefined" && window.Productlane) {
-                        window.Productlane.open("CHANGELOG");
-                      }
-                    },
-                  },
                 ].map((item, index) => (
                   <button
                     key={item.label}
@@ -1048,31 +1039,6 @@ export default function LandingPage() {
                   />
                 </button>
 
-                {/* Feedback Button */}
-                <button
-                  className="sidebar-icon-btn"
-                  onClick={() => {
-                    if (typeof window !== "undefined" && window.Productlane) {
-                      window.Productlane.open("INDEX");
-                    }
-                  }}
-                  style={{
-                    width: "36px",
-                    height: "36px",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    background: "rgba(0, 0, 0, 0.04)",
-                    border: "none",
-                    borderRadius: "9999px",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    color: "#3C3C43",
-                  }}
-                  title="Feedback and support"
-                >
-                  <ShieldQuestionMark size={24} strokeWidth={2} />
-                </button>
               </div>
 
             </div>
