@@ -1,13 +1,15 @@
 # passkey
 
-Standalone Next.js workspace for Squads Grid passkey WebAuthn proxy flow on a custom domain.
+Standalone Next.js workspace for Squads Grid passkey WebAuthn flows shared across
+`askloyal.com` and all `*.askloyal.com` subdomains.
 
 ## What this workspace owns
 
 - Passkey session endpoints proxying (`create`, `authorize`, `submit`)
 - Passkey account endpoints proxying (`create`, `find`, `get`)
-- Minimal browser ceremony pages for `create` and `auth`
-- Custom-domain forwarding requirements (cookies/origin passthrough)
+- Browser ceremony pages for `/continue`, `/create`, and `/auth`
+- Request-host-aware Grid forwarding (origin/cookie passthrough)
+- Explicit WebAuthn RP ID resolution for shared subdomain credentials
 
 ## Environment
 
@@ -15,7 +17,9 @@ Copy `.env.example` to `.env.local`:
 
 ```bash
 PASSKEY_GRID_ENVIRONMENT=sandbox
-PASSKEY_CUSTOM_DOMAIN_BASE_URL=https://passkey.example.com
+PASSKEY_ALLOWED_PARENT_DOMAIN=askloyal.com
+PASSKEY_ALLOW_LOCALHOST=true
+NEXT_PUBLIC_PASSKEY_RP_ID=askloyal.com
 PASSKEY_GRID_API_BASE_URL=https://grid.squads.xyz
 PASSKEY_APP_NAME=askloyal
 ```
@@ -25,6 +29,21 @@ Optional:
 ```bash
 PASSKEY_GRID_API_KEY=<grid_api_key>
 ```
+
+## Host and RP behavior
+
+- `askloyal.com` and any `*.askloyal.com` host are allowed.
+- All allowed `askloyal.com` hosts share the RP ID `askloyal.com`, so one
+  passkey can be reused across those subdomains.
+- `localhost` is supported as a separate dev-only passkey realm when
+  `PASSKEY_ALLOW_LOCALHOST=true`.
+- `localhost` passkeys do not work on `askloyal.com`, and `askloyal.com`
+  passkeys do not work on `localhost`.
+- Unrelated root domains and `127.0.0.1` are not supported by this workspace.
+
+The proxy derives `baseUrl` from the incoming request origin for allowed hosts,
+so `app.askloyal.com` and `admin.askloyal.com` each get their own callback base
+URL while still sharing the same WebAuthn RP ID.
 
 ## Commands
 

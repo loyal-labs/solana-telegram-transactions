@@ -19,32 +19,24 @@ export type PasskeyCreateCeremonyInput = {
 
 export type PasskeyAuthCeremonyInput = {
   challenge: string;
+  rpId?: string;
+  allowCredentialId?: string;
+  publicKey?: string;
   timeoutMs?: number;
 };
 
 export type NormalizedCreateAuthenticatorResponse = {
-  id: string;
   rawId: string;
-  type: string;
-  response: {
-    clientDataJSON: string;
-    attestationObject: string;
-    authenticatorData?: string;
-    publicKey?: string;
-    publicKeyAlgorithm?: number;
-    transports?: string[];
-  };
+  credentialId: string;
+  publicKey: string;
 };
 
 export type NormalizedAuthAuthenticatorResponse = {
-  id: string;
-  rawId: string;
-  type: string;
   response: {
     clientDataJSON: string;
     authenticatorData: string;
     signature: string;
-    userHandle: string | null;
+    publicKey?: string;
   };
 };
 
@@ -105,22 +97,15 @@ export async function runCreatePasskeyCeremony(
   const response =
     credential.response as unknown as AttestationResponseWithExtensions;
   const publicKey = response.getPublicKey?.();
-  const authenticatorData = response.getAuthenticatorData?.();
+
+  if (!publicKey) {
+    throw new Error("Browser did not return a passkey public key");
+  }
 
   return {
-    id: credential.id,
     rawId: arrayBufferToBase64Url(credential.rawId),
-    type: credential.type,
-    response: {
-      clientDataJSON: arrayBufferToBase64Url(response.clientDataJSON),
-      attestationObject: arrayBufferToBase64Url(response.attestationObject),
-      authenticatorData: authenticatorData
-        ? arrayBufferToBase64Url(authenticatorData)
-        : undefined,
-      publicKey: publicKey ? arrayBufferToBase64Url(publicKey) : undefined,
-      publicKeyAlgorithm: response.getPublicKeyAlgorithm?.(),
-      transports: response.getTransports?.(),
-    },
+    credentialId: credential.id,
+    publicKey: arrayBufferToBase64Url(publicKey),
   };
 }
 
@@ -132,11 +117,28 @@ export async function runAuthPasskeyCeremony(
     challengeBytes.byteOffset,
     challengeBytes.byteOffset + challengeBytes.byteLength
   ) as ArrayBuffer;
+  const allowCredentialId = input.allowCredentialId
+    ? base64UrlToUint8Array(input.allowCredentialId)
+    : null;
 
   const credential = ensurePublicKeyCredential(
     await navigator.credentials.get({
       publicKey: {
         challenge,
+        ...(allowCredentialId
+          ? {
+              allowCredentials: [
+                {
+                  id: allowCredentialId.buffer.slice(
+                    allowCredentialId.byteOffset,
+                    allowCredentialId.byteOffset + allowCredentialId.byteLength
+                  ) as ArrayBuffer,
+                  type: "public-key" as const,
+                },
+              ],
+            }
+          : {}),
+        rpId: input.rpId,
         userVerification: "required",
         timeout: input.timeoutMs ?? 60_000,
       },
@@ -145,16 +147,11 @@ export async function runAuthPasskeyCeremony(
 
   const response = credential.response as AuthenticatorAssertionResponse;
   return {
-    id: credential.id,
-    rawId: arrayBufferToBase64Url(credential.rawId),
-    type: credential.type,
     response: {
       clientDataJSON: arrayBufferToBase64Url(response.clientDataJSON),
       authenticatorData: arrayBufferToBase64Url(response.authenticatorData),
       signature: arrayBufferToBase64Url(response.signature),
-      userHandle: response.userHandle
-        ? arrayBufferToBase64Url(response.userHandle)
-        : null,
+      ...(input.publicKey ? { publicKey: input.publicKey } : {}),
     },
   };
 }

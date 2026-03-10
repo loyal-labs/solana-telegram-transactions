@@ -11,6 +11,10 @@ import {
   passkeyApiPaths,
   submitSessionRequestSchema,
 } from "@/lib/passkeys/contracts";
+import {
+  PasskeyHostResolutionError,
+  resolvePasskeyRequestContext,
+} from "@/lib/passkeys/host-resolution";
 
 type PasskeyOperation =
   | "createSession"
@@ -62,6 +66,7 @@ type PrepareProxyRequestArgs = {
   operation: PasskeyOperation;
   body?: unknown;
   passkeyAddress?: string;
+  requestUrl: string;
   incomingHeaders: Headers;
   config: PasskeyServerConfig;
 };
@@ -196,7 +201,8 @@ function buildForwardHeaders(
 function withCustomDomainDefaults(
   operation: PasskeyOperation,
   body: unknown,
-  config: PasskeyServerConfig
+  config: PasskeyServerConfig,
+  resolvedOrigin: string
 ): unknown {
   if (typeof body !== "object" || body === null) {
     return body;
@@ -211,7 +217,7 @@ function withCustomDomainDefaults(
     const resolvedBaseUrl =
       typeof payload.baseUrl === "string" && payload.baseUrl.length > 0
         ? payload.baseUrl
-        : config.customDomainBaseUrl;
+        : resolvedOrigin;
 
     return {
       ...payload,
@@ -239,7 +245,7 @@ function withCustomDomainDefaults(
 
     return {
       ...payload,
-      baseUrl: config.customDomainBaseUrl,
+      baseUrl: resolvedOrigin,
       metaInfo: {
         ...metaInfo,
         appName:
@@ -261,6 +267,16 @@ export function preparePasskeyUpstreamRequest(
     throw new ProxyValidationError("Unknown passkey operation", [args.operation]);
   }
 
+  const resolvedRequestContext = resolvePasskeyRequestContext({
+    requestUrl: args.requestUrl,
+    headers: args.incomingHeaders,
+    options: {
+      allowedParentDomain: args.config.allowedParentDomain,
+      allowLocalhost: args.config.allowLocalhost,
+      sharedRpId: args.config.sharedRpId,
+    },
+  });
+
   let validatedBody: unknown;
   if (definition.method === "POST") {
     if (!definition.schema) {
@@ -278,7 +294,8 @@ export function preparePasskeyUpstreamRequest(
     validatedBody = withCustomDomainDefaults(
       args.operation,
       parseResult.data,
-      args.config
+      args.config,
+      resolvedRequestContext.origin
     );
   } else if (args.operation === "getAccount") {
     const parsed = passkeyAccountParamSchema.safeParse({
@@ -404,6 +421,7 @@ export async function proxyPasskeyOperation({
       operation,
       body,
       passkeyAddress,
+      requestUrl: request.url,
       incomingHeaders: request.headers,
       config,
     });
@@ -416,6 +434,13 @@ export async function proxyPasskeyOperation({
         code: "invalid_request",
         message: error.message,
         details: error.details,
+      });
+    }
+
+    if (error instanceof PasskeyHostResolutionError) {
+      return createProxyErrorResponse(400, {
+        code: "invalid_request",
+        message: error.message,
       });
     }
 

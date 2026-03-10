@@ -14,18 +14,22 @@ export default function HomePage() {
     <main>
       <h1 style={{ fontSize: 28, marginBottom: 10 }}>Passkey Proxy Workspace</h1>
       <p style={{ lineHeight: 1.5, marginBottom: 20 }}>
-        This app owns the Squads Grid passkey WebAuthn proxy flow on a custom
-        domain.
+        This app owns the Squads Grid passkey WebAuthn proxy flow for
+        `askloyal.com`, all `*.askloyal.com` subdomains, and an optional
+        separate `localhost` dev realm.
       </p>
 
       <section style={cardStyle}>
         <h2 style={{ fontSize: 18, marginTop: 0 }}>Flow Pages</h2>
         <ul style={{ paddingLeft: 20 }}>
           <li>
-            <Link href="/create">/create</Link>
+            <Link href="/continue">/continue</Link> (primary)
           </li>
           <li>
-            <Link href="/auth">/auth</Link>
+            <Link href="/auth">/auth</Link> (legacy/debug)
+          </li>
+          <li>
+            <Link href="/create">/create</Link> (legacy/debug)
           </li>
         </ul>
       </section>

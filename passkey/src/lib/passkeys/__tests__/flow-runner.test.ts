@@ -8,14 +8,20 @@ import {
 
 describe("buildPasskeyFlowRequest", () => {
   test("builds create flow request payload", async () => {
-    const createCredentials = mock(async () => ({
-      id: new ArrayBuffer(8),
-      publicKey: "public-key",
+    const resolveHostContext = mock(() => ({
+      hostname: "app.askloyal.com",
+      origin: "https://app.askloyal.com",
+      rpId: "askloyal.com",
+      isLocalhost: false,
+    })) as FlowRunnerDependencies["resolveHostContext"];
+    const runCreateCeremony = mock(async () => ({
+      rawId: "raw-credential-id",
       credentialId: "credential-id",
-    })) as FlowRunnerDependencies["createCredentials"];
-    const getCredentials = mock(async () => ({
+      publicKey: "public-key",
+    })) as FlowRunnerDependencies["runCreateCeremony"];
+    const runAuthCeremony = mock(async () => ({
       response: { signature: "sig" },
-    })) as FlowRunnerDependencies["getCredentials"];
+    })) as FlowRunnerDependencies["runAuthCeremony"];
 
     const sessionKey = bs58.encode(Uint8Array.from([1, 2, 3, 4]));
     const request = await buildPasskeyFlowRequest(
@@ -29,8 +35,9 @@ describe("buildPasskeyFlowRequest", () => {
         userId: "tg-user",
       },
       {
-        createCredentials,
-        getCredentials,
+        resolveHostContext,
+        runCreateCeremony,
+        runAuthCeremony,
       }
     );
 
@@ -40,19 +47,35 @@ describe("buildPasskeyFlowRequest", () => {
       slotNumber: 10,
       sessionKey: { expiration: 900 },
     });
-    expect(createCredentials).toHaveBeenCalledTimes(1);
-    expect(getCredentials).toHaveBeenCalledTimes(1);
+    expect(runCreateCeremony).toHaveBeenCalledTimes(1);
+    expect(runCreateCeremony.mock.calls[0]?.[0]).toMatchObject({
+      rpId: "askloyal.com",
+      appName: "askloyal",
+      userId: "tg-user",
+    });
+    expect(runAuthCeremony).toHaveBeenCalledTimes(1);
+    expect(runAuthCeremony.mock.calls[0]?.[0]).toMatchObject({
+      rpId: "askloyal.com",
+      allowCredentialId: "raw-credential-id",
+      publicKey: "public-key",
+    });
   });
 
   test("builds auth flow request payload", async () => {
-    const createCredentials = mock(async () => ({
-      id: new ArrayBuffer(8),
+    const resolveHostContext = mock(() => ({
+      hostname: "localhost",
+      origin: "http://localhost:3000",
+      rpId: "localhost",
+      isLocalhost: true,
+    })) as FlowRunnerDependencies["resolveHostContext"];
+    const runCreateCeremony = mock(async () => ({
+      rawId: "unused",
+      credentialId: "unused",
       publicKey: "public-key",
-      credentialId: "credential-id",
-    })) as FlowRunnerDependencies["createCredentials"];
-    const getCredentials = mock(async () => ({
+    })) as FlowRunnerDependencies["runCreateCeremony"];
+    const runAuthCeremony = mock(async () => ({
       response: { signature: "sig" },
-    })) as FlowRunnerDependencies["getCredentials"];
+    })) as FlowRunnerDependencies["runAuthCeremony"];
 
     const sessionKey = bs58.encode(Uint8Array.from([9, 8, 7, 6]));
     const request = await buildPasskeyFlowRequest(
@@ -64,8 +87,9 @@ describe("buildPasskeyFlowRequest", () => {
         expirationInSeconds: 1200,
       },
       {
-        createCredentials,
-        getCredentials,
+        resolveHostContext,
+        runCreateCeremony,
+        runAuthCeremony,
       }
     );
 
@@ -75,19 +99,28 @@ describe("buildPasskeyFlowRequest", () => {
       slotNumber: 99,
       sessionKey: { expiration: 1200 },
     });
-    expect(createCredentials).toHaveBeenCalledTimes(0);
-    expect(getCredentials).toHaveBeenCalledTimes(1);
+    expect(runCreateCeremony).toHaveBeenCalledTimes(0);
+    expect(runAuthCeremony).toHaveBeenCalledTimes(1);
+    expect(runAuthCeremony.mock.calls[0]?.[0]).toMatchObject({
+      rpId: "localhost",
+    });
   });
 
-  test("normalizes URL-safe challenge before passing to SDK helpers", async () => {
-    const createCredentials = mock(async () => ({
-      id: new ArrayBuffer(8),
-      publicKey: "public-key",
+  test("normalizes challenge before passing to local ceremony helpers", async () => {
+    const resolveHostContext = mock(() => ({
+      hostname: "app.askloyal.com",
+      origin: "https://app.askloyal.com",
+      rpId: "askloyal.com",
+      isLocalhost: false,
+    })) as FlowRunnerDependencies["resolveHostContext"];
+    const runCreateCeremony = mock(async () => ({
+      rawId: "raw-credential-id",
       credentialId: "credential-id",
-    })) as FlowRunnerDependencies["createCredentials"];
-    const getCredentials = mock(async () => ({
+      publicKey: "public-key",
+    })) as FlowRunnerDependencies["runCreateCeremony"];
+    const runAuthCeremony = mock(async () => ({
       response: { signature: "sig" },
-    })) as FlowRunnerDependencies["getCredentials"];
+    })) as FlowRunnerDependencies["runAuthCeremony"];
 
     const sessionKey = bs58.encode(Uint8Array.from([1, 2, 3, 4]));
     await buildPasskeyFlowRequest(
@@ -101,14 +134,15 @@ describe("buildPasskeyFlowRequest", () => {
         userId: "tg-user",
       },
       {
-        createCredentials,
-        getCredentials,
+        resolveHostContext,
+        runCreateCeremony,
+        runAuthCeremony,
       }
     );
 
-    const createCall = createCredentials.mock.calls[0]?.[0] as
+    const createCall = runCreateCeremony.mock.calls[0]?.[0] as
       | { challenge?: string }
       | undefined;
-    expect(createCall?.challenge).toBe("a+b/c===");
+    expect(createCall?.challenge).toBe("a-b_c");
   });
 });

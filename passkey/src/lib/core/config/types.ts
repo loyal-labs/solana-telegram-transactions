@@ -2,7 +2,9 @@ export type PasskeyGridEnvironment = "sandbox" | "production";
 
 export type PasskeyServerConfig = {
   gridEnvironment: PasskeyGridEnvironment;
-  customDomainBaseUrl: string;
+  allowedParentDomain: string;
+  allowLocalhost: boolean;
+  sharedRpId: string;
   gridApiBaseUrl: string;
   appName: string;
   gridApiKey?: string;

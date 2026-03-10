@@ -8,7 +8,11 @@ import {
 import {
   toSessionKeyBackendObject,
 } from "@/lib/passkeys/session-key";
-import { getGridBrowserSdkClient } from "@/lib/passkeys/grid-browser-sdk";
+import { resolveCurrentPasskeyBrowserContext } from "@/lib/passkeys/host-resolution";
+import {
+  runAuthPasskeyCeremony,
+  runCreatePasskeyCeremony,
+} from "@/lib/passkeys/webauthn";
 import type { Env } from "@sqds/grid";
 
 export type PasskeyFlowMode = "create" | "auth";
@@ -39,22 +43,19 @@ const flowRegistry: {
 };
 
 export type FlowRunnerDependencies = {
-  createCredentials: ReturnType<
-    typeof getGridBrowserSdkClient
-  >["createPasskeyCredentials"];
-  getCredentials: ReturnType<typeof getGridBrowserSdkClient>["getPasskeyCredentials"];
+  resolveHostContext: typeof resolveCurrentPasskeyBrowserContext;
+  runCreateCeremony: typeof runCreatePasskeyCeremony;
+  runAuthCeremony: typeof runAuthPasskeyCeremony;
 };
 
 const defaultFlowRunnerDependencies: FlowRunnerDependencies = {
-  createCredentials: (...args) =>
-    getGridBrowserSdkClient().createPasskeyCredentials(...args),
-  getCredentials: (...args) => getGridBrowserSdkClient().getPasskeyCredentials(...args),
+  resolveHostContext: () => resolveCurrentPasskeyBrowserContext(),
+  runCreateCeremony: (...args) => runCreatePasskeyCeremony(...args),
+  runAuthCeremony: (...args) => runAuthPasskeyCeremony(...args),
 };
 
-function normalizeChallengeForSdk(challenge: string): string {
-  const urlNormalized = challenge.trim().replace(/ /g, "+").replace(/-/g, "+").replace(/_/g, "/");
-  const paddingNeeded = (4 - (urlNormalized.length % 4)) % 4;
-  return urlNormalized + "=".repeat(paddingNeeded);
+function normalizeChallenge(challenge: string): string {
+  return challenge.trim().replace(/ /g, "+");
 }
 
 function toSharedPasskeyRequest(
@@ -68,7 +69,7 @@ function toSharedPasskeyRequest(
         : "devnet";
 
   return {
-    challenge: normalizeChallengeForSdk(parsed.challenge),
+    challenge: normalizeChallenge(parsed.challenge),
     env: gridEnv,
     expirationInSeconds: String(parsed.expirationInSeconds),
     redirectUrl: parsed.redirectUrl,
@@ -90,6 +91,7 @@ export async function buildPasskeyFlowRequest(
   dependencies: FlowRunnerDependencies = defaultFlowRunnerDependencies
 ): Promise<PasskeyFlowRequest> {
   const sharedRequest = toSharedPasskeyRequest(parsed);
+  const hostContext = dependencies.resolveHostContext();
 
   if (mode === "create") {
     const createParsed = parsed as ParsedCreatePasskeyQuery;
@@ -99,11 +101,18 @@ export async function buildPasskeyFlowRequest(
       userId: createParsed.userId,
     };
 
-    const credentialData = await dependencies.createCredentials(createRequest);
-    const assertion = await dependencies.getCredentials(
-      createRequest,
-      credentialData
-    );
+    const credentialData = await dependencies.runCreateCeremony({
+      challenge: createRequest.challenge,
+      appName: createRequest.appName,
+      userId: createRequest.userId,
+      rpId: hostContext.rpId,
+    });
+    const assertion = await dependencies.runAuthCeremony({
+      challenge: createRequest.challenge,
+      rpId: hostContext.rpId,
+      allowCredentialId: credentialData.rawId,
+      publicKey: credentialData.publicKey,
+    });
 
     return {
       endpoint: "/api/passkeys/session/submit",
@@ -120,7 +129,10 @@ export async function buildPasskeyFlowRequest(
   }
 
   const authParsed = parsed as ParsedAuthPasskeyQuery;
-  const assertion = await dependencies.getCredentials(sharedRequest);
+  const assertion = await dependencies.runAuthCeremony({
+    challenge: sharedRequest.challenge,
+    rpId: hostContext.rpId,
+  });
 
   return {
     endpoint: "/api/passkeys/session/submit",
