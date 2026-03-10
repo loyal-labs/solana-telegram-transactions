@@ -35,7 +35,7 @@ import {
   SourcesTrigger,
 } from "@/components/ai-elements/source";
 import { TopicsSidebar } from "@/components/ai-elements/topics-sidebar";
-import { useConnection } from "@/components/solana/phantom-provider";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { useAnchorWallet } from "@/hooks/use-anchor-wallet";
 import { mapChatsToTopics } from "@/lib/chat/topic-utils";
 import { GrpcChatTransport } from "@/lib/query/transport";

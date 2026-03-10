@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 
-import { useConnection } from "@/components/solana/phantom-provider";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { useAnchorWallet } from "@/hooks/use-anchor-wallet";
 import {
   fetchAllUserChats,

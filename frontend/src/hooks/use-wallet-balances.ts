@@ -1,8 +1,9 @@
-import { useAccounts, usePhantom } from "@phantom/react-sdk";
+import {
+  useConnection,
+  useWallet,
+} from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useState } from "react";
-
-import { useConnection } from "@/components/solana/phantom-provider";
 
 export type TokenBalance = {
   symbol: string;
@@ -34,19 +35,15 @@ const KNOWN_TOKENS: Record<string, { symbol: string; decimals: number }> = {
 
 export function useWalletBalances() {
   const { connection } = useConnection();
-  const { isConnected } = usePhantom();
-  const accounts = useAccounts();
+  const { connected, publicKey } = useWallet();
   const [balances, setBalances] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get Solana address from accounts
-  const solanaAddress = accounts?.find(
-    (acc) => acc.addressType === "Solana"
-  )?.address;
+  const solanaAddress = publicKey?.toBase58();
 
   const fetchBalances = useCallback(async () => {
-    if (!(isConnected && solanaAddress)) {
+    if (!(connected && solanaAddress)) {
       setBalances([]);
       return;
     }
@@ -55,11 +52,11 @@ export function useWalletBalances() {
     setError(null);
 
     try {
-      const publicKey = new PublicKey(solanaAddress);
+      const pubkey = new PublicKey(solanaAddress);
       const tokenBalances: TokenBalance[] = [];
 
       // Fetch SOL balance
-      const solBalance = await connection.getBalance(publicKey);
+      const solBalance = await connection.getBalance(pubkey);
       if (solBalance > 0) {
         tokenBalances.push({
           symbol: "SOL",
@@ -71,7 +68,7 @@ export function useWalletBalances() {
 
       // Fetch SPL token balances
       const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-        publicKey,
+        pubkey,
         {
           programId: new PublicKey(
             "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
@@ -109,7 +106,7 @@ export function useWalletBalances() {
       console.error("Error fetching wallet balances:", err);
       setLoading(false);
     }
-  }, [isConnected, solanaAddress, connection]);
+  }, [connected, solanaAddress, connection]);
 
   // Fetch balances when wallet connects
   useEffect(() => {
@@ -120,7 +117,7 @@ export function useWalletBalances() {
     balances,
     loading,
     error,
-    isConnected: Boolean(isConnected && solanaAddress),
+    isConnected: Boolean(connected && solanaAddress),
     refetch: fetchBalances,
   };
 }

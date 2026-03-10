@@ -2,7 +2,10 @@ import {
   LoyalTransactionsClient,
   solToLamports,
 } from "@loyal-labs/transactions";
-import { usePhantom, useSolana } from "@phantom/react-sdk";
+import {
+  useConnection,
+  useWallet,
+} from "@solana/wallet-adapter-react";
 import {
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
@@ -19,8 +22,6 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { useCallback, useState } from "react";
-
-import { useConnection } from "@/components/solana/phantom-provider";
 
 export type SendResult = {
   signature?: string;
@@ -58,8 +59,7 @@ const getTokenMint = (symbol: string): string | undefined => {
 
 export function useSend() {
   const { connection } = useConnection();
-  const { solana, isAvailable } = useSolana();
-  const { isConnected } = usePhantom();
+  const { publicKey: walletPublicKey, connected: isConnected, signTransaction, sendTransaction } = useWallet();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,7 +72,7 @@ export function useSend() {
       tokenMint?: string,
       tokenDecimals?: number
     ): Promise<SendResult> => {
-      if (!(isConnected && isAvailable && solana)) {
+      if (!(isConnected && walletPublicKey)) {
         const error = "Wallet not connected";
         setError(error);
         return { success: false, error };
@@ -89,16 +89,7 @@ export function useSend() {
           destinationType,
         });
 
-        // Prefer the current public key; reconnect if the provider needs refresh.
-        let publicKeyString = solana.publicKey;
-        if (!publicKeyString) {
-          const connectionResult = await solana.connect();
-          publicKeyString = connectionResult.publicKey;
-        }
-        if (!publicKeyString) {
-          throw new Error("Failed to get public key from wallet");
-        }
-        const publicKey = new PublicKey(publicKeyString);
+        const publicKey = walletPublicKey;
 
         const isSol = currency.toUpperCase() === "SOL";
 
@@ -114,17 +105,20 @@ export function useSend() {
             amount,
           });
 
+          if (!signTransaction) {
+            throw new Error(
+              "signTransaction is not available. This feature requires a wallet that supports transaction signing."
+            );
+          }
+
           // Create wallet adapter for the SDK
           const walletAdapter = {
             publicKey,
-            signTransaction: async <
+            signTransaction: signTransaction as <
               T extends Transaction | VersionedTransaction,
             >(
               tx: T
-            ): Promise<T> => {
-              const signed = await solana.signTransaction(tx);
-              return signed as T;
-            },
+            ) => Promise<T>,
             signAllTransactions: async <
               T extends Transaction | VersionedTransaction,
             >(
@@ -132,8 +126,8 @@ export function useSend() {
             ): Promise<T[]> => {
               const signedTxs: T[] = [];
               for (const tx of txs) {
-                const signed = await solana.signTransaction(tx);
-                signedTxs.push(signed as T);
+                const signed = (await signTransaction(tx)) as T;
+                signedTxs.push(signed);
               }
               return signedTxs;
             },
@@ -201,15 +195,15 @@ export function useSend() {
           const transaction = new VersionedTransaction(messageV0);
 
           console.log("Signing and sending transaction...");
-          const result = await solana.signAndSendTransaction(transaction);
+          const signature = await sendTransaction(transaction, connection);
 
-          console.log("Transaction sent:", result.signature);
+          console.log("Transaction sent:", signature);
 
           // Confirm transaction
           console.log("Confirming transaction...");
           const confirmation = await connection.confirmTransaction(
             {
-              signature: result.signature,
+              signature,
               blockhash,
               lastValidBlockHeight,
             },
@@ -225,7 +219,7 @@ export function useSend() {
           console.log("Transaction confirmed!");
           setLoading(false);
           return {
-            signature: result.signature,
+            signature,
             success: true,
           };
         }
@@ -335,15 +329,15 @@ export function useSend() {
         const transaction = new VersionedTransaction(messageV0);
 
         console.log("Signing and sending transaction...");
-        const result = await solana.signAndSendTransaction(transaction);
+        const signature = await sendTransaction(transaction, connection);
 
-        console.log("Transaction sent:", result.signature);
+        console.log("Transaction sent:", signature);
 
         // Confirm transaction
         console.log("Confirming transaction...");
         const confirmation = await connection.confirmTransaction(
           {
-            signature: result.signature,
+            signature,
             blockhash,
             lastValidBlockHeight,
           },
@@ -359,7 +353,7 @@ export function useSend() {
         console.log("Transaction confirmed!");
         setLoading(false);
         return {
-          signature: result.signature,
+          signature,
           success: true,
         };
       } catch (err) {
@@ -386,7 +380,7 @@ export function useSend() {
         return { success: false, error: errorMessage };
       }
     },
-    [isConnected, isAvailable, solana, connection]
+    [isConnected, walletPublicKey, signTransaction, sendTransaction, connection]
   );
 
   return {

@@ -1,21 +1,18 @@
 "use client";
 
-import { useAccounts, useModal, usePhantom } from "@phantom/react-sdk";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
 
 import { useChatMode } from "@/contexts/chat-mode-context";
+import { useSignInModal } from "@/contexts/sign-in-modal-context";
 
 export function Header() {
   const [mounted, setMounted] = useState(false);
   const { isChatMode } = useChatMode();
-  const { isConnected } = usePhantom();
-  const { open } = useModal();
-  const accounts = useAccounts();
-  const solanaAddress = accounts?.find(
-    (acc) => acc.addressType === "Solana"
-  )?.address;
+  const { connected, publicKey } = useWallet();
+  const { open } = useSignInModal();
 
-  // Truncate wallet address for display
+  const solanaAddress = publicKey?.toBase58();
   const truncatedAddress = solanaAddress
     ? `${solanaAddress.slice(0, 4)}...${solanaAddress.slice(-4)}`
     : null;
@@ -25,7 +22,7 @@ export function Header() {
   }, []);
 
   // Hide when: chat mode AND connected (wallet button is in sidebar)
-  const shouldHide = isChatMode && isConnected;
+  const shouldHide = isChatMode && connected;
 
   if (!mounted || shouldHide) {
     return null;
@@ -35,7 +32,7 @@ export function Header() {
     <>
       <header className="header-wallet fixed top-6 right-6 z-[100]">
         <button
-          onClick={() => open()}
+          onClick={open}
           style={{
             display: "flex",
             alignItems: "center",
@@ -55,7 +52,7 @@ export function Header() {
               color: "#000",
             }}
           >
-            {isConnected && truncatedAddress ? truncatedAddress : "Sign In"}
+            {connected && truncatedAddress ? truncatedAddress : "Sign In"}
           </span>
         </button>
       </header>

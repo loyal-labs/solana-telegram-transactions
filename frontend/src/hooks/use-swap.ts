@@ -1,12 +1,13 @@
-import { usePhantom, useSolana } from "@phantom/react-sdk";
+import {
+  useConnection,
+  useWallet,
+} from "@solana/wallet-adapter-react";
 import {
   type ParsedAccountData,
   PublicKey,
   VersionedTransaction,
 } from "@solana/web3.js";
 import { useCallback, useState } from "react";
-
-import { useConnection } from "@/components/solana/phantom-provider";
 
 // Debug logger that only emits in development
 const logger = {
@@ -108,8 +109,7 @@ type JupiterSwapResponse = {
 
 export function useSwap() {
   const { connection } = useConnection();
-  const { solana, isAvailable } = useSolana();
-  const { isConnected } = usePhantom();
+  const { publicKey, connected: isConnected, sendTransaction } = useWallet();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quote, setQuote] = useState<SwapQuote | null>(null);
@@ -242,7 +242,7 @@ export function useSwap() {
   );
 
   const executeSwap = useCallback(async (): Promise<SwapResult> => {
-    if (!(isConnected && isAvailable && solana)) {
+    if (!(isConnected && publicKey)) {
       const errorMsg = "Wallet not connected";
       setError(errorMsg);
       return { success: false, error: errorMsg };
@@ -258,16 +258,6 @@ export function useSwap() {
     setError(null);
 
     try {
-      // Prefer the current public key; reconnect if the provider needs refresh.
-      let publicKeyString = solana.publicKey;
-      if (!publicKeyString) {
-        const connectionResult = await solana.connect();
-        publicKeyString = connectionResult.publicKey;
-      }
-      if (!publicKeyString) {
-        throw new Error("Failed to get public key from wallet");
-      }
-      const publicKey = new PublicKey(publicKeyString);
 
       logger.debug("Executing swap with quote:", quoteResponse);
 
@@ -313,13 +303,13 @@ export function useSwap() {
       const txBuffer = Buffer.from(serializedTx, "base64");
       const transaction = VersionedTransaction.deserialize(txBuffer);
 
-      // Step 3: Sign and send transaction using Phantom
+      // Step 3: Sign and send transaction using wallet-adapter
       logger.debug("Signing and sending transaction...");
-      const result = await solana.signAndSendTransaction(transaction);
+      const signature = await sendTransaction(transaction, connection);
 
-      logger.debug("Transaction sent:", result.signature);
+      logger.debug("Transaction sent:", signature);
       logger.debug(
-        `View transaction: https://orbmarkets.io/tx/${result.signature}?tab=summary`
+        `View transaction: https://orbmarkets.io/tx/${signature}?tab=summary`
       );
 
       // Step 4: Confirm transaction with proper strategy
@@ -327,7 +317,7 @@ export function useSwap() {
       const latestBlockhash = await connection.getLatestBlockhash("confirmed");
       const confirmation = await connection.confirmTransaction(
         {
-          signature: result.signature,
+          signature,
           blockhash: latestBlockhash.blockhash,
           lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
         },
@@ -343,7 +333,7 @@ export function useSwap() {
       logger.debug("Transaction confirmed!");
       setLoading(false);
       return {
-        signature: result.signature,
+        signature,
         success: true,
       };
     } catch (err) {
@@ -369,7 +359,7 @@ export function useSwap() {
       setLoading(false);
       return { success: false, error: errorMessage };
     }
-  }, [isConnected, isAvailable, solana, connection, quoteResponse]);
+  }, [isConnected, publicKey, sendTransaction, connection, quoteResponse]);
 
   const resetQuote = useCallback(() => {
     setQuote(null);

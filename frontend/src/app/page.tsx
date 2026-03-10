@@ -1,7 +1,7 @@
 "use client";
 // light theme v1
 import { useChat } from "@ai-sdk/react";
-import { useAccounts, useModal, usePhantom } from "@phantom/react-sdk";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import {
   ArrowDownIcon,
@@ -24,6 +24,7 @@ import { CopyIcon, type CopyIconHandle } from "@/components/ui/copy";
 import { MenuIcon, type MenuIconHandle } from "@/components/ui/menu";
 import { PlusIcon, type PlusIconHandle } from "@/components/ui/plus";
 import { useChatMode } from "@/contexts/chat-mode-context";
+import { useSignInModal } from "@/contexts/sign-in-modal-context";
 import { isSkillsEnabled } from "@/flags";
 
 const instrumentSerif = localFont({
@@ -110,12 +111,9 @@ export default function LandingPage() {
   const navItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // Wallet hooks
-  const { isConnected, isLoading: isWalletLoading } = usePhantom();
-  const { open } = useModal();
-  const accounts = useAccounts();
-  const solanaAddress = accounts?.find(
-    (acc) => acc.addressType === "Solana"
-  )?.address;
+  const { connected: isConnected, connecting: isWalletLoading, publicKey } = useWallet();
+  const { open } = useSignInModal();
+  const solanaAddress = publicKey?.toBase58();
 
   // Truncate wallet address for display (e.g., "233Q..7ABE")
   const truncatedAddress = solanaAddress
