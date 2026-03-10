@@ -153,8 +153,8 @@ export async function syncPrivateTransferHistory(): Promise<PrivateTransferHisto
       stats.headPagesProcessed += 1;
       stats.signaturesFetched += page.length;
 
-      if (!newestSeenSignature) {
-        newestSeenSignature = page[0]?.signature ?? null;
+      if (pageIndex === 0 && page[0]) {
+        newestSeenSignature = page[0].signature;
       }
 
       let signaturesToProcess = page.map((entry) => entry.signature);
