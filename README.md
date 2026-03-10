@@ -11,6 +11,7 @@ the Loyal web frontend, shared packages/SDKs, and worker services.
 | [`app/`](./app) | Next.js Telegram mini-app and API routes | [`app/README.md`](./app/README.md) |
 | [`frontend/`](./frontend) | Next.js Loyal web frontend | [`frontend/README.md`](./frontend/README.md) |
 | [`admin/`](./admin) | Internal Next.js admin dashboard | [`admin/README.md`](./admin/README.md) |
+| [`passkey/`](./passkey) | Next.js passkey proxy app for Squads Grid custom-domain WebAuthn flow | [`passkey/README.md`](./passkey/README.md) |
 | [`programs/`](./programs) | Anchor smart contracts (`telegram-transfer`, `telegram-verification`, `telegram-private-transfer`) | [`programs/`](./programs) |
 | [`tests/`](./tests) | Anchor integration tests and fixtures | [`tests/`](./tests) |
 | [`packages/`](./packages) | Shared workspace libraries (`db-core`, `db-adapter-neon`, `llm-core`, `llm-server`) | [`packages/`](./packages) |
@@ -60,6 +61,9 @@ bun run admin:build
 bun run frontend:dev
 bun run frontend:lint
 bun run frontend:build
+bun run passkey:dev
+bun run passkey:lint
+bun run passkey:build
 ```
 
 ### Telegram App (`/app`)
