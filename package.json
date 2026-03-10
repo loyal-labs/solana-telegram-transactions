@@ -6,6 +6,7 @@
     "admin",
     "app",
     "frontend",
+    "passkey",
     "packages/*",
     "sdk/*",
     "workers/*"
@@ -17,6 +18,9 @@
     "frontend:dev": "bun run --cwd frontend dev",
     "frontend:build": "bun run --cwd frontend build",
     "frontend:lint": "bun run --cwd frontend lint",
+    "passkey:dev": "bun run --cwd passkey dev",
+    "passkey:build": "bun run --cwd passkey build",
+    "passkey:lint": "bun run --cwd passkey lint",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "commitlint:head": "commitlint --from HEAD~1 --to HEAD --verbose",
