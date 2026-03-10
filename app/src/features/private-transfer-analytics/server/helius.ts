@@ -1,13 +1,14 @@
 import "server-only";
 
-import { Connection, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 
 import { fetchJson } from "@/lib/core/http";
 
 import {
-  HeliusAssetBatchLimit,
-  PRIVATE_TRANSFER_MAINNET_RPC_URL,
-} from "./constants";
+  getPrivateMainnetConnection,
+  getPrivateMainnetRpcUrl,
+} from "./connection";
+import { HeliusAssetBatchLimit, RPC_CONCURRENCY_LIMIT } from "./constants";
 
 type HeliusTokenAccountsResponse = {
   result?: {
@@ -37,24 +38,11 @@ type HeliusAsset = {
   };
 };
 
-let cachedMainnetConnection: Connection | null = null;
-
-export function getPrivateTransferMainnetConnection(): Connection {
-  if (cachedMainnetConnection) {
-    return cachedMainnetConnection;
-  }
-
-  cachedMainnetConnection = new Connection(PRIVATE_TRANSFER_MAINNET_RPC_URL, {
-    commitment: "confirmed",
-  });
-  return cachedMainnetConnection;
-}
-
 async function callHeliusRpc<T>(
   method: string,
   params: Record<string, unknown>
 ): Promise<T> {
-  return fetchJson<T>(PRIVATE_TRANSFER_MAINNET_RPC_URL, {
+  return await fetchJson<T>(getPrivateMainnetRpcUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -66,7 +54,9 @@ async function callHeliusRpc<T>(
   });
 }
 
-export async function getTokenAccountsByOwner(owner: string): Promise<
+export async function getTokenAccountsByOwner(
+  owner: string
+): Promise<
   Array<{
     address: string;
     amountRaw: string;
@@ -95,13 +85,42 @@ function chunk<T>(items: T[], size: number): T[][] {
   return chunks;
 }
 
-export async function getAssetsByMint(mints: string[]): Promise<HeliusAsset[]> {
+/**
+ * Process items with a bounded concurrency limit to avoid RPC 429 errors.
+ */
+export async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await fn(items[index]!);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => worker())
+  );
+  return results;
+}
+
+export async function getAssetsByMint(
+  mints: string[]
+): Promise<HeliusAsset[]> {
   if (mints.length === 0) {
     return [];
   }
 
-  const results = await Promise.all(
-    chunk(mints, HeliusAssetBatchLimit).map((mintChunk) =>
+  const chunks = chunk(mints, HeliusAssetBatchLimit);
+  const results = await mapWithConcurrency(
+    chunks,
+    RPC_CONCURRENCY_LIMIT,
+    (mintChunk) =>
       callHeliusRpc<{ result?: HeliusAsset[] } | HeliusAsset[]>(
         "getAssetBatch",
         {
@@ -109,7 +128,6 @@ export async function getAssetsByMint(mints: string[]): Promise<HeliusAsset[]> {
           displayOptions: { showFungible: true },
         }
       )
-    )
   );
 
   return results.flatMap((response) => {
@@ -126,7 +144,7 @@ export async function resolveMintMetadataFallback(mint: string): Promise<{
   priceUsd: string | null;
   symbol: string;
 }> {
-  const connection = getPrivateTransferMainnetConnection();
+  const connection = getPrivateMainnetConnection();
   const mintInfo = await connection.getParsedAccountInfo(
     new PublicKey(mint),
     "confirmed"

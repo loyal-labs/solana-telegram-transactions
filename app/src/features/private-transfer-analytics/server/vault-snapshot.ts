@@ -9,13 +9,15 @@ import type {
   PrivateTransferVaultHoldingRow,
   PrivateTransferVaultSnapshotStats,
 } from "../types";
+import { getPrivateMainnetConnection } from "./connection";
 import {
   PRIVATE_TRANSFER_PROGRAM_ID,
   PRIVATE_TRANSFER_VAULT_ACCOUNT_SPACE,
+  RPC_CONCURRENCY_LIMIT,
 } from "./constants";
 import {
-  getPrivateTransferMainnetConnection,
   getTokenAccountsByOwner,
+  mapWithConcurrency,
 } from "./helius";
 import { buildTokenCatalogUpserts, upsertTokenCatalog } from "./token-catalog";
 
@@ -23,7 +25,7 @@ async function loadCurrentVaultHoldings(): Promise<{
   holdings: PrivateTransferVaultHoldingRow[];
   vaultCount: number;
 }> {
-  const connection = getPrivateTransferMainnetConnection();
+  const connection = getPrivateMainnetConnection();
   const vaultAccounts = await connection.getProgramAccounts(
     PRIVATE_TRANSFER_PROGRAM_ID,
     {
@@ -32,8 +34,10 @@ async function loadCurrentVaultHoldings(): Promise<{
     }
   );
 
-  const holdingsByVault = await Promise.all(
-    vaultAccounts.map(async (vaultAccount) => {
+  const holdingsByVault = await mapWithConcurrency(
+    vaultAccounts,
+    RPC_CONCURRENCY_LIMIT,
+    async (vaultAccount) => {
       const vaultAddress = vaultAccount.pubkey.toBase58();
       const tokenAccounts = await getTokenAccountsByOwner(vaultAddress);
 
@@ -46,7 +50,7 @@ async function loadCurrentVaultHoldings(): Promise<{
           tokenMint: tokenAccount.mint,
           vaultAddress,
         }));
-    })
+    }
   );
 
   return {
@@ -63,9 +67,7 @@ export async function refreshPrivateTransferVaultSnapshot(): Promise<PrivateTran
 
   if (holdings.length > 0) {
     const taggedHoldings = holdings.map((h) => ({ ...h, snapshotAt }));
-    await db
-      .insert(privateTransferVaultHoldings)
-      .values(taggedHoldings);
+    await db.insert(privateTransferVaultHoldings).values(taggedHoldings);
     await db
       .delete(privateTransferVaultHoldings)
       .where(lt(privateTransferVaultHoldings.snapshotAt, snapshotAt));

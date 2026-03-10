@@ -44,28 +44,29 @@ const parseTelegramPeerId = (value: string, envName: string): bigint => {
   }
 };
 
-const getTelegramSummaryPeerOverride = (): TelegramSummaryPeerOverride | null => {
-  const fromValue = getOptionalEnv(TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM);
-  const toValue = getOptionalEnv(TELEGRAM_SUMMARY_PEER_OVERRIDE_TO);
+const getTelegramSummaryPeerOverride =
+  (): TelegramSummaryPeerOverride | null => {
+    const fromValue = getOptionalEnv(TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM);
+    const toValue = getOptionalEnv(TELEGRAM_SUMMARY_PEER_OVERRIDE_TO);
 
-  if (!fromValue && !toValue) {
-    return null;
-  }
+    if (!fromValue && !toValue) {
+      return null;
+    }
 
-  if (!fromValue || !toValue) {
-    throw new Error(
-      `${TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM} and ${TELEGRAM_SUMMARY_PEER_OVERRIDE_TO} must both be set`
-    );
-  }
+    if (!fromValue || !toValue) {
+      throw new Error(
+        `${TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM} and ${TELEGRAM_SUMMARY_PEER_OVERRIDE_TO} must both be set`
+      );
+    }
 
-  return {
-    fromPeerId: parseTelegramPeerId(
-      fromValue,
-      TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM
-    ),
-    toPeerId: parseTelegramPeerId(toValue, TELEGRAM_SUMMARY_PEER_OVERRIDE_TO),
+    return {
+      fromPeerId: parseTelegramPeerId(
+        fromValue,
+        TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM
+      ),
+      toPeerId: parseTelegramPeerId(toValue, TELEGRAM_SUMMARY_PEER_OVERRIDE_TO),
+    };
   };
-};
 
 export const serverEnv = {
   get databaseUrl(): string {
@@ -131,6 +132,9 @@ export const serverEnv = {
   },
   get cronSecret(): string {
     return getRequiredEnv("CRON_SECRET");
+  },
+  get privateMainnetRpcUrl(): string {
+    return getRequiredEnv("PRIVATE_MAINNET_RPC_URL");
   },
   get telegramSummaryPeerOverride(): TelegramSummaryPeerOverride | null {
     return getTelegramSummaryPeerOverride();

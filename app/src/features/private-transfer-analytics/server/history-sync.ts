@@ -9,14 +9,15 @@ import { eq } from "drizzle-orm";
 import { getDatabase } from "@/lib/core/database";
 
 import type { PrivateTransferHistorySyncStats } from "../types";
+import { getPrivateMainnetConnection } from "./connection";
 import {
   HISTORY_PAGE_LIMIT,
   MAX_BACKFILL_PAGES_PER_RUN,
   MAX_HEAD_SYNC_PAGES_PER_RUN,
+  PARSED_TX_BATCH_SIZE,
   PRIVATE_TRANSFER_ANALYTICS_SYNC_KEY,
   PRIVATE_TRANSFER_PROGRAM_ID,
 } from "./constants";
-import { getPrivateTransferMainnetConnection } from "./helius";
 import { buildTokenCatalogUpserts, upsertTokenCatalog } from "./token-catalog";
 import { parseModifyBalanceEventsFromTransaction } from "./transaction-parser";
 
@@ -46,7 +47,9 @@ async function getOrCreateSyncState(): Promise<SyncStateRow> {
     ),
   });
   if (!created) {
-    throw new Error("Failed to initialize private transfer analytics sync state");
+    throw new Error(
+      "Failed to initialize private transfer analytics sync state"
+    );
   }
 
   return created;
@@ -62,16 +65,30 @@ async function insertModifyBalanceEvents(
     return { latestSeenSignature: null };
   }
 
-  const connection = getPrivateTransferMainnetConnection();
-  const parsedTransactions = await connection.getParsedTransactions(signatures, {
-    maxSupportedTransactionVersion: 0,
-  });
+  const connection = getPrivateMainnetConnection();
+
+  // Chunk signatures to avoid 429s on large batches
+  const parsedTransactions: (
+    | import("@solana/web3.js").ParsedTransactionWithMeta
+    | null
+  )[] = [];
+  for (let i = 0; i < signatures.length; i += PARSED_TX_BATCH_SIZE) {
+    const batch = signatures.slice(i, i + PARSED_TX_BATCH_SIZE);
+    parsedTransactions.push(
+      ...(await connection.getParsedTransactions(batch, {
+        maxSupportedTransactionVersion: 0,
+      }))
+    );
+  }
 
   const parsedEvents = parsedTransactions.flatMap((tx, index) => {
     if (!tx) {
       return [];
     }
-    const result = parseModifyBalanceEventsFromTransaction(tx, signatures[index]!);
+    const result = parseModifyBalanceEventsFromTransaction(
+      tx,
+      signatures[index]!
+    );
     stats.eventsSkippedMissingBlockTime += result.skippedMissingBlockTime;
     return result.events;
   });
@@ -111,7 +128,7 @@ async function updateSyncState(
 }
 
 export async function syncPrivateTransferHistory(): Promise<PrivateTransferHistorySyncStats> {
-  const connection = getPrivateTransferMainnetConnection();
+  const connection = getPrivateMainnetConnection();
   const state = await getOrCreateSyncState();
   const stats: PrivateTransferHistorySyncStats = {
     backfillCompleted: Boolean(state.backfillCompletedAt),
@@ -175,7 +192,10 @@ export async function syncPrivateTransferHistory(): Promise<PrivateTransferHisto
     }
 
     const backfillCursor =
-      state.backfillCursor ?? headBefore ?? state.latestSeenSignature ?? undefined;
+      state.backfillCursor ??
+      headBefore ??
+      state.latestSeenSignature ??
+      undefined;
     let nextBackfillCursor = backfillCursor;
     let backfillCompletedAt = state.backfillCompletedAt;
 
