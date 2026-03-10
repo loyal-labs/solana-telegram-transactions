@@ -85,6 +85,19 @@ export type EncryptedMessageContent = {
  */
 export type PrivateTransferAnalyticsFlow = "shield" | "unshield";
 
+/**
+ * Gasless claim analytics transaction type
+ */
+export type GaslessClaimTransactionType =
+  | "store"
+  | "verify_telegram_init_data"
+  | "top_up_to_0_01_sol";
+
+/**
+ * Solana environment recorded for gasless claim analytics
+ */
+export type GaslessClaimSolanaEnv = "mainnet" | "devnet";
+
 // ============================================================================
 // TABLES
 // ============================================================================
@@ -643,6 +656,58 @@ export const privateTransferVaultHoldings = pgTable(
   ]
 );
 
+/**
+ * Individual gasless-payer transactions observed for claim flows.
+ * One row per transaction signature and environment.
+ */
+export const gaslessClaimTransactions = pgTable(
+  "gasless_claim_transactions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    solanaEnv: text("solana_env").$type<GaslessClaimSolanaEnv>().notNull(),
+    signature: text("signature").notNull(),
+    transactionType: text("transaction_type")
+      .$type<GaslessClaimTransactionType>()
+      .notNull(),
+    payerAddress: text("payer_address").notNull(),
+    recipientAddress: text("recipient_address"),
+    slot: bigint("slot", { mode: "bigint" }).notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    spentLamports: numeric("spent_lamports", {
+      precision: 30,
+      scale: 0,
+    }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("gasless_claim_transactions_env_signature_uidx").on(
+      table.solanaEnv,
+      table.signature
+    ),
+    index("gasless_claim_transactions_occurred_at_idx").on(table.occurredAt),
+    index("gasless_claim_transactions_type_occurred_at_idx").on(
+      table.transactionType,
+      table.occurredAt
+    ),
+    index("gasless_claim_transactions_recipient_address_idx").on(
+      table.recipientAddress
+    ),
+    check(
+      "gasless_claim_transactions_type_check",
+      sql`${table.transactionType} IN ('store', 'verify_telegram_init_data', 'top_up_to_0_01_sol')`
+    ),
+    check(
+      "gasless_claim_transactions_solana_env_check",
+      sql`${table.solanaEnv} IN ('mainnet', 'devnet')`
+    ),
+  ]
+);
+
 // ============================================================================
 // RELATIONS (for type-safe queries with Drizzle)
 // ============================================================================
@@ -804,3 +869,8 @@ export type PrivateTransferVaultHolding =
   typeof privateTransferVaultHoldings.$inferSelect;
 export type InsertPrivateTransferVaultHolding =
   typeof privateTransferVaultHoldings.$inferInsert;
+
+export type GaslessClaimTransaction =
+  typeof gaslessClaimTransactions.$inferSelect;
+export type InsertGaslessClaimTransaction =
+  typeof gaslessClaimTransactions.$inferInsert;

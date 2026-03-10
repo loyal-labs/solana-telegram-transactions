@@ -17,10 +17,11 @@ import {
 } from "@/components/ui/table";
 import { GaslessClaimsChart } from "./gasless-claims-chart";
 import { ShieldUnshieldChart } from "./shield-unshield-chart";
-import { getTransfersData } from "./transfers-data";
 import {
+  getFaucetBalance,
   getGaslessClaimsData,
-} from "./transfers-mock-data";
+  getTransfersData,
+} from "./transfers-data";
 
 export const dynamic = "force-dynamic";
 
@@ -42,21 +43,28 @@ function formatOptionalUsd(value: number | null) {
 }
 
 export default async function TransfersPage() {
-  const {
-    assets,
-    shieldPoints,
-    totalShielded,
-    totalUnshielded,
-    tvl,
-  } = await getTransfersData();
-  const { points: gaslessPoints, totalSpent } = getGaslessClaimsData();
+  const [
+    {
+      assets,
+      shieldPoints,
+      totalShielded,
+      totalUnshielded,
+      tvl,
+    },
+    { points: gaslessPoints, totalSpent },
+    faucetBalance,
+  ] = await Promise.all([
+    getTransfersData(),
+    getGaslessClaimsData(),
+    getFaucetBalance(),
+  ]);
 
   return (
     <PageContainer>
       <SectionHeader
         title="Transfers"
         breadcrumbs={[{ label: "Transfers" }]}
-        subtitle="Smart contract analytics for telegram-private-transfer"
+        subtitle="Smart contract analytics for private transfers and gasless claims"
       />
 
       <div className="space-y-6">
@@ -80,9 +88,11 @@ export default async function TransfersPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardDescription>Gasless claims spent (30d)</CardDescription>
+              <CardDescription>Gasless faucet balance</CardDescription>
               <CardTitle className="text-2xl font-bold tabular-nums">
-                {totalSpent.toLocaleString()} SOL
+                {faucetBalance !== null
+                  ? `${faucetBalance.toLocaleString()} SOL`
+                  : "N/A"}
               </CardTitle>
             </CardHeader>
           </Card>

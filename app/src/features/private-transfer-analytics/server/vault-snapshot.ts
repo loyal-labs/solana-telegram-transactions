@@ -1,7 +1,7 @@
 import "server-only";
 
 import { privateTransferVaultHoldings } from "@loyal-labs/db-core/schema";
-import { lt } from "drizzle-orm";
+import { lt, sql } from "drizzle-orm";
 
 import { getDatabase } from "@/lib/core/database";
 
@@ -67,7 +67,19 @@ export async function refreshPrivateTransferVaultSnapshot(): Promise<PrivateTran
 
   if (holdings.length > 0) {
     const taggedHoldings = holdings.map((h) => ({ ...h, snapshotAt }));
-    await db.insert(privateTransferVaultHoldings).values(taggedHoldings);
+    await db
+      .insert(privateTransferVaultHoldings)
+      .values(taggedHoldings)
+      .onConflictDoUpdate({
+        target: privateTransferVaultHoldings.vaultAddress,
+        set: {
+          tokenAccountAddress: sql`excluded.token_account_address`,
+          tokenMint: sql`excluded.token_mint`,
+          amountRaw: sql`excluded.amount_raw`,
+          snapshotAt: sql`excluded.snapshot_at`,
+          updatedAt: sql`now()`,
+        },
+      });
     await db
       .delete(privateTransferVaultHoldings)
       .where(lt(privateTransferVaultHoldings.snapshotAt, snapshotAt));

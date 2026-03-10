@@ -11,6 +11,17 @@ function clearTestEnv(): void {
 }
 
 const runPrivateTransferAnalyticsCron = mock(async () => ({
+  gaslessClaims: {
+    backfillCompleted: true,
+    backfillPagesProcessed: 1,
+    headPagesProcessed: 1,
+    latestSeenSignature: "gasless-sig-1",
+    recordsSkippedExcludedBpfLoader: 0,
+    recordsSkippedMissingBlockTime: 0,
+    recordsSkippedUnclassified: 1,
+    recordsUpserted: 2,
+    signaturesFetched: 3,
+  },
   history: {
     backfillCompleted: true,
     backfillPagesProcessed: 1,
@@ -86,6 +97,17 @@ describe("private transfer analytics cron route", () => {
     expect(await response.json()).toEqual({
       ok: true,
       stats: {
+        gaslessClaims: {
+          backfillCompleted: true,
+          backfillPagesProcessed: 1,
+          headPagesProcessed: 1,
+          latestSeenSignature: "gasless-sig-1",
+          recordsSkippedExcludedBpfLoader: 0,
+          recordsSkippedMissingBlockTime: 0,
+          recordsSkippedUnclassified: 1,
+          recordsUpserted: 2,
+          signaturesFetched: 3,
+        },
         history: {
           backfillCompleted: true,
           backfillPagesProcessed: 1,

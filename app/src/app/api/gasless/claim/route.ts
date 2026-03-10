@@ -10,6 +10,10 @@ import {
 import { SYSVAR_INSTRUCTIONS_PUBKEY } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
+import { RECIPIENT_TARGET_LAMPORTS } from "@/features/private-transfer-analytics/server/constants";
+import {
+  recordGaslessClaimTransactionBySignature,
+} from "@/features/private-transfer-analytics/server/gasless-claims";
 import { getEndpoints } from "@/lib/solana/rpc/connection";
 import {
   getSessionPda,
@@ -224,7 +228,7 @@ const verifyInitDataGasless = async (
   telegramPublicKeyBytes: Uint8Array,
   telegramSignatureBytes: Uint8Array,
   processedInitDataBytes: Uint8Array,
-): Promise<boolean> => {
+): Promise<TransactionSendResult> => {
   const sessionPda = getSessionPda(recipientPubKey, verificationProgram);
   const payerPubKey = payerWallet.publicKey;
   const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
@@ -255,19 +259,17 @@ const verifyInitDataGasless = async (
     verifyTx,
     payerWallet,
   );
-  return verifyResult.ok;
+  return verifyResult;
 };
-
-const RECIPIENT_TARGET_LAMPORTS = 10_000_000;
 
 const ensureRecipientBalance = async (
   provider: AnchorProvider,
   payerWallet: Wallet,
   recipient: PublicKey,
-): Promise<void> => {
+): Promise<string | null> => {
   const balance = await provider.connection.getBalance(recipient);
   if (balance >= RECIPIENT_TARGET_LAMPORTS) {
-    return;
+    return null;
   }
 
   const deficit = RECIPIENT_TARGET_LAMPORTS - balance;
@@ -289,6 +291,8 @@ const ensureRecipientBalance = async (
   if (!result.ok) {
     throw new Error(`Failed to fund recipient: ${result.message}`);
   }
+
+  return result.signature;
 };
 
 const verifyAndClaimDeposit = async (
@@ -316,8 +320,8 @@ const verifyAndClaimDeposit = async (
     telegramSignatureBytes,
     processedInitDataBytes,
   );
-  if (!verified) {
-    return false;
+  if (!verified.ok) {
+    return { ok: false as const };
   }
 
   // FIXME: `claimUsernameDeposit` is not working with PER, create gasless claim for PER
@@ -331,11 +335,36 @@ const verifyAndClaimDeposit = async (
   //   username,
   //   perAuthToken
   // );
-  await ensureRecipientBalance(provider, payerWallet, recipient);
+  const topUpSignature = await ensureRecipientBalance(
+    provider,
+    payerWallet,
+    recipient,
+  );
 
-  const claimed = true;
+  return {
+    ok: true as const,
+    topUpSignature,
+    verifySignature: verified.signature,
+  };
+};
 
-  return claimed;
+const recordGaslessClaimAnalyticsBestEffort = async (args: {
+  connection: Connection;
+  payerAddress: string;
+  recipientAddress?: string | null;
+  signature: string;
+  solanaEnv: ClaimSolanaEnv;
+  transactionType: "store" | "verify_telegram_init_data" | "top_up_to_0_01_sol";
+}): Promise<void> => {
+  try {
+    await recordGaslessClaimTransactionBySignature(args);
+  } catch (error) {
+    console.error("[gasless][claim][analytics] failed to record transaction", {
+      error,
+      signature: args.signature,
+      transactionType: args.transactionType,
+    });
+  }
 };
 
 export async function POST(req: Request) {
@@ -471,6 +500,13 @@ export async function POST(req: Request) {
         { status: invalidUsername ? 400 : 500 },
       );
     }
+    await recordGaslessClaimAnalyticsBestEffort({
+      connection: provider.connection,
+      payerAddress: payerWallet.publicKey.toBase58(),
+      signature: storeResult.signature,
+      solanaEnv: parsedSolanaEnv,
+      transactionType: "store",
+    });
 
     const result = await verifyAndClaimDeposit(
       provider,
@@ -482,11 +518,29 @@ export async function POST(req: Request) {
       telegramSignature,
       telegramPublicKey,
     );
-    if (!result) {
+    if (!result.ok) {
       return NextResponse.json(
         { error: "Failed to claim deposit" },
         { status: 500 },
       );
+    }
+
+    await recordGaslessClaimAnalyticsBestEffort({
+      connection: provider.connection,
+      payerAddress: payerWallet.publicKey.toBase58(),
+      signature: result.verifySignature,
+      solanaEnv: parsedSolanaEnv,
+      transactionType: "verify_telegram_init_data",
+    });
+    if (result.topUpSignature) {
+      await recordGaslessClaimAnalyticsBestEffort({
+        connection: provider.connection,
+        payerAddress: payerWallet.publicKey.toBase58(),
+        recipientAddress: parsedRecipient.toBase58(),
+        signature: result.topUpSignature,
+        solanaEnv: parsedSolanaEnv,
+        transactionType: "top_up_to_0_01_sol",
+      });
     }
 
     return NextResponse.json({ success: true });

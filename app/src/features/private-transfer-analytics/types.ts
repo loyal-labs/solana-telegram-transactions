@@ -1,4 +1,9 @@
 export type PrivateTransferAnalyticsFlow = "shield" | "unshield";
+export type GaslessClaimSolanaEnv = "mainnet" | "devnet";
+export type GaslessClaimTransactionType =
+  | "store"
+  | "verify_telegram_init_data"
+  | "top_up_to_0_01_sol";
 
 export type PrivateTransferModifyBalanceEventInput = {
   amountRaw: string;
@@ -31,6 +36,29 @@ export type PrivateTransferTokenCatalogUpsert = {
   tokenMint: string;
 };
 
+export type GaslessClaimTransactionInput = {
+  occurredAt: Date;
+  payerAddress: string;
+  recipientAddress: string | null;
+  signature: string;
+  slot: bigint;
+  solanaEnv: GaslessClaimSolanaEnv;
+  spentLamports: string;
+  transactionType: GaslessClaimTransactionType;
+};
+
+export type GaslessClaimHistorySyncStats = {
+  backfillCompleted: boolean;
+  backfillPagesProcessed: number;
+  headPagesProcessed: number;
+  latestSeenSignature: string | null;
+  recordsSkippedExcludedBpfLoader: number;
+  recordsSkippedMissingBlockTime: number;
+  recordsSkippedUnclassified: number;
+  recordsUpserted: number;
+  signaturesFetched: number;
+};
+
 export type PrivateTransferHistorySyncStats = {
   backfillCompleted: boolean;
   backfillPagesProcessed: number;
@@ -48,6 +76,7 @@ export type PrivateTransferVaultSnapshotStats = {
 };
 
 export type PrivateTransferAnalyticsCronStats = {
+  gaslessClaims: GaslessClaimHistorySyncStats;
   history: PrivateTransferHistorySyncStats;
   vaults: PrivateTransferVaultSnapshotStats;
 };

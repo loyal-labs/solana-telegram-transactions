@@ -15,7 +15,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import type { GaslessClaimPoint } from "./transfers-mock-data";
+import type { GaslessClaimPoint } from "./transfers-data";
 
 type GaslessClaimsChartProps = {
   data: GaslessClaimPoint[];
