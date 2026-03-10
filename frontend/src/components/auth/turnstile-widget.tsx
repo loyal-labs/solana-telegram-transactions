@@ -7,7 +7,7 @@ type TurnstileWidgetProps = {
 };
 
 const SITE_KEY =
-  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"; // Cloudflare test key
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAACowEozkJ4pWS0Xd";
 
 export function TurnstileWidget({ onVerify }: TurnstileWidgetProps) {
   return (
