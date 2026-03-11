@@ -1,0 +1,9 @@
+[Unit]
+Description=Run Loyal userbot summary publish daily at 10:00 PM PST
+
+[Timer]
+OnCalendar=*-*-* 22:00:00 America/Los_Angeles
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=Loyal userbot summary publish once
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/zotho/Projects/Loyal/solana-telegram-transactions/workers/userbot
+EnvironmentFile=/home/zotho/Projects/Loyal/solana-telegram-transactions/workers/userbot/.env.local
+ExecStart=/home/zotho/.bun/bin/bun run summary:publish:once
