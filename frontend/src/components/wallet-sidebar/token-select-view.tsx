@@ -66,17 +66,19 @@ export function TokenSelectView({
   onSelect,
   onBack,
   onClose,
+  showAllTokens,
 }: {
   title: string;
   currentToken: SwapToken;
   onSelect: (token: SwapToken) => void;
   onBack: () => void;
   onClose: () => void;
+  showAllTokens?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const availableSymbols = ["USDC", "SOL", "BNB"];
   const filtered = swapTokens
-    .filter((t) => availableSymbols.includes(t.symbol))
+    .filter((t) => showAllTokens || availableSymbols.includes(t.symbol))
     .filter((t) => t.symbol.toLowerCase().includes(search.toLowerCase()));
 
   return (

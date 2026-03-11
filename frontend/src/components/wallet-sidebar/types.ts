@@ -7,6 +7,7 @@ export interface HeroRightSidebarProps {
   onTabChange: (tab: RightSidebarTab) => void;
   isBalanceHidden: boolean;
   onBalanceHiddenChange: (hidden: boolean) => void;
+  showQuickActions?: boolean;
 }
 
 export interface TokenRow {
@@ -47,7 +48,8 @@ export type SubView =
   | "allTokens"
   | "allActivity"
   | { type: "transaction"; detail: TransactionDetail; from: "portfolio" | "allActivity" }
-  | { type: "tokenSelect"; field: "from" | "to" };
+  | { type: "tokenSelect"; field: "from" | "to" }
+  | { type: "sendTokenSelect" };
 
 export const swapTokens: SwapToken[] = [
   { symbol: "USDC", icon: "/hero-new/usdc.png", price: 0.9997, balance: 16285 },

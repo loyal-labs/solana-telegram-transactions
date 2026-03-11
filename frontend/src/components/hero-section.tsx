@@ -352,8 +352,7 @@ export function HeroSection(props: HeroSectionProps) {
             bottom: "0",
             left: "0",
             right: "0",
-            marginLeft: props.isChatMode && isSidebarOpen ? "314px" : "0",
-            transition: "margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            marginLeft: "0",
             display: "flex",
             flexDirection: "column",
             gap: "0",
@@ -397,6 +396,7 @@ export function HeroSection(props: HeroSectionProps) {
             onTabChange={setRightSidebarTab}
             isBalanceHidden={isBalanceHidden}
             onBalanceHiddenChange={setIsBalanceHidden}
+            showQuickActions={props.isChatMode || isInputStuckToBottom}
           />
         </div>
       </div>

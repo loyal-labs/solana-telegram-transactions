@@ -2,6 +2,7 @@
 
 import { ArrowUpRight, Eye, EyeOff, RefreshCw } from "lucide-react";
 import Image from "next/image";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { RightSidebarTab } from "@/components/wallet-sidebar";
 
@@ -21,6 +22,67 @@ export interface ChatInputProps {
   isBalanceHidden: boolean;
   onBalanceHiddenChange: (hidden: boolean) => void;
   onOpenRightSidebar: (tab: RightSidebarTab) => void;
+}
+
+// Pupil center in SVG coordinates and max travel distance
+const PUPIL_CX = 88;
+const PUPIL_CY = 79.6;
+const MAX_OFFSET = 6; // px in SVG space — keeps pupil inside white eye area
+
+function DogWithEye() {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const rect = svg.getBoundingClientRect();
+    // Scale from DOM coords to SVG viewBox coords
+    const scaleX = 160 / rect.width;
+    const scaleY = 128 / rect.height;
+
+    // Mouse position in SVG coordinate space
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    // Vector from pupil center to mouse
+    const dx = mx - PUPIL_CX;
+    const dy = my - PUPIL_CY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist === 0) {
+      setOffset({ x: 0, y: 0 });
+    } else {
+      // Clamp to MAX_OFFSET
+      const clamp = Math.min(dist, MAX_OFFSET) / dist;
+      setOffset({ x: dx * clamp, y: dy * clamp });
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [handleMouseMove]);
+
+  return (
+    <svg ref={svgRef} width="160" height="128" viewBox="0 0 160 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M24 112L0 56H72V0L104 56L112 0L160 128L24 112Z" fill="#F9363C" />
+      <path d="M88.5452 69.2141C101.782 69.9078 112.025 79.7698 111.424 91.2416L63.4895 88.7295C64.0907 77.2577 75.3086 68.5204 88.5452 69.2141Z" fill="white" />
+      <mask id="mask0_eye" style={{ maskType: "alpha" }} maskUnits="userSpaceOnUse" x="63" y="69" width="49" height="23">
+        <path d="M88.5452 69.2141C101.782 69.9078 112.025 79.7698 111.424 91.2416L63.4895 88.7295C64.0907 77.2577 75.3086 68.5204 88.5452 69.2141Z" fill="white" />
+      </mask>
+      <g mask="url(#mask0_eye)">
+        <circle
+          cx={PUPIL_CX}
+          cy={PUPIL_CY}
+          r="10.8"
+          fill="black"
+          style={{ transform: `translate(${offset.x}px, ${offset.y}px)`, transition: "transform 0.08s ease-out" }}
+        />
+      </g>
+    </svg>
+  );
 }
 
 export function ChatInput(props: ChatInputProps) {
@@ -100,16 +162,9 @@ export function ChatInput(props: ChatInputProps) {
               width: "160px",
               height: "128px",
               marginBottom: "-18px",
-              pointerEvents: "none",
             }}
           >
-            <Image
-              alt="Loyal Dog"
-              height={128}
-              src="/hero-new/Dog.svg"
-              style={{ width: "100%", height: "100%" }}
-              width={160}
-            />
+            <DogWithEye />
           </div>
         )}
 
@@ -285,9 +340,10 @@ export function ChatInput(props: ChatInputProps) {
           </div>
         </form>
 
-        {/* Wallet + Action Cards */}
+        {/* Wallet + Action Cards — hidden on mobile */}
         {!props.isChatMode && !props.isInputStuckToBottom && (
           <div
+            className="hero-wallet-cards"
             style={{
               display: "flex",
               gap: "8px",
@@ -645,6 +701,12 @@ export function ChatInput(props: ChatInputProps) {
         }
         .action-card:hover {
           background-color: rgba(0, 0, 0, 0.04);
+        }
+
+        @media (max-width: 767px) {
+          .hero-wallet-cards {
+            display: none !important;
+          }
         }
       `}</style>
     </>
