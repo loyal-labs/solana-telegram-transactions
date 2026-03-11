@@ -10,7 +10,7 @@
 | Unit | Schedule | Description |
 |------|----------|-------------|
 | `loyal-userbot-sync` | Every 2 hours | Sync Telegram messages |
-| `loyal-userbot-summary-publish` | Daily 10:00 PM PT | Publish summary notifications |
+| `loyal-userbot-summary-publish` | Daily 06:10 UTC | Publish summary notifications |
 
 ## Install & enable
 
