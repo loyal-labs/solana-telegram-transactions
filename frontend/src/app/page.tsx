@@ -8,12 +8,12 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import {
   ArrowDownIcon,
   ArrowUpToLine,
+  Eye,
+  EyeOff,
   MoreHorizontal,
   RefreshCw,
   X,
 } from "lucide-react";
-import { IBM_Plex_Sans, Plus_Jakarta_Sans } from "next/font/google";
-import localFont from "next/font/local";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { BentoGridSection } from "@/components/bento-grid-section";
@@ -28,39 +28,6 @@ import { PlusIcon, type PlusIconHandle } from "@/components/ui/plus";
 import { useChatMode } from "@/contexts/chat-mode-context";
 import { useSignInModal } from "@/contexts/sign-in-modal-context";
 import { isSkillsEnabled } from "@/flags";
-
-const instrumentSerif = localFont({
-  src: [
-    {
-      path: "../../public/fonts/InstrumentSerif-Regular.woff2",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "../../public/fonts/InstrumentSerif-Italic.woff2",
-      weight: "400",
-      style: "italic",
-    },
-  ],
-  display: "swap",
-});
-
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: ["600", "700"],
-  display: "swap",
-});
-
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  display: "swap",
-});
-
-const dirtyline = localFont({
-  src: "../../public/fonts/Dirtyline 36daysoftype 2022.woff2",
-  display: "swap",
-});
 
 type TimestampedMessage = UIMessage & { createdAt?: number };
 
@@ -102,6 +69,7 @@ export default function LandingPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
   const [hoveredNavIndex, setHoveredNavIndex] = useState<number | null>(null);
   const menuIconRef = useRef<MenuIconHandle>(null);
@@ -494,19 +462,19 @@ export default function LandingPage() {
       const offset = scrollY * 0.15;
       setParallaxOffset(offset);
 
-      // Calculate when the input's natural position goes above viewport
-      // Input is centered at viewportHeight/2, moves up at 0.85x scroll speed
-      // Stick when the input center would be above ~120px from top
-      const inputNaturalCenterFromTop = viewportHeight / 2 - scrollY * 0.85;
-      const stickThreshold = 120; // When input center reaches this point from top
+      // Calculate when the input form has completely scrolled above the viewport
+      const inputNaturalCenterFromTop = viewportHeight / 2 - 17 - scrollY * 0.85;
+      const formHalfHeight = 40; // ~half the rendered form height
+      const formBottomFromTop = inputNaturalCenterFromTop + formHalfHeight;
 
-      if (inputNaturalCenterFromTop < stickThreshold) {
+      if (formBottomFromTop < 0) {
         setIsInputStuckToBottom(true);
         setStickyInputBottomOffset(24);
       } else {
         setIsInputStuckToBottom(false);
         setStickyInputBottomOffset(24);
       }
+
     };
 
     window.addEventListener("scroll", handleParallaxScroll, { passive: true });
@@ -707,7 +675,7 @@ export default function LandingPage() {
 
   return (
     <main
-      className={ibmPlexSans.className}
+      className=""
       style={{
         margin: 0,
         minHeight: "100vh",
@@ -716,6 +684,26 @@ export default function LandingPage() {
         overflow: isChatMode ? "hidden" : "auto",
       }}
     >
+      {/* SVG pixelation filters for hidden balance */}
+      <svg height="0" style={{ position: "absolute" }} width="0">
+        <filter id="pixelate" x="0" y="0" width="100%" height="100%">
+          <feGaussianBlur in="SourceGraphic" result="smoothed" stdDeviation="3" />
+          <feFlood height="1" width="1" x="3" y="3" />
+          <feComposite height="7" width="7" />
+          <feTile result="tiles" />
+          <feComposite in="smoothed" in2="tiles" operator="in" />
+          <feMorphology operator="dilate" radius="4" />
+        </filter>
+        <filter id="pixelate-lg" x="0" y="0" width="100%" height="100%">
+          <feGaussianBlur in="SourceGraphic" result="smoothed" stdDeviation="5" />
+          <feFlood height="1" width="1" x="3" y="3" />
+          <feComposite height="7" width="7" />
+          <feTile result="tiles" />
+          <feComposite in="smoothed" in2="tiles" operator="in" />
+          <feMorphology operator="dilate" radius="4" />
+        </filter>
+      </svg>
+
       {/* Main content wrapper */}
       <div
         style={{
@@ -747,7 +735,7 @@ export default function LandingPage() {
               onMouseLeave={() => setHoveredNavIndex(null)}
               style={{
                 position: "fixed",
-                top: "1.4375rem",
+                top: "12px",
                 left: "50%",
                 transform: "translateX(-50%)",
                 alignItems: "center",
@@ -844,9 +832,12 @@ export default function LandingPage() {
                     style={{
                       position: "relative",
                       color: "#000",
-                      fontSize: "1rem",
+                      fontFamily: "var(--font-geist-sans), sans-serif",
+                      fontSize: "16px",
                       fontWeight: 400,
-                      padding: "0.5rem 1rem",
+                      lineHeight: "20px",
+                      fontFeatureSettings: "'liga' off, 'clig' off",
+                      padding: "8px 16px",
                       background: "transparent",
                       border: "none",
                       borderRadius: "9999px",
@@ -856,7 +847,7 @@ export default function LandingPage() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: "0.375rem",
+                      gap: "6px",
                       zIndex: 1,
                       filter:
                         (item.isAbout && isScrolledToAbout) ||
@@ -948,13 +939,37 @@ export default function LandingPage() {
             </nav>
           )}
 
+          {/* "loyal" logotype SVG - beside sidebar, covered when sidebar opens */}
+          {!isChatMode && (
+            <div
+              style={{
+                position: "fixed",
+                top: "24px",
+                left: "68px",
+                zIndex: 55,
+                opacity: isSidebarOpen ? 0 : 1,
+                pointerEvents: "none",
+                transition: "opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              }}
+            >
+              <Image
+                alt="loyal"
+                height={20}
+                src="/hero-new/Logotype.svg"
+                style={{ display: "block" }}
+                width={48}
+              />
+            </div>
+          )}
+
           {/* Sidebar Container - Fixed position on left */}
           <div
             style={{
               position: "fixed",
-              top: "8px",
-              left: "8px",
+              top: isSidebarOpen ? "8px" : "16px",
+              left: isSidebarOpen ? "8px" : "16px",
               bottom: "8px",
+              transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               zIndex: 60,
               display: "flex",
               flexDirection: "column",
@@ -973,7 +988,7 @@ export default function LandingPage() {
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
-                padding: "8px 0",
+                padding: "0",
                 opacity: isSidebarOpen ? 0 : 1,
                 pointerEvents: isSidebarOpen ? "none" : "auto",
                 transition: "opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -1677,7 +1692,7 @@ export default function LandingPage() {
                   ? "translateY(0)"
                   : isInputStuckToBottom
                     ? "translateY(0)"
-                    : `translateY(calc(50% + ${parallaxOffset}px))`,
+                    : `translateY(calc(50% - 17px + ${parallaxOffset}px))`,
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -1691,40 +1706,23 @@ export default function LandingPage() {
                     : "transform 0.3s ease-out",
               }}
             >
-              {/* Logo + Loyal title - only visible when not in chat mode */}
-              {!(isChatMode || isInputStuckToBottom) && (
+              {/* Dog illustration */}
+              {!isChatMode && !isInputStuckToBottom && (
                 <div
                   style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: "16px",
-                    marginBottom: "48px",
+                    width: "160px",
+                    height: "128px",
+                    marginBottom: "-18px",
                     pointerEvents: "none",
                   }}
                 >
                   <Image
-                    alt="Loyal"
-                    height={48}
-                    src="/logo-web.svg"
-                    style={{ flexShrink: 0 }}
-                    width={60}
+                    alt="Loyal Dog"
+                    height={128}
+                    src="/hero-new/Dog.svg"
+                    style={{ width: "100%", height: "100%" }}
+                    width={160}
                   />
-                  <h1
-                    style={{
-                      fontFamily: "var(--font-geist-sans), sans-serif",
-                      fontSize: "48px",
-                      fontWeight: 600,
-                      lineHeight: "none",
-                      letterSpacing: "-1.92px",
-                      color: "#000",
-                      whiteSpace: "nowrap",
-                      margin: 0,
-                      flexShrink: 0,
-                    }}
-                  >
-                    loyal
-                  </h1>
                 </div>
               )}
 
@@ -1899,21 +1897,47 @@ export default function LandingPage() {
                 </div>
               </form>
 
-              {/* Transaction widget - drag & drop tokens below input when not scrolled */}
-              {/* {skillsEnabled && !isChatMode && !isInputStuckToBottom && (
-                <div
-                  className="mt-4"
-                  style={{
-                    pointerEvents: "auto",
-                    width: "100%",
-                    maxWidth: "768px",
-                  }}
-                >
-                  <TransactionWidget
-                    onTransactionComplete={handleTransactionWidgetComplete}
-                  />
+              {/* Wallet + Action Cards */}
+              {!isChatMode && !isInputStuckToBottom && (
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", width: "100%", maxWidth: "768px", padding: "0 16px", marginTop: "28px", pointerEvents: "auto" }}>
+                  <div style={{ flex: 1, display: "flex", gap: "16px", alignItems: "flex-start", padding: "16px 16px 12px", borderRadius: "20px" }}>
+                    <div style={{ width: "64px", height: "64px", borderRadius: "12px", border: "0.533px solid rgba(0, 0, 0, 0.08)", overflow: "hidden", flexShrink: 0 }}>
+                      <Image alt="Wallet" height={64} src="/hero-new/Wallet-Cover.png" style={{ width: "100%", height: "100%", objectFit: "cover" }} width={64} />
+                    </div>
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <span style={{ fontFamily: "var(--font-geist-sans), sans-serif", fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: "rgba(60, 60, 67, 0.6)", fontFeatureSettings: "'liga' off, 'clig' off" }}>UQAt…qZir · Mainnet</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{ borderRadius: "8px", overflow: "hidden" }}>
+                          <span style={{ fontFamily: "var(--font-geist-sans), sans-serif", fontSize: "28px", fontWeight: 600, lineHeight: "32px", color: "#000", fontFeatureSettings: "'liga' off, 'clig' off", filter: isBalanceHidden ? "url(#pixelate-lg)" : "none", transition: "filter 0.2s ease", userSelect: isBalanceHidden ? "none" : "auto", display: "block" }}>$1,267<span style={{ color: "rgba(60, 60, 67, 0.6)" }}>.47</span></span>
+                        </div>
+                        <button onClick={() => setIsBalanceHidden((v) => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }} type="button">
+                          {isBalanceHidden ? (<EyeOff size={28} strokeWidth={1.75} style={{ color: "rgba(60, 60, 67, 0.6)" }} />) : (<Eye size={28} strokeWidth={1.75} style={{ color: "rgba(60, 60, 67, 0.6)" }} />)}
+                        </button>
+                      </div>
+                      <div style={{ borderRadius: "6px", overflow: "hidden" }}>
+                        <span style={{ fontFamily: "var(--font-geist-sans), sans-serif", fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: "rgba(60, 60, 67, 0.6)", fontFeatureSettings: "'liga' off, 'clig' off", filter: isBalanceHidden ? "url(#pixelate)" : "none", transition: "filter 0.2s ease", userSelect: isBalanceHidden ? "none" : "auto", display: "block" }}>14.98765 SOL</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, display: "flex", gap: "8px", alignItems: "center" }}>
+                    <div style={{ flex: 1, height: "116px", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "flex-start", padding: "16px 16px 12px", borderRadius: "20px", border: "1px solid rgba(0, 0, 0, 0.08)", overflow: "hidden" }}>
+                      <div style={{ display: "flex", alignItems: "center", paddingRight: "10px" }}>
+                        <div style={{ width: "36px", height: "36px", borderRadius: "90px", border: "2px solid white", overflow: "hidden", marginRight: "-10px", position: "relative", zIndex: 2 }}><Image alt="USDC" height={36} src="/hero-new/usdc.png" style={{ width: "100%", height: "100%", objectFit: "cover" }} width={36} /></div>
+                        <div style={{ width: "36px", height: "36px", borderRadius: "90px", border: "2px solid white", overflow: "hidden", position: "relative", zIndex: 1 }}><Image alt="SOL" height={36} src="/hero-new/solana.png" style={{ width: "100%", height: "100%", objectFit: "cover" }} width={36} /></div>
+                      </div>
+                      <span style={{ fontFamily: "var(--font-geist-sans), sans-serif", fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: "rgba(60, 60, 67, 0.6)", fontFeatureSettings: "'liga' off, 'clig' off" }}>Portfolio</span>
+                    </div>
+                    <div style={{ flex: 1, height: "116px", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "flex-start", padding: "16px 16px 12px", borderRadius: "20px", border: "1px solid rgba(0, 0, 0, 0.08)", overflow: "hidden" }}>
+                      <div style={{ width: "36px", height: "36px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", display: "flex", alignItems: "center", justifyContent: "center" }}><ArrowUpToLine size={20} style={{ color: "#F9363C" }} /></div>
+                      <span style={{ fontFamily: "var(--font-geist-sans), sans-serif", fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: "rgba(60, 60, 67, 0.6)", fontFeatureSettings: "'liga' off, 'clig' off" }}>Send</span>
+                    </div>
+                    <div style={{ flex: 1, height: "116px", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "flex-start", padding: "16px 16px 12px", borderRadius: "20px", border: "1px solid rgba(0, 0, 0, 0.08)", overflow: "hidden" }}>
+                      <div style={{ width: "36px", height: "36px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", display: "flex", alignItems: "center", justifyContent: "center" }}><RefreshCw size={20} style={{ color: "#F9363C" }} /></div>
+                      <span style={{ fontFamily: "var(--font-geist-sans), sans-serif", fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: "rgba(60, 60, 67, 0.6)", fontFeatureSettings: "'liga' off, 'clig' off" }}>Swap</span>
+                    </div>
+                  </div>
                 </div>
-              )} */}
+              )}
             </div>
           </div>
         </div>
