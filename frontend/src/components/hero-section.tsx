@@ -7,7 +7,7 @@ import { HeroNav } from "@/components/hero-nav";
 import {
   HeroRightSidebar,
   type RightSidebarTab,
-} from "@/components/hero-right-sidebar";
+} from "@/components/wallet-sidebar";
 import { HeroSidebar } from "@/components/hero-sidebar";
 import type { UIMessage } from "ai";
 
@@ -394,6 +394,7 @@ export function HeroSection(props: HeroSectionProps) {
             isOpen={isRightSidebarOpen}
             activeTab={rightSidebarTab}
             onClose={() => setIsRightSidebarOpen(false)}
+            onTabChange={setRightSidebarTab}
             isBalanceHidden={isBalanceHidden}
             onBalanceHiddenChange={setIsBalanceHidden}
           />

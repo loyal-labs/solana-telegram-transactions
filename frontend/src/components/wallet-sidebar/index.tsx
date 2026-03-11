@@ -1,0 +1,295 @@
+"use client";
+
+import { X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { AllActivityView } from "./all-activity-view";
+import { AllTokensView } from "./all-tokens-view";
+import { PortfolioContent } from "./portfolio-content";
+import { SendContent } from "./send-content";
+import { SwapContent } from "./swap-content";
+import { TokenSelectView } from "./token-select-view";
+import { TransactionDetailView } from "./transaction-detail-view";
+import type { HeroRightSidebarProps, SubView, SwapToken, TransactionDetail } from "./types";
+import { swapTokens } from "./types";
+
+export type { RightSidebarTab, HeroRightSidebarProps } from "./types";
+
+export function HeroRightSidebar(props: HeroRightSidebarProps) {
+  const [subView, setSubView] = useState<SubView>(null);
+  const [listSubView, setListSubView] = useState<"allTokens" | "allActivity" | null>(null);
+
+  // Cross-fade when switching tabs: fade out → swap content → fade in
+  const [crossFadeOpacity, setCrossFadeOpacity] = useState(1);
+  const [displayTab, setDisplayTab] = useState(props.activeTab);
+  useEffect(() => {
+    if (props.activeTab !== displayTab) {
+      setCrossFadeOpacity(0); // fade out
+      const t = setTimeout(() => {
+        setDisplayTab(props.activeTab); // swap content while near-invisible
+        setCrossFadeOpacity(1); // fade in
+      }, 200);
+      return () => clearTimeout(t);
+    }
+  }, [props.activeTab, displayTab]);
+
+  // Swap token state (lifted here so token selection sub-view can update it)
+  const [swapFromToken, setSwapFromToken] = useState<SwapToken>(swapTokens[0]);
+  const [swapToToken, setSwapToToken] = useState<SwapToken>(swapTokens[1]);
+
+  // Derived state
+  const isTransaction = typeof subView === "object" && subView?.type === "transaction";
+  const isTokenSelect = typeof subView === "object" && subView?.type === "tokenSelect";
+  const hasLevel1 = subView === "allTokens" || subView === "allActivity" || isTransaction || isTokenSelect;
+  const hasLevel2 = isTransaction;
+
+  // Keep listSubView in sync
+  useEffect(() => {
+    if (subView === "allTokens" || subView === "allActivity") {
+      setListSubView(subView);
+    } else if (subView === null) {
+      const t = setTimeout(() => setListSubView(null), 350);
+      return () => clearTimeout(t);
+    }
+  }, [subView]);
+
+  // Reset everything when sidebar closes
+  useEffect(() => {
+    if (!props.isOpen) {
+      const t = setTimeout(() => {
+        setSubView(null);
+        setListSubView(null);
+      }, 350);
+      return () => clearTimeout(t);
+    }
+  }, [props.isOpen]);
+
+  const handleTokenSelect = useCallback(
+    (token: SwapToken) => {
+      if (typeof subView === "object" && subView?.type === "tokenSelect") {
+        if (subView.field === "from") {
+          // If selecting the same token as "to", swap them
+          if (token.symbol === swapToToken.symbol) {
+            setSwapToToken(swapFromToken);
+          }
+          setSwapFromToken(token);
+        } else {
+          if (token.symbol === swapFromToken.symbol) {
+            setSwapFromToken(swapToToken);
+          }
+          setSwapToToken(token);
+        }
+      }
+    },
+    [subView, swapFromToken, swapToToken],
+  );
+
+  return (
+    <>
+      <style jsx>{`
+        .right-sidebar-close:hover {
+          background: rgba(0, 0, 0, 0.08) !important;
+        }
+        .show-all-btn:hover {
+          background: rgba(249, 54, 60, 0.22) !important;
+        }
+      `}</style>
+
+      <div
+        style={{
+          position: "fixed",
+          top: "8px",
+          right: "8px",
+          bottom: "8px",
+          zIndex: 110,
+          pointerEvents: props.isOpen ? "auto" : "none",
+        }}
+      >
+        <div
+          style={{
+            width: "398px",
+            height: "100%",
+            position: "relative",
+            transform: props.isOpen ? "translateX(0)" : "translateX(110%)",
+            opacity: props.isOpen ? 1 : 0,
+            transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+        >
+          {/* Layer 0: Main panel */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: hasLevel1 ? "#EBEBEB" : "#F5F5F5",
+              borderRadius: "20px",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              transform: hasLevel1 ? "translateX(-6px)" : "translateX(0)",
+              transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              pointerEvents: hasLevel1 ? "none" : "auto",
+            }}
+          >
+            {/* Content wrapper for cross-fade (bg stays solid) */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                flex: 1,
+                minHeight: 0,
+                opacity: crossFadeOpacity,
+                transition: "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+              }}
+            >
+              {displayTab === "portfolio" && (
+                <>
+                  <button
+                    className="right-sidebar-close"
+                    onClick={props.onClose}
+                    style={{
+                      position: "absolute",
+                      top: "8px",
+                      right: "8px",
+                      width: "36px",
+                      height: "36px",
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      background: "rgba(0, 0, 0, 0.04)",
+                      border: "none",
+                      borderRadius: "9999px",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      color: "#3C3C43",
+                      zIndex: 2,
+                    }}
+                  >
+                    <X size={24} />
+                  </button>
+                  <PortfolioContent
+                    isBalanceHidden={props.isBalanceHidden}
+                    onBalanceHiddenChange={props.onBalanceHiddenChange}
+                    onNavigate={setSubView}
+                  />
+                </>
+              )}
+              {displayTab === "send" && (
+                <>
+                  <button
+                    className="right-sidebar-close"
+                    onClick={props.onClose}
+                    style={{
+                      position: "absolute",
+                      top: "8px",
+                      right: "8px",
+                      width: "36px",
+                      height: "36px",
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      background: "rgba(0, 0, 0, 0.04)",
+                      border: "none",
+                      borderRadius: "9999px",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      color: "#3C3C43",
+                      zIndex: 2,
+                    }}
+                  >
+                    <X size={24} />
+                  </button>
+                  <SendContent />
+                </>
+              )}
+              {displayTab === "swap" && (
+                <SwapContent
+                  fromToken={swapFromToken}
+                  onClose={props.onClose}
+                  onDone={() => props.onTabChange("portfolio")}
+                  onFromTokenChange={setSwapFromToken}
+                  onNavigate={setSubView}
+                  onToTokenChange={setSwapToToken}
+                  toToken={swapToToken}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Layer 1: Sub-views (allTokens / allActivity / tokenSelect) */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: hasLevel2 ? "#EBEBEB" : "#F5F5F5",
+              borderRadius: "20px",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              transform: hasLevel1
+                ? hasLevel2
+                  ? "translateX(-6px)"
+                  : "translateX(0)"
+                : "translateX(105%)",
+              opacity: hasLevel1 ? 1 : 0,
+              transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              pointerEvents: hasLevel1 && !hasLevel2 ? "auto" : "none",
+            }}
+          >
+            {listSubView === "allTokens" && (
+              <AllTokensView
+                isBalanceHidden={props.isBalanceHidden}
+                onBack={() => setSubView(null)}
+                onClose={props.onClose}
+              />
+            )}
+            {listSubView === "allActivity" && (
+              <AllActivityView
+                isBalanceHidden={props.isBalanceHidden}
+                onBack={() => setSubView(null)}
+                onClose={props.onClose}
+                onNavigate={setSubView}
+              />
+            )}
+            {isTokenSelect && (
+              <TokenSelectView
+                currentToken={(subView as { type: "tokenSelect"; field: "from" | "to" }).field === "from" ? swapFromToken : swapToToken}
+                onBack={() => setSubView(null)}
+                onClose={props.onClose}
+                onSelect={handleTokenSelect}
+                title={(subView as { type: "tokenSelect"; field: "from" | "to" }).field === "from" ? "You Swap" : "You Receive"}
+              />
+            )}
+          </div>
+
+          {/* Layer 2: Transaction detail */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "#F5F5F5",
+              borderRadius: "20px",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              transform: hasLevel2 ? "translateX(0)" : "translateX(105%)",
+              opacity: hasLevel2 ? 1 : 0,
+              transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+              pointerEvents: hasLevel2 ? "auto" : "none",
+            }}
+          >
+            {isTransaction && (
+              <TransactionDetailView
+                detail={(subView as { type: "transaction"; detail: TransactionDetail; from: "portfolio" | "allActivity" }).detail}
+                onBack={() => {
+                  const from = (subView as { type: "transaction"; detail: TransactionDetail; from: "portfolio" | "allActivity" }).from;
+                  setSubView(from === "allActivity" ? "allActivity" : null);
+                }}
+                onClose={props.onClose}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

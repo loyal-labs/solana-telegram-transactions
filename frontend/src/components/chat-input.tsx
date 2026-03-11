@@ -3,7 +3,7 @@
 import { ArrowUpRight, Eye, EyeOff, RefreshCw } from "lucide-react";
 import Image from "next/image";
 
-import type { RightSidebarTab } from "@/components/hero-right-sidebar";
+import type { RightSidebarTab } from "@/components/wallet-sidebar";
 
 export interface ChatInputProps {
   isChatMode: boolean;
