@@ -4,6 +4,13 @@ import type {
   GetPasskeyAccountResponse,
   GridEnvironment,
 } from "@sqds/grid";
+import type {
+  GetEmailAuthSessionResponse,
+  StartEmailAuthRequest,
+  StartEmailAuthResponse,
+  VerifyEmailAuthRequest,
+  VerifyEmailAuthResponse,
+} from "./contracts";
 
 export type FetchLike = (
   input: RequestInfo | URL,
@@ -32,6 +39,16 @@ export type StartPasskeyRegistrationInput = CreatePasskeySessionRequest;
 export type StartPasskeySignInInput = AuthorizePasskeySessionRequest;
 
 export type GridAuthClient = {
+  startEmailAuth: (
+    payload: StartEmailAuthRequest
+  ) => Promise<ApiOutcome<StartEmailAuthResponse | unknown>>;
+  verifyEmailAuth: (
+    payload: VerifyEmailAuthRequest
+  ) => Promise<ApiOutcome<VerifyEmailAuthResponse | unknown>>;
+  getEmailAuthSession: () => Promise<
+    ApiOutcome<GetEmailAuthSessionResponse | unknown>
+  >;
+  logoutEmailAuth: () => Promise<ApiOutcome<unknown>>;
   startPasskeyRegistration: (
     payload: StartPasskeyRegistrationInput
   ) => Promise<ApiOutcome<unknown>>;

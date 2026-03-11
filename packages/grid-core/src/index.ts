@@ -8,8 +8,11 @@ export {
   resolveGridServerClientConfig,
 } from "./server";
 export {
+  emailAuthModeSchema,
+  emailAuthUserSchema,
   createAccountRequestSchema,
   findAccountRequestSchema,
+  getEmailAuthSessionResponseSchema,
   gridAuthRoutePaths,
   gridEnvironmentSchema,
   gridPasskeyUpstreamApiPaths,
@@ -17,9 +20,13 @@ export {
   sessionEnvironmentSchema,
   sessionKeyBackendSchema,
   sessionKeySchema,
+  startEmailAuthRequestSchema,
+  startEmailAuthResponseSchema,
   startPasskeyRegistrationRequestSchema,
   startPasskeySignInRequestSchema,
   submitSessionRequestSchema,
+  verifyEmailAuthRequestSchema,
+  verifyEmailAuthResponseSchema,
 } from "./contracts";
 export {
   extractGridErrorMessage,
@@ -27,11 +34,18 @@ export {
   parseGridErrorDetails,
 } from "./errors";
 export type {
+  EmailAuthMode,
   CreateAccountRequest,
+  EmailAuthUser,
   FindAccountRequest,
+  GetEmailAuthSessionResponse,
+  StartEmailAuthRequest,
+  StartEmailAuthResponse,
   StartPasskeyRegistrationRequest,
   StartPasskeySignInRequest,
   SubmitSessionRequest,
+  VerifyEmailAuthRequest,
+  VerifyEmailAuthResponse,
 } from "./contracts";
 export type {
   ApiOutcome,

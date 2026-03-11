@@ -1,5 +1,3 @@
-import "server-only";
-
 import { parsePasskeyServerConfig } from "@/lib/core/config/schema";
 import type { PasskeyServerConfig } from "@/lib/core/config/types";
 

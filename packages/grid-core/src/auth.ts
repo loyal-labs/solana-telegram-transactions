@@ -60,6 +60,34 @@ export function createGridAuthClient(
   config: GridAuthRuntimeConfig
 ): GridAuthClient {
   return {
+    startEmailAuth: (payload) =>
+      callGridAuthEndpoint(config, gridAuthRoutePaths.startEmailAuth, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      }),
+    verifyEmailAuth: (payload) =>
+      callGridAuthEndpoint(config, gridAuthRoutePaths.verifyEmailAuth, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      }),
+    getEmailAuthSession: () =>
+      callGridAuthEndpoint(config, gridAuthRoutePaths.getEmailAuthSession, {
+        method: "GET",
+        credentials: "include",
+      }),
+    logoutEmailAuth: () =>
+      callGridAuthEndpoint(config, gridAuthRoutePaths.logoutEmailAuth, {
+        method: "POST",
+        credentials: "include",
+      }),
     startPasskeyRegistration: (payload: StartPasskeyRegistrationInput) =>
       callGridAuthEndpoint(config, gridAuthRoutePaths.startPasskeyRegistration, {
         method: "POST",

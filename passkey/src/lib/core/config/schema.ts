@@ -31,6 +31,8 @@ const serverConfigSchema = z.object({
     .default("https://grid.squads.xyz"),
   GRID_APP_NAME: z.string().min(1).default("askloyal"),
   GRID_API_KEY: z.string().min(1).optional(),
+  AUTH_JWT_SECRET: z.string().min(32),
+  AUTH_JWT_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 60 * 24 * 7),
 }).superRefine((value, ctx) => {
   if (value.GRID_ALLOWED_PARENT_DOMAIN !== value.GRID_RP_ID) {
     ctx.addIssue({
@@ -57,5 +59,7 @@ export function parsePasskeyServerConfig(
     gridApiBaseUrl: trimTrailingSlash(parsed.GRID_API_BASE_URL),
     appName: parsed.GRID_APP_NAME,
     gridApiKey: parsed.GRID_API_KEY,
+    authJwtSecret: parsed.AUTH_JWT_SECRET,
+    authJwtTtlSeconds: parsed.AUTH_JWT_TTL_SECONDS,
   };
 }

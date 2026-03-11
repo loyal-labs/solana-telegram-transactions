@@ -2,6 +2,8 @@
 // light theme v1
 import { useChat } from "@ai-sdk/react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useAuthCapability } from "@/lib/auth/capability";
+import { useAuthSession } from "@/contexts/auth-session-context";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import {
   ArrowDownIcon,
@@ -112,6 +114,8 @@ export default function LandingPage() {
 
   // Wallet hooks
   const { connected: isConnected, connecting: isWalletLoading, publicKey } = useWallet();
+  const { isHydrated: isAuthHydrated } = useAuthSession();
+  const { isSignedIn } = useAuthCapability();
   const { open } = useSignInModal();
   const solanaAddress = publicKey?.toBase58();
 
@@ -126,13 +130,20 @@ export default function LandingPage() {
   // Wait until wallet loading is complete to avoid false triggers during initialization
   useEffect(() => {
     if (
-      !(isWalletLoading || hasPromptedAuth || isConnected) &&
+      !(isWalletLoading || !isAuthHydrated || hasPromptedAuth || isSignedIn) &&
       pendingText.length > 0
     ) {
       setHasPromptedAuth(true);
       open();
     }
-  }, [hasPromptedAuth, isConnected, isWalletLoading, pendingText, open]);
+  }, [
+    hasPromptedAuth,
+    isAuthHydrated,
+    isSignedIn,
+    isWalletLoading,
+    open,
+    pendingText,
+  ]);
 
   // Toggle body class when sidebar opens (for header visibility on mobile)
   useEffect(() => {
@@ -228,10 +239,10 @@ export default function LandingPage() {
   // Open Phantom modal when wallet disconnects in chat mode
   // Wait until wallet loading is complete to avoid false triggers during initialization
   useEffect(() => {
-    if (!isWalletLoading && isChatMode && !isConnected) {
+    if (!isWalletLoading && isAuthHydrated && isChatMode && !isSignedIn) {
       open();
     }
-  }, [isChatMode, isConnected, isWalletLoading, open]);
+  }, [isAuthHydrated, isChatMode, isSignedIn, isWalletLoading, open]);
 
   // Pre-fill input from URL query parameter (e.g., ?req=hello)
   useEffect(() => {
@@ -556,7 +567,7 @@ export default function LandingPage() {
     }
 
     // Check if wallet is connected before sending
-    if (!isConnected) {
+    if (!isSignedIn) {
       open();
       return;
     }
@@ -1791,8 +1802,8 @@ export default function LandingPage() {
                         }}
                         placeholder={
                           isOnline
-                            ? isChatMode && !isConnected
-                              ? "Please reconnect wallet to continue..."
+                            ? isChatMode && !isSignedIn
+                              ? "Please sign in to continue..."
                               : "Ask Loyal anything"
                             : "No internet connection..."
                         }

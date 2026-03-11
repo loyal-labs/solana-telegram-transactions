@@ -14,9 +14,42 @@ export const sessionKeySchema = z.object({
   expiration: z.number().int().positive(),
 });
 
+export const emailAuthModeSchema = z.enum(["create", "auth"]);
+
 export const sessionKeyBackendSchema = z.object({
   key: z.array(z.number().int().min(0).max(255)),
   expiration: z.number().int().positive(),
+});
+
+export const startEmailAuthRequestSchema = z.object({
+  email: z.string().trim().email(),
+  turnstileToken: z.string().trim().min(1).optional(),
+});
+
+export const startEmailAuthResponseSchema = z.object({
+  authTicketId: z.string().uuid(),
+  expiresAt: z.string().datetime(),
+  maskedEmail: z.string().min(1),
+});
+
+export const emailAuthUserSchema = z.object({
+  email: z.string().trim().email(),
+  gridUserId: z.string().min(1),
+  accountAddress: z.string().min(1),
+  provider: z.string().min(1).optional(),
+});
+
+export const verifyEmailAuthRequestSchema = z.object({
+  authTicketId: z.string().uuid(),
+  otpCode: z.string().trim().min(1).max(12),
+});
+
+export const verifyEmailAuthResponseSchema = z.object({
+  user: emailAuthUserSchema,
+});
+
+export const getEmailAuthSessionResponseSchema = z.object({
+  user: emailAuthUserSchema,
 });
 
 export const startPasskeyRegistrationRequestSchema = z
@@ -81,12 +114,25 @@ export const gridPasskeyUpstreamApiPaths = {
 } as const;
 
 export const gridAuthRoutePaths = {
+  startEmailAuth: "/api/auth/email/start",
+  verifyEmailAuth: "/api/auth/email/verify",
+  getEmailAuthSession: "/api/auth/session",
+  logoutEmailAuth: "/api/auth/logout",
   startPasskeyRegistration: "/api/passkeys/session/create",
   startPasskeySignIn: "/api/passkeys/session/authorize",
   getPasskeyAccount: (passkeyAddress: string) =>
     `/api/passkeys/account/${passkeyAddress}`,
 } as const;
 
+export type StartEmailAuthRequest = z.infer<typeof startEmailAuthRequestSchema>;
+export type StartEmailAuthResponse = z.infer<typeof startEmailAuthResponseSchema>;
+export type EmailAuthMode = z.infer<typeof emailAuthModeSchema>;
+export type EmailAuthUser = z.infer<typeof emailAuthUserSchema>;
+export type VerifyEmailAuthRequest = z.infer<typeof verifyEmailAuthRequestSchema>;
+export type VerifyEmailAuthResponse = z.infer<typeof verifyEmailAuthResponseSchema>;
+export type GetEmailAuthSessionResponse = z.infer<
+  typeof getEmailAuthSessionResponseSchema
+>;
 export type StartPasskeyRegistrationRequest = z.infer<
   typeof startPasskeyRegistrationRequestSchema
 >;

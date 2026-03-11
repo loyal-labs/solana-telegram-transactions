@@ -8,4 +8,6 @@ export type PasskeyServerConfig = {
   gridApiBaseUrl: string;
   appName: string;
   gridApiKey?: string;
+  authJwtSecret: string;
+  authJwtTtlSeconds: number;
 };

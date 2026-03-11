@@ -3,26 +3,31 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
 
+import { useAuthCapability } from "@/lib/auth/capability";
+import { useAuthSession } from "@/contexts/auth-session-context";
 import { useChatMode } from "@/contexts/chat-mode-context";
 import { useSignInModal } from "@/contexts/sign-in-modal-context";
 
 export function Header() {
   const [mounted, setMounted] = useState(false);
   const { isChatMode } = useChatMode();
-  const { connected, publicKey } = useWallet();
+  const { publicKey } = useWallet();
+  const { hasWalletConnection } = useAuthCapability();
+  const { user } = useAuthSession();
   const { open } = useSignInModal();
 
   const solanaAddress = publicKey?.toBase58();
   const truncatedAddress = solanaAddress
     ? `${solanaAddress.slice(0, 4)}...${solanaAddress.slice(-4)}`
     : null;
+  const emailLabel = user?.email ?? null;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   // Hide when: chat mode AND connected (wallet button is in sidebar)
-  const shouldHide = isChatMode && connected;
+  const shouldHide = isChatMode && hasWalletConnection;
 
   if (!mounted || shouldHide) {
     return null;
@@ -52,7 +57,9 @@ export function Header() {
               color: "#000",
             }}
           >
-            {connected && truncatedAddress ? truncatedAddress : "Sign In"}
+            {hasWalletConnection && truncatedAddress
+              ? truncatedAddress
+              : emailLabel ?? "Sign In"}
           </span>
         </button>
       </header>

@@ -6,6 +6,7 @@ import Script from "next/script";
 import { SignInModal } from "@/components/auth/sign-in-modal";
 import { WalletConnectionProvider } from "@/components/solana/wallet-provider";
 import { Header } from "@/components/ui/header";
+import { AuthSessionProvider } from "@/contexts/auth-session-context";
 import { ChatModeProvider } from "@/contexts/chat-mode-context";
 import { SignInModalProvider } from "@/contexts/sign-in-modal-context";
 import { UserChatsProvider } from "@/providers/user-chats";
@@ -73,15 +74,17 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <WalletConnectionProvider>
-          <SignInModalProvider>
-            <UserChatsProvider>
-              <ChatModeProvider>
-                <Header />
-                {children}
-                <SignInModal />
-              </ChatModeProvider>
-            </UserChatsProvider>
-          </SignInModalProvider>
+          <AuthSessionProvider>
+            <SignInModalProvider>
+              <UserChatsProvider>
+                <ChatModeProvider>
+                  <Header />
+                  {children}
+                  <SignInModal />
+                </ChatModeProvider>
+              </UserChatsProvider>
+            </SignInModalProvider>
+          </AuthSessionProvider>
         </WalletConnectionProvider>
 
         {/* Umami Analytics */}
