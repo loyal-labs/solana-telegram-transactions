@@ -17,7 +17,11 @@ let viewportMounted = false;
 interface TelegramWebApp {
   ready: () => void;
   version: string;
+  platform?: string;
+  isFullscreen?: boolean;
   isVersionAtLeast: (version: string) => boolean;
+  setHeaderColor?: (color: string) => void;
+  setBackgroundColor?: (color: string) => void;
   contentSafeAreaInset?: {
     top: number;
     bottom: number;
@@ -226,6 +230,35 @@ export const initTelegram = () => {
         miniApp.ready();
       } catch {
         // Gracefully handle if SDK init was incomplete
+      }
+
+      // Set header color to white so Android uses dark status bar icons.
+      // Per Telegram docs: "This color helps determine a contrasting color
+      // for the status bar and other UI controls."
+      try {
+        if (
+          miniApp.setHeaderColor.isAvailable() &&
+          miniApp.setHeaderColor.supports("rgb")
+        ) {
+          miniApp.setHeaderColor("#ffffff");
+        } else if (miniApp.setHeaderColor.isAvailable()) {
+          miniApp.setHeaderColor("bg_color");
+        }
+      } catch {
+        // Ignore SDK errors
+      }
+
+      // Also set via native WebApp API (most reliable on Android)
+      try {
+        const webApp = window.Telegram?.WebApp;
+        if (typeof webApp?.setHeaderColor === "function") {
+          webApp.setHeaderColor("#ffffff");
+        }
+        if (typeof webApp?.setBackgroundColor === "function") {
+          webApp.setBackgroundColor("#ffffff");
+        }
+      } catch {
+        // Ignore if not supported
       }
 
       // Also call native ready() for good measure
