@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessages } from "@/components/chat-messages";
 import { HeroNav } from "@/components/hero-nav";
+import {
+  HeroRightSidebar,
+  type RightSidebarTab,
+} from "@/components/hero-right-sidebar";
 import { HeroSidebar } from "@/components/hero-sidebar";
 import type { UIMessage } from "ai";
 
@@ -31,6 +35,10 @@ export interface HeroSectionProps {
 
 export function HeroSection(props: HeroSectionProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+  const [rightSidebarTab, setRightSidebarTab] =
+    useState<RightSidebarTab>("portfolio");
+  const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const [parallaxOffset, setParallaxOffset] = useState(0);
   const [isInputStuckToBottom, setIsInputStuckToBottom] = useState(false);
   const [stickyInputBottomOffset, setStickyInputBottomOffset] = useState(24);
@@ -374,6 +382,20 @@ export function HeroSection(props: HeroSectionProps) {
             isLoading={props.isLoading}
             isSignedIn={props.isSignedIn}
             isOnline={props.isOnline}
+            isBalanceHidden={isBalanceHidden}
+            onBalanceHiddenChange={setIsBalanceHidden}
+            onOpenRightSidebar={(tab) => {
+              setRightSidebarTab(tab);
+              setIsRightSidebarOpen(true);
+            }}
+          />
+
+          <HeroRightSidebar
+            isOpen={isRightSidebarOpen}
+            activeTab={rightSidebarTab}
+            onClose={() => setIsRightSidebarOpen(false)}
+            isBalanceHidden={isBalanceHidden}
+            onBalanceHiddenChange={setIsBalanceHidden}
           />
         </div>
       </div>

@@ -2,7 +2,8 @@
 
 import { ArrowUpRight, Eye, EyeOff, RefreshCw } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+
+import type { RightSidebarTab } from "@/components/hero-right-sidebar";
 
 export interface ChatInputProps {
   isChatMode: boolean;
@@ -17,10 +18,13 @@ export interface ChatInputProps {
   isLoading: boolean;
   isSignedIn: boolean;
   isOnline: boolean;
+  isBalanceHidden: boolean;
+  onBalanceHiddenChange: (hidden: boolean) => void;
+  onOpenRightSidebar: (tab: RightSidebarTab) => void;
 }
 
 export function ChatInput(props: ChatInputProps) {
-  const [isBalanceHidden, setIsBalanceHidden] = useState(false);
+  const isBalanceHidden = props.isBalanceHidden;
 
   return (
     <>
@@ -28,7 +32,12 @@ export function ChatInput(props: ChatInputProps) {
       <svg
         aria-hidden="true"
         height="0"
-        style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+        style={{
+          position: "absolute",
+          width: 0,
+          height: 0,
+          overflow: "hidden",
+        }}
         width="0"
       >
         <defs>
@@ -57,20 +66,20 @@ export function ChatInput(props: ChatInputProps) {
           position: props.isChatMode
             ? "absolute"
             : props.isInputStuckToBottom
-              ? "fixed"
-              : "absolute",
+            ? "fixed"
+            : "absolute",
           bottom: props.isChatMode
             ? "16px"
             : props.isInputStuckToBottom
-              ? `${props.stickyInputBottomOffset}px`
-              : "50%",
+            ? `${props.stickyInputBottomOffset}px`
+            : "50%",
           left: props.isInputStuckToBottom && !props.isChatMode ? "0" : "16px",
           right: props.isInputStuckToBottom && !props.isChatMode ? "0" : "16px",
           transform: props.isChatMode
             ? "translateY(0)"
             : props.isInputStuckToBottom
-              ? "translateY(0)"
-              : `translateY(calc(50% - 17px + ${props.parallaxOffset}px))`,
+            ? "translateY(0)"
+            : `translateY(calc(50% - 17px + ${props.parallaxOffset}px))`,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -80,8 +89,8 @@ export function ChatInput(props: ChatInputProps) {
           transition: props.isChatMode
             ? "bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)"
             : props.isInputStuckToBottom
-              ? "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), left 0.3s ease, right 0.3s ease, max-width 0.3s ease"
-              : "transform 0.3s ease-out",
+            ? "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), left 0.3s ease, right 0.3s ease, max-width 0.3s ease"
+            : "transform 0.3s ease-out",
         }}
       >
         {/* Dog illustration */}
@@ -231,8 +240,7 @@ export function ChatInput(props: ChatInputProps) {
                     alignItems: "center",
                     justifyContent: "center",
                     background: "#F9363C",
-                    opacity:
-                      props.hasUsableInput || props.isLoading ? 1 : 0.4,
+                    opacity: props.hasUsableInput || props.isLoading ? 1 : 0.4,
                     border: "none",
                     borderRadius: "9999px",
                     cursor:
@@ -375,7 +383,7 @@ export function ChatInput(props: ChatInputProps) {
                     </span>
                   </div>
                   <button
-                    onClick={() => setIsBalanceHidden((v) => !v)}
+                    onClick={() => props.onBalanceHiddenChange(!isBalanceHidden)}
                     style={{
                       background: "none",
                       border: "none",
@@ -445,6 +453,8 @@ export function ChatInput(props: ChatInputProps) {
                   border: "1px solid rgba(0, 0, 0, 0.08)",
                   overflow: "hidden",
                 }}
+                className="action-card"
+                onClick={() => props.onOpenRightSidebar("portfolio")}
               >
                 <div
                   style={{
@@ -469,7 +479,11 @@ export function ChatInput(props: ChatInputProps) {
                       alt="USDC"
                       height={36}
                       src="/hero-new/usdc.png"
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
                       width={36}
                     />
                   </div>
@@ -488,7 +502,11 @@ export function ChatInput(props: ChatInputProps) {
                       alt="SOL"
                       height={36}
                       src="/hero-new/solana.png"
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
                       width={36}
                     />
                   </div>
@@ -519,6 +537,8 @@ export function ChatInput(props: ChatInputProps) {
                   border: "1px solid rgba(0, 0, 0, 0.08)",
                   overflow: "hidden",
                 }}
+                className="action-card"
+                onClick={() => props.onOpenRightSidebar("send")}
               >
                 <div
                   style={{
@@ -559,6 +579,8 @@ export function ChatInput(props: ChatInputProps) {
                   border: "1px solid rgba(0, 0, 0, 0.08)",
                   overflow: "hidden",
                 }}
+                className="action-card"
+                onClick={() => props.onOpenRightSidebar("swap")}
               >
                 <div
                   style={{
@@ -615,6 +637,14 @@ export function ChatInput(props: ChatInputProps) {
         input::placeholder,
         textarea::placeholder {
           color: rgba(0, 0, 0, 0.4);
+        }
+
+        .action-card {
+          transition: background-color 0.3s ease;
+          cursor: pointer;
+        }
+        .action-card:hover {
+          background-color: rgba(0, 0, 0, 0.04);
         }
       `}</style>
     </>
