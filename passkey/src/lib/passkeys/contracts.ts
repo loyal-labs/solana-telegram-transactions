@@ -1,89 +1,19 @@
-import { z } from "zod";
-
-export const gridEnvironmentSchema = z.enum(["sandbox", "production"]);
-export const sessionEnvironmentSchema = z.enum([
-  "sandbox",
-  "production",
-  "devnet",
-  "mainnet",
-  "testnet",
-]);
-
-export const sessionKeySchema = z.object({
-  key: z.unknown(),
-  expiration: z.number().int().positive(),
-});
-
-export const sessionKeyBackendSchema = z.object({
-  key: z.array(z.number().int().min(0).max(255)),
-  expiration: z.number().int().positive(),
-});
-
-export const createSessionRequestSchema = z
-  .object({
-    sessionKey: sessionKeySchema,
-    env: sessionEnvironmentSchema,
-    metaInfo: z.record(z.string(), z.unknown()).default({}),
-  })
-  .passthrough();
-
-export const authorizeSessionRequestSchema = z
-  .object({
-    sessionKey: sessionKeySchema.optional(),
-    metaInfo: z
-      .object({
-        appName: z.string().min(1),
-        redirectUrl: z.string().url().optional(),
-      })
-      .passthrough(),
-    baseUrl: z.string().url().optional(),
-    accountAddress: z.string().optional(),
-  })
-  .passthrough();
-
-export const submitSessionRequestSchema = z
-  .object({
-    ceremonyType: z.enum(["create", "auth"]),
-    sessionKey: sessionKeyBackendSchema,
-    slotNumber: z.coerce.number().int().nonnegative(),
-    authenticatorResponse: z.unknown(),
-  })
-  .passthrough();
-
-export const createAccountRequestSchema = z
-  .object({
-    sessionKey: sessionKeySchema,
-    slotNumber: z.coerce.number().int().nonnegative(),
-    authenticatorResponse: z.unknown(),
-    adminAddress: z.string().optional(),
-    memo: z.string().optional(),
-  })
-  .passthrough();
-
-export const findAccountRequestSchema = z
-  .object({
-    sessionKey: sessionKeySchema,
-    authenticatorResponse: z.unknown(),
-  })
-  .passthrough();
-
-export const passkeyAccountParamSchema = z.object({
-  passkeyAddress: z.string().min(1),
-});
-
-export const passkeyApiPaths = {
-  createSession: "/passkeys",
-  authorizeSession: "/passkeys/auth",
-  submitSession: "/passkeys/submit",
-  createAccount: "/passkeys/account",
-  getAccount: (passkeyAddress: string) => `/passkeys/account/${passkeyAddress}`,
-  findAccount: "/passkeys/find",
-} as const;
-
-export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
-export type AuthorizeSessionRequest = z.infer<
-  typeof authorizeSessionRequestSchema
->;
-export type SubmitSessionRequest = z.infer<typeof submitSessionRequestSchema>;
-export type CreateAccountRequest = z.infer<typeof createAccountRequestSchema>;
-export type FindAccountRequest = z.infer<typeof findAccountRequestSchema>;
+export {
+  createAccountRequestSchema,
+  findAccountRequestSchema,
+  gridAuthRoutePaths,
+  gridEnvironmentSchema,
+  gridPasskeyUpstreamApiPaths,
+  passkeyAccountParamSchema,
+  sessionEnvironmentSchema,
+  sessionKeyBackendSchema,
+  sessionKeySchema,
+  startPasskeyRegistrationRequestSchema as createSessionRequestSchema,
+  startPasskeySignInRequestSchema as authorizeSessionRequestSchema,
+  submitSessionRequestSchema,
+  type CreateAccountRequest,
+  type FindAccountRequest,
+  type StartPasskeyRegistrationRequest as CreateSessionRequest,
+  type StartPasskeySignInRequest as AuthorizeSessionRequest,
+  type SubmitSessionRequest,
+} from "@loyal-labs/grid-core";

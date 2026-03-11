@@ -19,6 +19,9 @@ export const publicEnv = {
   get serverHost(): string | undefined {
     return normalizeOptionalValue(process.env.NEXT_PUBLIC_SERVER_HOST);
   },
+  get gridAuthBaseUrl(): string | undefined {
+    return normalizeOptionalValue(process.env.NEXT_PUBLIC_GRID_AUTH_BASE_URL);
+  },
   get telegramBotId(): string {
     return normalizeOptionalValue(process.env.NEXT_PUBLIC_TELEGRAM_BOT_ID) ?? "";
   },

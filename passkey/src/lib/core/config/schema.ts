@@ -18,26 +18,25 @@ const hostnameSchema = z
   );
 
 const serverConfigSchema = z.object({
-  PASSKEY_GRID_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
-  PASSKEY_ALLOWED_PARENT_DOMAIN: hostnameSchema,
-  PASSKEY_ALLOW_LOCALHOST: z
+  GRID_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
+  GRID_ALLOWED_PARENT_DOMAIN: hostnameSchema,
+  GRID_ALLOW_LOCALHOST: z
     .enum(["true", "false"])
     .default("true")
     .transform((value) => value === "true"),
-  NEXT_PUBLIC_PASSKEY_RP_ID: hostnameSchema,
-  PASSKEY_GRID_API_BASE_URL: z
+  GRID_RP_ID: hostnameSchema,
+  GRID_API_BASE_URL: z
     .string()
     .url()
     .default("https://grid.squads.xyz"),
-  PASSKEY_APP_NAME: z.string().min(1).default("askloyal"),
-  PASSKEY_GRID_API_KEY: z.string().min(1).optional(),
+  GRID_APP_NAME: z.string().min(1).default("askloyal"),
+  GRID_API_KEY: z.string().min(1).optional(),
 }).superRefine((value, ctx) => {
-  if (value.PASSKEY_ALLOWED_PARENT_DOMAIN !== value.NEXT_PUBLIC_PASSKEY_RP_ID) {
+  if (value.GRID_ALLOWED_PARENT_DOMAIN !== value.GRID_RP_ID) {
     ctx.addIssue({
       code: "custom",
-      message:
-        "NEXT_PUBLIC_PASSKEY_RP_ID must match PASSKEY_ALLOWED_PARENT_DOMAIN",
-      path: ["NEXT_PUBLIC_PASSKEY_RP_ID"],
+      message: "GRID_RP_ID must match GRID_ALLOWED_PARENT_DOMAIN",
+      path: ["GRID_RP_ID"],
     });
   }
 });
@@ -51,12 +50,12 @@ export function parsePasskeyServerConfig(
 ): PasskeyServerConfig {
   const parsed = serverConfigSchema.parse(env);
   return {
-    gridEnvironment: parsed.PASSKEY_GRID_ENVIRONMENT,
-    allowedParentDomain: parsed.PASSKEY_ALLOWED_PARENT_DOMAIN,
-    allowLocalhost: parsed.PASSKEY_ALLOW_LOCALHOST,
-    sharedRpId: parsed.NEXT_PUBLIC_PASSKEY_RP_ID,
-    gridApiBaseUrl: trimTrailingSlash(parsed.PASSKEY_GRID_API_BASE_URL),
-    appName: parsed.PASSKEY_APP_NAME,
-    gridApiKey: parsed.PASSKEY_GRID_API_KEY,
+    gridEnvironment: parsed.GRID_ENVIRONMENT,
+    allowedParentDomain: parsed.GRID_ALLOWED_PARENT_DOMAIN,
+    allowLocalhost: parsed.GRID_ALLOW_LOCALHOST,
+    rpId: parsed.GRID_RP_ID,
+    gridApiBaseUrl: trimTrailingSlash(parsed.GRID_API_BASE_URL),
+    appName: parsed.GRID_APP_NAME,
+    gridApiKey: parsed.GRID_API_KEY,
   };
 }

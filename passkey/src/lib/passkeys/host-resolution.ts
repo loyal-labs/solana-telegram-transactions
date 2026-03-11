@@ -1,7 +1,7 @@
 export type PasskeyHostResolutionOptions = {
   allowedParentDomain: string;
   allowLocalhost: boolean;
-  sharedRpId: string;
+  rpId: string;
 };
 
 export type ResolvedPasskeyHostContext = {
@@ -38,7 +38,7 @@ export function resolvePasskeyHostContext(
 ): Omit<ResolvedPasskeyHostContext, "origin"> {
   const normalizedHostname = normalizeHostname(hostname);
   const normalizedParentDomain = normalizeHostname(options.allowedParentDomain);
-  const normalizedRpId = normalizeHostname(options.sharedRpId);
+  const normalizedRpId = normalizeHostname(options.rpId);
 
   if (!normalizedHostname) {
     throw new PasskeyHostResolutionError("Passkey hostname is required");
@@ -100,18 +100,18 @@ export function resolvePasskeyRequestContext(args: {
 export function resolveCurrentPasskeyBrowserContext(
   locationLike: Pick<Location, "hostname" | "origin"> = window.location
 ): ResolvedPasskeyHostContext {
-  const sharedRpId = process.env.NEXT_PUBLIC_PASSKEY_RP_ID;
+  const rpId = process.env.NEXT_PUBLIC_GRID_RP_ID;
 
-  if (!sharedRpId) {
+  if (!rpId?.trim()) {
     throw new PasskeyHostResolutionError(
-      "NEXT_PUBLIC_PASSKEY_RP_ID is required for passkey flows"
+      "NEXT_PUBLIC_GRID_RP_ID is required for passkey flows"
     );
   }
 
   const resolvedHost = resolvePasskeyHostContext(locationLike.hostname, {
-    allowedParentDomain: sharedRpId,
+    allowedParentDomain: rpId,
     allowLocalhost: true,
-    sharedRpId,
+    rpId,
   });
 
   return {

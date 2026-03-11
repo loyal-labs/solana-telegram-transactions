@@ -1,12 +1,13 @@
 "use client";
 
 import {
-  callPasskeyApi,
-  extractPasskeyErrorMessage,
-  extractPasskeySessionUrl,
-  parsePasskeyErrorDetails,
+  buildGridAuthUrl,
+  extractGridErrorMessage,
+  extractGridSessionUrl,
+  parseGridErrorDetails,
   type ApiOutcome,
-} from "@/lib/passkeys/client-api";
+} from "@loyal-labs/grid-core";
+
 import {
   buildPasskeyFlowRequest,
   type FlowRunnerDependencies,
@@ -14,6 +15,7 @@ import {
 import {
   parseCreatePasskeyQuery,
   type ParsedAuthPasskeyQuery,
+  type ParsedCreatePasskeyQuery,
 } from "@/lib/passkeys/query-params";
 import { toSessionKeyObject } from "@/lib/passkeys/session-key";
 import { isChallengeTimeoutError } from "@/lib/passkeys/webauthn";
@@ -21,15 +23,42 @@ import { isChallengeTimeoutError } from "@/lib/passkeys/webauthn";
 type ContinueRunnerDependencies = {
   buildFlowRequest: (
     mode: "create" | "auth",
-    parsed: unknown,
+    parsed: ParsedAuthPasskeyQuery | ParsedCreatePasskeyQuery,
     dependencies?: FlowRunnerDependencies
   ) => ReturnType<typeof buildPasskeyFlowRequest>;
   callApi: (endpoint: string, payload: unknown) => Promise<ApiOutcome>;
 };
 
+async function callLocalPasskeyApi(
+  endpoint: string,
+  payload: unknown
+): Promise<ApiOutcome> {
+  const response = await fetch(buildGridAuthUrl("", endpoint), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const bodyText = await response.text();
+  let body: unknown = bodyText;
+  try {
+    body = bodyText ? JSON.parse(bodyText) : null;
+  } catch {
+    body = bodyText;
+  }
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    body,
+  };
+}
+
 const defaultContinueRunnerDependencies: ContinueRunnerDependencies = {
   buildFlowRequest: buildPasskeyFlowRequest as ContinueRunnerDependencies["buildFlowRequest"],
-  callApi: callPasskeyApi,
+  callApi: callLocalPasskeyApi,
 };
 
 const knownAccountNotFoundCodes = new Set([
@@ -105,7 +134,7 @@ export function shouldFallbackToCreateFromAuthFailure(payload: unknown): boolean
     return true;
   }
 
-  const message = extractPasskeyErrorMessage(payload).toLowerCase();
+  const message = extractGridErrorMessage(payload).toLowerCase();
   return (
     message.includes("account not found") ||
     message.includes("no valid externally signed account") ||
@@ -124,12 +153,12 @@ function toFailure(
   branch: "auth" | "create",
   payload: unknown
 ): ContinueRunnerResult {
-  const message = extractPasskeyErrorMessage(payload);
+  const message = extractGridErrorMessage(payload);
   return {
     type: "error",
     branch,
     message,
-    details: parsePasskeyErrorDetails(payload),
+    details: parseGridErrorDetails(payload),
     challengeExpired: isChallengeTimeoutError(new Error(message)),
   };
 }
@@ -160,7 +189,7 @@ export async function runCreateFallbackFromAuth(
     return toFailure("create", createSessionOutcome.body);
   }
 
-  const createSessionUrl = extractPasskeySessionUrl(createSessionOutcome.body);
+  const createSessionUrl = extractGridSessionUrl(createSessionOutcome.body);
   if (!createSessionUrl) {
     return {
       type: "error",
@@ -247,4 +276,3 @@ export async function runContinueAuthFirst(
     };
   }
 }
-

@@ -16,18 +16,19 @@ Standalone Next.js workspace for Squads Grid passkey WebAuthn flows shared acros
 Copy `.env.example` to `.env.local`:
 
 ```bash
-PASSKEY_GRID_ENVIRONMENT=sandbox
-PASSKEY_ALLOWED_PARENT_DOMAIN=askloyal.com
-PASSKEY_ALLOW_LOCALHOST=true
-NEXT_PUBLIC_PASSKEY_RP_ID=askloyal.com
-PASSKEY_GRID_API_BASE_URL=https://grid.squads.xyz
-PASSKEY_APP_NAME=askloyal
+GRID_ENVIRONMENT=sandbox
+GRID_ALLOWED_PARENT_DOMAIN=askloyal.com
+GRID_ALLOW_LOCALHOST=true
+GRID_RP_ID=askloyal.com
+NEXT_PUBLIC_GRID_RP_ID=askloyal.com
+GRID_API_BASE_URL=https://grid.squads.xyz
+GRID_APP_NAME=askloyal
 ```
 
 Optional:
 
 ```bash
-PASSKEY_GRID_API_KEY=<grid_api_key>
+GRID_API_KEY=<grid_api_key>
 ```
 
 ## Host and RP behavior
@@ -36,7 +37,7 @@ PASSKEY_GRID_API_KEY=<grid_api_key>
 - All allowed `askloyal.com` hosts share the RP ID `askloyal.com`, so one
   passkey can be reused across those subdomains.
 - `localhost` is supported as a separate dev-only passkey realm when
-  `PASSKEY_ALLOW_LOCALHOST=true`.
+  `GRID_ALLOW_LOCALHOST=true`.
 - `localhost` passkeys do not work on `askloyal.com`, and `askloyal.com`
   passkeys do not work on `localhost`.
 - Unrelated root domains and `127.0.0.1` are not supported by this workspace.
@@ -62,3 +63,17 @@ bun test
 - `POST /api/passkeys/account/create`
 - `POST /api/passkeys/account/find`
 - `GET /api/passkeys/account/:passkeyAddress`
+
+## Package boundary
+
+Reusable runtime-agnostic Grid contracts, error helpers, auth-domain client
+helpers, and direct server-client construction now live in
+[`packages/grid-core/`](../packages/grid-core). This workspace keeps only the
+custom-domain auth boundary:
+
+- request host allowlisting
+- RP ID resolution
+- browser WebAuthn ceremony pages
+- Grid upstream proxy handlers
+- passkey redirect/query parsing
+- auth flow orchestration

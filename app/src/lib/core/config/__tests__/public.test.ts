@@ -4,6 +4,7 @@ import { publicEnv } from "../public";
 
 const PUBLIC_ENV_KEYS = [
   "NEXT_PUBLIC_SERVER_HOST",
+  "NEXT_PUBLIC_GRID_AUTH_BASE_URL",
   "NEXT_PUBLIC_TELEGRAM_BOT_ID",
   "NEXT_PUBLIC_SOLANA_ENV",
   "NEXT_PUBLIC_GAS_PUBLIC_KEY",
@@ -27,9 +28,11 @@ describe("public config", () => {
 
   test("returns trimmed optional values", () => {
     process.env.NEXT_PUBLIC_SERVER_HOST = "  https://example.com  ";
+    process.env.NEXT_PUBLIC_GRID_AUTH_BASE_URL = "  https://auth.askloyal.com  ";
     process.env.NEXT_PUBLIC_GAS_PUBLIC_KEY = "  gas-key  ";
 
     expect(publicEnv.serverHost).toBe("https://example.com");
+    expect(publicEnv.gridAuthBaseUrl).toBe("https://auth.askloyal.com");
     expect(publicEnv.gasPublicKey).toBe("gas-key");
   });
 

@@ -4,11 +4,15 @@
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
   "https://solana-telegram-transactions.vercel.app";
+const GRID_AUTH_BASE_URL =
+  process.env.EXPO_PUBLIC_GRID_AUTH_BASE_URL ??
+  "https://auth.askloyal.com";
 
 // Hardcoded identity for MVP (auth deferred)
 const TELEGRAM_USER_ID = "2131567542";
 
 export const env = {
   apiBaseUrl: API_BASE_URL,
+  gridAuthBaseUrl: GRID_AUTH_BASE_URL,
   telegramUserId: TELEGRAM_USER_ID,
 } as const;

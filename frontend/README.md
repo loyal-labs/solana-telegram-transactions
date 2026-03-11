@@ -48,6 +48,9 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 
 Create a `.env.local` file with required API keys (see `.env.example`).
 
+For Grid auth integrations, set `NEXT_PUBLIC_GRID_AUTH_BASE_URL` to the shared
+passkey domain, typically `https://auth.askloyal.com`.
+
 ## Development
 
 ```bash

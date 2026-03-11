@@ -255,6 +255,18 @@
         "drizzle-orm": "^0.45.1",
       },
     },
+    "packages/grid-core": {
+      "name": "@loyal-labs/grid-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@sqds/grid": "^3.1.2",
+        "zod": "^4.0.17",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5",
+      },
+    },
     "packages/llm-core": {
       "name": "@loyal-labs/llm-core",
       "version": "0.1.0",
@@ -277,11 +289,15 @@
     "packages/shared": {
       "name": "@loyal-labs/shared",
       "version": "0.1.0",
+      "devDependencies": {
+        "typescript": "^5",
+      },
     },
     "passkey": {
       "name": "passkey",
       "version": "0.1.0",
       "dependencies": {
+        "@loyal-labs/grid-core": "workspace:*",
         "@sqds/grid": "^3.1.2",
         "bs58": "^6.0.0",
         "next": "^15.5.7",
@@ -1037,6 +1053,8 @@
     "@loyal-labs/db-adapter-neon": ["@loyal-labs/db-adapter-neon@workspace:packages/db-adapter-neon"],
 
     "@loyal-labs/db-core": ["@loyal-labs/db-core@workspace:packages/db-core"],
+
+    "@loyal-labs/grid-core": ["@loyal-labs/grid-core@workspace:packages/grid-core"],
 
     "@loyal-labs/llm-core": ["@loyal-labs/llm-core@workspace:packages/llm-core"],
 

@@ -9,7 +9,7 @@ import {
 const options = {
   allowedParentDomain: "askloyal.com",
   allowLocalhost: true,
-  sharedRpId: "askloyal.com",
+  rpId: "askloyal.com",
 } as const;
 
 describe("resolvePasskeyHostContext", () => {

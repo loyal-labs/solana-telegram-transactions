@@ -11,7 +11,9 @@ const baseQuerySchema = z.object({
   slotNumber: z.coerce.number().int().nonnegative(),
   sessionKey: z.string().min(1),
   expirationInSeconds: z.coerce.number().int().positive(),
-  env: z.enum(["sandbox", "production", "devnet", "mainnet", "testnet"]).optional(),
+  env: z
+    .enum(["sandbox", "production", "devnet", "mainnet", "testnet"])
+    .optional(),
   redirectUrl: z.string().url().optional(),
 });
 
@@ -54,7 +56,9 @@ function mapBaseQuery(query: QueryLike) {
   };
 }
 
-export function parseCreatePasskeyQuery(query: QueryLike): ParseResult<ParsedCreatePasskeyQuery> {
+export function parseCreatePasskeyQuery(
+  query: QueryLike
+): ParseResult<ParsedCreatePasskeyQuery> {
   const optional = (value: string | null | undefined): string | undefined =>
     value == null ? undefined : value;
   const extracted = getGridBrowserSdkClient().extractPasskeyCreateParams(
@@ -74,7 +78,9 @@ export function parseCreatePasskeyQuery(query: QueryLike): ParseResult<ParsedCre
   return { ok: true, data: parsed.data };
 }
 
-export function parseAuthPasskeyQuery(query: QueryLike): ParseResult<ParsedAuthPasskeyQuery> {
+export function parseAuthPasskeyQuery(
+  query: QueryLike
+): ParseResult<ParsedAuthPasskeyQuery> {
   const parsed = authQuerySchema.safeParse(mapBaseQuery(query));
   if (!parsed.success) {
     return { ok: false, errors: collectIssues(parsed.error) };

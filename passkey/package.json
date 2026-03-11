@@ -4,13 +4,16 @@
   "private": true,
   "packageManager": "bun@1.2.17",
   "scripts": {
+    "predev": "bun run --cwd .. build:grid-packages",
     "dev": "next dev --turbopack",
+    "prebuild": "bun run --cwd .. build:grid-packages",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "test": "bun test"
   },
   "dependencies": {
+    "@loyal-labs/grid-core": "workspace:*",
     "@sqds/grid": "^3.1.2",
     "bs58": "^6.0.0",
     "next": "^15.5.7",

@@ -68,6 +68,11 @@ export async function runCreatePasskeyCeremony(
     challengeBytes.byteOffset,
     challengeBytes.byteOffset + challengeBytes.byteLength
   ) as ArrayBuffer;
+  const userIdBytes = new TextEncoder().encode(input.userId);
+  const userIdBuffer = userIdBytes.buffer.slice(
+    userIdBytes.byteOffset,
+    userIdBytes.byteOffset + userIdBytes.byteLength
+  ) as ArrayBuffer;
 
   const credential = ensurePublicKeyCredential(
     await navigator.credentials.create({
@@ -78,7 +83,7 @@ export async function runCreatePasskeyCeremony(
           name: input.appName,
         },
         user: {
-          id: new TextEncoder().encode(input.userId),
+          id: userIdBuffer,
           name: `${input.appName}#${input.userId}`,
           displayName: input.appName,
         },

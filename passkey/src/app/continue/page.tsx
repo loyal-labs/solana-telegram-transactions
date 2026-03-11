@@ -9,4 +9,3 @@ export default function ContinuePage() {
     </Suspense>
   );
 }
-
