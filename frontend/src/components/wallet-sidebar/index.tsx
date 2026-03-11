@@ -208,7 +208,6 @@ export function HeroRightSidebar(props: HeroRightSidebarProps) {
                       position: "absolute",
                       top: props.showQuickActions ? "56px" : "8px",
                       right: "8px",
-                      transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                       width: "36px",
                       height: "36px",
                       display: "flex",
@@ -218,7 +217,7 @@ export function HeroRightSidebar(props: HeroRightSidebarProps) {
                       border: "none",
                       borderRadius: "9999px",
                       cursor: "pointer",
-                      transition: "all 0.2s ease",
+                      transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease",
                       color: "#3C3C43",
                       zIndex: 2,
                     }}
