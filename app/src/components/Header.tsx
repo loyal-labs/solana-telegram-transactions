@@ -5,9 +5,22 @@ import { useEffect, useState } from "react";
 
 import { useDeviceSafeAreaTop } from "@/hooks/useTelegramSafeArea";
 
+/**
+ * Whether the status bar gray strip workaround is needed.
+ * Only on Android — Telegram ignores setHeaderColor for status bar icon
+ * contrast, so light icons are invisible on white bg.
+ */
+const isAndroid = () =>
+  typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
+
 export default function Header() {
   const safeAreaInsetTop = useDeviceSafeAreaTop();
   const [isScrolled, setIsScrolled] = useState(false);
+  const [showStatusBarFix, setShowStatusBarFix] = useState(false);
+
+  useEffect(() => {
+    setShowStatusBarFix(isAndroid());
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -29,6 +42,13 @@ export default function Header() {
         boxShadow: "none",
       }}
     >
+      {/* Light gray strip behind the Android status bar so light icons stay visible */}
+      {showStatusBarFix && safeAreaInsetTop > 0 && (
+        <div
+          className="absolute top-0 left-0 right-0"
+          style={{ height: safeAreaInsetTop, background: "#b0b0b0" }}
+        />
+      )}
       <Image
         src="/Logo.svg"
         alt="Loyal"

@@ -119,6 +119,7 @@
   html {
     touch-action: manipulation;
     -webkit-text-size-adjust: 100%;
+    color-scheme: light;
     background: #fff !important;
     background-color: #fff !important;
   }
