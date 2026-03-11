@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpToLine, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { ArrowUpRight, Eye, EyeOff, RefreshCw } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 
@@ -24,6 +24,33 @@ export function ChatInput(props: ChatInputProps) {
 
   return (
     <>
+      {/* SVG pixelation filters for balance hiding */}
+      <svg
+        aria-hidden="true"
+        height="0"
+        style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+        width="0"
+      >
+        <defs>
+          {/* Large pixel filter for main dollar balance */}
+          <filter id="pixelate-lg" x="0" y="0" width="100%" height="100%">
+            <feFlood x="4" y="4" height="2" width="2" />
+            <feComposite width="10" height="10" />
+            <feTile result="a" />
+            <feComposite in="SourceGraphic" in2="a" operator="in" />
+            <feMorphology operator="dilate" radius="5" />
+          </filter>
+          {/* Smaller pixel filter for SOL balance */}
+          <filter id="pixelate-sm" x="0" y="0" width="100%" height="100%">
+            <feFlood x="3" y="3" height="2" width="2" />
+            <feComposite width="8" height="8" />
+            <feTile result="a" />
+            <feComposite in="SourceGraphic" in2="a" operator="in" />
+            <feMorphology operator="dilate" radius="4" />
+          </filter>
+        </defs>
+      </svg>
+
       {/* Chat Input Container - animates between center and bottom */}
       <div
         style={{
@@ -326,16 +353,23 @@ export function ChatInput(props: ChatInputProps) {
                         fontSize: "28px",
                         fontWeight: 600,
                         lineHeight: "32px",
-                        color: "#000",
+                        color: isBalanceHidden ? "#BBBBC0" : "#000",
                         fontFeatureSettings: "'liga' off, 'clig' off",
                         filter: isBalanceHidden ? "url(#pixelate-lg)" : "none",
-                        transition: "filter 0.2s ease",
+                        transition: "filter 0.15s ease, color 0.15s ease",
                         userSelect: isBalanceHidden ? "none" : "auto",
                         display: "block",
                       }}
                     >
                       $1,267
-                      <span style={{ color: "rgba(60, 60, 67, 0.6)" }}>
+                      <span
+                        style={{
+                          color: isBalanceHidden
+                            ? "#BBBBC0"
+                            : "rgba(60, 60, 67, 0.6)",
+                          transition: "color 0.15s ease",
+                        }}
+                      >
                         .47
                       </span>
                     </span>
@@ -375,10 +409,12 @@ export function ChatInput(props: ChatInputProps) {
                       fontSize: "14px",
                       fontWeight: 400,
                       lineHeight: "20px",
-                      color: "rgba(60, 60, 67, 0.6)",
+                      color: isBalanceHidden
+                        ? "#C8C8CC"
+                        : "rgba(60, 60, 67, 0.6)",
                       fontFeatureSettings: "'liga' off, 'clig' off",
-                      filter: isBalanceHidden ? "url(#pixelate)" : "none",
-                      transition: "filter 0.2s ease",
+                      filter: isBalanceHidden ? "url(#pixelate-sm)" : "none",
+                      transition: "filter 0.15s ease, color 0.15s ease",
                       userSelect: isBalanceHidden ? "none" : "auto",
                       display: "block",
                     }}
@@ -495,7 +531,7 @@ export function ChatInput(props: ChatInputProps) {
                     justifyContent: "center",
                   }}
                 >
-                  <ArrowUpToLine size={20} style={{ color: "#F9363C" }} />
+                  <ArrowUpRight size={20} style={{ color: "#F9363C" }} />
                 </div>
                 <span
                   style={{
