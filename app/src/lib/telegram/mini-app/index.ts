@@ -236,12 +236,7 @@ export const initTelegram = () => {
       // Per Telegram docs: "This color helps determine a contrasting color
       // for the status bar and other UI controls."
       try {
-        if (
-          miniApp.setHeaderColor.isAvailable() &&
-          miniApp.setHeaderColor.supports("rgb")
-        ) {
-          miniApp.setHeaderColor("#ffffff");
-        } else if (miniApp.setHeaderColor.isAvailable()) {
+        if (miniApp.setHeaderColor.isAvailable()) {
           miniApp.setHeaderColor("bg_color");
         }
       } catch {
