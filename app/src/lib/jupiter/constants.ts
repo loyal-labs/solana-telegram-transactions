@@ -1,4 +1,6 @@
 export const JUPITER_API_BASE_URL = "https://api.jup.ag";
+export const JUPITER_LITE_API_BASE_URL = "https://lite-api.jup.ag";
+export const JUPITER_TOKENS_V2_BASE_URL = `${JUPITER_LITE_API_BASE_URL}/tokens/v2`;
 
 /** Jupiter V6 Aggregator program — used for deterministic on-chain swap detection */
 export const JUPITER_PROGRAM_ID = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
@@ -20,4 +22,8 @@ export const SWAP_ERRORS = {
   MISSING_API_KEY: "Swap service is not configured.",
   ORDER_EXPIRED: "Swap order expired. Please try again.",
   EXECUTION_FAILED: "Swap execution failed. Please try again.",
+} as const;
+
+export const TOKEN_DATA_ERRORS = {
+  INVALID_RESPONSE: "Invalid Jupiter token response.",
 } as const;
