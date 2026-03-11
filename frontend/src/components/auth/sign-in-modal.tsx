@@ -85,20 +85,20 @@ export function SignInModal() {
                 Choose your preferred sign-in method.
               </DialogDescription>
             </DialogHeader>
-            <Tabs className="w-full" defaultValue="wallet">
+            <Tabs className="w-full" defaultValue="email">
               <TabsList className="grid w-full grid-cols-3 bg-neutral-100 [&_button]:!text-neutral-500 [&_button:hover]:!text-neutral-700 [&_[data-state=active]]:!bg-white [&_[data-state=active]]:!text-neutral-900 [&_[data-state=active]]:shadow-sm">
-                <TabsTrigger value="wallet">Wallet</TabsTrigger>
                 <TabsTrigger value="email">Email</TabsTrigger>
                 <TabsTrigger value="passkey">Passkey</TabsTrigger>
+                <TabsTrigger value="wallet">Wallet</TabsTrigger>
               </TabsList>
-              <TabsContent value="wallet">
-                <WalletTab />
-              </TabsContent>
               <TabsContent value="email">
                 <EmailTab />
               </TabsContent>
               <TabsContent value="passkey">
                 <PasskeyTab />
+              </TabsContent>
+              <TabsContent value="wallet">
+                <WalletTab />
               </TabsContent>
             </Tabs>
           </>
