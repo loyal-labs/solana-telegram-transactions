@@ -55,18 +55,35 @@ describe("public config", () => {
     expect(env.gridAuthBaseUrl).toBe("https://auth.askloyal.com");
   });
 
-  test("returns the default solana rpc endpoint", () => {
-    expect(createPublicEnv({}).solanaRpcEndpoint).toBe(
-      "https://api.mainnet-beta.solana.com"
+  test("defaults the solana env to devnet", () => {
+    const env = createPublicEnv({});
+
+    expect(env.solanaEnv).toBe("devnet");
+    expect(env.solanaRpcEndpoint).toBe(
+      "https://aurora-o23cd4-fast-devnet.helius-rpc.com"
     );
   });
 
-  test("returns a trimmed custom solana rpc endpoint", () => {
+  test("resolves the solana rpc endpoint from the selected env", () => {
     const env = createPublicEnv({
-      NEXT_PUBLIC_SOLANA_RPC_ENDPOINT: "  https://rpc.example.com  ",
+      NEXT_PUBLIC_SOLANA_ENV: "  mainnet  ",
     });
 
-    expect(env.solanaRpcEndpoint).toBe("https://rpc.example.com");
+    expect(env.solanaEnv).toBe("mainnet");
+    expect(env.solanaRpcEndpoint).toBe(
+      "https://guendolen-nvqjc4-fast-mainnet.helius-rpc.com"
+    );
+  });
+
+  test("falls back to devnet for invalid solana env values", () => {
+    const env = createPublicEnv({
+      NEXT_PUBLIC_SOLANA_ENV: "staging",
+    });
+
+    expect(env.solanaEnv).toBe("devnet");
+    expect(env.solanaRpcEndpoint).toBe(
+      "https://aurora-o23cd4-fast-devnet.helius-rpc.com"
+    );
   });
 
   test("enables swap when the jupiter api key is configured", () => {

@@ -1,4 +1,9 @@
 import {
+  getSolanaEndpoints,
+  resolveSolanaEnv,
+  type SolanaEnv,
+} from "@loyal-labs/solana-rpc";
+import {
   getOptionalEnv,
   isStrictTrue,
   type AppEnvironment,
@@ -8,12 +13,11 @@ import {
 
 export type { AppEnvironment } from "./shared";
 
-const DEFAULT_SOLANA_RPC_ENDPOINT = "https://api.mainnet-beta.solana.com";
 const LOCAL_TURNSTILE_BYPASS_TOKEN = "local-bypass";
 const APP_ENVIRONMENT_ENV_NAME = "NEXT_PUBLIC_APP_ENVIRONMENT";
 const TURNSTILE_SITE_KEY_ENV_NAME = "NEXT_PUBLIC_TURNSTILE_SITE_KEY";
 const GRID_AUTH_BASE_URL_ENV_NAME = "NEXT_PUBLIC_GRID_AUTH_BASE_URL";
-const SOLANA_RPC_ENDPOINT_ENV_NAME = "NEXT_PUBLIC_SOLANA_RPC_ENDPOINT";
+const SOLANA_ENV_ENV_NAME = "NEXT_PUBLIC_SOLANA_ENV";
 const JUPITER_API_KEY_ENV_NAME = "NEXT_PUBLIC_JUPITER_API_KEY";
 const SKILLS_ENABLED_ENV_NAME = "NEXT_PUBLIC_SKILLS_ENABLED";
 const DEMO_RECIPE_ENV_NAME = "NEXT_PUBLIC_DEMO_RECIPE";
@@ -31,6 +35,7 @@ export type PublicEnv = {
   appEnvironment: AppEnvironment;
   turnstile: TurnstileConfig;
   gridAuthBaseUrl: string | undefined;
+  solanaEnv: SolanaEnv;
   solanaRpcEndpoint: string;
   swap: SwapConfig;
   skillsEnabled: boolean;
@@ -81,14 +86,14 @@ export function createPublicEnv(env: EnvSource): PublicEnv {
   const appEnvironment = resolveAppEnvironment(
     getOptionalEnv(env, APP_ENVIRONMENT_ENV_NAME)
   );
+  const solanaEnv = resolveSolanaEnv(getOptionalEnv(env, SOLANA_ENV_ENV_NAME));
 
   return {
     appEnvironment,
     turnstile: resolveTurnstileConfig(env, appEnvironment),
     gridAuthBaseUrl: getOptionalEnv(env, GRID_AUTH_BASE_URL_ENV_NAME),
-    solanaRpcEndpoint:
-      getOptionalEnv(env, SOLANA_RPC_ENDPOINT_ENV_NAME) ??
-      DEFAULT_SOLANA_RPC_ENDPOINT,
+    solanaEnv,
+    solanaRpcEndpoint: getSolanaEndpoints(solanaEnv).rpcEndpoint,
     swap: resolveSwapConfig(env),
     skillsEnabled: isStrictTrue(
       getOptionalEnv(env, SKILLS_ENABLED_ENV_NAME) ?? "true"

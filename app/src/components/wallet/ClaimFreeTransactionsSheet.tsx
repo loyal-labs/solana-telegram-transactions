@@ -122,7 +122,7 @@ export default function ClaimFreeTransactionsSheet({
     try {
       const response = await fetch(endpoint, {
         method: "POST",
-        body: new TextEncoder().encode(rawInitData),
+        body: rawInitData,
       });
 
       const payload = await response

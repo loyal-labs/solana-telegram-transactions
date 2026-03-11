@@ -1,19 +1,9 @@
+import { resolveSolanaEnv, type SolanaEnv } from "@loyal-labs/solana-rpc";
+
 import { isStrictTrue, normalizeOptionalValue } from "./shared";
 
-export type PublicSolanaEnv = "mainnet" | "testnet" | "devnet" | "localnet";
-
-const DEFAULT_SOLANA_ENV: PublicSolanaEnv = "devnet";
+export type PublicSolanaEnv = SolanaEnv;
 const DEFAULT_MIXPANEL_PROXY_PATH = "/ingest";
-
-const PUBLIC_SOLANA_ENV_VALUES: readonly PublicSolanaEnv[] = [
-  "mainnet",
-  "testnet",
-  "devnet",
-  "localnet",
-];
-
-const isPublicSolanaEnv = (value: string): value is PublicSolanaEnv =>
-  PUBLIC_SOLANA_ENV_VALUES.includes(value as PublicSolanaEnv);
 
 export const publicEnv = {
   get serverHost(): string | undefined {
@@ -26,8 +16,9 @@ export const publicEnv = {
     return normalizeOptionalValue(process.env.NEXT_PUBLIC_TELEGRAM_BOT_ID) ?? "";
   },
   get solanaEnv(): PublicSolanaEnv {
-    const value = normalizeOptionalValue(process.env.NEXT_PUBLIC_SOLANA_ENV);
-    return value && isPublicSolanaEnv(value) ? value : DEFAULT_SOLANA_ENV;
+    return resolveSolanaEnv(
+      normalizeOptionalValue(process.env.NEXT_PUBLIC_SOLANA_ENV),
+    );
   },
   get gasPublicKey(): string | undefined {
     return normalizeOptionalValue(process.env.NEXT_PUBLIC_GAS_PUBLIC_KEY);

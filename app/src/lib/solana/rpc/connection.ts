@@ -1,22 +1,12 @@
+import {
+  getPerEndpoints as getSharedPerEndpoints,
+  getSolanaEndpoints as getSharedSolanaEndpoints,
+  type SolanaEnv,
+} from "@loyal-labs/solana-rpc";
 import { Connection } from "@solana/web3.js";
 
 import { publicEnv } from "@/lib/core/config/public";
 
-import {
-  LOCALNET_RPC_URL,
-  LOCALNET_RPC_WS,
-  PER_DEVNET_RPC_ENDPOINT,
-  PER_DEVNET_WS_ENDPOINT,
-  PER_MAINNET_RPC_ENDPOINT,
-  PER_MAINNET_WS_ENDPOINT,
-  SECURE_DEVNET_RPC_URL,
-  SECURE_DEVNET_RPC_WS,
-  SECURE_MAINNET_RPC_URL,
-  SECURE_MAINNET_RPC_WS,
-  TESTNET_RPC_URL,
-  TESTNET_RPC_WS,
-} from "./constants";
-import type { SolanaEnv } from "./types";
 import { attachWsDebugLogging } from "./ws-debug";
 
 export const getSolanaEnv = (): SolanaEnv => {
@@ -38,47 +28,13 @@ export const getSolanaEnv = (): SolanaEnv => {
 export const getEndpoints = (
   env: SolanaEnv
 ): { rpcEndpoint: string; websocketEndpoint: string } => {
-  switch (env) {
-    case "mainnet":
-      return {
-        rpcEndpoint: SECURE_MAINNET_RPC_URL,
-        websocketEndpoint: SECURE_MAINNET_RPC_WS,
-      };
-    case "testnet":
-      return {
-        rpcEndpoint: TESTNET_RPC_URL,
-        websocketEndpoint: TESTNET_RPC_WS,
-      };
-    case "localnet":
-      return {
-        rpcEndpoint: LOCALNET_RPC_URL,
-        websocketEndpoint: LOCALNET_RPC_WS,
-      };
-    case "devnet":
-    default:
-      return {
-        rpcEndpoint: SECURE_DEVNET_RPC_URL,
-        websocketEndpoint: SECURE_DEVNET_RPC_WS,
-      };
-  }
+  return getSharedSolanaEndpoints(env);
 };
 
 export const getPerEndpoints = (
   env: SolanaEnv
 ): { perRpcEndpoint: string; perWsEndpoint: string } => {
-  switch (env) {
-    case "mainnet":
-      return {
-        perRpcEndpoint: PER_MAINNET_RPC_ENDPOINT,
-        perWsEndpoint: PER_MAINNET_WS_ENDPOINT,
-      };
-    case "devnet":
-    default:
-      return {
-        perRpcEndpoint: PER_DEVNET_RPC_ENDPOINT,
-        perWsEndpoint: PER_DEVNET_WS_ENDPOINT,
-      };
-  }
+  return getSharedPerEndpoints(env);
 };
 
 const selectedSolanaEnv = getSolanaEnv();

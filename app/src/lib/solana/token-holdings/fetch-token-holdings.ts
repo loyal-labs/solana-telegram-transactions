@@ -1,3 +1,4 @@
+import { getSolanaEndpoints } from "@loyal-labs/solana-rpc";
 import { PublicKey } from "@solana/web3.js";
 
 import { NATIVE_SOL_DECIMALS, NATIVE_SOL_MINT } from "@/lib/constants";
@@ -5,11 +6,6 @@ import { NATIVE_SOL_DECIMALS, NATIVE_SOL_MINT } from "@/lib/constants";
 import { fetchJson } from "../../core/http";
 import { fetchLoyalDeposits } from "../deposits/loyal-deposits";
 import { getSolanaEnv } from "../rpc/connection";
-import {
-  SECURE_DEVNET_RPC_URL,
-  SECURE_MAINNET_RPC_URL,
-  TESTNET_RPC_URL,
-} from "../rpc/constants";
 import { CACHE_TTL_MS } from "./constants";
 import { resolveTokenIcon } from "./resolve-token-info";
 import type {
@@ -30,10 +26,8 @@ function isCacheValid(cached: CachedHoldings | undefined): boolean {
 
 function getRpcUrl(): string | null {
   const env = getSolanaEnv();
-  if (env === "mainnet") return SECURE_MAINNET_RPC_URL;
-  if (env === "testnet") return TESTNET_RPC_URL;
-  if (env === "devnet") return SECURE_DEVNET_RPC_URL;
-  return null;
+  if (env === "localnet") return null;
+  return getSolanaEndpoints(env).rpcEndpoint;
 }
 
 function getSafeString(value: unknown): string {

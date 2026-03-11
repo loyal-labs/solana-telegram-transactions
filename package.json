@@ -23,6 +23,8 @@
     "passkey:lint": "bun run --cwd passkey lint",
     "build:grid-packages": "bun run --cwd packages/grid-core build",
     "typecheck:grid-packages": "bun run --cwd packages/grid-core typecheck",
+    "build:solana-packages": "bun run --cwd packages/solana-rpc build",
+    "typecheck:solana-packages": "bun run --cwd packages/solana-rpc typecheck",
     "build:shared-packages": "bun run --cwd packages/shared build",
     "typecheck:shared-packages": "bun run --cwd packages/shared typecheck",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",

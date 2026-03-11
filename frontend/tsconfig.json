@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@loyal-labs/solana-rpc": ["../packages/solana-rpc/src/index.ts"]
     },
     "strictNullChecks": true
   },
