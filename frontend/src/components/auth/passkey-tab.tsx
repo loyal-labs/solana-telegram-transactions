@@ -2,27 +2,21 @@
 
 import { useCallback, useState } from "react";
 
-import { TurnstileWidget } from "./turnstile-widget";
-
-type Step = "idle" | "captcha" | "waiting" | "success" | "error";
+type Step = "idle" | "waiting" | "success" | "error";
 
 export function PasskeyTab({ onFlowStart }: { onFlowStart?: () => void }) {
   const [step, setStep] = useState<Step>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
   const handleStart = useCallback(() => {
-    setStep("captcha");
-    onFlowStart?.();
-  }, [onFlowStart]);
-
-  const handleCaptchaVerify = useCallback((_token: string) => {
     setStep("waiting");
+    onFlowStart?.();
 
     // Simulate passkey prompt — stub for now
     setTimeout(() => {
       setStep("success");
     }, 1500);
-  }, []);
+  }, [onFlowStart]);
 
   const handleRetry = useCallback(() => {
     setErrorMessage("");
@@ -72,15 +66,6 @@ export function PasskeyTab({ onFlowStart }: { onFlowStart?: () => void }) {
         >
           Sign in with Passkey
         </button>
-      )}
-
-      {step === "captcha" && (
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-neutral-500 text-sm">
-            Complete the verification
-          </p>
-          <TurnstileWidget onVerify={handleCaptchaVerify} />
-        </div>
       )}
 
       {step === "waiting" && (

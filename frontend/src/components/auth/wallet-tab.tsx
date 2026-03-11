@@ -5,9 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useSignInModal } from "@/contexts/sign-in-modal-context";
 
-import { TurnstileWidget } from "./turnstile-widget";
-
-type Step = "connect" | "captcha" | "signing";
+type Step = "connect" | "signing";
 
 export function WalletTab({ onFlowStart }: { onFlowStart?: () => void }) {
   const { connected, select, wallets } = useWallet();
@@ -15,12 +13,27 @@ export function WalletTab({ onFlowStart }: { onFlowStart?: () => void }) {
   const [step, setStep] = useState<Step>("connect");
   const [errorMessage, setErrorMessage] = useState("");
 
-  // When wallet connects, move to captcha (or close if already verified)
+  const handleVerify = useCallback(async () => {
+    setStep("signing");
+
+    try {
+      // TODO: integrate with SIWS verification flow
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      close();
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error ? err.message : "Signing failed"
+      );
+      setStep("connect");
+    }
+  }, [close]);
+
+  // When wallet connects, go directly to signing verification
   useEffect(() => {
     if (connected && step === "connect") {
-      setStep("captcha");
+      handleVerify();
     }
-  }, [connected, step]);
+  }, [connected, step, handleVerify]);
 
   const handleConnect = useCallback(
     (walletName: string) => {
@@ -33,28 +46,10 @@ export function WalletTab({ onFlowStart }: { onFlowStart?: () => void }) {
     [wallets, select, onFlowStart]
   );
 
-  const handleCaptchaVerify = useCallback(
-    async (_token: string) => {
-      setStep("signing");
-
-      try {
-        // TODO: integrate with SIWS verification flow
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        close();
-      } catch (err) {
-        setErrorMessage(
-          err instanceof Error ? err.message : "Signing failed"
-        );
-        setStep("connect");
-      }
-    },
-    [close]
-  );
-
   const handleRetry = useCallback(() => {
     setErrorMessage("");
-    setStep(connected ? "captcha" : "connect");
-  }, [connected]);
+    setStep("connect");
+  }, []);
 
   if (errorMessage) {
     return (
@@ -105,15 +100,6 @@ export function WalletTab({ onFlowStart }: { onFlowStart?: () => void }) {
               No wallet extensions detected.
             </p>
           )}
-        </div>
-      )}
-
-      {step === "captcha" && (
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-neutral-500 text-sm">
-            Complete the verification
-          </p>
-          <TurnstileWidget onVerify={handleCaptchaVerify} />
         </div>
       )}
 

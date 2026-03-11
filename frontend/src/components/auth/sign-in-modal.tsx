@@ -1,7 +1,7 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   Dialog,
@@ -14,8 +14,11 @@ import { useAuthCapability } from "@/lib/auth/capability";
 import { useAuthSession } from "@/contexts/auth-session-context";
 import { useSignInModal } from "@/contexts/sign-in-modal-context";
 
+import { publicEnv } from "@/lib/core/config/public";
+
 import { EmailTab } from "./email-tab";
 import { PasskeyTab } from "./passkey-tab";
+import { TurnstileWidget } from "./turnstile-widget";
 import { WalletTab } from "./wallet-tab";
 
 function Divider() {
@@ -104,6 +107,19 @@ export function SignInModal() {
   const [activeSection, setActiveSection] = useState<
     "email" | "passkey" | "wallet" | null
   >(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+
+  // Auto-resolve captcha for bypass (local dev) and misconfigured environments
+  const needsCaptchaWidget = publicEnv.turnstile.mode === "widget";
+  useEffect(() => {
+    if (!needsCaptchaWidget && captchaToken === null) {
+      setCaptchaToken(
+        publicEnv.turnstile.mode === "bypass"
+          ? publicEnv.turnstile.verificationToken
+          : "captcha-skipped"
+      );
+    }
+  }, [needsCaptchaWidget, captchaToken]);
 
   const hasInstalledWallets = wallets.some(
     (w) => w.readyState === "Installed"
@@ -114,6 +130,7 @@ export function SignInModal() {
       if (!open) {
         close();
         setActiveSection(null);
+        setCaptchaToken(null);
       }
     },
     [close]
@@ -142,40 +159,50 @@ export function SignInModal() {
                 Choose your preferred sign-in method.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex flex-col gap-4">
-              {activeSection && (
-                <button
-                  className="self-start text-neutral-400 text-xs transition hover:text-neutral-700"
-                  onClick={handleBack}
-                  type="button"
-                >
-                  ← All sign-in options
-                </button>
-              )}
+            {captchaToken === null ? (
+              <div className="flex flex-col items-center gap-3 py-4">
+                <p className="text-neutral-500 text-sm">
+                  Complete verification to continue
+                </p>
+                <TurnstileWidget onVerify={setCaptchaToken} />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {activeSection && (
+                  <button
+                    className="self-start text-neutral-400 text-xs transition hover:text-neutral-700"
+                    onClick={handleBack}
+                    type="button"
+                  >
+                    ← All sign-in options
+                  </button>
+                )}
 
-              {(!activeSection || activeSection === "email") && (
-                <EmailTab
-                  onFlowStart={() => setActiveSection("email")}
-                />
-              )}
-
-              {!activeSection && <Divider />}
-
-              {(!activeSection || activeSection === "passkey") && (
-                <PasskeyTab
-                  onFlowStart={() => setActiveSection("passkey")}
-                />
-              )}
-
-              {!activeSection && hasInstalledWallets && <Divider />}
-
-              {hasInstalledWallets &&
-                (!activeSection || activeSection === "wallet") && (
-                  <WalletTab
-                    onFlowStart={() => setActiveSection("wallet")}
+                {(!activeSection || activeSection === "email") && (
+                  <EmailTab
+                    captchaToken={captchaToken}
+                    onFlowStart={() => setActiveSection("email")}
                   />
                 )}
-            </div>
+
+                {!activeSection && <Divider />}
+
+                {(!activeSection || activeSection === "passkey") && (
+                  <PasskeyTab
+                    onFlowStart={() => setActiveSection("passkey")}
+                  />
+                )}
+
+                {!activeSection && hasInstalledWallets && <Divider />}
+
+                {hasInstalledWallets &&
+                  (!activeSection || activeSection === "wallet") && (
+                    <WalletTab
+                      onFlowStart={() => setActiveSection("wallet")}
+                    />
+                  )}
+              </div>
+            )}
           </>
         )}
       </DialogContent>

@@ -5,13 +5,18 @@ import { useCallback, useReducer, useRef } from "react";
 import { AuthApiClientError, authApiClient } from "@/lib/auth/client";
 import { useAuthSession } from "@/contexts/auth-session-context";
 import { useSignInModal } from "@/contexts/sign-in-modal-context";
-import { TurnstileWidget } from "./turnstile-widget";
 import {
   createInitialEmailFlowState,
   emailFlowReducer,
 } from "./email-flow-state";
 
-export function EmailTab({ onFlowStart }: { onFlowStart?: () => void }) {
+export function EmailTab({
+  captchaToken,
+  onFlowStart,
+}: {
+  captchaToken: string;
+  onFlowStart?: () => void;
+}) {
   const { setAuthenticatedUser } = useAuthSession();
   const { close } = useSignInModal();
   const [state, dispatch] = useReducer(
@@ -21,18 +26,7 @@ export function EmailTab({ onFlowStart }: { onFlowStart?: () => void }) {
   );
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const handleEmailSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (state.email.trim()) {
-        dispatch({ type: "continueRequested" });
-        onFlowStart?.();
-      }
-    },
-    [state.email, onFlowStart]
-  );
-
-  const handleCaptchaVerify = useCallback(
+  const submitEmail = useCallback(
     async (turnstileToken: string) => {
       dispatch({ type: "submitStarted" });
 
@@ -63,6 +57,17 @@ export function EmailTab({ onFlowStart }: { onFlowStart?: () => void }) {
       }
     },
     [state.email]
+  );
+
+  const handleEmailSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (state.email.trim()) {
+        onFlowStart?.();
+        submitEmail(captchaToken);
+      }
+    },
+    [state.email, onFlowStart, captchaToken, submitEmail]
   );
 
   const handleOtpChange = useCallback(
@@ -169,15 +174,6 @@ export function EmailTab({ onFlowStart }: { onFlowStart?: () => void }) {
             Continue with Email
           </button>
         </form>
-      )}
-
-      {state.status === "captcha" && (
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-neutral-500 text-sm">
-            Complete the verification
-          </p>
-          <TurnstileWidget onVerify={handleCaptchaVerify} />
-        </div>
       )}
 
       {state.status === "awaitingOtp" && (
