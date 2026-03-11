@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthCapability } from "@/lib/auth/capability";
 import { useAuthSession } from "@/contexts/auth-session-context";
 import { useSignInModal } from "@/contexts/sign-in-modal-context";
@@ -18,6 +17,16 @@ import { useSignInModal } from "@/contexts/sign-in-modal-context";
 import { EmailTab } from "./email-tab";
 import { PasskeyTab } from "./passkey-tab";
 import { WalletTab } from "./wallet-tab";
+
+function Divider() {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex-1 border-t border-neutral-200" />
+      <span className="text-neutral-400 text-xs uppercase tracking-wide">or</span>
+      <div className="flex-1 border-t border-neutral-200" />
+    </div>
+  );
+}
 
 function ConnectedView() {
   const { publicKey, disconnect } = useWallet();
@@ -91,9 +100,29 @@ function ConnectedView() {
 export function SignInModal() {
   const { isOpen, close } = useSignInModal();
   const { capability } = useAuthCapability();
+  const { wallets } = useWallet();
+  const [activeSection, setActiveSection] = useState<
+    "email" | "passkey" | "wallet" | null
+  >(null);
+
+  const hasInstalledWallets = wallets.some(
+    (w) => w.readyState === "Installed"
+  );
+
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        close();
+        setActiveSection(null);
+      }
+    },
+    [close]
+  );
+
+  const handleBack = useCallback(() => setActiveSection(null), []);
 
   return (
-    <Dialog onOpenChange={(open) => !open && close()} open={isOpen}>
+    <Dialog onOpenChange={handleOpenChange} open={isOpen}>
       <DialogContent className="border-neutral-200 bg-white text-neutral-900 sm:max-w-[420px] [&_[data-slot=dialog-close]]:text-neutral-500">
         {capability !== "anonymous" ? (
           <>
@@ -113,22 +142,40 @@ export function SignInModal() {
                 Choose your preferred sign-in method.
               </DialogDescription>
             </DialogHeader>
-            <Tabs className="w-full" defaultValue="email">
-              <TabsList className="grid w-full grid-cols-3 bg-neutral-100 [&_button]:!text-neutral-500 [&_button:hover]:!text-neutral-700 [&_[data-state=active]]:!bg-white [&_[data-state=active]]:!text-neutral-900 [&_[data-state=active]]:shadow-sm">
-                <TabsTrigger value="email">Email</TabsTrigger>
-                <TabsTrigger value="passkey">Passkey</TabsTrigger>
-                <TabsTrigger value="wallet">Wallet</TabsTrigger>
-              </TabsList>
-              <TabsContent value="email">
-                <EmailTab />
-              </TabsContent>
-              <TabsContent value="passkey">
-                <PasskeyTab />
-              </TabsContent>
-              <TabsContent value="wallet">
-                <WalletTab />
-              </TabsContent>
-            </Tabs>
+            <div className="flex flex-col gap-4">
+              {activeSection && (
+                <button
+                  className="self-start text-neutral-400 text-xs transition hover:text-neutral-700"
+                  onClick={handleBack}
+                  type="button"
+                >
+                  ← All sign-in options
+                </button>
+              )}
+
+              {(!activeSection || activeSection === "email") && (
+                <EmailTab
+                  onFlowStart={() => setActiveSection("email")}
+                />
+              )}
+
+              {!activeSection && <Divider />}
+
+              {(!activeSection || activeSection === "passkey") && (
+                <PasskeyTab
+                  onFlowStart={() => setActiveSection("passkey")}
+                />
+              )}
+
+              {!activeSection && hasInstalledWallets && <Divider />}
+
+              {hasInstalledWallets &&
+                (!activeSection || activeSection === "wallet") && (
+                  <WalletTab
+                    onFlowStart={() => setActiveSection("wallet")}
+                  />
+                )}
+            </div>
           </>
         )}
       </DialogContent>

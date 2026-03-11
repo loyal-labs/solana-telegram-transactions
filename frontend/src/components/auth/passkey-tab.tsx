@@ -6,13 +6,14 @@ import { TurnstileWidget } from "./turnstile-widget";
 
 type Step = "idle" | "captcha" | "waiting" | "success" | "error";
 
-export function PasskeyTab() {
+export function PasskeyTab({ onFlowStart }: { onFlowStart?: () => void }) {
   const [step, setStep] = useState<Step>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
   const handleStart = useCallback(() => {
     setStep("captcha");
-  }, []);
+    onFlowStart?.();
+  }, [onFlowStart]);
 
   const handleCaptchaVerify = useCallback((_token: string) => {
     setStep("waiting");

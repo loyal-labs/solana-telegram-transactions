@@ -11,7 +11,7 @@ import {
   emailFlowReducer,
 } from "./email-flow-state";
 
-export function EmailTab() {
+export function EmailTab({ onFlowStart }: { onFlowStart?: () => void }) {
   const { setAuthenticatedUser } = useAuthSession();
   const { close } = useSignInModal();
   const [state, dispatch] = useReducer(
@@ -26,9 +26,10 @@ export function EmailTab() {
       e.preventDefault();
       if (state.email.trim()) {
         dispatch({ type: "continueRequested" });
+        onFlowStart?.();
       }
     },
-    [state.email]
+    [state.email, onFlowStart]
   );
 
   const handleCaptchaVerify = useCallback(

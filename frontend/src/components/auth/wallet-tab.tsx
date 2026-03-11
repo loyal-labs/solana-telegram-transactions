@@ -9,7 +9,7 @@ import { TurnstileWidget } from "./turnstile-widget";
 
 type Step = "connect" | "captcha" | "signing";
 
-export function WalletTab() {
+export function WalletTab({ onFlowStart }: { onFlowStart?: () => void }) {
   const { connected, select, wallets } = useWallet();
   const { close } = useSignInModal();
   const [step, setStep] = useState<Step>("connect");
@@ -27,9 +27,10 @@ export function WalletTab() {
       const wallet = wallets.find((w) => w.adapter.name === walletName);
       if (wallet) {
         select(wallet.adapter.name);
+        onFlowStart?.();
       }
     },
-    [wallets, select]
+    [wallets, select, onFlowStart]
   );
 
   const handleCaptchaVerify = useCallback(
@@ -79,7 +80,7 @@ export function WalletTab() {
       {step === "connect" && (
         <div className="flex flex-col gap-2">
           {wallets
-            .filter((w) => w.readyState === "Installed" || w.readyState === "Loadable")
+            .filter((w) => w.readyState === "Installed")
             .map((wallet) => (
               <button
                 className="flex items-center gap-3 rounded-lg border border-neutral-200 px-4 py-3 text-neutral-900 text-sm transition hover:bg-neutral-50"
@@ -98,10 +99,10 @@ export function WalletTab() {
               </button>
             ))}
           {wallets.filter(
-            (w) => w.readyState === "Installed" || w.readyState === "Loadable"
+            (w) => w.readyState === "Installed"
           ).length === 0 && (
             <p className="py-4 text-center text-neutral-500 text-sm">
-              No wallet detected. Please install a Solana wallet extension.
+              No wallet extensions detected.
             </p>
           )}
         </div>
