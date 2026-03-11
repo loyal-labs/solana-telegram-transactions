@@ -11,7 +11,7 @@ import {
 import type { FC, ReactNode } from "react";
 import { useMemo } from "react";
 
-const DEFAULT_SOLANA_RPC_ENDPOINT = "https://api.mainnet-beta.solana.com";
+import { publicEnv } from "@/lib/core/config/public";
 
 type WalletConnectionProviderProps = {
   children: ReactNode;
@@ -21,7 +21,7 @@ export const WalletConnectionProvider: FC<WalletConnectionProviderProps> = ({
   children,
 }) => {
   const endpoint = useMemo(() => {
-    return process.env.NEXT_PUBLIC_SOLANA_RPC_ENDPOINT || DEFAULT_SOLANA_RPC_ENDPOINT;
+    return publicEnv.solanaRpcEndpoint;
   }, []);
 
   const wallets = useMemo(

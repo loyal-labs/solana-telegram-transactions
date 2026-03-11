@@ -9,6 +9,8 @@ import {
 } from "@solana/web3.js";
 import { useCallback, useState } from "react";
 
+import { publicEnv } from "@/lib/core/config/public";
+
 // Debug logger that only emits in development
 const logger = {
   debug: (...args: unknown[]) => {
@@ -40,17 +42,6 @@ export type SwapResult = {
 // Use Jupiter Swap v1 API with paid tier endpoint
 const JUPITER_QUOTE_API_URL = "https://api.jup.ag/swap/v1/quote";
 const JUPITER_SWAP_API_URL = "https://api.jup.ag/swap/v1/swap";
-
-// Get Jupiter API key from environment variable
-const getJupiterApiKey = (): string => {
-  const apiKey = process.env.NEXT_PUBLIC_JUPITER_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "NEXT_PUBLIC_JUPITER_API_KEY environment variable is not set. Please add it to your .env file."
-    );
-  }
-  return apiKey;
-};
 
 // Token mint address mapping for Solana mainnet
 const TOKEN_MINTS: Record<string, string> = {
@@ -110,6 +101,7 @@ type JupiterSwapResponse = {
 export function useSwap() {
   const { connection } = useConnection();
   const { publicKey, connected: isConnected, sendTransaction } = useWallet();
+  const swapConfig = publicEnv.swap;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quote, setQuote] = useState<SwapQuote | null>(null);
@@ -147,6 +139,10 @@ export function useSwap() {
     ): Promise<SwapQuote | null> => {
       try {
         setError(null);
+
+        if (swapConfig.mode === "disabled") {
+          throw new Error(swapConfig.reason);
+        }
 
         // Convert token symbols to mint addresses
         // Use provided mints if available, otherwise look up
@@ -191,7 +187,7 @@ export function useSwap() {
 
         const response = await fetch(url, {
           headers: {
-            "x-api-key": getJupiterApiKey(),
+            "x-api-key": swapConfig.apiKey,
           },
         });
 
@@ -238,10 +234,15 @@ export function useSwap() {
         return null;
       }
     },
-    [getTokenDecimals]
+    [getTokenDecimals, swapConfig]
   );
 
   const executeSwap = useCallback(async (): Promise<SwapResult> => {
+    if (swapConfig.mode === "disabled") {
+      setError(swapConfig.reason);
+      return { success: false, error: swapConfig.reason };
+    }
+
     if (!(isConnected && publicKey)) {
       const errorMsg = "Wallet not connected";
       setError(errorMsg);
@@ -268,7 +269,7 @@ export function useSwap() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": getJupiterApiKey(),
+          "x-api-key": swapConfig.apiKey,
         },
         body: JSON.stringify({
           userPublicKey: publicKey.toBase58(),
@@ -359,7 +360,7 @@ export function useSwap() {
       setLoading(false);
       return { success: false, error: errorMessage };
     }
-  }, [isConnected, publicKey, sendTransaction, connection, quoteResponse]);
+  }, [connection, isConnected, publicKey, quoteResponse, sendTransaction, swapConfig]);
 
   const resetQuote = useCallback(() => {
     setQuote(null);
@@ -374,5 +375,8 @@ export function useSwap() {
     quote,
     loading,
     error,
+    isAvailable: swapConfig.mode === "enabled",
+    unavailableReason:
+      swapConfig.mode === "disabled" ? swapConfig.reason : null,
   };
 }
