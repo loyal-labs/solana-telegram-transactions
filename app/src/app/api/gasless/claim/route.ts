@@ -500,7 +500,8 @@ export async function POST(req: Request) {
         { status: invalidUsername ? 400 : 500 },
       );
     }
-    await recordGaslessClaimAnalyticsBestEffort({
+    // fire and forget — errors are already caught inside the helper
+    void recordGaslessClaimAnalyticsBestEffort({
       connection: provider.connection,
       payerAddress: payerWallet.publicKey.toBase58(),
       signature: storeResult.signature,
@@ -525,7 +526,8 @@ export async function POST(req: Request) {
       );
     }
 
-    await recordGaslessClaimAnalyticsBestEffort({
+    // fire and forget — errors are already caught inside the helper
+    void recordGaslessClaimAnalyticsBestEffort({
       connection: provider.connection,
       payerAddress: payerWallet.publicKey.toBase58(),
       signature: result.verifySignature,
@@ -533,7 +535,8 @@ export async function POST(req: Request) {
       transactionType: "verify_telegram_init_data",
     });
     if (result.topUpSignature) {
-      await recordGaslessClaimAnalyticsBestEffort({
+      // fire and forget — errors are already caught inside the helper
+      void recordGaslessClaimAnalyticsBestEffort({
         connection: provider.connection,
         payerAddress: payerWallet.publicKey.toBase58(),
         recipientAddress: parsedRecipient.toBase58(),
