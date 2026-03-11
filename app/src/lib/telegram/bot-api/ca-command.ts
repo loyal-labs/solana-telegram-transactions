@@ -25,6 +25,15 @@ function formatIntegerValue(value: number | undefined): string {
   }).format(value);
 }
 
+function formatUpdatedAt(value: string | undefined): string {
+  if (typeof value !== "string" || value.length < 19) {
+    return "N/A";
+  }
+
+  const normalized = value.slice(0, 19).replace("T", " ");
+  return normalized.length === 19 ? normalized : "N/A";
+}
+
 export function createCaCommandKeyboard(caAddress: string): InlineKeyboard {
   return new InlineKeyboard()
     .url("Jupiter", `https://jup.ag/tokens/${caAddress}`)
@@ -44,7 +53,7 @@ export function formatCaCommandMessage(
     `FDV: **${formatUsdValue(metrics?.fdvUsd)}**`,
     `Holders: **${formatIntegerValue(metrics?.holderCount)}**`,
     `Liquidity: **${formatUsdValue(metrics?.liquidityUsd)}**`,
-    `Updated: **${metrics?.updatedAt ?? "N/A"}**`,
+    `Updated: **${formatUpdatedAt(metrics?.updatedAt)}**`,
   ].join("\n");
 
   return `$LOYAL's CA: ${caAddressMarkdown}\n\n${tokenInfoLines}`;

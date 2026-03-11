@@ -124,7 +124,7 @@ describe("/ca command", () => {
     expect(text).toContain("FDV: **$3,341,945.817**");
     expect(text).toContain("Holders: **1,572**");
     expect(text).toContain("Liquidity: **$402,595.319**");
-    expect(text).toContain("Updated: **2026-03-10T21:57:59.390765983Z**");
+    expect(text).toContain("Updated: **2026-03-10 21:57:59**");
     expect(options).toEqual(
       expect.objectContaining({
         parse_mode: "Markdown",
