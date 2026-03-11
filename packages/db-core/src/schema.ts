@@ -6,6 +6,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
   text,
   timestamp,
@@ -78,6 +79,24 @@ export type EncryptedMessageContent = {
     mimeType?: string;
   };
 };
+
+/**
+ * Private transfer analytics flow type
+ */
+export type PrivateTransferAnalyticsFlow = "shield" | "unshield";
+
+/**
+ * Gasless claim analytics transaction type
+ */
+export type GaslessClaimTransactionType =
+  | "store"
+  | "verify_telegram_init_data"
+  | "top_up_to_0_01_sol";
+
+/**
+ * Solana environment recorded for gasless claim analytics
+ */
+export type GaslessClaimSolanaEnv = "mainnet" | "devnet";
 
 // ============================================================================
 // TABLES
@@ -503,6 +522,192 @@ export const pushTokens = pgTable(
   ]
 );
 
+/**
+ * Sync state for telegram-private-transfer analytics ingestion.
+ * Tracks head sync and long-running historical backfill progress.
+ */
+export const privateTransferAnalyticsSyncState = pgTable(
+  "private_transfer_analytics_sync_state",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    syncKey: text("sync_key").notNull(),
+    backfillCursor: text("backfill_cursor"),
+    latestSeenSignature: text("latest_seen_signature"),
+    backfillCompletedAt: timestamp("backfill_completed_at", {
+      withTimezone: true,
+    }),
+    lastRunStartedAt: timestamp("last_run_started_at", { withTimezone: true }),
+    lastRunFinishedAt: timestamp("last_run_finished_at", {
+      withTimezone: true,
+    }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("private_transfer_analytics_sync_state_sync_key_uidx").on(
+      table.syncKey
+    ),
+  ]
+);
+
+/**
+ * Latest token metadata and pricing for mints observed in private-transfer analytics.
+ */
+export const privateTransferTokenCatalog = pgTable(
+  "private_transfer_token_catalog",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tokenMint: text("token_mint").notNull(),
+    symbol: text("symbol").notNull(),
+    name: text("name").notNull(),
+    decimals: integer("decimals").notNull(),
+    lastPriceUsd: numeric("last_price_usd", { precision: 30, scale: 12 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("private_transfer_token_catalog_token_mint_uidx").on(
+      table.tokenMint
+    ),
+  ]
+);
+
+/**
+ * Raw successful modify_balance instructions observed for telegram-private-transfer.
+ */
+export const privateTransferModifyBalanceEvents = pgTable(
+  "private_transfer_modify_balance_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    signature: text("signature").notNull(),
+    instructionIndex: integer("instruction_index").notNull(),
+    slot: bigint("slot", { mode: "bigint" }).notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    userAddress: text("user_address").notNull(),
+    vaultAddress: text("vault_address").notNull(),
+    tokenMint: text("token_mint").notNull(),
+    flow: text("flow").$type<PrivateTransferAnalyticsFlow>().notNull(),
+    amountRaw: numeric("amount_raw", { precision: 30, scale: 0 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex(
+      "private_transfer_modify_balance_events_signature_instruction_uidx"
+    ).on(table.signature, table.instructionIndex),
+    index("private_transfer_modify_balance_events_occurred_at_idx").on(
+      table.occurredAt
+    ),
+    index("private_transfer_modify_balance_events_token_mint_idx").on(
+      table.tokenMint
+    ),
+    index("private_transfer_modify_balance_events_flow_occurred_at_idx").on(
+      table.flow,
+      table.occurredAt
+    ),
+    index("private_transfer_modify_balance_events_vault_address_idx").on(
+      table.vaultAddress
+    ),
+    check(
+      "private_transfer_modify_balance_events_flow_check",
+      sql`${table.flow} IN ('shield', 'unshield')`
+    ),
+  ]
+);
+
+/**
+ * Current vault token balances observed on base layer for telegram-private-transfer.
+ * This table is fully replaced on each successful snapshot refresh.
+ */
+export const privateTransferVaultHoldings = pgTable(
+  "private_transfer_vault_holdings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    vaultAddress: text("vault_address").notNull(),
+    tokenAccountAddress: text("token_account_address").notNull(),
+    tokenMint: text("token_mint").notNull(),
+    amountRaw: numeric("amount_raw", { precision: 30, scale: 0 }).notNull(),
+    snapshotAt: timestamp("snapshot_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("private_transfer_vault_holdings_vault_address_uidx").on(
+      table.vaultAddress
+    ),
+    uniqueIndex(
+      "private_transfer_vault_holdings_token_account_address_uidx"
+    ).on(table.tokenAccountAddress),
+    index("private_transfer_vault_holdings_token_mint_idx").on(table.tokenMint),
+  ]
+);
+
+/**
+ * Individual gasless-payer transactions observed for claim flows.
+ * One row per transaction signature and environment.
+ */
+export const gaslessClaimTransactions = pgTable(
+  "gasless_claim_transactions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    solanaEnv: text("solana_env").$type<GaslessClaimSolanaEnv>().notNull(),
+    signature: text("signature").notNull(),
+    transactionType: text("transaction_type")
+      .$type<GaslessClaimTransactionType>()
+      .notNull(),
+    payerAddress: text("payer_address").notNull(),
+    recipientAddress: text("recipient_address"),
+    slot: bigint("slot", { mode: "bigint" }).notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    spentLamports: numeric("spent_lamports", {
+      precision: 30,
+      scale: 0,
+    }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("gasless_claim_transactions_env_signature_uidx").on(
+      table.solanaEnv,
+      table.signature
+    ),
+    index("gasless_claim_transactions_occurred_at_idx").on(table.occurredAt),
+    index("gasless_claim_transactions_type_occurred_at_idx").on(
+      table.transactionType,
+      table.occurredAt
+    ),
+    index("gasless_claim_transactions_recipient_address_idx").on(
+      table.recipientAddress
+    ),
+    check(
+      "gasless_claim_transactions_type_check",
+      sql`${table.transactionType} IN ('store', 'verify_telegram_init_data', 'top_up_to_0_01_sol')`
+    ),
+    check(
+      "gasless_claim_transactions_solana_env_check",
+      sql`${table.solanaEnv} IN ('mainnet', 'devnet')`
+    ),
+  ]
+);
+
 // ============================================================================
 // RELATIONS (for type-safe queries with Drizzle)
 // ============================================================================
@@ -644,3 +849,28 @@ export type PushToken = typeof pushTokens.$inferSelect;
 export type InsertPushToken = typeof pushTokens.$inferInsert;
 
 export type Topic = { title: string; content: string; sources: string[] };
+
+export type PrivateTransferAnalyticsSyncState =
+  typeof privateTransferAnalyticsSyncState.$inferSelect;
+export type InsertPrivateTransferAnalyticsSyncState =
+  typeof privateTransferAnalyticsSyncState.$inferInsert;
+
+export type PrivateTransferTokenCatalog =
+  typeof privateTransferTokenCatalog.$inferSelect;
+export type InsertPrivateTransferTokenCatalog =
+  typeof privateTransferTokenCatalog.$inferInsert;
+
+export type PrivateTransferModifyBalanceEvent =
+  typeof privateTransferModifyBalanceEvents.$inferSelect;
+export type InsertPrivateTransferModifyBalanceEvent =
+  typeof privateTransferModifyBalanceEvents.$inferInsert;
+
+export type PrivateTransferVaultHolding =
+  typeof privateTransferVaultHoldings.$inferSelect;
+export type InsertPrivateTransferVaultHolding =
+  typeof privateTransferVaultHoldings.$inferInsert;
+
+export type GaslessClaimTransaction =
+  typeof gaslessClaimTransactions.$inferSelect;
+export type InsertGaslessClaimTransaction =
+  typeof gaslessClaimTransactions.$inferInsert;
