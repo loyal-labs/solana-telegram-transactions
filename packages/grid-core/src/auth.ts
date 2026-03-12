@@ -59,6 +59,17 @@ export async function callGridAuthEndpoint(
 export function createGridAuthClient(
   config: GridAuthRuntimeConfig
 ): GridAuthClient {
+  const getAuthSession = () =>
+    callGridAuthEndpoint(config, gridAuthRoutePaths.getAuthSession, {
+      method: "GET",
+      credentials: "include",
+    });
+  const logoutAuthSession = () =>
+    callGridAuthEndpoint(config, gridAuthRoutePaths.logoutAuthSession, {
+      method: "POST",
+      credentials: "include",
+    });
+
   return {
     startEmailAuth: (payload) =>
       callGridAuthEndpoint(config, gridAuthRoutePaths.startEmailAuth, {
@@ -78,16 +89,10 @@ export function createGridAuthClient(
         credentials: "include",
         body: JSON.stringify(payload),
       }),
-    getEmailAuthSession: () =>
-      callGridAuthEndpoint(config, gridAuthRoutePaths.getEmailAuthSession, {
-        method: "GET",
-        credentials: "include",
-      }),
-    logoutEmailAuth: () =>
-      callGridAuthEndpoint(config, gridAuthRoutePaths.logoutEmailAuth, {
-        method: "POST",
-        credentials: "include",
-      }),
+    getAuthSession,
+    getEmailAuthSession: getAuthSession,
+    logoutAuthSession,
+    logoutEmailAuth: logoutAuthSession,
     startPasskeyRegistration: (payload: StartPasskeyRegistrationInput) =>
       callGridAuthEndpoint(config, gridAuthRoutePaths.startPasskeyRegistration, {
         method: "POST",

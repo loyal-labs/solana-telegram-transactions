@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  embeddedPasskeyMessageSchema,
+  getAuthSessionResponseSchema,
   startPasskeyRegistrationRequestSchema,
   startPasskeySignInRequestSchema,
   submitSessionRequestSchema,
@@ -34,5 +36,29 @@ describe("grid contracts", () => {
     });
 
     expect(parsed.success).toBe(false);
+  });
+
+  test("accepts generic auth session responses for passkey users", () => {
+    const parsed = getAuthSessionResponseSchema.safeParse({
+      user: {
+        authMethod: "passkey",
+        accountAddress: "smart-account-1",
+        passkeyAccount: "passkey-account-1",
+        sessionKey: { key: "session-key", expiration: 900 },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  test("accepts embedded passkey error messages", () => {
+    const parsed = embeddedPasskeyMessageSchema.safeParse({
+      type: "authz_error",
+      message: "Passkey sign-in failed",
+      details: ["Try again."],
+      challengeExpired: true,
+    });
+
+    expect(parsed.success).toBe(true);
   });
 });

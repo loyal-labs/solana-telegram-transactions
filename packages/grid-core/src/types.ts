@@ -5,9 +5,11 @@ import type {
   GridEnvironment,
 } from "@sqds/grid";
 import type {
+  GetAuthSessionResponse,
   GetEmailAuthSessionResponse,
   StartEmailAuthRequest,
   StartEmailAuthResponse,
+  StartPasskeySessionResponse,
   VerifyEmailAuthRequest,
   VerifyEmailAuthResponse,
 } from "./contracts";
@@ -45,16 +47,20 @@ export type GridAuthClient = {
   verifyEmailAuth: (
     payload: VerifyEmailAuthRequest
   ) => Promise<ApiOutcome<VerifyEmailAuthResponse | unknown>>;
-  getEmailAuthSession: () => Promise<
-    ApiOutcome<GetEmailAuthSessionResponse | unknown>
+  getAuthSession: () => Promise<
+    ApiOutcome<GetAuthSessionResponse | GetEmailAuthSessionResponse | unknown>
   >;
+  getEmailAuthSession: () => Promise<
+    ApiOutcome<GetAuthSessionResponse | GetEmailAuthSessionResponse | unknown>
+  >;
+  logoutAuthSession: () => Promise<ApiOutcome<unknown>>;
   logoutEmailAuth: () => Promise<ApiOutcome<unknown>>;
   startPasskeyRegistration: (
     payload: StartPasskeyRegistrationInput
-  ) => Promise<ApiOutcome<unknown>>;
+  ) => Promise<ApiOutcome<StartPasskeySessionResponse | unknown>>;
   startPasskeySignIn: (
     payload: StartPasskeySignInInput
-  ) => Promise<ApiOutcome<unknown>>;
+  ) => Promise<ApiOutcome<StartPasskeySessionResponse | unknown>>;
   getPasskeyAccount: (
     passkeyAddress: string
   ) => Promise<ApiOutcome<GetPasskeyAccountResponse | unknown>>;

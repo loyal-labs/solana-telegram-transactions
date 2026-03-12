@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 
 import { getServerConfig } from "@/lib/core/config/server";
 import {
-  createSessionCookieService,
-  EMAIL_AUTH_SESSION_COOKIE_NAME,
-} from "@/lib/auth/email/session-cookie";
+  AUTH_SESSION_COOKIE_NAME,
+  createAuthSessionCookieService,
+} from "@/lib/auth/session-cookie";
 import {
   AuthCorsError,
   createAuthCorsPreflightResponse,
@@ -30,13 +30,13 @@ export async function POST(request: Request) {
 
   try {
     const corsHeaders = getAuthCorsHeaders(request, config);
-    const sessionCookieService = createSessionCookieService({
+    const sessionCookieService = createAuthSessionCookieService({
       getConfig: () => config,
     });
     const response = new NextResponse(null, { status: 204 });
 
     response.cookies.set({
-      name: EMAIL_AUTH_SESSION_COOKIE_NAME,
+      name: AUTH_SESSION_COOKIE_NAME,
       value: "",
       ...sessionCookieService.createClearedSessionCookieOptions(request),
     });

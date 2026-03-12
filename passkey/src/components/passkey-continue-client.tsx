@@ -1,8 +1,15 @@
 "use client";
 
+import { type EmbeddedPasskeyMessage } from "@loyal-labs/grid-core";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { startTransition, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
   runContinueAuthFirst,
@@ -10,9 +17,32 @@ import {
 } from "@/lib/passkeys/continue-runner";
 import { parseAuthPasskeyQuery } from "@/lib/passkeys/query-params";
 
+function isEmbeddedPasskeyFlow(searchParams: URLSearchParams): boolean {
+  return searchParams.get("embed") === "1";
+}
+
+function shouldAutostartPasskeyFlow(searchParams: URLSearchParams): boolean {
+  return searchParams.get("autostart") === "1";
+}
+
+function resolveParentWindowOrigin(): string {
+  if (typeof document === "undefined" || !document.referrer) {
+    return "*";
+  }
+
+  try {
+    return new URL(document.referrer).origin;
+  } catch {
+    return "*";
+  }
+}
+
 export function PasskeyContinueClient() {
   const searchParams = useSearchParams();
   const parsed = parseAuthPasskeyQuery(searchParams);
+  const isEmbedded = isEmbeddedPasskeyFlow(searchParams);
+  const shouldAutostart = shouldAutostartPasskeyFlow(searchParams);
+  const hasAutostartedRef = useRef(false);
 
   const [isRunning, setIsRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -25,7 +55,18 @@ export function PasskeyContinueClient() {
   const [showCreateCta, setShowCreateCta] = useState(false);
   const [createCtaMessage, setCreateCtaMessage] = useState<string | null>(null);
 
-  async function handleContinue() {
+  const postMessageToParent = useCallback(
+    (payload: EmbeddedPasskeyMessage) => {
+      if (!isEmbedded || typeof window === "undefined" || window.parent === window) {
+        return;
+      }
+
+      window.parent.postMessage(payload, resolveParentWindowOrigin());
+    },
+    [isEmbedded]
+  );
+
+  const handleContinue = useCallback(async () => {
     if (!parsed.ok || isRunning) {
       return;
     }
@@ -43,6 +84,7 @@ export function PasskeyContinueClient() {
 
     const outcome = await runContinueAuthFirst(parsed.data);
     if (outcome.type === "success") {
+      postMessageToParent({ type: "authz_complete" });
       startTransition(() => {
         setResult(outcome.body);
         setResultBranch(outcome.branch);
@@ -52,19 +94,38 @@ export function PasskeyContinueClient() {
     }
 
     if (outcome.type === "needs_create_cta") {
+      if (isEmbedded) {
+        postMessageToParent({
+          type: "authz_error",
+          message: outcome.message,
+          details: [],
+        });
+        setErrorMessage(outcome.message);
+        setIsRunning(false);
+        return;
+      }
+
       setCreateCtaMessage(outcome.message);
       setShowCreateCta(true);
       setIsRunning(false);
       return;
     }
 
+    postMessageToParent({
+      type: "authz_error",
+      message: outcome.message,
+      details: outcome.details,
+      ...(outcome.challengeExpired
+        ? { challengeExpired: outcome.challengeExpired }
+        : {}),
+    });
     setErrorMessage(outcome.message);
     setErrorDetails(outcome.details);
     setIsChallengeExpired(outcome.challengeExpired);
     setIsRunning(false);
-  }
+  }, [isEmbedded, isRunning, parsed, postMessageToParent]);
 
-  async function handleCreateFallback() {
+  const handleCreateFallback = useCallback(async () => {
     if (!parsed.ok || isRunning) {
       return;
     }
@@ -82,6 +143,7 @@ export function PasskeyContinueClient() {
 
     const outcome = await runCreateFallbackFromAuth(parsed.data);
     if (outcome.type === "success") {
+      postMessageToParent({ type: "authz_complete" });
       startTransition(() => {
         setResult(outcome.body);
         setResultBranch(outcome.branch);
@@ -91,25 +153,57 @@ export function PasskeyContinueClient() {
     }
 
     if (outcome.type === "needs_create_cta") {
+      if (isEmbedded) {
+        postMessageToParent({
+          type: "authz_error",
+          message: outcome.message,
+          details: [],
+        });
+        setErrorMessage(outcome.message);
+        setIsRunning(false);
+        return;
+      }
+
       setCreateCtaMessage(outcome.message);
       setShowCreateCta(true);
       setIsRunning(false);
       return;
     }
 
+    postMessageToParent({
+      type: "authz_error",
+      message: outcome.message,
+      details: outcome.details,
+      ...(outcome.challengeExpired
+        ? { challengeExpired: outcome.challengeExpired }
+        : {}),
+    });
     setErrorMessage(outcome.message);
     setErrorDetails(outcome.details);
     setIsChallengeExpired(outcome.challengeExpired);
     setIsRunning(false);
-  }
+  }, [isEmbedded, isRunning, parsed, postMessageToParent]);
+
+  useEffect(() => {
+    if (!parsed.ok || !isEmbedded || !shouldAutostart || hasAutostartedRef.current) {
+      return;
+    }
+
+    hasAutostartedRef.current = true;
+    void handleContinue();
+  }, [handleContinue, isEmbedded, parsed, shouldAutostart]);
 
   return (
     <section>
-      <h1 style={{ fontSize: 26, marginBottom: 8 }}>Continue with Passkey</h1>
-      <p style={{ lineHeight: 1.5, marginBottom: 18 }}>
-        Attempts passkey login first. If no account exists, it automatically
-        falls back to account creation.
-      </p>
+      {isEmbedded ? null : (
+        <>
+          <h1 style={{ fontSize: 26, marginBottom: 8 }}>Continue with Passkey</h1>
+          <p style={{ lineHeight: 1.5, marginBottom: 18 }}>
+            Attempts passkey login first. If no account exists, it automatically
+            falls back to account creation.
+          </p>
+        </>
+      )}
 
       {!parsed.ok ? (
         <div
@@ -127,6 +221,18 @@ export function PasskeyContinueClient() {
               <li key={issue}>{issue}</li>
             ))}
           </ul>
+        </div>
+      ) : isEmbedded && shouldAutostart ? (
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+            background: "#f8fafc",
+            padding: 14,
+            marginBottom: 12,
+          }}
+        >
+          <strong>{isRunning ? "Running passkey flow..." : "Preparing passkey flow..."}</strong>
         </div>
       ) : (
         <button
@@ -236,9 +342,11 @@ export function PasskeyContinueClient() {
         </section>
       ) : null}
 
-      <p style={{ marginTop: 18 }}>
-        <Link href="/">Back to workspace home</Link>
-      </p>
+      {isEmbedded ? null : (
+        <p style={{ marginTop: 18 }}>
+          <Link href="/">Back to workspace home</Link>
+        </p>
+      )}
     </section>
   );
 }

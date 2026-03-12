@@ -19,6 +19,8 @@ export function Header() {
   const solanaAddress = publicKey?.toBase58();
   const truncatedAddress = solanaAddress
     ? `${solanaAddress.slice(0, 4)}...${solanaAddress.slice(-4)}`
+    : user?.accountAddress
+      ? `${user.accountAddress.slice(0, 4)}...${user.accountAddress.slice(-4)}`
     : null;
   const emailLabel = user?.email ?? null;
 

@@ -51,6 +51,23 @@ Create a `.env.local` file with required API keys (see `.env.example`).
 For Grid auth integrations, set `NEXT_PUBLIC_GRID_AUTH_BASE_URL` to the shared
 passkey domain, typically `https://auth.askloyal.com`.
 
+## Grid auth integration
+
+This frontend treats Grid auth as a shared cookie-backed auth session.
+
+- Email sign-in and passkey sign-in both hydrate the same auth session model.
+- Passkey sign-in is implemented in the sign-in modal without duplicating
+  WebAuthn logic in this workspace.
+- The modal starts passkey sign-in against `NEXT_PUBLIC_GRID_AUTH_BASE_URL`,
+  loads the returned `/continue` URL in an iframe, and refreshes the shared
+  auth session when the auth domain posts `authz_complete`.
+
+Implementation note:
+
+- browser passkey orchestration stays in the `passkey` workspace
+- reusable contracts and auth-client helpers live in `packages/grid-core`
+- this workspace owns only the modal UI state and session refresh behavior
+
 ## Development
 
 ```bash

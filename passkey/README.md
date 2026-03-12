@@ -8,8 +8,10 @@ Standalone Next.js workspace for Squads Grid passkey WebAuthn flows shared acros
 - Passkey session endpoints proxying (`create`, `authorize`, `submit`)
 - Passkey account endpoints proxying (`create`, `find`, `get`)
 - Browser ceremony pages for `/continue`, `/create`, and `/auth`
+- Embedded passkey modal flow used by `/frontend` via iframe + `postMessage`
 - Request-host-aware Grid forwarding (origin/cookie passthrough)
 - Explicit WebAuthn RP ID resolution for shared subdomain credentials
+- Cookie-backed auth session issuance for both email and passkey sign-in
 
 ## Environment
 
@@ -64,6 +66,32 @@ bun test
 - `POST /api/passkeys/account/find`
 - `GET /api/passkeys/account/:passkeyAddress`
 
+## Auth session model
+
+This workspace is the shared auth-domain for Loyal Grid sign-in.
+
+- `/api/auth/session` returns a generic auth principal, not an email-only shape
+- `/api/auth/logout` clears the shared auth session cookie
+- `POST /api/passkeys/session/submit` writes the same auth session cookie after a
+  successful passkey submit
+- the cookie name remains `loyal_email_session` for backward compatibility, even
+  though the session now supports both `authMethod: "email"` and
+  `authMethod: "passkey"`
+
+## Embedded modal flow
+
+`/frontend` does not reimplement WebAuthn logic. Instead it:
+
+1. starts passkey sign-in against this auth domain
+2. loads the returned `/continue?...&embed=1&autostart=1` URL in an iframe
+3. waits for a typed `postMessage` event from this workspace
+4. refreshes `/api/auth/session` and closes the modal on success
+
+In embed mode, `/continue` posts one of:
+
+- `authz_complete`
+- `authz_error`
+
 ## Package boundary
 
 Reusable runtime-agnostic Grid contracts, error helpers, auth-domain client
@@ -74,6 +102,7 @@ custom-domain auth boundary:
 - request host allowlisting
 - RP ID resolution
 - browser WebAuthn ceremony pages
+- embedded passkey orchestration for modal flows
 - Grid upstream proxy handlers
 - passkey redirect/query parsing
 - auth flow orchestration

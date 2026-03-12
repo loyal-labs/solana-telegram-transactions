@@ -111,7 +111,7 @@ describe("grid auth client", () => {
       },
     });
 
-    const outcome = await client.getEmailAuthSession();
+    const outcome = await client.getAuthSession();
 
     expect(outcome.ok).toBe(true);
     expect(requests[0]?.input).toBe(
@@ -131,7 +131,7 @@ describe("grid auth client", () => {
       },
     });
 
-    const outcome = await client.logoutEmailAuth();
+    const outcome = await client.logoutAuthSession();
 
     expect(outcome.ok).toBe(true);
     expect(requests[0]?.input).toBe(

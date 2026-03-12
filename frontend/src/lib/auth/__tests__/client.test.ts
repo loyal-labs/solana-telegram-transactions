@@ -15,7 +15,9 @@ describe("auth api client", () => {
         },
       }),
       verifyEmailAuth: async () => ({ ok: true, status: 200, body: {} }),
+      getAuthSession: async () => ({ ok: true, status: 200, body: {} }),
       getEmailAuthSession: async () => ({ ok: true, status: 200, body: {} }),
+      logoutAuthSession: async () => ({ ok: true, status: 204, body: null }),
       logoutEmailAuth: async () => ({ ok: true, status: 204, body: null }),
       startPasskeyRegistration: async () => ({ ok: true, status: 200, body: {} }),
       startPasskeySignIn: async () => ({ ok: true, status: 200, body: {} }),
@@ -33,6 +35,16 @@ describe("auth api client", () => {
     const client = createAuthApiClient({
       startEmailAuth: async () => ({ ok: true, status: 200, body: {} }),
       verifyEmailAuth: async () => ({ ok: true, status: 200, body: {} }),
+      getAuthSession: async () => ({
+        ok: false,
+        status: 401,
+        body: {
+          error: {
+            code: "unauthenticated",
+            message: "No active auth session.",
+          },
+        },
+      }),
       getEmailAuthSession: async () => ({
         ok: false,
         status: 401,
@@ -43,6 +55,7 @@ describe("auth api client", () => {
           },
         },
       }),
+      logoutAuthSession: async () => ({ ok: true, status: 204, body: null }),
       logoutEmailAuth: async () => ({ ok: true, status: 204, body: null }),
       startPasskeyRegistration: async () => ({ ok: true, status: 200, body: {} }),
       startPasskeySignIn: async () => ({ ok: true, status: 200, body: {} }),
@@ -60,7 +73,9 @@ describe("auth api client", () => {
         status: 200,
         body: { nope: true },
       }),
+      getAuthSession: async () => ({ ok: true, status: 200, body: {} }),
       getEmailAuthSession: async () => ({ ok: true, status: 200, body: {} }),
+      logoutAuthSession: async () => ({ ok: true, status: 204, body: null }),
       logoutEmailAuth: async () => ({ ok: true, status: 204, body: null }),
       startPasskeyRegistration: async () => ({ ok: true, status: 200, body: {} }),
       startPasskeySignIn: async () => ({ ok: true, status: 200, body: {} }),
@@ -73,5 +88,33 @@ describe("auth api client", () => {
         otpCode: "123456",
       })
     ).rejects.toBeInstanceOf(AuthApiClientError);
+  });
+
+  test("returns embedded passkey continue urls", async () => {
+    const client = createAuthApiClient({
+      startEmailAuth: async () => ({ ok: true, status: 200, body: {} }),
+      verifyEmailAuth: async () => ({ ok: true, status: 200, body: {} }),
+      getAuthSession: async () => ({ ok: true, status: 200, body: {} }),
+      getEmailAuthSession: async () => ({ ok: true, status: 200, body: {} }),
+      logoutAuthSession: async () => ({ ok: true, status: 204, body: null }),
+      logoutEmailAuth: async () => ({ ok: true, status: 204, body: null }),
+      startPasskeyRegistration: async () => ({ ok: true, status: 200, body: {} }),
+      startPasskeySignIn: async () => ({
+        ok: true,
+        status: 200,
+        body: {
+          url: "https://auth.askloyal.com/continue?challenge=abc",
+        },
+      }),
+      getPasskeyAccount: async () => ({ ok: true, status: 200, body: {} }),
+    });
+
+    expect(
+      await client.startPasskeySignIn({
+        metaInfo: {
+          appName: "askloyal",
+        },
+      })
+    ).toBe("https://auth.askloyal.com/continue?challenge=abc&embed=1&autostart=1");
   });
 });

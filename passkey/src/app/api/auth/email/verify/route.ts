@@ -3,7 +3,10 @@ import { ZodError } from "zod";
 
 import { getServerConfig } from "@/lib/core/config/server";
 import { EmailAuthError } from "@/lib/auth/email/errors";
-import { createSessionCookieService, EMAIL_AUTH_SESSION_COOKIE_NAME } from "@/lib/auth/email/session-cookie";
+import {
+  AUTH_SESSION_COOKIE_NAME,
+  createAuthSessionCookieService,
+} from "@/lib/auth/session-cookie";
 import { verifyEmailAuth } from "@/lib/auth/email/service";
 import {
   AuthCorsError,
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
     const corsHeaders = getAuthCorsHeaders(request, config);
     const body = await request.json();
     const response = await verifyEmailAuth(body);
-    const sessionCookieService = createSessionCookieService({
+    const sessionCookieService = createAuthSessionCookieService({
       getConfig: () => config,
     });
     const nextResponse = NextResponse.json({
@@ -40,7 +43,7 @@ export async function POST(request: Request) {
     });
 
     nextResponse.cookies.set({
-      name: EMAIL_AUTH_SESSION_COOKIE_NAME,
+      name: AUTH_SESSION_COOKIE_NAME,
       value: response.sessionToken,
       ...sessionCookieService.createSessionCookieOptions(request),
     });

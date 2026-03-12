@@ -1,16 +1,19 @@
 import {
   createGridAuthClient,
   extractGridErrorMessage,
-  getEmailAuthSessionResponseSchema,
+  extractGridSessionUrl,
+  getAuthSessionResponseSchema,
   parseGridErrorDetails,
+  startPasskeySessionResponseSchema,
   startEmailAuthResponseSchema,
   verifyEmailAuthResponseSchema,
 } from "@loyal-labs/grid-core";
 import type {
-  EmailAuthUser,
+  AuthSessionUser,
   GridAuthClient,
   StartEmailAuthRequest,
   StartEmailAuthResponse,
+  StartPasskeySignInRequest,
   VerifyEmailAuthRequest,
 } from "@loyal-labs/grid-core";
 
@@ -33,10 +36,20 @@ export class AuthApiClientError extends Error {
   }
 }
 
+function withPasskeyEmbedParams(url: string): string {
+  const baseOrigin =
+    typeof window !== "undefined" ? window.location.origin : "http://localhost";
+  const nextUrl = new URL(url, baseOrigin);
+  nextUrl.searchParams.set("embed", "1");
+  nextUrl.searchParams.set("autostart", "1");
+  return nextUrl.toString();
+}
+
 export type AuthApiClient = {
   startEmailAuth(payload: StartEmailAuthRequest): Promise<StartEmailAuthResponse>;
-  verifyEmailAuth(payload: VerifyEmailAuthRequest): Promise<EmailAuthUser>;
-  getSession(): Promise<EmailAuthUser | null>;
+  verifyEmailAuth(payload: VerifyEmailAuthRequest): Promise<AuthSessionUser>;
+  startPasskeySignIn(payload: StartPasskeySignInRequest): Promise<string>;
+  getSession(): Promise<AuthSessionUser | null>;
   logout(): Promise<void>;
 };
 
@@ -99,16 +112,50 @@ export function createAuthApiClient(
 
     async verifyEmailAuth(payload) {
       const outcome = await rawClient.verifyEmailAuth(payload);
-      const parsed = assertSuccessfulResponse(outcome, verifyEmailAuthResponseSchema, {
-        invalidResponseMessage: "The auth server returned an invalid verify response.",
-        errorCode: "email_auth_verify_failed",
-      });
+      const parsed = assertSuccessfulResponse(
+        outcome,
+        verifyEmailAuthResponseSchema,
+        {
+          invalidResponseMessage:
+            "The auth server returned an invalid verify response.",
+          errorCode: "email_auth_verify_failed",
+        }
+      );
 
       return parsed.user;
     },
 
+    async startPasskeySignIn(payload) {
+      const outcome = await rawClient.startPasskeySignIn(payload);
+      if (!outcome.ok) {
+        throw new AuthApiClientError(extractGridErrorMessage(outcome.body), {
+          code: toErrorCode(outcome.body, "passkey_sign_in_start_failed"),
+          status: outcome.status,
+          details: parseGridErrorDetails(outcome.body),
+        });
+      }
+
+      const parsed = startPasskeySessionResponseSchema.safeParse(outcome.body);
+      if (parsed.success) {
+        return withPasskeyEmbedParams(parsed.data.url);
+      }
+
+      const extractedUrl = extractGridSessionUrl(outcome.body);
+      if (extractedUrl) {
+        return withPasskeyEmbedParams(extractedUrl);
+      }
+
+      throw new AuthApiClientError(
+        "The auth server returned an invalid passkey start response.",
+        {
+          code: "passkey_sign_in_start_invalid_response",
+          status: 502,
+        }
+      );
+    },
+
     async getSession() {
-      const outcome = await rawClient.getEmailAuthSession();
+      const outcome = await rawClient.getAuthSession();
       if (!outcome.ok) {
         if (outcome.status === 401) {
           return null;
@@ -121,7 +168,7 @@ export function createAuthApiClient(
         });
       }
 
-      const parsed = getEmailAuthSessionResponseSchema.safeParse(outcome.body);
+      const parsed = getAuthSessionResponseSchema.safeParse(outcome.body);
       if (!parsed.success) {
         throw new AuthApiClientError(
           "The auth server returned an invalid session response.",
@@ -136,7 +183,7 @@ export function createAuthApiClient(
     },
 
     async logout() {
-      const outcome = await rawClient.logoutEmailAuth();
+      const outcome = await rawClient.logoutAuthSession();
       if (outcome.ok) {
         return;
       }

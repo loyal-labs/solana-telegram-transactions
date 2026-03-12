@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { createGridAuthClient } from "@loyal-labs/grid-core";
-import type { EmailAuthUser } from "@loyal-labs/grid-core";
+import type { AuthSessionUser } from "@loyal-labs/grid-core";
 
 import { usePublicEnv } from "@/contexts/public-env-context";
 import { createAuthApiClient } from "@/lib/auth/client";
@@ -12,9 +12,9 @@ import type { AuthApiClient } from "@/lib/auth/client";
 type AuthSessionContextValue = {
   isAuthenticated: boolean;
   isHydrated: boolean;
-  user: EmailAuthUser | null;
+  user: AuthSessionUser | null;
   refreshSession: () => Promise<void>;
-  setAuthenticatedUser: (user: EmailAuthUser) => void;
+  setAuthenticatedUser: (user: AuthSessionUser) => void;
   logout: () => Promise<void>;
 };
 
@@ -23,7 +23,7 @@ const AuthApiClientContext = createContext<AuthApiClient | null>(null);
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const publicEnv = usePublicEnv();
-  const [user, setUser] = useState<EmailAuthUser | null>(null);
+  const [user, setUser] = useState<AuthSessionUser | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const authApiClient = useMemo(
     () =>
@@ -73,16 +73,18 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     }
 
     console.log("[auth-session] signed-in user claims", {
+      authMethod: user.authMethod,
       email: user.email,
       gridUserId: user.gridUserId,
       accountAddress: user.accountAddress,
+      passkeyAccount: user.passkeyAccount ?? null,
       provider: user.provider ?? null,
       claimKeys: Object.keys(user),
       rawUser: user,
     });
   }, [isHydrated, user]);
 
-  const setAuthenticatedUser = useCallback((nextUser: EmailAuthUser) => {
+  const setAuthenticatedUser = useCallback((nextUser: AuthSessionUser) => {
     setUser(nextUser);
   }, []);
 

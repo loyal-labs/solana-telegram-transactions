@@ -5,7 +5,7 @@ import {
   verifyEmailAuthRequestSchema,
   type VerifyEmailAuthRequest,
 } from "@loyal-labs/grid-core";
-import type { EmailAuthUser } from "@loyal-labs/grid-core";
+import type { AuthSessionUser } from "@loyal-labs/grid-core";
 
 import { getServerConfig } from "@/lib/core/config/server";
 
@@ -21,9 +21,9 @@ import {
   type PendingAuthStore,
 } from "./pending-auth-store";
 import {
-  createSessionCookieService,
+  createAuthSessionCookieService,
   type SessionCookieService,
-} from "./session-cookie";
+} from "@/lib/auth/session-cookie";
 
 type EmailAuthDependencies = {
   getPendingAuthStore: () => PendingAuthStore;
@@ -35,7 +35,7 @@ const defaultDependencies: EmailAuthDependencies = {
   getPendingAuthStore: () => getPendingAuthStore(),
   getGridEmailAuthAdapter: () => getGridEmailAuthAdapter(),
   getSessionCookieService: () =>
-    createSessionCookieService({
+    createAuthSessionCookieService({
       getConfig: () => getServerConfig(),
     }),
 };
@@ -84,7 +84,7 @@ export async function verifyEmailAuth(
   input: VerifyEmailAuthRequest,
   dependencies: EmailAuthDependencies = defaultDependencies
 ): Promise<{
-  user: EmailAuthUser;
+  user: AuthSessionUser;
   sessionToken: string;
 }> {
   const payload = verifyEmailAuthRequestSchema.parse(input);
@@ -102,7 +102,14 @@ export async function verifyEmailAuth(
     });
   }
 
-  const user = await adapter.completeEmailAuth(pendingAuth, payload.otpCode);
+  const emailUser = await adapter.completeEmailAuth(pendingAuth, payload.otpCode);
+  const user: AuthSessionUser = {
+    authMethod: "email",
+    accountAddress: emailUser.accountAddress,
+    email: emailUser.email,
+    gridUserId: emailUser.gridUserId,
+    ...(emailUser.provider ? { provider: emailUser.provider } : {}),
+  };
   await store.consumePendingAuth(payload.authTicketId);
   const sessionToken = await sessionCookieService.issueSessionToken(user);
 

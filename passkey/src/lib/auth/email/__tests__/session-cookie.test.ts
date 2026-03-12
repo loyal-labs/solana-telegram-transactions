@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createSessionCookieService } from "@/lib/auth/email/session-cookie";
+import { createAuthSessionCookieService } from "@/lib/auth/session-cookie";
 
 const config = {
   gridEnvironment: "sandbox" as const,
@@ -15,7 +15,7 @@ const config = {
 
 describe("session cookie service", () => {
   test("issues cookie options for shared production subdomains", () => {
-    const service = createSessionCookieService({
+    const service = createAuthSessionCookieService({
       getConfig: () => config,
     });
 
@@ -32,7 +32,7 @@ describe("session cookie service", () => {
   });
 
   test("omits the cookie domain for localhost", () => {
-    const service = createSessionCookieService({
+    const service = createAuthSessionCookieService({
       getConfig: () => config,
     });
 
@@ -45,11 +45,12 @@ describe("session cookie service", () => {
   });
 
   test("reads authenticated sessions back from the cookie", async () => {
-    const service = createSessionCookieService({
+    const service = createAuthSessionCookieService({
       getConfig: () => config,
     });
 
     const token = await service.issueSessionToken({
+      authMethod: "email",
       email: "user@example.com",
       gridUserId: "grid-user-1",
       accountAddress: "account-1",
@@ -65,10 +66,39 @@ describe("session cookie service", () => {
     );
 
     expect(user).toEqual({
+      authMethod: "email",
       email: "user@example.com",
       gridUserId: "grid-user-1",
       accountAddress: "account-1",
       provider: "privy",
+    });
+  });
+
+  test("reads passkey sessions back from the cookie", async () => {
+    const service = createAuthSessionCookieService({
+      getConfig: () => config,
+    });
+
+    const token = await service.issueSessionToken({
+      authMethod: "passkey",
+      accountAddress: "smart-account-1",
+      passkeyAccount: "passkey-account-1",
+      sessionKey: { key: "session-key", expiration: 900 },
+    });
+
+    const user = await service.readSessionFromRequest(
+      new Request("https://auth.askloyal.com/api/auth/session", {
+        headers: {
+          cookie: `loyal_email_session=${token}`,
+        },
+      })
+    );
+
+    expect(user).toEqual({
+      authMethod: "passkey",
+      accountAddress: "smart-account-1",
+      passkeyAccount: "passkey-account-1",
+      sessionKey: { key: "session-key", expiration: 900 },
     });
   });
 });

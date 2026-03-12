@@ -36,7 +36,7 @@ function ConnectedView() {
   const { close } = useSignInModal();
   const { hasEmailSession, hasWalletConnection } = useAuthCapability();
   const [copied, setCopied] = useState(false);
-  const address = publicKey?.toBase58() ?? "";
+  const address = publicKey?.toBase58() ?? user?.accountAddress ?? "";
   const email = user?.email ?? "";
 
   const handleCopy = useCallback(async () => {
@@ -150,7 +150,7 @@ export function SignInModal() {
 
   return (
     <Dialog onOpenChange={handleOpenChange} open={isOpen}>
-      <DialogContent className="border-neutral-200 bg-white text-neutral-900 sm:max-w-[420px] [&_[data-slot=dialog-close]]:text-neutral-500">
+      <DialogContent className="border-neutral-200 bg-white text-neutral-900 sm:max-w-[520px] [&_[data-slot=dialog-close]]:text-neutral-500">
         {capability !== "anonymous" ? (
           <>
             <DialogHeader>

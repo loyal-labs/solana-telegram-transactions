@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getServerConfig } from "@/lib/core/config/server";
-import { createSessionCookieService } from "@/lib/auth/email/session-cookie";
+import { createAuthSessionCookieService } from "@/lib/auth/session-cookie";
 import {
   AuthCorsError,
   createAuthCorsPreflightResponse,
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
   try {
     const corsHeaders = getAuthCorsHeaders(request, config);
-    const sessionCookieService = createSessionCookieService({
+    const sessionCookieService = createAuthSessionCookieService({
       getConfig: () => config,
     });
     const user = await sessionCookieService.readSessionFromRequest(request);

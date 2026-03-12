@@ -8,6 +8,8 @@ Runtime-agnostic Grid helpers for Loyal apps.
 - auth-domain URL/client helpers
 - shared Grid request contracts
 - normalized error parsing
+- shared auth-session contracts
+- embedded passkey iframe message contracts
 
 ## What does not belong here
 
@@ -46,3 +48,22 @@ const serverClient = createGridServerClient({
   baseUrl: "https://grid.squads.xyz",
 });
 ```
+
+## Auth session helpers
+
+The preferred auth-session methods are:
+
+- `getAuthSession()`
+- `logoutAuthSession()`
+
+The older email-specific method names are still exported as compatibility
+aliases:
+
+- `getEmailAuthSession()`
+- `logoutEmailAuth()`
+
+This package also exports:
+
+- `authSessionUserSchema` for the shared cookie-backed auth principal
+- `embeddedPasskeyMessageSchema` for iframe `postMessage` validation between
+  the auth domain and embedding apps
