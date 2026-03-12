@@ -4,21 +4,29 @@ import { useState } from "react";
 
 import { ActivityRowItem } from "./activity-row-item";
 import { SearchInput, SubViewHeader } from "./shared";
-import { activityToDetail, allActivities, type ActivityRow, type SubView } from "./types";
+import type {
+  ActivityRow,
+  SubView,
+  TransactionDetail,
+} from "./types";
 
 export function AllActivityView({
+  activities,
+  details,
   isBalanceHidden,
   onBack,
   onClose,
   onNavigate,
 }: {
+  activities: ActivityRow[];
+  details: Record<string, TransactionDetail>;
   isBalanceHidden: boolean;
   onBack: () => void;
   onClose: () => void;
   onNavigate: (view: SubView) => void;
 }) {
   const [search, setSearch] = useState("");
-  const filtered = allActivities.filter(
+  const filtered = activities.filter(
     (a) =>
       a.counterparty.toLowerCase().includes(search.toLowerCase()) ||
       a.amount.toLowerCase().includes(search.toLowerCase()) ||
@@ -73,7 +81,7 @@ export function AllActivityView({
                 onClick={() =>
                   onNavigate({
                     type: "transaction",
-                    detail: activityToDetail(activity),
+                    detail: details[activity.id],
                     from: "allActivity",
                   })
                 }

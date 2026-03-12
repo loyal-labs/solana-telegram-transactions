@@ -38,6 +38,7 @@
     "@noble/hashes": "^1.8.0",
     "@number-flow/react": "^0.5.10",
     "@loyal-labs/solana-rpc": "workspace:*",
+    "@loyal-labs/solana-wallet": "workspace:*",
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/web3.js": "1",
     "@sqds/grid": "^3.1.2",

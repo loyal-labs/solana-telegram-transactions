@@ -5,7 +5,6 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { SubView, SwapToken } from "./types";
-import { swapTokens } from "./types";
 
 const font = "var(--font-geist-sans), sans-serif";
 const secondary = "rgba(60, 60, 67, 0.6)";

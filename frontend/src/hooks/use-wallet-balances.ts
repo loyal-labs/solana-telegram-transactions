@@ -1,9 +1,9 @@
 import {
-  useConnection,
   useWallet,
 } from "@solana/wallet-adapter-react";
-import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useState } from "react";
+
+import { useSolanaWalletDataClient } from "./use-solana-wallet-data-client";
 
 export type TokenBalance = {
   symbol: string;
@@ -12,39 +12,18 @@ export type TokenBalance = {
   decimals: number;
 };
 
-// Known token mints for Solana mainnet
-const KNOWN_TOKENS: Record<string, { symbol: string; decimals: number }> = {
-  So11111111111111111111111111111111111111112: { symbol: "SOL", decimals: 9 },
-  EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: {
-    symbol: "USDC",
-    decimals: 6,
-  },
-  Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: {
-    symbol: "USDT",
-    decimals: 6,
-  },
-  DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263: {
-    symbol: "BONK",
-    decimals: 5,
-  },
-  LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta: {
-    symbol: "LOYAL",
-    decimals: 6,
-  },
-};
-
 export function useWalletBalances() {
-  const { connection } = useConnection();
   const { connected, publicKey } = useWallet();
+  const client = useSolanaWalletDataClient();
   const [balances, setBalances] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const solanaAddress = publicKey?.toBase58();
-
   const fetchBalances = useCallback(async () => {
-    if (!(connected && solanaAddress)) {
+    if (!(connected && publicKey)) {
       setBalances([]);
+      setLoading(false);
+      setError(null);
       return;
     }
 
@@ -52,50 +31,14 @@ export function useWalletBalances() {
     setError(null);
 
     try {
-      const pubkey = new PublicKey(solanaAddress);
-      const tokenBalances: TokenBalance[] = [];
-
-      // Fetch SOL balance
-      const solBalance = await connection.getBalance(pubkey);
-      if (solBalance > 0) {
-        tokenBalances.push({
-          symbol: "SOL",
-          balance: solBalance / LAMPORTS_PER_SOL,
-          mint: "So11111111111111111111111111111111111111112",
-          decimals: 9,
-        });
-      }
-
-      // Fetch SPL token balances
-      const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-        pubkey,
-        {
-          programId: new PublicKey(
-            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-          ),
-        }
+      const tokenBalances = (await client.getPortfolio(publicKey)).positions.map(
+        (position) => ({
+          symbol: position.asset.symbol,
+          balance: position.totalBalance,
+          mint: position.asset.mint,
+          decimals: position.asset.decimals,
+        })
       );
-
-      for (const { account } of tokenAccounts.value) {
-        const parsedInfo = account.data.parsed.info;
-        const mintAddress = parsedInfo.mint;
-        const balance = parsedInfo.tokenAmount.uiAmount;
-
-        // Only include tokens with balance > 0
-        if (balance > 0) {
-          const tokenInfo = KNOWN_TOKENS[mintAddress];
-
-          // Include all tokens with balance > 0, not just known ones
-          tokenBalances.push({
-            symbol:
-              tokenInfo?.symbol ||
-              `${mintAddress.slice(0, 4)}...${mintAddress.slice(-4)}`,
-            balance,
-            mint: mintAddress,
-            decimals: parsedInfo.tokenAmount.decimals,
-          });
-        }
-      }
 
       setBalances(tokenBalances);
       setLoading(false);
@@ -106,7 +49,7 @@ export function useWalletBalances() {
       console.error("Error fetching wallet balances:", err);
       setLoading(false);
     }
-  }, [connected, solanaAddress, connection]);
+  }, [client, connected, publicKey]);
 
   // Fetch balances when wallet connects
   useEffect(() => {
@@ -117,7 +60,7 @@ export function useWalletBalances() {
     balances,
     loading,
     error,
-    isConnected: Boolean(connected && solanaAddress),
+    isConnected: Boolean(connected && publicKey),
     refetch: fetchBalances,
   };
 }

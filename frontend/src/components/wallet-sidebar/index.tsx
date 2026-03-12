@@ -2,7 +2,9 @@
 
 import { ArrowUpRight, RefreshCw, X } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import { useWalletSidebarData } from "@/hooks/use-wallet-sidebar-data";
 
 import { AllActivityView } from "./all-activity-view";
 import { AllTokensView } from "./all-tokens-view";
@@ -11,14 +13,22 @@ import { SendContent } from "./send-content";
 import { SwapContent } from "./swap-content";
 import { TokenSelectView } from "./token-select-view";
 import { TransactionDetailView } from "./transaction-detail-view";
-import type { HeroRightSidebarProps, SubView, SwapToken, TransactionDetail } from "./types";
+import type {
+  HeroRightSidebarProps,
+  SubView,
+  SwapToken,
+  TransactionDetail,
+} from "./types";
 import { swapTokens } from "./types";
 
 export type { RightSidebarTab, HeroRightSidebarProps } from "./types";
 
 export function HeroRightSidebar(props: HeroRightSidebarProps) {
+  const walletSidebarData = useWalletSidebarData();
   const [subView, setSubView] = useState<SubView>(null);
-  const [listSubView, setListSubView] = useState<"allTokens" | "allActivity" | null>(null);
+  const [listSubView, setListSubView] = useState<"allTokens" | "allActivity" | null>(
+    null
+  );
 
   // Cross-fade when switching tabs: fade out → swap content → fade in
   const [crossFadeOpacity, setCrossFadeOpacity] = useState(1);
@@ -42,10 +52,18 @@ export function HeroRightSidebar(props: HeroRightSidebarProps) {
   const [sendToken, setSendToken] = useState<SwapToken>(swapTokens[0]);
 
   // Derived state
-  const isTransaction = typeof subView === "object" && subView?.type === "transaction";
-  const isTokenSelect = typeof subView === "object" && subView?.type === "tokenSelect";
-  const isSendTokenSelect = typeof subView === "object" && subView?.type === "sendTokenSelect";
-  const hasLevel1 = subView === "allTokens" || subView === "allActivity" || isTransaction || isTokenSelect || isSendTokenSelect;
+  const isTransaction =
+    typeof subView === "object" && subView?.type === "transaction";
+  const isTokenSelect =
+    typeof subView === "object" && subView?.type === "tokenSelect";
+  const isSendTokenSelect =
+    typeof subView === "object" && subView?.type === "sendTokenSelect";
+  const hasLevel1 =
+    subView === "allTokens" ||
+    subView === "allActivity" ||
+    isTransaction ||
+    isTokenSelect ||
+    isSendTokenSelect;
   const hasLevel2 = isTransaction;
 
   // Keep listSubView in sync
@@ -170,7 +188,13 @@ export function HeroRightSidebar(props: HeroRightSidebarProps) {
                   }}
                 >
                   {tab === "portfolio" && (
-                    <div style={{ display: "flex", alignItems: "center", paddingRight: "2px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      paddingRight: "2px",
+                    }}
+                  >
                       <div style={{ width: "20px", height: "20px", borderRadius: "9999px", border: "1.5px solid white", overflow: "hidden", marginRight: "-6px", position: "relative", zIndex: 2 }}>
                         <Image alt="USDC" height={20} src="/hero-new/usdc.png" style={{ width: "100%", height: "100%", objectFit: "cover" }} width={20} />
                       </div>
@@ -225,9 +249,17 @@ export function HeroRightSidebar(props: HeroRightSidebarProps) {
                     <X size={24} />
                   </button>
                   <PortfolioContent
+                    activityRows={walletSidebarData.activityRows}
+                    balanceFraction={walletSidebarData.balanceFraction}
+                    balanceSolLabel={walletSidebarData.balanceSolLabel}
+                    balanceWhole={walletSidebarData.balanceWhole}
                     isBalanceHidden={props.isBalanceHidden}
+                    isLoading={walletSidebarData.isLoading}
                     onBalanceHiddenChange={props.onBalanceHiddenChange}
                     onNavigate={setSubView}
+                    tokenRows={walletSidebarData.tokenRows}
+                    transactionDetails={walletSidebarData.transactionDetails}
+                    walletLabel={walletSidebarData.walletLabel}
                   />
                 </>
               )}
@@ -274,14 +306,17 @@ export function HeroRightSidebar(props: HeroRightSidebarProps) {
             }}
           >
             {listSubView === "allTokens" && (
-              <AllTokensView
-                isBalanceHidden={props.isBalanceHidden}
-                onBack={() => setSubView(null)}
-                onClose={props.onClose}
-              />
-            )}
+                <AllTokensView
+                  isBalanceHidden={props.isBalanceHidden}
+                  onBack={() => setSubView(null)}
+                  onClose={props.onClose}
+                  tokens={walletSidebarData.allTokenRows}
+                />
+              )}
             {listSubView === "allActivity" && (
               <AllActivityView
+                activities={walletSidebarData.allActivityRows}
+                details={walletSidebarData.transactionDetails}
                 isBalanceHidden={props.isBalanceHidden}
                 onBack={() => setSubView(null)}
                 onClose={props.onClose}

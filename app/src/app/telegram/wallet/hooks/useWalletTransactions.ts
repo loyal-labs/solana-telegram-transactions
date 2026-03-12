@@ -1,14 +1,14 @@
+import type {
+  ProgramActionType,
+  WalletActivity,
+} from "@loyal-labs/solana-wallet";
 import { PublicKey } from "@solana/web3.js";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 
-import {
-  getAccountTransactionHistory,
-  listenForAccountTransactions,
-} from "@/lib/solana/rpc/get-account-txn-history";
-import type { WalletTransfer } from "@/lib/solana/rpc/types";
-import type { Transaction } from "@/types/wallet";
+import type { Transaction, WalletTransactionTransferType } from "@/types/wallet";
 
+import { getTelegramWalletDataClient } from "../solana-wallet-data-client";
 import { cachedWalletAddress, walletTransactionsCache } from "../wallet-cache";
 import { MOCK_WALLET_TRANSACTIONS, USE_MOCK_DATA } from "../wallet-mock-data";
 
@@ -28,40 +28,83 @@ export function useWalletTransactions(walletAddress: string | null): {
   );
   const [isFetchingTransactions, setIsFetchingTransactions] = useState(false);
 
+  const resolveTransferType = useCallback(
+    (activity: WalletActivity): WalletTransactionTransferType => {
+      switch (activity.type) {
+        case "sol_transfer":
+        case "token_transfer":
+          return "transfer";
+        case "swap":
+        case "secure":
+        case "unshield":
+          return activity.type;
+        case "program_action":
+          return activity.action as ProgramActionType;
+      }
+    },
+    []
+  );
+
   const mapTransferToTransaction = useCallback(
-    (transfer: WalletTransfer): Transaction => {
-      const isIncoming = transfer.direction === "in";
+    (activity: WalletActivity): Transaction => {
+      const isIncoming = activity.direction === "in";
       const counterparty =
-        transfer.counterparty ||
+        activity.counterparty ||
         (isIncoming ? "Unknown sender" : "Unknown recipient");
 
       const base: Transaction = {
-        id: transfer.signature,
+        id: activity.signature,
         type: isIncoming ? "incoming" : "outgoing",
-        transferType: transfer.type,
-        amountLamports: transfer.amountLamports,
-        tokenMint: transfer.tokenMint,
-        tokenAmount: transfer.tokenAmount,
-        tokenDecimals: transfer.tokenDecimals,
+        transferType: resolveTransferType(activity),
+        amountLamports:
+          activity.type === "sol_transfer" ||
+          activity.type === "swap" ||
+          activity.type === "program_action"
+            ? activity.amountLamports
+            : 0,
+        tokenMint:
+          activity.type === "token_transfer" ||
+          activity.type === "secure" ||
+          activity.type === "unshield"
+            ? activity.token.mint
+            : activity.type === "program_action"
+              ? activity.token?.mint
+              : undefined,
+        tokenAmount:
+          activity.type === "token_transfer" ||
+          activity.type === "secure" ||
+          activity.type === "unshield"
+            ? activity.token.amount
+            : activity.type === "program_action"
+              ? activity.token?.amount
+              : undefined,
+        tokenDecimals:
+          activity.type === "token_transfer" ||
+          activity.type === "secure" ||
+          activity.type === "unshield"
+            ? activity.token.decimals
+            : activity.type === "program_action"
+              ? activity.token?.decimals
+              : undefined,
         sender: isIncoming ? counterparty : undefined,
         recipient: !isIncoming ? counterparty : undefined,
-        timestamp: transfer.timestamp ?? Date.now(),
-        networkFeeLamports: transfer.feeLamports,
-        signature: transfer.signature,
-        status: transfer.status === "failed" ? "error" : "completed",
+        timestamp: activity.timestamp ?? Date.now(),
+        networkFeeLamports: activity.feeLamports,
+        signature: activity.signature,
+        status: activity.status === "failed" ? "error" : "completed",
       };
 
-      if (transfer.type === "swap") {
-        base.swapFromMint = transfer.swapFromMint;
-        base.swapToMint = transfer.swapToMint;
-        if (transfer.swapToAmount) {
-          base.swapToAmount = parseFloat(transfer.swapToAmount);
+      if (activity.type === "swap") {
+        base.swapFromMint = activity.fromToken.mint;
+        base.swapToMint = activity.toToken.mint;
+        if (activity.toToken.amount) {
+          base.swapToAmount = parseFloat(activity.toToken.amount);
         }
       }
 
       return base;
     },
-    []
+    [resolveTransferType]
   );
 
   const loadWalletTransactions = useCallback(
@@ -81,15 +124,16 @@ export function useWalletTransactions(walletAddress: string | null): {
         setIsFetchingTransactions(true);
       }
       try {
-        const { transfers } = await getAccountTransactionHistory(
-          new PublicKey(walletAddress),
-          {
-            limit: 10,
-            onlySystemTransfers: false,
-          }
-        );
+        const { activities } =
+          await getTelegramWalletDataClient().getActivity(
+            new PublicKey(walletAddress),
+            {
+              limit: 10,
+              onlySystemTransfers: false,
+            }
+          );
 
-        const mappedTransactions: Transaction[] = transfers.map(
+        const mappedTransactions: Transaction[] = activities.map(
           mapTransferToTransaction
         );
 
@@ -149,40 +193,41 @@ export function useWalletTransactions(walletAddress: string | null): {
 
     void (async () => {
       try {
-        unsubscribe = await listenForAccountTransactions(
-          new PublicKey(walletAddress),
-          (transfer) => {
-            if (isCancelled) return;
-            const mapped = mapTransferToTransaction(transfer);
-            setWalletTransactions((prev) => {
-              const next = [...prev];
+        unsubscribe =
+          await getTelegramWalletDataClient().subscribeActivity(
+            new PublicKey(walletAddress),
+            (activity) => {
+              if (isCancelled) return;
+              const mapped = mapTransferToTransaction(activity);
+              setWalletTransactions((prev) => {
+                const next = [...prev];
 
-              const matchIndex = mapped.signature
-                ? next.findIndex((tx) => tx.signature === mapped.signature)
-                : next.findIndex((tx) => tx.id === mapped.id);
+                const matchIndex = mapped.signature
+                  ? next.findIndex((tx) => tx.signature === mapped.signature)
+                  : next.findIndex((tx) => tx.id === mapped.id);
 
-              if (matchIndex >= 0) {
-                const existing = next[matchIndex];
-                // Preserve app-injected swap data when on-chain data arrives
-                if (
-                  existing.transferType === "swap" &&
-                  mapped.transferType !== "swap"
-                ) {
-                  next[matchIndex] = { ...mapped, ...existing };
+                if (matchIndex >= 0) {
+                  const existing = next[matchIndex];
+                  // Preserve app-injected swap data when on-chain data arrives
+                  if (
+                    existing.transferType === "swap" &&
+                    mapped.transferType !== "swap"
+                  ) {
+                    next[matchIndex] = { ...mapped, ...existing };
+                  } else {
+                    next[matchIndex] = { ...existing, ...mapped };
+                  }
                 } else {
-                  next[matchIndex] = { ...existing, ...mapped };
+                  next.unshift(mapped);
                 }
-              } else {
-                next.unshift(mapped);
-              }
 
-              const sorted = next.sort((a, b) => b.timestamp - a.timestamp);
-              walletTransactionsCache.set(walletAddress, sorted);
-              return sorted;
-            });
-          },
-          { onlySystemTransfers: false }
-        );
+                const sorted = next.sort((a, b) => b.timestamp - a.timestamp);
+                walletTransactionsCache.set(walletAddress, sorted);
+                return sorted;
+              });
+            },
+            { onlySystemTransfers: false, emitInitial: false }
+          );
       } catch (error) {
         console.error("Failed to subscribe to transaction updates", error);
       }

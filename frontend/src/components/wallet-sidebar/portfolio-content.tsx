@@ -5,16 +5,37 @@ import Image from "next/image";
 
 import { ActivityRowItem } from "./activity-row-item";
 import { TokenRowItem } from "./token-row-item";
-import { activities, activityToDetail, tokens, type SubView } from "./types";
+import type {
+  ActivityRow,
+  SubView,
+  TokenRow,
+  TransactionDetail,
+} from "./types";
 
 export function PortfolioContent({
+  activityRows,
+  balanceFraction,
+  balanceSolLabel,
+  balanceWhole,
   isBalanceHidden,
+  isLoading,
   onBalanceHiddenChange,
   onNavigate,
+  tokenRows,
+  transactionDetails,
+  walletLabel,
 }: {
+  activityRows: ActivityRow[];
+  balanceFraction: string;
+  balanceSolLabel: string;
+  balanceWhole: string;
   isBalanceHidden: boolean;
+  isLoading: boolean;
   onBalanceHiddenChange: (hidden: boolean) => void;
   onNavigate: (view: SubView) => void;
+  tokenRows: TokenRow[];
+  transactionDetails: Record<string, TransactionDetail>;
+  walletLabel: string;
 }) {
   return (
     <>
@@ -89,7 +110,7 @@ export function PortfolioContent({
               color: "rgba(60, 60, 67, 0.6)",
             }}
           >
-            UQAt…qZir · Mainnet
+            {walletLabel}
           </span>
           <div
             style={{
@@ -112,14 +133,14 @@ export function PortfolioContent({
                   display: "block",
                 }}
               >
-                $1,267
+                {balanceWhole}
                 <span
                   style={{
                     color: isBalanceHidden ? "#BBBBC0" : "rgba(60, 60, 67, 0.6)",
                     transition: "color 0.15s ease",
                   }}
                 >
-                  .47
+                  {balanceFraction}
                 </span>
               </span>
             </div>
@@ -165,7 +186,7 @@ export function PortfolioContent({
                 display: "block",
               }}
             >
-              14.98765 SOL
+              {balanceSolLabel}
             </span>
           </div>
         </div>
@@ -204,10 +225,10 @@ export function PortfolioContent({
             </span>
           </div>
 
-          {tokens.map((token) => (
+          {tokenRows.map((token) => (
             <TokenRowItem
               isBalanceHidden={isBalanceHidden}
-              key={token.symbol}
+              key={token.id ?? token.symbol}
               token={token}
             />
           ))}
@@ -271,7 +292,7 @@ export function PortfolioContent({
             </span>
           </div>
 
-          {activities.map((activity) => (
+          {activityRows.map((activity) => (
             <ActivityRowItem
               activity={activity}
               isBalanceHidden={isBalanceHidden}
@@ -279,12 +300,26 @@ export function PortfolioContent({
               onClick={() =>
                 onNavigate({
                   type: "transaction",
-                  detail: activityToDetail(activity),
+                  detail: transactionDetails[activity.id],
                   from: "portfolio",
                 })
               }
             />
           ))}
+
+          {!isLoading && activityRows.length === 0 && (
+            <div
+              style={{
+                padding: "12px 20px",
+                textAlign: "center",
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "14px",
+                color: "rgba(60, 60, 67, 0.6)",
+              }}
+            >
+              No activity yet
+            </div>
+          )}
 
           <div
             style={{

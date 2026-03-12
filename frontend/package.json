@@ -29,6 +29,7 @@
     "@loyal-labs/grid-core": "workspace:*",
     "@loyal-labs/llm-core": "workspace:*",
     "@loyal-labs/solana-rpc": "workspace:*",
+    "@loyal-labs/solana-wallet": "workspace:*",
     "@loyal-labs/transactions": "workspace:*",
     "@nillion/nilai-ts": "^0.2.0",
     "@nillion/nuc": "^1.0.0",

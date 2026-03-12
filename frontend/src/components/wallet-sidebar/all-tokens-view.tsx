@@ -4,19 +4,21 @@ import { useState } from "react";
 
 import { SearchInput, SubViewHeader } from "./shared";
 import { TokenRowItem } from "./token-row-item";
-import { allTokens } from "./types";
+import type { TokenRow } from "./types";
 
 export function AllTokensView({
+  tokens,
   isBalanceHidden,
   onBack,
   onClose,
 }: {
+  tokens: TokenRow[];
   isBalanceHidden: boolean;
   onBack: () => void;
   onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
-  const filtered = allTokens.filter((t) =>
+  const filtered = tokens.filter((t) =>
     t.symbol.toLowerCase().includes(search.toLowerCase()),
   );
 
@@ -35,7 +37,7 @@ export function AllTokensView({
         {filtered.map((token, i) => (
           <TokenRowItem
             isBalanceHidden={isBalanceHidden}
-            key={`${token.symbol}-${i}`}
+            key={token.id ?? `${token.symbol}-${i}`}
             token={token}
           />
         ))}
