@@ -4,7 +4,7 @@ import { ArrowUpRight, RefreshCw, X } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 
-import { useWalletSidebarData } from "@/hooks/use-wallet-sidebar-data";
+import type { WalletDesktopData } from "@/hooks/use-wallet-desktop-data";
 
 import { AllActivityView } from "./all-activity-view";
 import { AllTokensView } from "./all-tokens-view";
@@ -14,17 +14,27 @@ import { SwapContent } from "./swap-content";
 import { TokenSelectView } from "./token-select-view";
 import { TransactionDetailView } from "./transaction-detail-view";
 import type {
-  HeroRightSidebarProps,
+  RightSidebarTab,
   SubView,
   SwapToken,
   TransactionDetail,
 } from "./types";
 import { swapTokens } from "./types";
 
-export type { RightSidebarTab, HeroRightSidebarProps } from "./types";
+export type { RightSidebarTab } from "./types";
+
+export interface HeroRightSidebarProps {
+  isOpen: boolean;
+  activeTab: RightSidebarTab;
+  onClose: () => void;
+  onTabChange: (tab: RightSidebarTab) => void;
+  isBalanceHidden: boolean;
+  onBalanceHiddenChange: (hidden: boolean) => void;
+  showQuickActions?: boolean;
+  walletDesktopData: WalletDesktopData;
+}
 
 export function HeroRightSidebar(props: HeroRightSidebarProps) {
-  const walletSidebarData = useWalletSidebarData();
   const [subView, setSubView] = useState<SubView>(null);
   const [listSubView, setListSubView] = useState<"allTokens" | "allActivity" | null>(
     null
@@ -249,17 +259,17 @@ export function HeroRightSidebar(props: HeroRightSidebarProps) {
                     <X size={24} />
                   </button>
                   <PortfolioContent
-                    activityRows={walletSidebarData.activityRows}
-                    balanceFraction={walletSidebarData.balanceFraction}
-                    balanceSolLabel={walletSidebarData.balanceSolLabel}
-                    balanceWhole={walletSidebarData.balanceWhole}
+                    activityRows={props.walletDesktopData.activityRows}
+                    balanceFraction={props.walletDesktopData.balanceFraction}
+                    balanceSolLabel={props.walletDesktopData.balanceSolLabel}
+                    balanceWhole={props.walletDesktopData.balanceWhole}
                     isBalanceHidden={props.isBalanceHidden}
-                    isLoading={walletSidebarData.isLoading}
+                    isLoading={props.walletDesktopData.isLoading}
                     onBalanceHiddenChange={props.onBalanceHiddenChange}
                     onNavigate={setSubView}
-                    tokenRows={walletSidebarData.tokenRows}
-                    transactionDetails={walletSidebarData.transactionDetails}
-                    walletLabel={walletSidebarData.walletLabel}
+                    tokenRows={props.walletDesktopData.tokenRows}
+                    transactionDetails={props.walletDesktopData.transactionDetails}
+                    walletLabel={props.walletDesktopData.walletLabel}
                   />
                 </>
               )}
@@ -310,13 +320,13 @@ export function HeroRightSidebar(props: HeroRightSidebarProps) {
                   isBalanceHidden={props.isBalanceHidden}
                   onBack={() => setSubView(null)}
                   onClose={props.onClose}
-                  tokens={walletSidebarData.allTokenRows}
+                  tokens={props.walletDesktopData.allTokenRows}
                 />
               )}
             {listSubView === "allActivity" && (
               <AllActivityView
-                activities={walletSidebarData.allActivityRows}
-                details={walletSidebarData.transactionDetails}
+                activities={props.walletDesktopData.allActivityRows}
+                details={props.walletDesktopData.transactionDetails}
                 isBalanceHidden={props.isBalanceHidden}
                 onBack={() => setSubView(null)}
                 onClose={props.onClose}

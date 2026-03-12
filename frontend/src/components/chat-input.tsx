@@ -21,6 +21,10 @@ export interface ChatInputProps {
   isOnline: boolean;
   isBalanceHidden: boolean;
   onBalanceHiddenChange: (hidden: boolean) => void;
+  walletLabel: string;
+  balanceWhole: string;
+  balanceFraction: string;
+  balanceSolLabel: string;
   onOpenRightSidebar: (tab: RightSidebarTab) => void;
 }
 
@@ -401,7 +405,7 @@ export function ChatInput(props: ChatInputProps) {
                     fontFeatureSettings: "'liga' off, 'clig' off",
                   }}
                 >
-                  UQAt…qZir · Mainnet
+                  {props.walletLabel}
                 </span>
                 <div
                   style={{
@@ -425,7 +429,7 @@ export function ChatInput(props: ChatInputProps) {
                         display: "block",
                       }}
                     >
-                      $1,267
+                      {props.balanceWhole}
                       <span
                         style={{
                           color: isBalanceHidden
@@ -434,7 +438,7 @@ export function ChatInput(props: ChatInputProps) {
                           transition: "color 0.15s ease",
                         }}
                       >
-                        .47
+                        {props.balanceFraction}
                       </span>
                     </span>
                   </div>
@@ -483,7 +487,7 @@ export function ChatInput(props: ChatInputProps) {
                       display: "block",
                     }}
                   >
-                    14.98765 SOL
+                    {props.balanceSolLabel}
                   </span>
                 </div>
               </div>

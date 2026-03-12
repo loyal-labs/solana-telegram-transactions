@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessages } from "@/components/chat-messages";
 import { HeroNav } from "@/components/hero-nav";
+import { useWalletDesktopData } from "@/hooks/use-wallet-desktop-data";
 import {
   HeroRightSidebar,
   type RightSidebarTab,
@@ -34,6 +35,7 @@ export interface HeroSectionProps {
 }
 
 export function HeroSection(props: HeroSectionProps) {
+  const walletDesktopData = useWalletDesktopData();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] =
@@ -383,6 +385,10 @@ export function HeroSection(props: HeroSectionProps) {
             isOnline={props.isOnline}
             isBalanceHidden={isBalanceHidden}
             onBalanceHiddenChange={setIsBalanceHidden}
+            walletLabel={walletDesktopData.walletLabel}
+            balanceWhole={walletDesktopData.balanceWhole}
+            balanceFraction={walletDesktopData.balanceFraction}
+            balanceSolLabel={walletDesktopData.balanceSolLabel}
             onOpenRightSidebar={(tab) => {
               setRightSidebarTab(tab);
               setIsRightSidebarOpen(true);
@@ -396,6 +402,7 @@ export function HeroSection(props: HeroSectionProps) {
             onTabChange={setRightSidebarTab}
             isBalanceHidden={isBalanceHidden}
             onBalanceHiddenChange={setIsBalanceHidden}
+            walletDesktopData={walletDesktopData}
             showQuickActions={props.isChatMode || isInputStuckToBottom}
           />
         </div>

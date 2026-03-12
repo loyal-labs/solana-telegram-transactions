@@ -16,7 +16,7 @@ import type {
 
 import { useSolanaWalletDataClient } from "./use-solana-wallet-data-client";
 
-export type WalletSidebarData = {
+export type WalletDesktopData = {
   walletAddress: string | null;
   isConnected: boolean;
   isLoading: boolean;
@@ -235,7 +235,7 @@ function mapPositionToTokenRow(position: PortfolioPosition): TokenRow {
   };
 }
 
-export function useWalletSidebarData(): WalletSidebarData {
+export function useWalletDesktopData(): WalletDesktopData {
   const client = useSolanaWalletDataClient();
   const wallet = useWallet();
   const walletAddress = wallet.publicKey?.toBase58() ?? null;
@@ -269,7 +269,7 @@ export function useWalletSidebarData(): WalletSidebarData {
         setIsLoading(false);
       })
       .catch((error) => {
-        console.error("Failed to load wallet sidebar data", error);
+        console.error("Failed to load wallet desktop data", error);
         if (!cancelled) {
           setIsLoading(false);
         }
@@ -386,7 +386,7 @@ export function useWalletSidebarData(): WalletSidebarData {
   const balanceParts = formattedBalance.split(".");
   const walletLabel = walletAddress
     ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)} · Solana`
-    : "Wallet not connected";
+    : "No account";
 
   return {
     walletAddress,

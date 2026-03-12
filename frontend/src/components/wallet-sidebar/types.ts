@@ -1,15 +1,5 @@
 export type RightSidebarTab = "portfolio" | "send" | "swap";
 
-export interface HeroRightSidebarProps {
-  isOpen: boolean;
-  activeTab: RightSidebarTab;
-  onClose: () => void;
-  onTabChange: (tab: RightSidebarTab) => void;
-  isBalanceHidden: boolean;
-  onBalanceHiddenChange: (hidden: boolean) => void;
-  showQuickActions?: boolean;
-}
-
 export interface TokenRow {
   id?: string;
   symbol: string;
