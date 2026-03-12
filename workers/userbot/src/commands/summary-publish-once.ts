@@ -187,7 +187,7 @@ async function fetchInlineSummaryResult(params: {
   resultId: string | null;
 }> {
   const destinationPeer = await params.bundle.client.resolvePeer(
-    params.community.chatId.toString()
+    Number(params.community.chatId)
   );
   const sourceChatId = resolveSummarySourceChatId(
     params.community.chatId,
