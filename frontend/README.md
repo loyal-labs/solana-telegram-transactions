@@ -4,24 +4,20 @@ Fully private, on-chain AI platform built on Solana.
 
 ## What is Loyal?
 
-Loyal is a web application that provides AI chat capabilities with end-to-end encryption and on-chain data storage. Every message is encrypted and facilitated on-chain with AI running in confidential compute environments. Neither Loyal developers nor compute node owners can access your data.
+Loyal is a web application that provides AI chat capabilities with wallet-aware identity and private compute infrastructure. The desktop frontend currently focuses on the live chat experience rather than persisted on-chain conversation storage.
 
 [![Better Stack Badge](https://uptime.betterstack.com/status-badges/v2/monitor/29j20.svg)](https://uptime.betterstack.com/?utm_source=status_badge)
 
 ## Key Features
 
-- **Fully Private AI**: Messages encrypted client-side, processed in confidential VMs
-- **On-Chain Storage**: Conversation state anchored to Solana PDAs
+- **Private AI UX**: Wallet-aware chat experience backed by Loyal services
 - **Solana Wallet Integration**: Sign in with Phantom, Solflare, and other Solana wallets
-- **User-Owned Data**: Your wallet = your data, no centralization
 - **Automated Workflows**: AI-powered task automation on Solana
 
 ## Tech Stack
 
 - **Framework**: Next.js 15 (App Router, React 19)
 - **Blockchain**: Solana (web3.js, Anchor)
-- **Encryption**: WebCrypto API, Nillion integration
-- **Storage**: Irys (Arweave)
 - **Styling**: Tailwind CSS, Framer Motion
 - **Code Quality**: Ultracite (Biome preset)
 
@@ -90,9 +86,7 @@ bun run ultracite
 src/
 ├── app/              # Next.js app router pages
 ├── components/       # React components
-├── lib/              # Core libraries
-│   ├── loyal/       # Loyal-specific logic (encryption, chat)
-│   └── proto/       # gRPC protocol definitions
+├── lib/              # Core libraries and transport helpers
 ├── hooks/           # React hooks
 └── data/            # Static data and content
 ```

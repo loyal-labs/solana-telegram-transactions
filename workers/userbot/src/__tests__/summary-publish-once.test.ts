@@ -31,7 +31,7 @@ type FakeState = {
   communities: CommunityRecord[];
   destroyedCount: number;
   inlineResponsesByQuery: Map<string, Array<Error | FakeInlineResponse>>;
-  resolvePeerCalls: string[];
+  resolvePeerCalls: number[];
   resolveUserCalls: string[];
   sendResponsesByResultId: Map<string, Array<Error | { ok: true }>>;
   startedCount: number;
@@ -151,7 +151,7 @@ function createFakeBundle(state: FakeState, config: UserbotConfig): any {
       destroy: async () => {
         state.destroyedCount += 1;
       },
-      resolvePeer: async (chatId: string) => {
+      resolvePeer: async (chatId: number) => {
         state.resolvePeerCalls.push(chatId);
         return { _: "inputPeerMock", chatId };
       },
@@ -241,7 +241,7 @@ describe("summary-publish-once", () => {
     expect(result.stats.deliveryFailed).toBe(0);
     expect(result.stats.skippedNoInlineResults).toBe(0);
     expect(state.resolveUserCalls).toEqual(["custom_inline_bot"]);
-    expect(state.resolvePeerCalls).toEqual(["-1001"]);
+    expect(state.resolvePeerCalls).toEqual([-1001]);
 
     const getInlineCall = state.callRequests.find(
       (request) => request._ === "messages.getInlineBotResults"
@@ -476,7 +476,7 @@ describe("summary-publish-once", () => {
       });
 
       expect(exitCode).toBe(0);
-      expect(state.resolvePeerCalls).toEqual(["-1002"]);
+      expect(state.resolvePeerCalls).toEqual([-1002]);
 
       const inlineQueries = state.callRequests.filter(
         (request) => request._ === "messages.getInlineBotResults"

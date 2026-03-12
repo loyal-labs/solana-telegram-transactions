@@ -187,12 +187,7 @@ src/
 ├── components/      # React components
 │   ├── ui/          # Reusable UI components
 │   └── kibo-ui/     # Design system components
-├── lib/             # Core libraries
-│   ├── loyal/       # Loyal-specific logic
-│   │   ├── encryption.ts    # Client-side encryption
-│   │   ├── chat.ts          # Chat transport layer
-│   │   └── wallet.ts        # Wallet integration
-│   └── proto/       # gRPC protocol buffers
+├── lib/             # Core libraries and transport helpers
 ├── hooks/           # React hooks
 └── data/            # Static content
 ```
@@ -202,8 +197,6 @@ src/
 - **Next.js 15**: App Router, Server Components
 - **React 19**: Latest React features
 - **Solana**: web3.js, Anchor, wallet adapters
-- **Encryption**: WebCrypto API, Nillion
-- **Storage**: Irys (Arweave)
 - **Styling**: Tailwind CSS 4, Framer Motion
 
 ## Security Considerations

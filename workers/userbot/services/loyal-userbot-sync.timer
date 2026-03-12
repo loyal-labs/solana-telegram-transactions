@@ -1,0 +1,9 @@
+[Unit]
+Description=Run Loyal userbot sync every 2 hours
+
+[Timer]
+OnCalendar=*-*-* 0/2:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

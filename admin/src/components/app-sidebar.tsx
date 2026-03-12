@@ -26,6 +26,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: "/overview", label: "Overview" },
   { href: "/communities", label: "Communities" },
+  { href: "/transfers", label: "Transfers" },
   { href: "/admins", label: "Admins" },
 ];
 
@@ -51,11 +52,16 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {NAV_ITEMS.map(({ href, label }) => {
-                const isActive = pathname === href || pathname?.startsWith(`${href}/`);
+                const isActive =
+                  pathname === href || pathname?.startsWith(`${href}/`);
 
                 return (
                   <SidebarMenuItem key={href}>
-                    <SidebarMenuButton asChild isActive={isActive} className="gap-2">
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      className="gap-2"
+                    >
                       <Link href={href}>{label}</Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
