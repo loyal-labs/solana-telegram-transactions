@@ -7,7 +7,16 @@ function createDependencies() {
   const authTicketId = "3fdb64ce-29ff-4ef8-b5e0-a9df0a3352b4";
   const calls = {
     consumed: [] as string[],
-    setTokens: [] as Array<{ user: { email: string; gridUserId: string; accountAddress: string; provider?: string } }>,
+    setTokens: [] as Array<{
+      user: {
+        email: string;
+        gridUserId: string;
+        subjectAddress: string;
+        displayAddress: string;
+        smartAccountAddress: string;
+        provider?: string;
+      };
+    }>,
   };
 
   const store = {
@@ -73,7 +82,9 @@ function createDependencies() {
     async issueSessionToken(user: {
       email: string;
       gridUserId: string;
-      accountAddress: string;
+      subjectAddress: string;
+      displayAddress: string;
+      smartAccountAddress: string;
       provider?: string;
     }) {
       calls.setTokens.push({ user });
@@ -153,6 +164,8 @@ describe("email auth service", () => {
     expect(response.user.email).toBe("user@example.com");
     expect(calls.consumed).toEqual([authTicketId]);
     expect(calls.setTokens[0]?.user.gridUserId).toBe("grid-user-1");
+    expect(calls.setTokens[0]?.user.subjectAddress).toBe("account-1");
+    expect(calls.setTokens[0]?.user.displayAddress).toBe("user@example.com");
   });
 
   test("fails verification when the pending auth request is missing", async () => {

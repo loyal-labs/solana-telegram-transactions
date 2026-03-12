@@ -34,9 +34,9 @@ function ConnectedView() {
   const { publicKey, disconnect } = useWallet();
   const { logout, user } = useAuthSession();
   const { close } = useSignInModal();
-  const { hasEmailSession, hasWalletConnection } = useAuthCapability();
+  const { hasAuthSession, hasWalletConnection } = useAuthCapability();
   const [copied, setCopied] = useState(false);
-  const address = publicKey?.toBase58() ?? user?.accountAddress ?? "";
+  const address = publicKey?.toBase58() ?? user?.displayAddress ?? "";
   const email = user?.email ?? "";
 
   const handleCopy = useCallback(async () => {
@@ -71,7 +71,7 @@ function ConnectedView() {
           </span>
         </button>
       ) : null}
-      {hasEmailSession ? (
+      {hasAuthSession ? (
         <button
           className="mt-1 text-neutral-400 text-xs underline transition hover:text-neutral-700"
           onClick={async () => {

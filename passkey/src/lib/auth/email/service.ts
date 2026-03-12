@@ -1,11 +1,9 @@
 import {
   startEmailAuthRequestSchema,
-  type StartEmailAuthRequest,
   type StartEmailAuthResponse,
   verifyEmailAuthRequestSchema,
-  type VerifyEmailAuthRequest,
-} from "@loyal-labs/grid-core";
-import type { AuthSessionUser } from "@loyal-labs/grid-core";
+} from "@loyal-labs/auth-core";
+import type { AuthSessionUser } from "@loyal-labs/auth-core";
 
 import { getServerConfig } from "@/lib/core/config/server";
 
@@ -54,7 +52,7 @@ function maskEmail(email: string): string {
 }
 
 export async function startEmailAuth(
-  input: StartEmailAuthRequest,
+  input: unknown,
   dependencies: EmailAuthDependencies = defaultDependencies
 ): Promise<StartEmailAuthResponse> {
   const payload = startEmailAuthRequestSchema.parse(input);
@@ -81,7 +79,7 @@ export async function startEmailAuth(
 }
 
 export async function verifyEmailAuth(
-  input: VerifyEmailAuthRequest,
+  input: unknown,
   dependencies: EmailAuthDependencies = defaultDependencies
 ): Promise<{
   user: AuthSessionUser;
@@ -105,9 +103,11 @@ export async function verifyEmailAuth(
   const emailUser = await adapter.completeEmailAuth(pendingAuth, payload.otpCode);
   const user: AuthSessionUser = {
     authMethod: "email",
-    accountAddress: emailUser.accountAddress,
+    subjectAddress: emailUser.accountAddress,
+    displayAddress: emailUser.email,
     email: emailUser.email,
     gridUserId: emailUser.gridUserId,
+    smartAccountAddress: emailUser.accountAddress,
     ...(emailUser.provider ? { provider: emailUser.provider } : {}),
   };
   await store.consumePendingAuth(payload.authTicketId);

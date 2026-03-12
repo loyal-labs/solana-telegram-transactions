@@ -6,24 +6,24 @@ import { useAuthSession } from "@/contexts/auth-session-context";
 
 export type AuthCapability =
   | "anonymous"
-  | "emailAuthenticated"
-  | "walletAuthenticated"
-  | "emailAndWalletAuthenticated";
+  | "authSession"
+  | "walletConnected"
+  | "authSessionAndWalletConnected";
 
 export function resolveAuthCapability(args: {
-  hasEmailSession: boolean;
+  hasAuthSession: boolean;
   hasWalletConnection: boolean;
 }): AuthCapability {
-  if (args.hasEmailSession && args.hasWalletConnection) {
-    return "emailAndWalletAuthenticated";
+  if (args.hasAuthSession && args.hasWalletConnection) {
+    return "authSessionAndWalletConnected";
   }
 
-  if (args.hasEmailSession) {
-    return "emailAuthenticated";
+  if (args.hasAuthSession) {
+    return "authSession";
   }
 
   if (args.hasWalletConnection) {
-    return "walletAuthenticated";
+    return "walletConnected";
   }
 
   return "anonymous";
@@ -31,9 +31,9 @@ export function resolveAuthCapability(args: {
 
 export function useAuthCapability() {
   const { connected } = useWallet();
-  const { isAuthenticated, isHydrated } = useAuthSession();
+  const { isAuthenticated, isHydrated, user } = useAuthSession();
   const capability = resolveAuthCapability({
-    hasEmailSession: isAuthenticated,
+    hasAuthSession: isAuthenticated,
     hasWalletConnection: connected,
   });
 
@@ -41,9 +41,9 @@ export function useAuthCapability() {
     capability,
     isHydrated,
     isSignedIn: capability !== "anonymous",
+    hasAuthSession: isAuthenticated,
     hasWalletConnection: connected,
-    hasEmailSession:
-      capability === "emailAuthenticated" ||
-      capability === "emailAndWalletAuthenticated",
+    hasEmailSession: user?.authMethod === "email",
+    hasWalletProofSession: user?.authMethod === "wallet",
   };
 }

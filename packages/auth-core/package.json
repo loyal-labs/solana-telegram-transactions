@@ -1,5 +1,5 @@
 {
-  "name": "@loyal-labs/grid-core",
+  "name": "@loyal-labs/auth-core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,10 +12,10 @@
       "default": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./server": {
-      "import": "./dist/server.js",
-      "default": "./dist/server.js",
-      "types": "./dist/server.d.ts"
+    "./auth": {
+      "import": "./dist/auth.js",
+      "default": "./dist/auth.js",
+      "types": "./dist/auth.d.ts"
     },
     "./types": {
       "import": "./dist/types.js",
@@ -33,7 +33,7 @@
     "test": "bun test src"
   },
   "dependencies": {
-    "@sqds/grid": "^3.1.2",
+    "@loyal-labs/grid-core": "workspace:*",
     "zod": "^4.0.17"
   },
   "devDependencies": {

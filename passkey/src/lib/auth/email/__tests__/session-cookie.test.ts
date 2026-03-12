@@ -53,7 +53,9 @@ describe("session cookie service", () => {
       authMethod: "email",
       email: "user@example.com",
       gridUserId: "grid-user-1",
-      accountAddress: "account-1",
+      subjectAddress: "account-1",
+      displayAddress: "user@example.com",
+      smartAccountAddress: "account-1",
       provider: "privy",
     });
 
@@ -69,7 +71,9 @@ describe("session cookie service", () => {
       authMethod: "email",
       email: "user@example.com",
       gridUserId: "grid-user-1",
-      accountAddress: "account-1",
+      subjectAddress: "account-1",
+      displayAddress: "user@example.com",
+      smartAccountAddress: "account-1",
       provider: "privy",
     });
   });
@@ -81,8 +85,10 @@ describe("session cookie service", () => {
 
     const token = await service.issueSessionToken({
       authMethod: "passkey",
-      accountAddress: "smart-account-1",
+      subjectAddress: "smart-account-1",
+      displayAddress: "smart-account-1",
       passkeyAccount: "passkey-account-1",
+      smartAccountAddress: "smart-account-1",
       sessionKey: { key: "session-key", expiration: 900 },
     });
 
@@ -96,9 +102,41 @@ describe("session cookie service", () => {
 
     expect(user).toEqual({
       authMethod: "passkey",
-      accountAddress: "smart-account-1",
+      subjectAddress: "smart-account-1",
+      displayAddress: "smart-account-1",
       passkeyAccount: "passkey-account-1",
+      smartAccountAddress: "smart-account-1",
       sessionKey: { key: "session-key", expiration: 900 },
+    });
+  });
+
+  test("reads wallet sessions back from the cookie", async () => {
+    const service = createAuthSessionCookieService({
+      getConfig: () => config,
+    });
+
+    const token = await service.issueSessionToken({
+      authMethod: "wallet",
+      subjectAddress: "wallet-1",
+      displayAddress: "wallet-1",
+      walletAddress: "wallet-1",
+      provider: "solana",
+    });
+
+    const user = await service.readSessionFromRequest(
+      new Request("https://auth.askloyal.com/api/auth/session", {
+        headers: {
+          cookie: `loyal_email_session=${token}`,
+        },
+      })
+    );
+
+    expect(user).toEqual({
+      authMethod: "wallet",
+      subjectAddress: "wallet-1",
+      displayAddress: "wallet-1",
+      walletAddress: "wallet-1",
+      provider: "solana",
     });
   });
 });

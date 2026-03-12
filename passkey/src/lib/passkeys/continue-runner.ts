@@ -1,12 +1,12 @@
 "use client";
 
 import {
-  buildGridAuthUrl,
-  extractGridErrorMessage,
-  extractGridSessionUrl,
-  parseGridErrorDetails,
+  buildAuthUrl,
+  extractApiErrorMessage,
+  extractSessionUrl,
+  parseApiErrorDetails,
   type ApiOutcome,
-} from "@loyal-labs/grid-core";
+} from "@loyal-labs/auth-core";
 
 import {
   buildPasskeyFlowRequest,
@@ -33,7 +33,7 @@ async function callLocalPasskeyApi(
   endpoint: string,
   payload: unknown
 ): Promise<ApiOutcome> {
-  const response = await fetch(buildGridAuthUrl("", endpoint), {
+  const response = await fetch(buildAuthUrl("", endpoint), {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -134,7 +134,7 @@ export function shouldFallbackToCreateFromAuthFailure(payload: unknown): boolean
     return true;
   }
 
-  const message = extractGridErrorMessage(payload).toLowerCase();
+  const message = extractApiErrorMessage(payload).toLowerCase();
   return (
     message.includes("account not found") ||
     message.includes("no valid externally signed account") ||
@@ -153,12 +153,12 @@ function toFailure(
   branch: "auth" | "create",
   payload: unknown
 ): ContinueRunnerResult {
-  const message = extractGridErrorMessage(payload);
+  const message = extractApiErrorMessage(payload);
   return {
     type: "error",
     branch,
     message,
-    details: parseGridErrorDetails(payload),
+    details: parseApiErrorDetails(payload),
     challengeExpired: isChallengeTimeoutError(new Error(message)),
   };
 }
@@ -189,7 +189,7 @@ export async function runCreateFallbackFromAuth(
     return toFailure("create", createSessionOutcome.body);
   }
 
-  const createSessionUrl = extractGridSessionUrl(createSessionOutcome.body);
+  const createSessionUrl = extractSessionUrl(createSessionOutcome.body);
   if (!createSessionUrl) {
     return {
       type: "error",

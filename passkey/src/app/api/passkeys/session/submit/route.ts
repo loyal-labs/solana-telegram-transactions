@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sessionKeySchema } from "@loyal-labs/grid-core";
+import { sessionKeySchema } from "@loyal-labs/auth-core";
 import { z } from "zod";
 
 import { getServerConfig } from "@/lib/core/config/server";
@@ -74,8 +74,10 @@ export async function POST(request: Request) {
       name: AUTH_SESSION_COOKIE_NAME,
       value: await sessionCookieService.issueSessionToken({
         authMethod: "passkey",
-        accountAddress: parsed.data.smartAccount.address,
+        subjectAddress: parsed.data.smartAccount.address,
+        displayAddress: parsed.data.smartAccount.address,
         passkeyAccount: parsed.data.passkeyAccount,
+        smartAccountAddress: parsed.data.smartAccount.address,
         sessionKey: parsed.data.sessionKey,
       }),
       ...sessionCookieService.createSessionCookieOptions(request),

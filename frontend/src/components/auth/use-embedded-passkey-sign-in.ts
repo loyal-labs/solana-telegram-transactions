@@ -1,6 +1,6 @@
 "use client";
 
-import { embeddedPasskeyMessageSchema } from "@loyal-labs/grid-core";
+import { embeddedPasskeyMessageSchema } from "@loyal-labs/auth-core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuthApiClient, useAuthSession } from "@/contexts/auth-session-context";

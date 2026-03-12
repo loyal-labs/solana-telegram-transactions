@@ -1,4 +1,4 @@
-export function extractGridErrorMessage(payload: unknown): string {
+export function extractApiErrorMessage(payload: unknown): string {
   if (
     typeof payload === "object" &&
     payload !== null &&
@@ -24,10 +24,10 @@ export function extractGridErrorMessage(payload: unknown): string {
     return payload.message;
   }
 
-  return "Grid request failed";
+  return "Request failed";
 }
 
-export function parseGridErrorDetails(payload: unknown): string[] {
+export function parseApiErrorDetails(payload: unknown): string[] {
   const normalizeDetail = (detail: unknown): string | null => {
     if (typeof detail === "string") {
       return detail;
@@ -80,7 +80,7 @@ export function parseGridErrorDetails(payload: unknown): string[] {
   return [];
 }
 
-export function extractGridSessionUrl(payload: unknown): string | null {
+export function extractSessionUrl(payload: unknown): string | null {
   if (
     typeof payload === "object" &&
     payload !== null &&

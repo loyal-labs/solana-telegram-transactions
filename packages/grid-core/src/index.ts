@@ -1,71 +1,29 @@
 export {
-  buildGridAuthUrl,
-  callGridAuthEndpoint,
-  createGridAuthClient,
-} from "./auth";
-export {
   createGridServerClient,
   resolveGridServerClientConfig,
 } from "./server";
 export {
-  authMethodSchema,
-  authSessionUserSchema,
   emailAuthModeSchema,
-  emailAuthUserSchema,
   createAccountRequestSchema,
-  embeddedPasskeyErrorMessageSchema,
-  embeddedPasskeyMessageSchema,
-  embeddedPasskeyMessageTypeSchema,
-  embeddedPasskeySuccessMessageSchema,
-  getAuthSessionResponseSchema,
   findAccountRequestSchema,
-  getEmailAuthSessionResponseSchema,
-  gridAuthRoutePaths,
   gridEnvironmentSchema,
   gridPasskeyUpstreamApiPaths,
   passkeyAccountParamSchema,
   sessionEnvironmentSchema,
   sessionKeyBackendSchema,
   sessionKeySchema,
-  startEmailAuthRequestSchema,
-  startEmailAuthResponseSchema,
   startPasskeySessionResponseSchema,
   startPasskeyRegistrationRequestSchema,
   startPasskeySignInRequestSchema,
   submitSessionRequestSchema,
-  verifyEmailAuthRequestSchema,
-  verifyEmailAuthResponseSchema,
 } from "./contracts";
-export {
-  extractGridErrorMessage,
-  extractGridSessionUrl,
-  parseGridErrorDetails,
-} from "./errors";
 export type {
-  AuthMethod,
-  AuthSessionUser,
   EmailAuthMode,
   CreateAccountRequest,
-  EmbeddedPasskeyMessage,
-  EmailAuthUser,
   FindAccountRequest,
-  GetAuthSessionResponse,
-  GetEmailAuthSessionResponse,
-  StartEmailAuthRequest,
-  StartEmailAuthResponse,
   StartPasskeySessionResponse,
   StartPasskeyRegistrationRequest,
   StartPasskeySignInRequest,
   SubmitSessionRequest,
-  VerifyEmailAuthRequest,
-  VerifyEmailAuthResponse,
 } from "./contracts";
-export type {
-  ApiOutcome,
-  FetchLike,
-  GridAuthClient,
-  GridAuthRuntimeConfig,
-  GridServerRuntimeConfig,
-  StartPasskeyRegistrationInput,
-  StartPasskeySignInInput,
-} from "./types";
+export type { GridServerRuntimeConfig } from "./types";

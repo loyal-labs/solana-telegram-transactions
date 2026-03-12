@@ -1,7 +1,7 @@
-export type { ApiOutcome } from "@loyal-labs/grid-core";
+export type { ApiOutcome } from "@loyal-labs/auth-core";
 export {
-  buildGridAuthUrl as buildPasskeyApiUrl,
-  extractGridErrorMessage as extractPasskeyErrorMessage,
-  extractGridSessionUrl as extractPasskeySessionUrl,
-  parseGridErrorDetails as parsePasskeyErrorDetails,
-} from "@loyal-labs/grid-core";
+  buildAuthUrl as buildPasskeyApiUrl,
+  extractApiErrorMessage as extractPasskeyErrorMessage,
+  extractSessionUrl as extractPasskeySessionUrl,
+  parseApiErrorDetails as parsePasskeyErrorDetails,
+} from "@loyal-labs/auth-core";

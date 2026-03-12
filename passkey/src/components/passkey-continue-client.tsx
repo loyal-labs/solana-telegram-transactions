@@ -1,6 +1,6 @@
 "use client";
 
-import { type EmbeddedPasskeyMessage } from "@loyal-labs/grid-core";
+import { type EmbeddedPasskeyMessage } from "@loyal-labs/auth-core";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {

@@ -1,4 +1,4 @@
-import type { AuthSessionUser } from "@loyal-labs/grid-core";
+import type { AuthSessionUser } from "@loyal-labs/auth-core";
 
 import type { PasskeyServerConfig } from "@/lib/core/config/types";
 import { resolvePasskeyRequestContext } from "@/lib/passkeys/host-resolution";
@@ -82,12 +82,17 @@ export function createAuthSessionCookieService(
       const config = dependencies.getConfig();
       return issueAuthSessionToken(
         {
-          accountAddress: user.accountAddress,
           authMethod: user.authMethod,
+          subjectAddress: user.subjectAddress,
+          displayAddress: user.displayAddress,
           ...(user.gridUserId ? { sub: user.gridUserId } : {}),
           ...(user.email ? { email: user.email } : {}),
           ...(user.provider ? { provider: user.provider } : {}),
           ...(user.passkeyAccount ? { passkeyAccount: user.passkeyAccount } : {}),
+          ...(user.walletAddress ? { walletAddress: user.walletAddress } : {}),
+          ...(user.smartAccountAddress
+            ? { smartAccountAddress: user.smartAccountAddress }
+            : {}),
           ...(user.sessionKey ? { sessionKey: user.sessionKey } : {}),
         },
         config.authJwtSecret,
@@ -108,12 +113,19 @@ export function createAuthSessionCookieService(
         const claims = await verifyAuthSessionToken(token, config.authJwtSecret);
         return {
           authMethod: claims.authMethod,
-          accountAddress: claims.accountAddress,
+          subjectAddress: claims.subjectAddress,
+          displayAddress: claims.displayAddress,
           ...(claims.email ? { email: claims.email } : {}),
           ...(claims.sub ? { gridUserId: claims.sub } : {}),
           ...(claims.provider ? { provider: claims.provider } : {}),
           ...(claims.passkeyAccount
             ? { passkeyAccount: claims.passkeyAccount }
+            : {}),
+          ...(claims.walletAddress
+            ? { walletAddress: claims.walletAddress }
+            : {}),
+          ...(claims.smartAccountAddress
+            ? { smartAccountAddress: claims.smartAccountAddress }
             : {}),
           ...(claims.sessionKey ? { sessionKey: claims.sessionKey } : {}),
         };

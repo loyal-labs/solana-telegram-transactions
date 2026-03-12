@@ -1,22 +1,26 @@
 import { createHash } from "node:crypto";
 import { jwtVerify, SignJWT, type JWTPayload } from "jose";
 
-import type { AuthMethod, AuthSessionUser } from "@loyal-labs/grid-core";
+import type { AuthMethod, AuthSessionUser } from "@loyal-labs/auth-core";
 
 export type AuthSessionTokenClaims = JWTPayload & {
   sub?: string;
   authMethod: AuthMethod;
-  accountAddress: string;
+  subjectAddress: string;
+  displayAddress: string;
   email?: string;
   provider?: string;
   passkeyAccount?: string;
+  walletAddress?: string;
+  smartAccountAddress?: string;
   sessionKey?: AuthSessionUser["sessionKey"];
 };
 
 export type EmailAccessTokenClaims = AuthSessionTokenClaims & {
   sub: string;
   email: string;
-  accountAddress: string;
+  subjectAddress: string;
+  displayAddress: string;
   authMethod: "email";
   provider?: string;
 };

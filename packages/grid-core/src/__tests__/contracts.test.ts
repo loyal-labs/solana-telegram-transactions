@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  embeddedPasskeyMessageSchema,
-  getAuthSessionResponseSchema,
+  createAccountRequestSchema,
+  gridPasskeyUpstreamApiPaths,
+  passkeyAccountParamSchema,
   startPasskeyRegistrationRequestSchema,
   startPasskeySignInRequestSchema,
   submitSessionRequestSchema,
@@ -38,27 +39,28 @@ describe("grid contracts", () => {
     expect(parsed.success).toBe(false);
   });
 
-  test("accepts generic auth session responses for passkey users", () => {
-    const parsed = getAuthSessionResponseSchema.safeParse({
-      user: {
-        authMethod: "passkey",
-        accountAddress: "smart-account-1",
-        passkeyAccount: "passkey-account-1",
-        sessionKey: { key: "session-key", expiration: 900 },
-      },
+  test("accepts create-account payloads", () => {
+    const parsed = createAccountRequestSchema.safeParse({
+      sessionKey: { key: "session-key", expiration: 900 },
+      slotNumber: 10,
+      authenticatorResponse: { credential: "123" },
     });
 
     expect(parsed.success).toBe(true);
   });
 
-  test("accepts embedded passkey error messages", () => {
-    const parsed = embeddedPasskeyMessageSchema.safeParse({
-      type: "authz_error",
-      message: "Passkey sign-in failed",
-      details: ["Try again."],
-      challengeExpired: true,
+  test("accepts passkey account params", () => {
+    const parsed = passkeyAccountParamSchema.safeParse({
+      passkeyAddress: "passkey-account-1",
     });
 
     expect(parsed.success).toBe(true);
+  });
+
+  test("keeps upstream passkey api paths stable", () => {
+    expect(gridPasskeyUpstreamApiPaths.authorizeSession).toBe("/passkeys/auth");
+    expect(gridPasskeyUpstreamApiPaths.getAccount("abc123")).toBe(
+      "/passkeys/account/abc123"
+    );
   });
 });

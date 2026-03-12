@@ -1,13 +1,15 @@
 export {
+  authRoutePaths,
+  sessionKeyBackendSchema,
+  sessionKeySchema,
+} from "@loyal-labs/auth-core";
+export {
   createAccountRequestSchema,
   findAccountRequestSchema,
-  gridAuthRoutePaths,
   gridEnvironmentSchema,
   gridPasskeyUpstreamApiPaths,
   passkeyAccountParamSchema,
   sessionEnvironmentSchema,
-  sessionKeyBackendSchema,
-  sessionKeySchema,
   startPasskeyRegistrationRequestSchema as createSessionRequestSchema,
   startPasskeySignInRequestSchema as authorizeSessionRequestSchema,
   submitSessionRequestSchema,

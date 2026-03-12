@@ -2,8 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { createGridAuthClient } from "@loyal-labs/grid-core";
-import type { AuthSessionUser } from "@loyal-labs/grid-core";
+import { createAuthClient } from "@loyal-labs/auth-core";
+import type { AuthSessionUser } from "@loyal-labs/auth-core";
 
 import { usePublicEnv } from "@/contexts/public-env-context";
 import { createAuthApiClient } from "@/lib/auth/client";
@@ -28,7 +28,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const authApiClient = useMemo(
     () =>
       createAuthApiClient(
-        createGridAuthClient({
+        createAuthClient({
           authBaseUrl: publicEnv.gridAuthBaseUrl ?? "",
         })
       ),
@@ -76,7 +76,10 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       authMethod: user.authMethod,
       email: user.email,
       gridUserId: user.gridUserId,
-      accountAddress: user.accountAddress,
+      subjectAddress: user.subjectAddress,
+      displayAddress: user.displayAddress,
+      smartAccountAddress: user.smartAccountAddress ?? null,
+      walletAddress: user.walletAddress ?? null,
       passkeyAccount: user.passkeyAccount ?? null,
       provider: user.provider ?? null,
       claimKeys: Object.keys(user),

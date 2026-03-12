@@ -1,6 +1,6 @@
-import { EmailAuthError } from "@/lib/auth/email/errors";
-import { startEmailAuth } from "@/lib/auth/email/service";
 import { handleAuthJsonPost, handleAuthOptions } from "@/lib/auth/route-handler";
+import { createWalletAuthChallenge } from "@/lib/auth/wallet-service";
+import { WalletAuthError } from "@/lib/auth/wallet-errors";
 
 export function OPTIONS(request: Request) {
   return handleAuthOptions(request);
@@ -8,9 +8,13 @@ export function OPTIONS(request: Request) {
 
 export async function POST(request: Request) {
   return handleAuthJsonPost(request, {
-    execute: (body) => startEmailAuth(body),
+    execute: (body) =>
+      createWalletAuthChallenge(body, {
+        requestOrigin:
+          request.headers.get("origin") ?? new URL(request.url).origin,
+      }),
     mapKnownError: (error) =>
-      error instanceof EmailAuthError
+      error instanceof WalletAuthError
         ? {
             code: error.code,
             status: error.status,
@@ -19,8 +23,8 @@ export async function POST(request: Request) {
           }
         : null,
     defaultError: {
-      code: "email_auth_start_failed",
-      message: "Failed to start email authentication",
+      code: "wallet_auth_failed",
+      message: "Failed to create a wallet challenge",
     },
   });
 }

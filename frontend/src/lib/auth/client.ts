@@ -1,21 +1,26 @@
 import {
-  createGridAuthClient,
-  extractGridErrorMessage,
-  extractGridSessionUrl,
+  createAuthClient,
+  extractApiErrorMessage,
+  extractSessionUrl,
   getAuthSessionResponseSchema,
-  parseGridErrorDetails,
+  parseApiErrorDetails,
   startPasskeySessionResponseSchema,
   startEmailAuthResponseSchema,
   verifyEmailAuthResponseSchema,
-} from "@loyal-labs/grid-core";
+  walletChallengeResponseSchema,
+  walletCompleteResponseSchema,
+} from "@loyal-labs/auth-core";
 import type {
   AuthSessionUser,
-  GridAuthClient,
+  AuthClient,
   StartEmailAuthRequest,
   StartEmailAuthResponse,
-  StartPasskeySignInRequest,
+  StartPasskeySignInInput,
+  WalletChallengeRequest,
+  WalletChallengeResponse,
+  WalletCompleteRequest,
   VerifyEmailAuthRequest,
-} from "@loyal-labs/grid-core";
+} from "@loyal-labs/auth-core";
 
 import { getPublicEnv } from "@/lib/core/config/public";
 
@@ -48,7 +53,11 @@ function withPasskeyEmbedParams(url: string): string {
 export type AuthApiClient = {
   startEmailAuth(payload: StartEmailAuthRequest): Promise<StartEmailAuthResponse>;
   verifyEmailAuth(payload: VerifyEmailAuthRequest): Promise<AuthSessionUser>;
-  startPasskeySignIn(payload: StartPasskeySignInRequest): Promise<string>;
+  startPasskeySignIn(payload: StartPasskeySignInInput): Promise<string>;
+  challengeWalletAuth(
+    payload: WalletChallengeRequest
+  ): Promise<WalletChallengeResponse>;
+  completeWalletAuth(payload: WalletCompleteRequest): Promise<AuthSessionUser>;
   getSession(): Promise<AuthSessionUser | null>;
   logout(): Promise<void>;
 };
@@ -78,10 +87,10 @@ function assertSuccessfulResponse<T>(
   }
 ): T {
   if (!outcome.ok) {
-    throw new AuthApiClientError(extractGridErrorMessage(outcome.body), {
+    throw new AuthApiClientError(extractApiErrorMessage(outcome.body), {
       code: toErrorCode(outcome.body, options.errorCode),
       status: outcome.status,
-      details: parseGridErrorDetails(outcome.body),
+      details: parseApiErrorDetails(outcome.body),
     });
   }
 
@@ -97,7 +106,7 @@ function assertSuccessfulResponse<T>(
 }
 
 export function createAuthApiClient(
-  rawClient: GridAuthClient = createGridAuthClient({
+  rawClient: AuthClient = createAuthClient({
     authBaseUrl: getPublicEnv().gridAuthBaseUrl ?? "",
   })
 ): AuthApiClient {
@@ -128,10 +137,10 @@ export function createAuthApiClient(
     async startPasskeySignIn(payload) {
       const outcome = await rawClient.startPasskeySignIn(payload);
       if (!outcome.ok) {
-        throw new AuthApiClientError(extractGridErrorMessage(outcome.body), {
+        throw new AuthApiClientError(extractApiErrorMessage(outcome.body), {
           code: toErrorCode(outcome.body, "passkey_sign_in_start_failed"),
           status: outcome.status,
-          details: parseGridErrorDetails(outcome.body),
+          details: parseApiErrorDetails(outcome.body),
         });
       }
 
@@ -140,7 +149,7 @@ export function createAuthApiClient(
         return withPasskeyEmbedParams(parsed.data.url);
       }
 
-      const extractedUrl = extractGridSessionUrl(outcome.body);
+      const extractedUrl = extractSessionUrl(outcome.body);
       if (extractedUrl) {
         return withPasskeyEmbedParams(extractedUrl);
       }
@@ -154,6 +163,30 @@ export function createAuthApiClient(
       );
     },
 
+    async challengeWalletAuth(payload) {
+      const outcome = await rawClient.challengeWalletAuth(payload);
+      return assertSuccessfulResponse(outcome, walletChallengeResponseSchema, {
+        invalidResponseMessage:
+          "The auth server returned an invalid wallet challenge response.",
+        errorCode: "wallet_auth_challenge_failed",
+      });
+    },
+
+    async completeWalletAuth(payload) {
+      const outcome = await rawClient.completeWalletAuth(payload);
+      const parsed = assertSuccessfulResponse(
+        outcome,
+        walletCompleteResponseSchema,
+        {
+          invalidResponseMessage:
+            "The auth server returned an invalid wallet completion response.",
+          errorCode: "wallet_auth_complete_failed",
+        }
+      );
+
+      return parsed.user;
+    },
+
     async getSession() {
       const outcome = await rawClient.getAuthSession();
       if (!outcome.ok) {
@@ -161,10 +194,10 @@ export function createAuthApiClient(
           return null;
         }
 
-        throw new AuthApiClientError(extractGridErrorMessage(outcome.body), {
+        throw new AuthApiClientError(extractApiErrorMessage(outcome.body), {
           code: toErrorCode(outcome.body, "email_auth_session_failed"),
           status: outcome.status,
-          details: parseGridErrorDetails(outcome.body),
+          details: parseApiErrorDetails(outcome.body),
         });
       }
 
@@ -188,10 +221,10 @@ export function createAuthApiClient(
         return;
       }
 
-      throw new AuthApiClientError(extractGridErrorMessage(outcome.body), {
+      throw new AuthApiClientError(extractApiErrorMessage(outcome.body), {
         code: toErrorCode(outcome.body, "email_auth_logout_failed"),
         status: outcome.status,
-        details: parseGridErrorDetails(outcome.body),
+        details: parseApiErrorDetails(outcome.body),
       });
     },
   };

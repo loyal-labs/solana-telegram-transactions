@@ -1,5 +1,5 @@
 import type { SessionSecrets } from "@sqds/grid";
-import type { EmailAuthMode } from "@loyal-labs/grid-core";
+import type { EmailAuthMode } from "@loyal-labs/auth-core";
 
 export type PendingEmailAuth = {
   authTicketId: string;

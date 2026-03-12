@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { EmailAuthError } from "@/lib/auth/email/errors";
+import { handleAuthJsonPost, handleAuthOptions } from "@/lib/auth/route-handler";
 import {
   AUTH_SESSION_COOKIE_NAME,
   createAuthSessionCookieService,
 } from "@/lib/auth/session-cookie";
-import { verifyEmailAuth } from "@/lib/auth/email/service";
-import { handleAuthJsonPost, handleAuthOptions } from "@/lib/auth/route-handler";
+import { completeWalletAuth } from "@/lib/auth/wallet-service";
+import { WalletAuthError } from "@/lib/auth/wallet-errors";
 
 export function OPTIONS(request: Request) {
   return handleAuthOptions(request);
@@ -15,7 +15,10 @@ export function OPTIONS(request: Request) {
 export async function POST(request: Request) {
   return handleAuthJsonPost(request, {
     execute: async (body, { config }) => {
-      const response = await verifyEmailAuth(body);
+      const response = await completeWalletAuth(body, {
+        requestOrigin:
+          request.headers.get("origin") ?? new URL(request.url).origin,
+      });
       const sessionCookieService = createAuthSessionCookieService({
         getConfig: () => config,
       });
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
       return nextResponse;
     },
     mapKnownError: (error) =>
-      error instanceof EmailAuthError
+      error instanceof WalletAuthError
         ? {
             code: error.code,
             status: error.status,
@@ -41,8 +44,8 @@ export async function POST(request: Request) {
           }
         : null,
     defaultError: {
-      code: "email_auth_verify_failed",
-      message: "Failed to verify email authentication",
+      code: "wallet_auth_failed",
+      message: "Failed to verify wallet ownership",
     },
   });
 }

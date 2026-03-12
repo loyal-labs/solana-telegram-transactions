@@ -5,10 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { startTransition, useState } from "react";
 
 import {
-  buildGridAuthUrl,
-  extractGridErrorMessage,
-  parseGridErrorDetails,
-} from "@loyal-labs/grid-core";
+  buildAuthUrl,
+  extractApiErrorMessage,
+  parseApiErrorDetails,
+} from "@loyal-labs/auth-core";
 import {
   buildPasskeyFlowRequest,
   parsePasskeyFlowQuery,
@@ -17,7 +17,7 @@ import {
 import { isChallengeTimeoutError } from "@/lib/passkeys/webauthn";
 
 async function callLocalPasskeyApi(endpoint: string, payload: unknown) {
-  const response = await fetch(buildGridAuthUrl("", endpoint), {
+  const response = await fetch(buildAuthUrl("", endpoint), {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -61,11 +61,11 @@ export function PasskeyFlowClient({ mode }: { mode: PasskeyFlowMode }) {
       const request = await buildPasskeyFlowRequest(mode, parsed.data);
       const outcome = await callLocalPasskeyApi(request.endpoint, request.payload);
       if (!outcome.ok) {
-        const details = parseGridErrorDetails(outcome.body);
+        const details = parseApiErrorDetails(outcome.body);
         if (details.length > 0) {
           setErrorDetails(details);
         }
-        throw new Error(extractGridErrorMessage(outcome.body));
+        throw new Error(extractApiErrorMessage(outcome.body));
       }
 
       startTransition(() => setResult(outcome.body));
