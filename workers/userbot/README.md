@@ -90,6 +90,10 @@ Missing chats are inserted into `communities` with `parserType=userbot` and inac
 3. Start service with `bun run start`.
 4. Keep replicas at `1` per `TELEGRAM_USERBOT_ACCOUNT_KEY`.
 
+## Systemd scheduling
+
+See [`services/README.md`](services/README.md) for systemd timer setup (sync, summary publish).
+
 ## Notes
 
 - Session files are account-scoped: `mtcute-<account-key>.sqlite`.
