@@ -2,8 +2,8 @@
 
 import { useCallback, useReducer, useRef } from "react";
 
-import { AuthApiClientError, authApiClient } from "@/lib/auth/client";
-import { useAuthSession } from "@/contexts/auth-session-context";
+import { AuthApiClientError } from "@/lib/auth/client";
+import { useAuthApiClient, useAuthSession } from "@/contexts/auth-session-context";
 import { useSignInModal } from "@/contexts/sign-in-modal-context";
 import {
   createInitialEmailFlowState,
@@ -17,6 +17,7 @@ export function EmailTab({
   captchaToken: string;
   onFlowStart?: () => void;
 }) {
+  const authApiClient = useAuthApiClient();
   const { setAuthenticatedUser } = useAuthSession();
   const { close } = useSignInModal();
   const [state, dispatch] = useReducer(
@@ -56,7 +57,7 @@ export function EmailTab({
         });
       }
     },
-    [state.email]
+    [authApiClient, state.email]
   );
 
   const handleEmailSubmit = useCallback(
@@ -120,7 +121,7 @@ export function EmailTab({
         error: authError,
       });
     }
-  }, [close, setAuthenticatedUser, state.authTicketId, state.otp]);
+  }, [authApiClient, close, setAuthenticatedUser, state.authTicketId, state.otp]);
 
   const handleReset = useCallback(() => {
     dispatch({ type: "resetRequested" });

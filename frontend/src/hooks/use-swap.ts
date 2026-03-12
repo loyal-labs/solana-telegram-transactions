@@ -9,7 +9,7 @@ import {
 } from "@solana/web3.js";
 import { useCallback, useState } from "react";
 
-import { publicEnv } from "@/lib/core/config/public";
+import { usePublicEnv } from "@/contexts/public-env-context";
 
 // Debug logger that only emits in development
 const logger = {
@@ -101,7 +101,7 @@ type JupiterSwapResponse = {
 export function useSwap() {
   const { connection } = useConnection();
   const { publicKey, connected: isConnected, sendTransaction } = useWallet();
-  const swapConfig = publicEnv.swap;
+  const { swap: swapConfig } = usePublicEnv();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quote, setQuote] = useState<SwapQuote | null>(null);

@@ -11,7 +11,7 @@ import {
 import type { FC, ReactNode } from "react";
 import { useMemo } from "react";
 
-import { publicEnv } from "@/lib/core/config/public";
+import { usePublicEnv } from "@/contexts/public-env-context";
 
 type WalletConnectionProviderProps = {
   children: ReactNode;
@@ -20,9 +20,8 @@ type WalletConnectionProviderProps = {
 export const WalletConnectionProvider: FC<WalletConnectionProviderProps> = ({
   children,
 }) => {
-  const endpoint = useMemo(() => {
-    return publicEnv.solanaRpcEndpoint;
-  }, []);
+  const { solanaRpcEndpoint } = usePublicEnv();
+  const endpoint = useMemo(() => solanaRpcEndpoint, [solanaRpcEndpoint]);
 
   const wallets = useMemo(
     () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],

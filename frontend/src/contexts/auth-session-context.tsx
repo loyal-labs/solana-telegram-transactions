@@ -2,9 +2,12 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { createGridAuthClient } from "@loyal-labs/grid-core";
 import type { EmailAuthUser } from "@loyal-labs/grid-core";
 
-import { authApiClient } from "@/lib/auth/client";
+import { usePublicEnv } from "@/contexts/public-env-context";
+import { createAuthApiClient } from "@/lib/auth/client";
+import type { AuthApiClient } from "@/lib/auth/client";
 
 type AuthSessionContextValue = {
   isAuthenticated: boolean;
@@ -16,15 +19,26 @@ type AuthSessionContextValue = {
 };
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
+const AuthApiClientContext = createContext<AuthApiClient | null>(null);
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
+  const publicEnv = usePublicEnv();
   const [user, setUser] = useState<EmailAuthUser | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const authApiClient = useMemo(
+    () =>
+      createAuthApiClient(
+        createGridAuthClient({
+          authBaseUrl: publicEnv.gridAuthBaseUrl ?? "",
+        })
+      ),
+    [publicEnv.gridAuthBaseUrl]
+  );
 
   const refreshSession = useCallback(async () => {
     const nextUser = await authApiClient.getSession();
     setUser(nextUser);
-  }, []);
+  }, [authApiClient]);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,7 +65,22 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authApiClient]);
+
+  useEffect(() => {
+    if (!isHydrated || user === null) {
+      return;
+    }
+
+    console.log("[auth-session] signed-in user claims", {
+      email: user.email,
+      gridUserId: user.gridUserId,
+      accountAddress: user.accountAddress,
+      provider: user.provider ?? null,
+      claimKeys: Object.keys(user),
+      rawUser: user,
+    });
+  }, [isHydrated, user]);
 
   const setAuthenticatedUser = useCallback((nextUser: EmailAuthUser) => {
     setUser(nextUser);
@@ -60,7 +89,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     await authApiClient.logout();
     setUser(null);
-  }, []);
+  }, [authApiClient]);
 
   const value = useMemo(
     () => ({
@@ -75,9 +104,11 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AuthSessionContext.Provider value={value}>
-      {children}
-    </AuthSessionContext.Provider>
+    <AuthApiClientContext.Provider value={authApiClient}>
+      <AuthSessionContext.Provider value={value}>
+        {children}
+      </AuthSessionContext.Provider>
+    </AuthApiClientContext.Provider>
   );
 }
 
@@ -85,6 +116,15 @@ export function useAuthSession() {
   const context = useContext(AuthSessionContext);
   if (!context) {
     throw new Error("useAuthSession must be used within AuthSessionProvider");
+  }
+
+  return context;
+}
+
+export function useAuthApiClient() {
+  const context = useContext(AuthApiClientContext);
+  if (!context) {
+    throw new Error("useAuthApiClient must be used within an AuthSessionProvider");
   }
 
   return context;

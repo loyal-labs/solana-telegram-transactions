@@ -8,8 +8,10 @@ import { WalletConnectionProvider } from "@/components/solana/wallet-provider";
 import { Header } from "@/components/ui/header";
 import { AuthSessionProvider } from "@/contexts/auth-session-context";
 import { ChatModeProvider } from "@/contexts/chat-mode-context";
+import { PublicEnvProvider } from "@/contexts/public-env-context";
 import { SignInModalProvider } from "@/contexts/sign-in-modal-context";
 import { UserChatsProvider } from "@/providers/user-chats";
+import { createPublicEnv } from "@/lib/core/config/public";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -68,24 +70,28 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const publicEnv = createPublicEnv(process.env);
+
   return (
     <html className="dark" lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <WalletConnectionProvider>
-          <AuthSessionProvider>
-            <SignInModalProvider>
-              <UserChatsProvider>
-                <ChatModeProvider>
-                  <Header />
-                  {children}
-                  <SignInModal />
-                </ChatModeProvider>
-              </UserChatsProvider>
-            </SignInModalProvider>
-          </AuthSessionProvider>
-        </WalletConnectionProvider>
+        <PublicEnvProvider value={publicEnv}>
+          <WalletConnectionProvider>
+            <AuthSessionProvider>
+              <SignInModalProvider>
+                <UserChatsProvider>
+                  <ChatModeProvider>
+                    <Header />
+                    {children}
+                    <SignInModal />
+                  </ChatModeProvider>
+                </UserChatsProvider>
+              </SignInModalProvider>
+            </AuthSessionProvider>
+          </WalletConnectionProvider>
+        </PublicEnvProvider>
 
         {/* Umami Analytics */}
         <Script
@@ -94,7 +100,6 @@ export default function RootLayout({
           src="https://cloud.umami.is/script.js"
           strategy="afterInteractive"
         />
-
       </body>
     </html>
   );

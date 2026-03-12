@@ -102,4 +102,6 @@ export function createPublicEnv(env: EnvSource): PublicEnv {
   };
 }
 
-export const publicEnv = createPublicEnv(process.env);
+export function getPublicEnv(): PublicEnv {
+  return createPublicEnv(process.env);
+}

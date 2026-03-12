@@ -1,4 +1,4 @@
-import { publicEnv } from "@/lib/core/config/public";
+import { getPublicEnv } from "@/lib/core/config/public";
 
 /**
  * Feature flag for Skills activation
@@ -7,5 +7,5 @@ import { publicEnv } from "@/lib/core/config/public";
  * Set NEXT_PUBLIC_SKILLS_ENABLED=false in .env to disable Skills
  */
 export function isSkillsEnabled(): boolean {
-  return publicEnv.skillsEnabled;
+  return getPublicEnv().skillsEnabled;
 }

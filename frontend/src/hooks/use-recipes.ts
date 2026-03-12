@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { publicEnv } from "@/lib/core/config/public";
+import { usePublicEnv } from "@/contexts/public-env-context";
 
 export interface Recipe {
   id: string;
@@ -58,7 +58,7 @@ function saveRecipes(recipes: Recipe[]): void {
 
 export function useRecipes() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const showDemoRecipe = publicEnv.demoRecipeEnabled;
+  const { demoRecipeEnabled: showDemoRecipe } = usePublicEnv();
 
   // Load recipes from localStorage on mount
   useEffect(() => {

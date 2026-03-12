@@ -14,7 +14,7 @@ import type {
   VerifyEmailAuthRequest,
 } from "@loyal-labs/grid-core";
 
-import { publicEnv } from "@/lib/core/config/public";
+import { getPublicEnv } from "@/lib/core/config/public";
 
 export class AuthApiClientError extends Error {
   readonly code: string;
@@ -33,7 +33,7 @@ export class AuthApiClientError extends Error {
   }
 }
 
-type AuthApiClient = {
+export type AuthApiClient = {
   startEmailAuth(payload: StartEmailAuthRequest): Promise<StartEmailAuthResponse>;
   verifyEmailAuth(payload: VerifyEmailAuthRequest): Promise<EmailAuthUser>;
   getSession(): Promise<EmailAuthUser | null>;
@@ -85,7 +85,7 @@ function assertSuccessfulResponse<T>(
 
 export function createAuthApiClient(
   rawClient: GridAuthClient = createGridAuthClient({
-    authBaseUrl: publicEnv.gridAuthBaseUrl ?? "",
+    authBaseUrl: getPublicEnv().gridAuthBaseUrl ?? "",
   })
 ): AuthApiClient {
   return {
@@ -149,5 +149,3 @@ export function createAuthApiClient(
     },
   };
 }
-
-export const authApiClient = createAuthApiClient();

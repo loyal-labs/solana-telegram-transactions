@@ -5,18 +5,48 @@ import {
   createSessionCookieService,
   EMAIL_AUTH_SESSION_COOKIE_NAME,
 } from "@/lib/auth/email/session-cookie";
+import {
+  AuthCorsError,
+  createAuthCorsPreflightResponse,
+  createForbiddenOriginResponse,
+  getAuthCorsHeaders,
+  withAuthCorsHeaders,
+} from "@/lib/auth/cors";
+
+export function OPTIONS(request: Request) {
+  try {
+    return createAuthCorsPreflightResponse(request, getServerConfig());
+  } catch (error) {
+    if (error instanceof AuthCorsError) {
+      return createForbiddenOriginResponse();
+    }
+
+    throw error;
+  }
+}
 
 export async function POST(request: Request) {
-  const sessionCookieService = createSessionCookieService({
-    getConfig: () => getServerConfig(),
-  });
-  const response = new NextResponse(null, { status: 204 });
+  const config = getServerConfig();
 
-  response.cookies.set({
-    name: EMAIL_AUTH_SESSION_COOKIE_NAME,
-    value: "",
-    ...sessionCookieService.createClearedSessionCookieOptions(request),
-  });
+  try {
+    const corsHeaders = getAuthCorsHeaders(request, config);
+    const sessionCookieService = createSessionCookieService({
+      getConfig: () => config,
+    });
+    const response = new NextResponse(null, { status: 204 });
 
-  return response;
+    response.cookies.set({
+      name: EMAIL_AUTH_SESSION_COOKIE_NAME,
+      value: "",
+      ...sessionCookieService.createClearedSessionCookieOptions(request),
+    });
+
+    return withAuthCorsHeaders(response, corsHeaders);
+  } catch (error) {
+    if (error instanceof AuthCorsError) {
+      return createForbiddenOriginResponse();
+    }
+
+    throw error;
+  }
 }

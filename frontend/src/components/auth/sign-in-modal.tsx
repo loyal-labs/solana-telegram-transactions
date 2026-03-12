@@ -12,9 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { useAuthCapability } from "@/lib/auth/capability";
 import { useAuthSession } from "@/contexts/auth-session-context";
+import { usePublicEnv } from "@/contexts/public-env-context";
 import { useSignInModal } from "@/contexts/sign-in-modal-context";
-
-import { publicEnv } from "@/lib/core/config/public";
 
 import { EmailTab } from "./email-tab";
 import { PasskeyTab } from "./passkey-tab";
@@ -103,23 +102,34 @@ function ConnectedView() {
 export function SignInModal() {
   const { isOpen, close } = useSignInModal();
   const { capability } = useAuthCapability();
+  const publicEnv = usePublicEnv();
   const { wallets } = useWallet();
   const [activeSection, setActiveSection] = useState<
     "email" | "passkey" | "wallet" | null
   >(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileMode = publicEnv.turnstile.mode;
+  const turnstileVerificationToken =
+    turnstileMode === "bypass"
+      ? publicEnv.turnstile.verificationToken
+      : null;
 
   // Auto-resolve captcha for bypass (local dev) and misconfigured environments
-  const needsCaptchaWidget = publicEnv.turnstile.mode === "widget";
+  const needsCaptchaWidget = turnstileMode === "widget";
   useEffect(() => {
     if (!needsCaptchaWidget && captchaToken === null) {
       setCaptchaToken(
-        publicEnv.turnstile.mode === "bypass"
-          ? publicEnv.turnstile.verificationToken
+        turnstileMode === "bypass"
+          ? turnstileVerificationToken
           : "captcha-skipped"
       );
     }
-  }, [needsCaptchaWidget, captchaToken]);
+  }, [
+    captchaToken,
+    needsCaptchaWidget,
+    turnstileMode,
+    turnstileVerificationToken,
+  ]);
 
   const hasInstalledWallets = wallets.some(
     (w) => w.readyState === "Installed"

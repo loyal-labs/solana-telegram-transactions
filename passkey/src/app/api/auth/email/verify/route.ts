@@ -5,13 +5,35 @@ import { getServerConfig } from "@/lib/core/config/server";
 import { EmailAuthError } from "@/lib/auth/email/errors";
 import { createSessionCookieService, EMAIL_AUTH_SESSION_COOKIE_NAME } from "@/lib/auth/email/session-cookie";
 import { verifyEmailAuth } from "@/lib/auth/email/service";
+import {
+  AuthCorsError,
+  createAuthCorsPreflightResponse,
+  createForbiddenOriginResponse,
+  getAuthCorsHeaders,
+  withAuthCorsHeaders,
+} from "@/lib/auth/cors";
+
+export function OPTIONS(request: Request) {
+  try {
+    return createAuthCorsPreflightResponse(request, getServerConfig());
+  } catch (error) {
+    if (error instanceof AuthCorsError) {
+      return createForbiddenOriginResponse();
+    }
+
+    throw error;
+  }
+}
 
 export async function POST(request: Request) {
+  const config = getServerConfig();
+
   try {
+    const corsHeaders = getAuthCorsHeaders(request, config);
     const body = await request.json();
     const response = await verifyEmailAuth(body);
     const sessionCookieService = createSessionCookieService({
-      getConfig: () => getServerConfig(),
+      getConfig: () => config,
     });
     const nextResponse = NextResponse.json({
       user: response.user,
@@ -23,57 +45,73 @@ export async function POST(request: Request) {
       ...sessionCookieService.createSessionCookieOptions(request),
     });
 
-    return nextResponse;
+    return withAuthCorsHeaders(nextResponse, corsHeaders);
   } catch (error) {
+    if (error instanceof AuthCorsError) {
+      return createForbiddenOriginResponse();
+    }
+
     if (error instanceof EmailAuthError) {
-      return NextResponse.json(
-        {
-          error: {
-            code: error.code,
-            message: error.message,
-            ...(error.details !== undefined ? { details: error.details } : {}),
+      return withAuthCorsHeaders(
+        NextResponse.json(
+          {
+            error: {
+              code: error.code,
+              message: error.message,
+              ...(error.details !== undefined ? { details: error.details } : {}),
+            },
           },
-        },
-        { status: error.status }
+          { status: error.status }
+        ),
+        getAuthCorsHeaders(request, config)
       );
     }
 
     if (error instanceof ZodError) {
-      return NextResponse.json(
-        {
-          error: {
-            code: "invalid_request",
-            message: "Invalid request payload",
-            details: error.issues.map((issue) => issue.message),
+      return withAuthCorsHeaders(
+        NextResponse.json(
+          {
+            error: {
+              code: "invalid_request",
+              message: "Invalid request payload",
+              details: error.issues.map((issue) => issue.message),
+            },
           },
-        },
-        { status: 400 }
+          { status: 400 }
+        ),
+        getAuthCorsHeaders(request, config)
       );
     }
 
     if (error instanceof SyntaxError) {
-      return NextResponse.json(
-        {
-          error: {
-            code: "invalid_json",
-            message: "Request body must be valid JSON",
+      return withAuthCorsHeaders(
+        NextResponse.json(
+          {
+            error: {
+              code: "invalid_json",
+              message: "Request body must be valid JSON",
+            },
           },
-        },
-        { status: 400 }
+          { status: 400 }
+        ),
+        getAuthCorsHeaders(request, config)
       );
     }
 
-    return NextResponse.json(
-      {
-        error: {
-          code: "email_auth_verify_failed",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Failed to verify email authentication",
+    return withAuthCorsHeaders(
+      NextResponse.json(
+        {
+          error: {
+            code: "email_auth_verify_failed",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Failed to verify email authentication",
+          },
         },
-      },
-      { status: 500 }
+        { status: 500 }
+      ),
+      getAuthCorsHeaders(request, config)
     );
   }
 }

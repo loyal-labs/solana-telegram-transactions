@@ -2,7 +2,8 @@
 
 import Turnstile from "react-turnstile";
 
-import { publicEnv, type TurnstileConfig } from "@/lib/core/config/public";
+import { usePublicEnv } from "@/contexts/public-env-context";
+import type { TurnstileConfig } from "@/lib/core/config/public";
 
 type TurnstileWidgetProps = {
   onVerify: (token: string) => void;
@@ -50,6 +51,8 @@ export function TurnstileWidgetContent({
 }
 
 export function TurnstileWidget({ onVerify }: TurnstileWidgetProps) {
+  const publicEnv = usePublicEnv();
+
   return (
     <TurnstileWidgetContent
       onVerify={onVerify}
