@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   Conversation,
@@ -35,12 +35,7 @@ import {
   SourcesTrigger,
 } from "@/components/ai-elements/source";
 import { TopicsSidebar } from "@/components/ai-elements/topics-sidebar";
-import { useConnection } from "@/components/solana/phantom-provider";
-import { useAnchorWallet } from "@/hooks/use-anchor-wallet";
-import { mapChatsToTopics } from "@/lib/chat/topic-utils";
 import { GrpcChatTransport } from "@/lib/query/transport";
-import { createAndUploadChat } from "@/lib/services/service";
-import { useUserChats } from "@/providers/user-chats";
 
 const models = [
   {
@@ -53,19 +48,16 @@ const models = [
   },
 ];
 
+type SidebarTopic = {
+  id: string;
+  title: string;
+  updatedAt: string;
+};
+
 const ChatBotDemo = () => {
   const [input, setInput] = useState("");
   const [model, setModel] = useState<string>(models[0].value);
   const [darkMode, setDarkMode] = useState(false);
-  const [isCreatingChat, setIsCreatingChat] = useState(false);
-  const { connection } = useConnection();
-  const anchorWallet = useAnchorWallet();
-  const {
-    userChats,
-    isLoading: isUserChatsLoading,
-    refreshUserChats,
-    ensureUserContext,
-  } = useUserChats();
 
   const { messages, sendMessage, status, setMessages } = useChat({
     transport: new GrpcChatTransport({
@@ -75,8 +67,7 @@ const ChatBotDemo = () => {
       },
     }),
   });
-
-  const topics = useMemo(() => mapChatsToTopics(userChats), [userChats]);
+  const topics: SidebarTopic[] = [];
 
   // Handle new chat creation
   const handleNewChat = useCallback(() => {
@@ -98,34 +89,6 @@ const ChatBotDemo = () => {
     mediaQuery.addEventListener("change", handler);
     return () => mediaQuery.removeEventListener("change", handler);
   }, []);
-
-  const handleTestCreateChat = useCallback(async () => {
-    if (!anchorWallet) {
-      console.warn("Wallet not connected");
-      return;
-    }
-    const messageText =
-      userChats.length === 0
-        ? "Hello!"
-        : `Hello again! (#${userChats.length + 1})`;
-    setIsCreatingChat(true);
-    try {
-      // Lazily ensure context exists (creates if needed, triggers signing only once)
-      const context = await ensureUserContext();
-      await createAndUploadChat(connection, anchorWallet, messageText, context);
-      await refreshUserChats();
-    } catch (error) {
-      console.error("Failed to create chat", error);
-    } finally {
-      setIsCreatingChat(false);
-    }
-  }, [
-    anchorWallet,
-    connection,
-    ensureUserContext,
-    refreshUserChats,
-    userChats,
-  ]);
 
   // apply dark mode
   useEffect(() => {
@@ -156,14 +119,6 @@ const ChatBotDemo = () => {
       <TopicsSidebar onNewChat={handleNewChat} topics={topics} />
       <div className="flex-1 overflow-hidden">
         <div className="relative mx-auto flex h-full max-w-4xl flex-col p-6">
-          <button
-            className="fixed top-6 right-[10.5rem] z-20 rounded-md border border-white/20 bg-zinc-900 px-3 py-2 font-medium text-white text-xs transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={!anchorWallet || isCreatingChat || isUserChatsLoading}
-            onClick={handleTestCreateChat}
-            type="button"
-          >
-            {isCreatingChat ? "Creating chat..." : "Test Chat Upload"}
-          </button>
           <div className="flex h-full flex-col">
             <Conversation className="h-full">
               <ConversationContent>

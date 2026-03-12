@@ -6,7 +6,6 @@ import Script from "next/script";
 import { PhantomWalletProvider } from "@/components/solana/phantom-provider";
 import { Header } from "@/components/ui/header";
 import { ChatModeProvider } from "@/contexts/chat-mode-context";
-import { UserChatsProvider } from "@/providers/user-chats";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -71,12 +70,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <PhantomWalletProvider>
-          <UserChatsProvider>
-            <ChatModeProvider>
-              <Header />
-              {children}
-            </ChatModeProvider>
-          </UserChatsProvider>
+          <ChatModeProvider>
+            <Header />
+            {children}
+          </ChatModeProvider>
         </PhantomWalletProvider>
 
         {/* Umami Analytics */}
@@ -86,7 +83,6 @@ export default function RootLayout({
           src="https://cloud.umami.is/script.js"
           strategy="afterInteractive"
         />
-
       </body>
     </html>
   );
