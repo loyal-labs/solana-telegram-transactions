@@ -488,6 +488,7 @@ export function HeroRightSidebar(props: HeroRightSidebarProps) {
               )}
               {displayTab === "send" && (
                 <SendContent
+                  addLocalActivity={props.walletDesktopData.addLocalActivity}
                   onClose={props.onClose}
                   onDone={() => props.onTabChange("portfolio")}
                   onNavigate={setSubView}

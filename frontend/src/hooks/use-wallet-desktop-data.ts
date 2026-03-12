@@ -6,7 +6,7 @@ import {
   type WalletActivity,
 } from "@loyal-labs/solana-wallet";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   ActivityRow,
@@ -37,6 +37,7 @@ export type WalletDesktopData = {
   transactionDetails: Record<string, TransactionDetail>;
   positions: PortfolioPosition[];
   balanceHistory: BalanceHistoryPoint[];
+  addLocalActivity: (row: ActivityRow, detail: TransactionDetail) => void;
 };
 
 const EMPTY_POSITIONS: PortfolioPosition[] = [];
@@ -320,6 +321,49 @@ export function useWalletDesktopData(): WalletDesktopData {
     useState<PortfolioSnapshot | null>(null);
   const [activities, setActivities] = useState<WalletActivity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [localRows, setLocalRows] = useState<ActivityRow[]>([]);
+  const [localDetails, setLocalDetails] = useState<Record<string, TransactionDetail>>({});
+
+  // Load local activity from localStorage when wallet connects
+  useEffect(() => {
+    if (!walletAddress) {
+      setLocalRows([]);
+      setLocalDetails({});
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(`loyal:local-activity:${walletAddress}`);
+      if (stored) {
+        const parsed = JSON.parse(stored) as { rows: ActivityRow[]; details: Record<string, TransactionDetail> };
+        setLocalRows(parsed.rows ?? []);
+        setLocalDetails(parsed.details ?? {});
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [walletAddress]);
+
+  const addLocalActivity = useCallback(
+    (row: ActivityRow, detail: TransactionDetail) => {
+      setLocalRows((prev) => {
+        const next = [row, ...prev];
+        if (walletAddress) {
+          try {
+            const nextDetails = { ...localDetails, [row.id]: detail };
+            localStorage.setItem(
+              `loyal:local-activity:${walletAddress}`,
+              JSON.stringify({ rows: next, details: nextDetails }),
+            );
+          } catch {
+            // ignore quota errors
+          }
+        }
+        return next;
+      });
+      setLocalDetails((prev) => ({ ...prev, [row.id]: detail }));
+    },
+    [walletAddress, localDetails],
+  );
 
   useEffect(() => {
     console.log("[wallet-data] effect fired", {
@@ -500,6 +544,15 @@ export function useWalletDesktopData(): WalletDesktopData {
     return { rows, details };
   }, [activities, positions, totals.effectiveSolPriceUsd]);
 
+  // Merge local (private send) rows with on-chain activity, deduping by id
+  const mergedActivityData = useMemo(() => {
+    const onChainIds = new Set(activityData.rows.map((r) => r.id));
+    const uniqueLocalRows = localRows.filter((r) => !onChainIds.has(r.id));
+    const rows = [...uniqueLocalRows, ...activityData.rows];
+    const details = { ...activityData.details, ...localDetails };
+    return { rows, details };
+  }, [activityData, localRows, localDetails]);
+
   // Lock balance history to the initial fetch so WebSocket subscription
   // updates don't cause jarring redraws of the sparkline.
   const balanceHistoryRef = useRef<BalanceHistoryPoint[]>([]);
@@ -569,10 +622,11 @@ export function useWalletDesktopData(): WalletDesktopData {
     walletLabel,
     tokenRows: allTokenRows.slice(0, 3),
     allTokenRows,
-    activityRows: activityData.rows.slice(0, 5),
-    allActivityRows: activityData.rows,
-    transactionDetails: activityData.details,
+    activityRows: mergedActivityData.rows.slice(0, 5),
+    allActivityRows: mergedActivityData.rows,
+    transactionDetails: mergedActivityData.details,
     positions,
     balanceHistory,
+    addLocalActivity,
   };
 }

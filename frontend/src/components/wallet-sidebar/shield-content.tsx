@@ -22,7 +22,14 @@ function SwapShieldTabs({
   onClose: () => void;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px",
+      }}
+    >
       <div
         style={{
           display: "flex",
@@ -78,7 +85,11 @@ function SwapShieldTabs({
           type="button"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img alt="" src="/hero-new/Shield.png" style={{ width: "20px", height: "20px" }} />
+          <img
+            alt=""
+            src="/hero-new/Shield.png"
+            style={{ width: "20px", height: "20px" }}
+          />
           Shield
         </button>
       </div>
@@ -118,16 +129,50 @@ function StatusHeader({
   onClose: () => void;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px" }}>
-      <div style={{ flex: 1, paddingLeft: "12px", paddingTop: "4px", paddingBottom: "4px" }}>
-        <span style={{ fontFamily: font, fontSize: "18px", fontWeight: 600, lineHeight: "28px", color: "#000" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px",
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          paddingLeft: "12px",
+          paddingTop: "4px",
+          paddingBottom: "4px",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: font,
+            fontSize: "18px",
+            fontWeight: 600,
+            lineHeight: "28px",
+            color: "#000",
+          }}
+        >
           {title}
         </span>
       </div>
       <button
         className="shield-close"
         onClick={onClose}
-        style={{ width: "36px", height: "36px", display: "flex", justifyContent: "center", alignItems: "center", background: "rgba(0, 0, 0, 0.04)", border: "none", borderRadius: "9999px", cursor: "pointer", transition: "all 0.2s ease", color: "#3C3C43" }}
+        style={{
+          width: "36px",
+          height: "36px",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          background: "rgba(0, 0, 0, 0.04)",
+          border: "none",
+          borderRadius: "9999px",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          color: "#3C3C43",
+        }}
         type="button"
       >
         <X size={24} />
@@ -146,18 +191,56 @@ function ShieldedTokenPill({ token }: { token: SwapToken }) {
         flexShrink: 0,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", padding: "4px 14px 4px 4px", position: "relative" }}>
-        <div style={{ width: "28px", height: "28px", borderRadius: "9999px", overflow: "hidden", marginRight: "-8px" }}>
-          <Image alt={token.symbol} height={28} src={token.icon} style={{ width: "100%", height: "100%", objectFit: "cover" }} width={28} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          padding: "4px 14px 4px 4px",
+          position: "relative",
+        }}
+      >
+        <div
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "9999px",
+            overflow: "hidden",
+            marginRight: "-8px",
+          }}
+        >
+          <Image
+            alt={token.symbol}
+            height={28}
+            src={token.icon}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            width={28}
+          />
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           alt="Shielded"
           src="/hero-new/Shield.png"
-          style={{ width: "16px", height: "16px", position: "absolute", bottom: "2px", right: "2px" }}
+          style={{
+            width: "16px",
+            height: "16px",
+            position: "absolute",
+            bottom: "2px",
+            right: "2px",
+          }}
         />
       </div>
-      <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 500, lineHeight: "20px", color: "#000", letterSpacing: "-0.176px", whiteSpace: "nowrap", padding: "8px 0" }}>
+      <span
+        style={{
+          fontFamily: font,
+          fontSize: "16px",
+          fontWeight: 500,
+          lineHeight: "20px",
+          color: "#000",
+          letterSpacing: "-0.176px",
+          whiteSpace: "nowrap",
+          padding: "8px 0",
+        }}
+      >
         {token.symbol}
       </span>
     </div>
@@ -186,15 +269,54 @@ function SelectableTokenPill({
       }}
       type="button"
     >
-      <div style={{ display: "flex", alignItems: "center", paddingRight: "6px", padding: "4px 6px 4px 4px" }}>
-        <div style={{ width: "28px", height: "28px", borderRadius: "9999px", overflow: "hidden" }}>
-          <Image alt={token.symbol} height={28} src={token.icon} style={{ width: "100%", height: "100%", objectFit: "cover" }} width={28} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          paddingRight: "6px",
+          padding: "4px 6px 4px 4px",
+        }}
+      >
+        <div
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "9999px",
+            overflow: "hidden",
+          }}
+        >
+          <Image
+            alt={token.symbol}
+            height={28}
+            src={token.icon}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            width={28}
+          />
         </div>
       </div>
-      <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 500, lineHeight: "20px", color: "#000", letterSpacing: "-0.176px", whiteSpace: "nowrap", padding: "8px 0" }}>
+      <span
+        style={{
+          fontFamily: font,
+          fontSize: "16px",
+          fontWeight: 500,
+          lineHeight: "20px",
+          color: "#000",
+          letterSpacing: "-0.176px",
+          whiteSpace: "nowrap",
+          padding: "8px 0",
+        }}
+      >
         {token.symbol}
       </span>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "36px", padding: "8px 0" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "36px",
+          padding: "8px 0",
+        }}
+      >
         <ChevronRight size={16} style={{ color: "#3C3C43" }} />
       </div>
     </button>
@@ -223,21 +345,67 @@ function ShieldedSelectableTokenPill({
       }}
       type="button"
     >
-      <div style={{ display: "flex", alignItems: "center", padding: "4px 14px 4px 4px", position: "relative" }}>
-        <div style={{ width: "28px", height: "28px", borderRadius: "9999px", overflow: "hidden", marginRight: "-8px" }}>
-          <Image alt={token.symbol} height={28} src={token.icon} style={{ width: "100%", height: "100%", objectFit: "cover" }} width={28} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          padding: "4px 14px 4px 4px",
+          position: "relative",
+        }}
+      >
+        <div
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "9999px",
+            overflow: "hidden",
+            marginRight: "-8px",
+          }}
+        >
+          <Image
+            alt={token.symbol}
+            height={28}
+            src={token.icon}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            width={28}
+          />
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           alt="Shielded"
           src="/hero-new/Shield.png"
-          style={{ width: "16px", height: "16px", position: "absolute", bottom: "2px", right: "2px" }}
+          style={{
+            width: "16px",
+            height: "16px",
+            position: "absolute",
+            bottom: "2px",
+            right: "2px",
+          }}
         />
       </div>
-      <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 500, lineHeight: "20px", color: "#000", letterSpacing: "-0.176px", whiteSpace: "nowrap", padding: "8px 0" }}>
+      <span
+        style={{
+          fontFamily: font,
+          fontSize: "16px",
+          fontWeight: 500,
+          lineHeight: "20px",
+          color: "#000",
+          letterSpacing: "-0.176px",
+          whiteSpace: "nowrap",
+          padding: "8px 0",
+        }}
+      >
         {token.symbol}
       </span>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "36px", padding: "8px 0" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "36px",
+          padding: "8px 0",
+        }}
+      >
         <ChevronRight size={16} style={{ color: "#3C3C43" }} />
       </div>
     </button>
@@ -292,23 +460,30 @@ export function ShieldContent({
   const insufficientFunds = numericAmount > sourceBalance;
 
   const usdValue = useMemo(
-    () => (numericAmount * token.price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-    [numericAmount, token.price],
+    () =>
+      (numericAmount * token.price).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    [numericAmount, token.price]
   );
 
   const exchangeRate = useMemo(
     () =>
-      `1 ${token.symbol} ≈ $${token.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`,
-    [token.symbol, token.price],
+      `1 ${token.symbol} ≈ $${token.price.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
+      })}`,
+    [token.symbol, token.price]
   );
 
   const buttonLabel = !hasAmount
     ? "Enter Amount"
     : insufficientFunds
-      ? "Insufficient Funds"
-      : direction === "shield"
-        ? "Confirm and Shield"
-        : "Confirm and Unshield";
+    ? "Insufficient Funds"
+    : direction === "shield"
+    ? "Confirm and Shield"
+    : "Confirm and Unshield";
   const buttonDisabled = !hasAmount || insufficientFunds;
   const amountColor = insufficientFunds && hasAmount ? red : "#000";
 
@@ -322,14 +497,19 @@ export function ShieldContent({
       const val = pct === 100 ? bal : bal * (pct / 100);
       setAmount(val > 0 ? String(Number(val.toFixed(6))) : "");
     },
-    [sourceBalance],
+    [sourceBalance]
   );
 
   const handleConfirm = useCallback(async () => {
     if (!hasAmount || insufficientFunds) return;
 
     setResultAmount(String(numericAmount));
-    setResultUsd(`$${(numericAmount * token.price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+    setResultUsd(
+      `$${(numericAmount * token.price).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`
+    );
     setErrorMessage(undefined);
     setPhase("processing");
 
@@ -339,9 +519,10 @@ export function ShieldContent({
       tokenMint: token.mint,
     };
 
-    const result = direction === "shield"
-      ? await shieldFn(params)
-      : await unshieldFn(params);
+    const result =
+      direction === "shield"
+        ? await shieldFn(params)
+        : await unshieldFn(params);
 
     if (result.success) {
       setPhase("success");
@@ -350,7 +531,17 @@ export function ShieldContent({
       setErrorMessage(result.error);
       setPhase("error");
     }
-  }, [hasAmount, insufficientFunds, numericAmount, token.price, token.symbol, token.mint, direction, shieldFn, unshieldFn]);
+  }, [
+    hasAmount,
+    insufficientFunds,
+    numericAmount,
+    token.price,
+    token.symbol,
+    token.mint,
+    direction,
+    shieldFn,
+    unshieldFn,
+  ]);
 
   // Report form button props to parent when chrome is managed externally
   useEffect(() => {
@@ -359,7 +550,11 @@ export function ShieldContent({
       onFormButtonChange(null);
       return;
     }
-    onFormButtonChange({ label: buttonLabel, disabled: buttonDisabled, onClick: handleConfirm });
+    onFormButtonChange({
+      label: buttonLabel,
+      disabled: buttonDisabled,
+      onClick: handleConfirm,
+    });
   });
 
   // Cross-fade between phases
@@ -381,37 +576,113 @@ export function ShieldContent({
   const renderPhaseContent = (p: ShieldPhase) => {
     if (p === "processing") {
       return (
-        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <div
+          style={{ display: "flex", flexDirection: "column", height: "100%" }}
+        >
           <style jsx>{`
-            .shield-close:hover { background: rgba(0, 0, 0, 0.08) !important; }
+            .shield-close:hover {
+              background: rgba(0, 0, 0, 0.08) !important;
+            }
             @keyframes chevronBounce {
-              0%, 100% { transform: translateX(0); }
-              50% { transform: translateX(4px); }
+              0%,
+              100% {
+                transform: translateX(0);
+              }
+              50% {
+                transform: translateX(4px);
+              }
             }
           `}</style>
 
-          <StatusHeader onClose={onClose} title={direction === "shield" ? "Shield" : "Unshield"} />
+          <StatusHeader
+            onClose={onClose}
+            title={direction === "shield" ? "Shield" : "Unshield"}
+          />
 
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", padding: "24px 32px" }}>
-              <div style={{ display: "flex", gap: "16px", alignItems: "center", padding: "8px 0" }}>
-                <div style={{ width: "64px", height: "64px", borderRadius: "9999px", overflow: "hidden", flexShrink: 0 }}>
-                  <Image alt={token.symbol} height={64} src={token.icon} style={{ width: "100%", height: "100%", objectFit: "cover" }} width={64} />
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "20px",
+                alignItems: "center",
+                padding: "24px 32px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  gap: "16px",
+                  alignItems: "center",
+                  padding: "8px 0",
+                }}
+              >
+                <div
+                  style={{
+                    width: "64px",
+                    height: "64px",
+                    borderRadius: "9999px",
+                    overflow: "hidden",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Image
+                    alt={token.symbol}
+                    height={64}
+                    src={token.icon}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                    width={64}
+                  />
                 </div>
-                <ChevronRight size={16} style={{ color: secondary, animation: "chevronBounce 1s ease-in-out infinite" }} />
+                <ChevronRight
+                  size={16}
+                  style={{
+                    color: secondary,
+                    animation: "chevronBounce 1s ease-in-out infinite",
+                  }}
+                />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   alt={direction === "shield" ? "Shield" : "Unshield"}
-                  src={direction === "shield" ? "/hero-new/Shield.png" : "/hero-new/Unshield.svg"}
+                  src={
+                    direction === "shield"
+                      ? "/hero-new/Shield.png"
+                      : "/hero-new/Unshield.svg"
+                  }
                   style={{ width: "64px", height: "64px", flexShrink: 0 }}
                 />
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "center", textAlign: "center" }}>
-                <span style={{ fontFamily: font, fontSize: "20px", fontWeight: 600, lineHeight: "24px", color: "#000" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "4px",
+                  alignItems: "center",
+                  textAlign: "center",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "20px",
+                    fontWeight: 600,
+                    lineHeight: "24px",
+                    color: "#000",
+                  }}
+                >
                   {direction === "shield" ? "Shielding..." : "Unshielding..."}
-                </span>
-                <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary, maxWidth: "285px" }}>
-                  You can close this screen and continue using the app
                 </span>
               </div>
             </div>
@@ -420,7 +691,20 @@ export function ShieldContent({
           <div style={{ padding: "16px 20px" }}>
             <button
               disabled
-              style={{ width: "100%", padding: "12px 16px", borderRadius: "9999px", background: "#CCCDCD", border: "none", cursor: "default", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#fff", textAlign: "center" }}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: "9999px",
+                background: "#CCCDCD",
+                border: "none",
+                cursor: "default",
+                fontFamily: font,
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "#fff",
+                textAlign: "center",
+              }}
               type="button"
             >
               In progress...
@@ -433,61 +717,164 @@ export function ShieldContent({
     if (p === "success" || p === "error") {
       const isSuccess = p === "success";
       return (
-        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <div
+          style={{ display: "flex", flexDirection: "column", height: "100%" }}
+        >
           <style jsx>{`
-            .shield-close:hover { background: rgba(0, 0, 0, 0.08) !important; }
-            .shield-done-btn:hover { background: #333 !important; }
-            .shield-done-secondary-btn:hover { background: rgba(0, 0, 0, 0.08) !important; }
+            .shield-close:hover {
+              background: rgba(0, 0, 0, 0.08) !important;
+            }
+            .shield-done-btn:hover {
+              background: #333 !important;
+            }
+            .shield-done-secondary-btn:hover {
+              background: rgba(0, 0, 0, 0.08) !important;
+            }
             @keyframes mascotNod {
-              0%, 100% { transform: rotate(0deg); }
-              25% { transform: rotate(4deg); }
-              75% { transform: rotate(-4deg); }
+              0%,
+              100% {
+                transform: rotate(0deg);
+              }
+              25% {
+                transform: rotate(4deg);
+              }
+              75% {
+                transform: rotate(-4deg);
+              }
             }
           `}</style>
 
           <StatusHeader
             onClose={onClose}
-            title={isSuccess
-              ? (direction === "shield" ? "Shield" : "Unshield")
-              : "Shield/Unshield"}
+            title={
+              isSuccess
+                ? direction === "shield"
+                  ? "Shield"
+                  : "Unshield"
+                : "Shield/Unshield"
+            }
           />
 
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", padding: "24px 32px" }}>
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "20px",
+                alignItems: "center",
+                padding: "24px 32px",
+              }}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 alt={isSuccess ? "Success" : "Error"}
-                src={isSuccess ? "/hero-new/success.svg" : "/hero-new/error.svg"}
-                style={{ width: "100px", height: "80px", animation: "mascotNod 0.6s ease-in-out 2", transformOrigin: "center bottom" }}
+                src={
+                  isSuccess ? "/hero-new/success.svg" : "/hero-new/error.svg"
+                }
+                style={{
+                  width: "100px",
+                  height: "80px",
+                  animation: "mascotNod 0.6s ease-in-out 2",
+                  transformOrigin: "center bottom",
+                }}
               />
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "center", textAlign: "center" }}>
-                <span style={{ fontFamily: font, fontSize: "20px", fontWeight: 600, lineHeight: "24px", color: "#000" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "4px",
+                  alignItems: "center",
+                  textAlign: "center",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "20px",
+                    fontWeight: 600,
+                    lineHeight: "24px",
+                    color: "#000",
+                  }}
+                >
                   {isSuccess
-                    ? `${token.symbol} ${direction === "shield" ? "Shielded" : "Unshielded"}`
-                    : (direction === "shield" ? "Shielding Failed" : "Unshielding Failed")}
+                    ? `${token.symbol} ${
+                        direction === "shield" ? "Shielded" : "Unshielded"
+                      }`
+                    : direction === "shield"
+                    ? "Shielding Failed"
+                    : "Unshielding Failed"}
                 </span>
-                <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary, maxWidth: "255px" }}>
-                  {isSuccess
-                    ? (<><span style={{ color: "#000" }}>{resultAmount} {token.symbol}</span>{` moved to your ${direction === "shield" ? "secure" : "main"} balance`}</>)
-                    : (errorMessage || "Something went wrong. Please try again.")}
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                    maxWidth: "255px",
+                  }}
+                >
+                  {isSuccess ? (
+                    <>
+                      <span style={{ color: "#000" }}>
+                        {resultAmount} {token.symbol}
+                      </span>
+                      {` moved to your ${
+                        direction === "shield" ? "secure" : "main"
+                      } balance`}
+                    </>
+                  ) : (
+                    errorMessage || "Something went wrong. Please try again."
+                  )}
                 </span>
               </div>
             </div>
           </div>
 
-          <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div
+            style={{
+              padding: "16px 20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}
+          >
             {isSuccess && (
               <button
                 className="shield-done-btn"
                 onClick={() => setPhase("details")}
-                style={{ width: "100%", padding: "12px 16px", borderRadius: "9999px", background: "#000", border: "none", cursor: "pointer", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#fff", textAlign: "center", transition: "background 0.15s ease" }}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  borderRadius: "9999px",
+                  background: "#000",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: "#fff",
+                  textAlign: "center",
+                  transition: "background 0.15s ease",
+                }}
                 type="button"
               >
                 Transaction Details
               </button>
             )}
             <button
-              className={isSuccess ? "shield-done-secondary-btn" : "shield-done-btn"}
+              className={
+                isSuccess ? "shield-done-secondary-btn" : "shield-done-btn"
+              }
               onClick={() => {
                 setPhase("form");
                 onDone();
@@ -518,53 +905,180 @@ export function ShieldContent({
 
     if (p === "details") {
       const now = new Date();
-      const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+      const dateStr = now.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      const timeStr = now.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
 
       return (
-        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <div
+          style={{ display: "flex", flexDirection: "column", height: "100%" }}
+        >
           <style jsx>{`
-            .shield-close:hover { background: rgba(0, 0, 0, 0.08) !important; }
-            .shield-done-btn:hover { background: #333 !important; }
+            .shield-close:hover {
+              background: rgba(0, 0, 0, 0.08) !important;
+            }
+            .shield-done-btn:hover {
+              background: #333 !important;
+            }
           `}</style>
 
-          <StatusHeader onClose={onClose} title={direction === "shield" ? "Shielded" : "Unshielded"} />
+          <StatusHeader
+            onClose={onClose}
+            title={direction === "shield" ? "Shielded" : "Unshielded"}
+          />
 
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "8px", overflowY: "auto" }}>
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              padding: "8px",
+              overflowY: "auto",
+            }}
+          >
             {/* Token icon with badge */}
             <div style={{ padding: "8px 12px 0" }}>
-              <div style={{ position: "relative", width: "48px", height: "56px" }}>
-                <div style={{ width: "48px", height: "48px", borderRadius: "9999px", overflow: "hidden" }}>
-                  <Image alt={token.symbol} height={48} src={token.icon} style={{ width: "100%", height: "100%", objectFit: "cover" }} width={48} />
+              <div
+                style={{ position: "relative", width: "48px", height: "56px" }}
+              >
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "9999px",
+                    overflow: "hidden",
+                  }}
+                >
+                  <Image
+                    alt={token.symbol}
+                    height={48}
+                    src={token.icon}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                    width={48}
+                  />
                 </div>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   alt={direction === "shield" ? "Shielded" : "Unshielded"}
-                  src={direction === "shield" ? "/hero-new/Shield.png" : "/hero-new/Unshield.svg"}
-                  style={{ width: "24px", height: "24px", position: "absolute", bottom: "0", left: "16px" }}
+                  src={
+                    direction === "shield"
+                      ? "/hero-new/Shield.png"
+                      : "/hero-new/Unshield.svg"
+                  }
+                  style={{
+                    width: "24px",
+                    height: "24px",
+                    position: "absolute",
+                    bottom: "0",
+                    left: "16px",
+                  }}
                 />
               </div>
             </div>
 
             {/* Amount hero */}
             <div style={{ padding: "12px 12px 24px" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "8px", fontFamily: font, fontWeight: 600, whiteSpace: "nowrap" }}>
-                <span style={{ fontSize: "40px", lineHeight: "48px", color: "#000" }}>{resultAmount}</span>
-                <span style={{ fontSize: "28px", lineHeight: "32px", color: "rgba(60, 60, 67, 0.4)", letterSpacing: "0.4px" }}>{token.symbol}</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: "8px",
+                  fontFamily: font,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "40px",
+                    lineHeight: "48px",
+                    color: "#000",
+                  }}
+                >
+                  {resultAmount}
+                </span>
+                <span
+                  style={{
+                    fontSize: "28px",
+                    lineHeight: "32px",
+                    color: "rgba(60, 60, 67, 0.4)",
+                    letterSpacing: "0.4px",
+                  }}
+                >
+                  {token.symbol}
+                </span>
               </div>
-              <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary, display: "block", marginTop: "4px" }}>
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: secondary,
+                  display: "block",
+                  marginTop: "4px",
+                }}
+              >
                 ≈{resultUsd}
               </span>
-              <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary, display: "block" }}>
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: secondary,
+                  display: "block",
+                }}
+              >
                 {dateStr}, {timeStr}
               </span>
             </div>
 
             {/* Status card */}
-            <div style={{ background: "rgba(0, 0, 0, 0.04)", borderRadius: "16px", padding: "4px 0" }}>
+            <div
+              style={{
+                background: "rgba(0, 0, 0, 0.04)",
+                borderRadius: "16px",
+                padding: "4px 0",
+              }}
+            >
               <div style={{ padding: "9px 12px" }}>
-                <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, display: "block" }}>Status</span>
-                <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#000", display: "block", marginTop: "2px" }}>Completed</span>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    lineHeight: "16px",
+                    color: secondary,
+                    display: "block",
+                  }}
+                >
+                  Status
+                </span>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: "#000",
+                    display: "block",
+                    marginTop: "2px",
+                  }}
+                >
+                  Completed
+                </span>
               </div>
             </div>
           </div>
@@ -577,7 +1091,21 @@ export function ShieldContent({
                 setPhase("form");
                 onDone();
               }}
-              style={{ width: "100%", padding: "12px 16px", borderRadius: "9999px", background: "#000", border: "none", cursor: "pointer", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#fff", textAlign: "center", transition: "background 0.15s ease" }}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: "9999px",
+                background: "#000",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: font,
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "#fff",
+                textAlign: "center",
+                transition: "background 0.15s ease",
+              }}
               type="button"
             >
               Done
@@ -591,32 +1119,145 @@ export function ShieldContent({
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <style jsx>{`
-          .shield-close:hover { background: rgba(0, 0, 0, 0.08) !important; }
-          .pct-btn:hover { opacity: 0.7; }
-          .swap-circle:hover { background: #333 !important; }
-          .confirm-btn:not(:disabled):hover { background: #333 !important; }
+          .shield-close:hover {
+            background: rgba(0, 0, 0, 0.08) !important;
+          }
+          .pct-btn:hover {
+            opacity: 0.7;
+          }
+          .swap-circle:hover {
+            background: #333 !important;
+          }
+          .confirm-btn:not(:disabled):hover {
+            background: #333 !important;
+          }
         `}</style>
 
         {/* Header with tabs — hidden when parent owns chrome */}
-        {!hideFormChrome && <SwapShieldTabs mode={swapMode} onClose={onClose} onModeChange={onSwapModeChange} />}
+        {!hideFormChrome && (
+          <SwapShieldTabs
+            mode={swapMode}
+            onClose={onClose}
+            onModeChange={onSwapModeChange}
+          />
+        )}
 
         {/* Body */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0", overflow: "auto", padding: "8px 8px 16px" }}>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: "0",
+            overflow: "auto",
+            padding: "8px 8px 16px",
+          }}
+        >
           {/* Input cards container */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", position: "relative", isolation: "isolate", overflow: "visible" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+              position: "relative",
+              isolation: "isolate",
+              overflow: "visible",
+            }}
+          >
             {/* From card */}
-            <div style={{ background: "#fff", borderRadius: "16px", padding: "10px 12px", position: "relative", zIndex: 2 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: font, fontWeight: 400, lineHeight: "20px", whiteSpace: "nowrap" }}>
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                padding: "10px 12px",
+                position: "relative",
+                zIndex: 2,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  fontFamily: font,
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 <span style={{ fontSize: "16px", color: secondary }}>
                   {direction === "shield" ? "You shield" : "You unshield"}
                 </span>
-                <div style={{ display: "flex", gap: "16px", alignItems: "center", fontSize: "14px", color: red }}>
-                  <button className="pct-btn" onClick={() => handlePercentage(25)} style={{ background: "none", border: "none", cursor: "pointer", color: red, fontFamily: font, fontSize: "14px", fontWeight: 400, padding: 0 }} type="button">25%</button>
-                  <button className="pct-btn" onClick={() => handlePercentage(50)} style={{ background: "none", border: "none", cursor: "pointer", color: red, fontFamily: font, fontSize: "14px", fontWeight: 400, padding: 0 }} type="button">50%</button>
-                  <button className="pct-btn" onClick={() => handlePercentage(100)} style={{ background: "none", border: "none", cursor: "pointer", color: red, fontFamily: font, fontSize: "14px", fontWeight: 400, padding: 0 }} type="button">Max</button>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "16px",
+                    alignItems: "center",
+                    fontSize: "14px",
+                    color: red,
+                  }}
+                >
+                  <button
+                    className="pct-btn"
+                    onClick={() => handlePercentage(25)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: red,
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      padding: 0,
+                    }}
+                    type="button"
+                  >
+                    25%
+                  </button>
+                  <button
+                    className="pct-btn"
+                    onClick={() => handlePercentage(50)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: red,
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      padding: 0,
+                    }}
+                    type="button"
+                  >
+                    50%
+                  </button>
+                  <button
+                    className="pct-btn"
+                    onClick={() => handlePercentage(100)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: red,
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      padding: 0,
+                    }}
+                    type="button"
+                  >
+                    Max
+                  </button>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: "4px", height: "48px", alignItems: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "4px",
+                  height: "48px",
+                  alignItems: "center",
+                }}
+              >
                 <input
                   inputMode="decimal"
                   onChange={(e) => {
@@ -624,26 +1265,81 @@ export function ShieldContent({
                     if (v === "" || /^\d*\.?\d*$/.test(v)) setAmount(v);
                   }}
                   placeholder="0"
-                  style={{ flex: 1, fontFamily: font, fontSize: "32px", fontWeight: 600, lineHeight: "36px", color: amountColor, background: "none", border: "none", outline: "none", padding: 0, minWidth: 0 }}
+                  style={{
+                    flex: 1,
+                    fontFamily: font,
+                    fontSize: "32px",
+                    fontWeight: 600,
+                    lineHeight: "36px",
+                    color: amountColor,
+                    background: "none",
+                    border: "none",
+                    outline: "none",
+                    padding: 0,
+                    minWidth: 0,
+                  }}
                   type="text"
                   value={amount}
                 />
                 {direction === "shield" ? (
-                  <SelectableTokenPill onClick={() => onNavigate({ type: "shieldTokenSelect" })} token={token} />
+                  <SelectableTokenPill
+                    onClick={() => onNavigate({ type: "shieldTokenSelect" })}
+                    token={token}
+                  />
                 ) : (
-                  <ShieldedSelectableTokenPill onClick={() => onNavigate({ type: "shieldTokenSelect" })} token={token} />
+                  <ShieldedSelectableTokenPill
+                    onClick={() => onNavigate({ type: "shieldTokenSelect" })}
+                    token={token}
+                  />
                 )}
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                  <div style={{ width: "20px", height: "20px", borderRadius: "9999px", background: "#F5F5F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <ArrowDownUp size={12} style={{ color: secondary, opacity: 0.4 }} />
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div
+                  style={{ display: "flex", gap: "6px", alignItems: "center" }}
+                >
+                  <div
+                    style={{
+                      width: "20px",
+                      height: "20px",
+                      borderRadius: "9999px",
+                      background: "#F5F5F5",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <ArrowDownUp
+                      size={12}
+                      style={{ color: secondary, opacity: 0.4 }}
+                    />
                   </div>
-                  <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: secondary }}>
+                  <span
+                    style={{
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      lineHeight: "20px",
+                      color: secondary,
+                    }}
+                  >
                     {exchangeRate}
                   </span>
                 </div>
-                <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: secondary }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
                   Balance: {sourceBalance.toLocaleString()}{" "}
                 </span>
               </div>
@@ -676,34 +1372,137 @@ export function ShieldContent({
             </div>
 
             {/* To card */}
-            <div style={{ border: "1px solid rgba(0, 0, 0, 0.08)", borderRadius: "16px", padding: "12px", zIndex: 1 }}>
+            <div
+              style={{
+                border: "1px solid rgba(0, 0, 0, 0.08)",
+                borderRadius: "16px",
+                padding: "12px",
+                zIndex: 1,
+              }}
+            >
               <div style={{ display: "flex", alignItems: "center" }}>
-                <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary }}>You receive</span>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
+                  You receive
+                </span>
               </div>
-              <div style={{ display: "flex", gap: "4px", height: "48px", alignItems: "center" }}>
-                <span style={{ flex: 1, fontFamily: font, fontSize: "32px", fontWeight: 600, lineHeight: "36px", color: insufficientFunds && hasAmount ? red : hasAmount ? "#000" : "rgba(60, 60, 67, 0.4)", minWidth: 0 }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "4px",
+                  height: "48px",
+                  alignItems: "center",
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    fontFamily: font,
+                    fontSize: "32px",
+                    fontWeight: 600,
+                    lineHeight: "36px",
+                    color:
+                      insufficientFunds && hasAmount
+                        ? red
+                        : hasAmount
+                        ? "#000"
+                        : "rgba(60, 60, 67, 0.4)",
+                    minWidth: 0,
+                  }}
+                >
                   {hasAmount ? amount : "0"}
                 </span>
                 {direction === "shield" ? (
                   <ShieldedTokenPill token={token} />
                 ) : (
-                  <div style={{ display: "flex", alignItems: "center", padding: "0 4px", flexShrink: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", paddingRight: "6px", padding: "4px 6px 4px 4px" }}>
-                      <div style={{ width: "28px", height: "28px", borderRadius: "9999px", overflow: "hidden" }}>
-                        <Image alt={token.symbol} height={28} src={token.icon} style={{ width: "100%", height: "100%", objectFit: "cover" }} width={28} />
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "0 4px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        paddingRight: "6px",
+                        padding: "4px 6px 4px 4px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "9999px",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <Image
+                          alt={token.symbol}
+                          height={28}
+                          src={token.icon}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                          width={28}
+                        />
                       </div>
                     </div>
-                    <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 500, lineHeight: "20px", color: "#000", letterSpacing: "-0.176px", whiteSpace: "nowrap", padding: "8px 0" }}>
+                    <span
+                      style={{
+                        fontFamily: font,
+                        fontSize: "16px",
+                        fontWeight: 500,
+                        lineHeight: "20px",
+                        color: "#000",
+                        letterSpacing: "-0.176px",
+                        whiteSpace: "nowrap",
+                        padding: "8px 0",
+                      }}
+                    >
                       {token.symbol}
                     </span>
                   </div>
                 )}
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: secondary }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
                   ${hasAmount ? usdValue : "0"}
                 </span>
-                <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: secondary }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
                   Balance: {destBalance.toLocaleString()}{" "}
                 </span>
               </div>
@@ -715,17 +1514,64 @@ export function ShieldContent({
 
           {/* Info card about shielded assets */}
           <div style={{ padding: "0 12px" }}>
-            <div style={{ background: "rgba(0, 0, 0, 0.04)", borderRadius: "16px", display: "flex", alignItems: "center", padding: "0 12px", overflow: "hidden" }}>
-              <div style={{ display: "flex", alignItems: "center", paddingRight: "12px", padding: "4px 12px 4px 0", flexShrink: 0 }}>
+            <div
+              style={{
+                background: "rgba(0, 0, 0, 0.04)",
+                borderRadius: "16px",
+                display: "flex",
+                alignItems: "center",
+                padding: "0 12px",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  paddingRight: "12px",
+                  padding: "4px 12px 4px 0",
+                  flexShrink: 0,
+                }}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img alt="" src="/hero-new/Shield.png" style={{ width: "40px", height: "40px" }} />
+                <img
+                  alt=""
+                  src="/hero-new/Shield.png"
+                  style={{ width: "40px", height: "40px" }}
+                />
               </div>
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px", padding: "10px 0" }}>
-                <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#000" }}>
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "2px",
+                  padding: "10px 0",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: "#000",
+                  }}
+                >
                   What are Shielded Assets?
                 </span>
-                <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary }}>
-                  When you shield assets, they move to your private balance. This enables private transactions without revealing your address or sensitive data on-chain.
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    lineHeight: "16px",
+                    color: secondary,
+                  }}
+                >
+                  When you shield assets, they move to your private balance.
+                  This enables private transactions without revealing your
+                  address or sensitive data on-chain.
                 </span>
               </div>
             </div>

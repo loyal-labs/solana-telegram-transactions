@@ -24,6 +24,7 @@ export function TransactionDetailView({
   const isSent = detail.activity.type === "sent";
   const isShielded = detail.activity.type === "shielded";
   const isUnshielded = detail.activity.type === "unshielded";
+  const isPrivate = detail.isPrivate || detail.activity.isPrivate;
   const isShieldType = isShielded || isUnshielded;
   const title = isShielded ? "Shielded" : isUnshielded ? "Unshielded" : isSent ? "Sent" : "Received";
   // Strip the +/− prefix for the large display
@@ -247,47 +248,49 @@ export function TransactionDetailView({
           }}
         >
           {/* View in explorer */}
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <button
-              className="tx-action-btn"
-              onClick={() => window.open(`https://explorer.solana.com/tx/${detail.activity.id}`, "_blank")}
+          {!isPrivate && (
+            <div
               style={{
-                width: "48px",
-                height: "48px",
-                borderRadius: "9999px",
-                background: "rgba(249, 54, 60, 0.14)",
-                border: "none",
+                flex: 1,
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                transition: "background-color 0.15s ease",
-              }}
-              type="button"
-            >
-              <Globe size={24} style={{ color: "#3C3C43" }} />
-            </button>
-            <span
-              style={{
-                fontFamily: "var(--font-geist-sans), sans-serif",
-                fontSize: "13px",
-                fontWeight: 400,
-                lineHeight: "16px",
-                color: "rgba(60, 60, 67, 0.6)",
-                textAlign: "center",
+                gap: "8px",
               }}
             >
-              View in explorer
-            </span>
-          </div>
+              <button
+                className="tx-action-btn"
+                onClick={() => window.open(`https://explorer.solana.com/tx/${detail.activity.id}`, "_blank")}
+                style={{
+                  width: "48px",
+                  height: "48px",
+                  borderRadius: "9999px",
+                  background: "rgba(249, 54, 60, 0.14)",
+                  border: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "background-color 0.15s ease",
+                }}
+                type="button"
+              >
+                <Globe size={24} style={{ color: "#3C3C43" }} />
+              </button>
+              <span
+                style={{
+                  fontFamily: "var(--font-geist-sans), sans-serif",
+                  fontSize: "13px",
+                  fontWeight: 400,
+                  lineHeight: "16px",
+                  color: "rgba(60, 60, 67, 0.6)",
+                  textAlign: "center",
+                }}
+              >
+                View in explorer
+              </span>
+            </div>
+          )}
 
           {/* Share */}
           <div
@@ -302,9 +305,11 @@ export function TransactionDetailView({
             <button
               className="tx-action-btn"
               onClick={() => {
-                const text = isShieldType
-                  ? `${title} ${rawAmount} ${amountToken} (${detail.usdValue})\nhttps://explorer.solana.com/tx/${detail.activity.id}`
-                  : `${title} ${rawAmount} ${amountToken} (${detail.usdValue}) ${isSent ? "to" : "from"} ${truncateAddress(detail.activity.counterparty)}\nhttps://explorer.solana.com/tx/${detail.activity.id}`;
+                const text = isPrivate
+                  ? `Sent ${rawAmount} ${amountToken} (${detail.usdValue}) to ${truncateAddress(detail.activity.counterparty)}`
+                  : isShieldType
+                    ? `${title} ${rawAmount} ${amountToken} (${detail.usdValue})\nhttps://explorer.solana.com/tx/${detail.activity.id}`
+                    : `${title} ${rawAmount} ${amountToken} (${detail.usdValue}) ${isSent ? "to" : "from"} ${truncateAddress(detail.activity.counterparty)}\nhttps://explorer.solana.com/tx/${detail.activity.id}`;
                 void navigator.clipboard.writeText(text).then(() => {
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);

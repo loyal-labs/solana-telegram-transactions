@@ -20,6 +20,7 @@ export interface ActivityRow {
   timestamp: string;
   date: string;
   icon: string;
+  isPrivate?: boolean;
 }
 
 export interface TransactionDetail {
@@ -28,6 +29,7 @@ export interface TransactionDetail {
   status: string;
   networkFee: string;
   networkFeeUsd: string;
+  isPrivate?: boolean;
 }
 
 export interface SwapToken {
