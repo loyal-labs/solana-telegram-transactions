@@ -5,7 +5,6 @@ import { useState } from "react";
 
 import { SearchInput, SubViewHeader } from "./shared";
 import type { SwapToken } from "./types";
-import { swapTokens } from "./types";
 
 function SelectableTokenRow({
   token,
@@ -66,19 +65,17 @@ export function TokenSelectView({
   onSelect,
   onBack,
   onClose,
-  showAllTokens,
+  tokens,
 }: {
   title: string;
   currentToken: SwapToken;
   onSelect: (token: SwapToken) => void;
   onBack: () => void;
   onClose: () => void;
-  showAllTokens?: boolean;
+  tokens: SwapToken[];
 }) {
   const [search, setSearch] = useState("");
-  const availableSymbols = ["USDC", "SOL", "BNB"];
-  const filtered = swapTokens
-    .filter((t) => showAllTokens || availableSymbols.includes(t.symbol))
+  const filtered = tokens
     .filter((t) => t.symbol.toLowerCase().includes(search.toLowerCase()));
 
   return (

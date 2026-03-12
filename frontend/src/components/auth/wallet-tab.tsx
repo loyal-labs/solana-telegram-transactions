@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { useWalletProofAuth } from "./use-wallet-proof-auth";
 
 export function WalletTab({ onFlowStart }: { onFlowStart?: () => void }) {
@@ -14,6 +16,21 @@ export function WalletTab({ onFlowStart }: { onFlowStart?: () => void }) {
   } = useWalletProofAuth({
     onFlowStart,
   });
+
+  // Delay showing errors so transient failures during connection don't flash
+  const isErrorState =
+    state.status === "rejected" ||
+    state.status === "unsupported" ||
+    state.status === "error";
+  const [showError, setShowError] = useState(false);
+  useEffect(() => {
+    if (!isErrorState) {
+      setShowError(false);
+      return;
+    }
+    const t = setTimeout(() => setShowError(true), 600);
+    return () => clearTimeout(t);
+  }, [isErrorState]);
 
   if (
     state.status === "connecting" ||
@@ -34,11 +51,7 @@ export function WalletTab({ onFlowStart }: { onFlowStart?: () => void }) {
     );
   }
 
-  if (
-    state.status === "rejected" ||
-    state.status === "unsupported" ||
-    state.status === "error"
-  ) {
+  if (isErrorState && showError) {
     return (
       <div className="flex flex-col gap-4 py-4">
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700 text-sm">

@@ -40,21 +40,32 @@ export function TokenRowItem({
           flexShrink: 0,
         }}
       >
-        <div
-          style={{
-            width: "48px",
-            height: "48px",
-            borderRadius: "10px",
-            overflow: "hidden",
-          }}
-        >
-          <Image
-            alt={token.symbol}
-            height={48}
-            src={token.icon}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            width={48}
-          />
+        <div style={{ position: "relative", width: "48px", height: "48px" }}>
+          <div
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "9999px",
+              overflow: "hidden",
+            }}
+          >
+            <Image
+              alt={token.symbol}
+              height={48}
+              src={token.icon}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              width={48}
+            />
+          </div>
+          {token.isSecured && (
+            <Image
+              alt="Secured"
+              height={24}
+              src="/hero-new/Shield.png"
+              style={{ position: "absolute", bottom: -2, right: -2 }}
+              width={24}
+            />
+          )}
         </div>
       </div>
       <div

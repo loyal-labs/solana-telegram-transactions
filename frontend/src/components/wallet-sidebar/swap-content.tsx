@@ -4,7 +4,10 @@ import { ArrowDownUp, ChevronRight, Globe, Share, X } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { SubView, SwapToken } from "./types";
+import { useSwap } from "@/hooks/use-swap";
+
+import { SwapShieldTabs } from "./shield-content";
+import type { FormButtonProps, SubView, SwapMode, SwapToken } from "./types";
 
 const font = "var(--font-geist-sans), sans-serif";
 const secondary = "rgba(60, 60, 67, 0.6)";
@@ -138,6 +141,7 @@ function SwapResult({
   fromToken,
   toToken,
   receivedAmount,
+  errorMessage,
   onClose,
   onDone,
   onDetails,
@@ -146,6 +150,7 @@ function SwapResult({
   fromToken: SwapToken;
   toToken: SwapToken;
   receivedAmount: string;
+  errorMessage?: string;
   onClose: () => void;
   onDone: () => void;
   onDetails: () => void;
@@ -186,7 +191,7 @@ function SwapResult({
               </span>
             ) : (
               <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary, maxWidth: "255px" }}>
-                Something went wrong. Please try again.
+                {errorMessage || "Something went wrong. Please try again."}
               </span>
             )}
           </div>
@@ -236,6 +241,7 @@ function SwapTransactionDetail({
   toToken,
   receivedAmount,
   usdValue,
+  signature,
   onClose,
   onDone,
 }: {
@@ -243,6 +249,7 @@ function SwapTransactionDetail({
   toToken: SwapToken;
   receivedAmount: string;
   usdValue: string;
+  signature?: string;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -295,7 +302,8 @@ function SwapTransactionDetail({
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
             <button
               className="swap-tx-action-btn"
-              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "background-color 0.15s ease" }}
+              onClick={() => signature && window.open(`https://explorer.solana.com/tx/${signature}`, "_blank")}
+              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: signature ? "pointer" : "default", opacity: signature ? 1 : 0.5, transition: "background-color 0.15s ease" }}
               type="button"
             >
               <Globe size={24} style={{ color: "#3C3C43" }} />
@@ -305,7 +313,8 @@ function SwapTransactionDetail({
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
             <button
               className="swap-tx-action-btn"
-              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "background-color 0.15s ease" }}
+              onClick={() => signature && void navigator.clipboard.writeText(`https://explorer.solana.com/tx/${signature}`)}
+              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: signature ? "pointer" : "default", opacity: signature ? 1 : 0.5, transition: "background-color 0.15s ease" }}
               type="button"
             >
               <Share size={24} style={{ color: "#3C3C43" }} />
@@ -338,6 +347,11 @@ export function SwapContent({
   toToken: toTokenProp,
   onFromTokenChange,
   onToTokenChange,
+  swapMode,
+  onSwapModeChange,
+  hideFormChrome,
+  onFormActiveChange,
+  onFormButtonChange,
 }: {
   onClose: () => void;
   onDone: () => void;
@@ -346,27 +360,80 @@ export function SwapContent({
   toToken: SwapToken;
   onFromTokenChange: (t: SwapToken) => void;
   onToTokenChange: (t: SwapToken) => void;
+  swapMode: SwapMode;
+  onSwapModeChange: (mode: SwapMode) => void;
+  hideFormChrome?: boolean;
+  onFormActiveChange?: (isForm: boolean) => void;
+  onFormButtonChange?: (props: FormButtonProps | null) => void;
 }) {
+  const { getQuote, executeSwap, resetQuote, quote, isAvailable, unavailableReason, error: swapError } = useSwap();
   const [fromAmount, setFromAmount] = useState("");
   const [phase, setPhase] = useState<SwapPhase>("form");
   const [resultAmount, setResultAmount] = useState("");
   const [resultUsd, setResultUsd] = useState("");
+  const [resultSignature, setResultSignature] = useState<string | undefined>();
+  const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const [isQuoting, setIsQuoting] = useState(false);
+  const quoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    onFormActiveChange?.(phase === "form");
+  }, [phase, onFormActiveChange]);
 
   const fromToken = fromTokenProp;
   const toToken = toTokenProp;
 
   const numericFrom = Number.parseFloat(fromAmount) || 0;
+
+  // Use quote output amount when available, fall back to price ratio estimate
   const toAmount = useMemo(() => {
     if (numericFrom <= 0) return 0;
+    if (quote?.outputAmount) return Number.parseFloat(quote.outputAmount);
+    if (toToken.price <= 0) return 0;
     return (numericFrom * fromToken.price) / toToken.price;
-  }, [numericFrom, fromToken.price, toToken.price]);
+  }, [numericFrom, fromToken.price, toToken.price, quote]);
 
-  const toUsd = useMemo(() => (toAmount * toToken.price).toFixed(2), [toAmount, toToken.price]);
+  const toUsd = useMemo(() => {
+    const val = toAmount * toToken.price;
+    return Number.isFinite(val) ? val.toFixed(2) : "0.00";
+  }, [toAmount, toToken.price]);
   const hasAmount = numericFrom > 0;
   const insufficientFunds = numericFrom > fromToken.balance;
 
-  const buttonLabel = !hasAmount ? "Enter Amount" : insufficientFunds ? "Insufficient Funds" : "Confirm and Swap";
-  const buttonDisabled = !hasAmount || insufficientFunds;
+  // Debounced quote fetching
+  useEffect(() => {
+    if (quoteTimerRef.current) clearTimeout(quoteTimerRef.current);
+    if (!hasAmount || insufficientFunds || phase !== "form") {
+      resetQuote();
+      setIsQuoting(false);
+      return;
+    }
+    setIsQuoting(true);
+    quoteTimerRef.current = setTimeout(() => {
+      void getQuote(
+        fromToken.symbol,
+        toToken.symbol,
+        String(numericFrom),
+        fromToken.mint,
+      ).finally(() => setIsQuoting(false));
+    }, 500);
+    return () => {
+      if (quoteTimerRef.current) clearTimeout(quoteTimerRef.current);
+    };
+  }, [fromAmount, fromToken.symbol, fromToken.mint, toToken.symbol, hasAmount, insufficientFunds, phase, getQuote, resetQuote, numericFrom]);
+
+  const buttonLabel = !isAvailable
+    ? (unavailableReason ?? "Swap unavailable")
+    : !hasAmount
+      ? "Enter Amount"
+      : insufficientFunds
+        ? "Insufficient Funds"
+        : isQuoting
+          ? "Getting quote..."
+          : !quote
+            ? "Enter Amount"
+            : "Confirm and Swap";
+  const buttonDisabled = !isAvailable || !hasAmount || insufficientFunds || isQuoting || !quote;
   const amountColor = insufficientFunds && hasAmount ? red : "#000";
 
   const handleSwapTokens = useCallback(() => {
@@ -374,28 +441,45 @@ export function SwapContent({
     const prevTo = toToken;
     onFromTokenChange(prevTo);
     onToTokenChange(prevFrom);
-    if (numericFrom > 0) {
+    if (numericFrom > 0 && prevTo.price > 0) {
       const usdValue = numericFrom * prevFrom.price;
       const converted = usdValue / prevTo.price;
       setFromAmount(String(Number(converted.toFixed(6))));
+    } else if (numericFrom > 0) {
+      setFromAmount("");
     }
   }, [fromToken, toToken, onFromTokenChange, onToTokenChange, numericFrom]);
 
-  const handleConfirm = useCallback(() => {
+  const handleConfirm = useCallback(async () => {
+    if (!quote) return;
     setResultAmount(hasAmount ? Number(toAmount.toFixed(6)).toString() : "0");
     setResultUsd(`$${hasAmount ? (toAmount * toToken.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0"}`);
+    setResultSignature(undefined);
+    setErrorMessage(undefined);
     setPhase("processing");
-  }, [hasAmount, toAmount, toToken.price]);
 
-  // Processing → success after 2s (mock)
-  useEffect(() => {
-    if (phase !== "processing") return;
-    const t = setTimeout(() => {
+    const result = await executeSwap();
+
+    if (result.success) {
+      setResultSignature(result.signature);
       setPhase("success");
       setFromAmount("");
-    }, 2000);
-    return () => clearTimeout(t);
-  }, [phase]);
+      resetQuote();
+    } else {
+      setErrorMessage(result.error);
+      setPhase("error");
+    }
+  }, [hasAmount, toAmount, toToken.price, quote, executeSwap, resetQuote]);
+
+  // Report form button props to parent when chrome is managed externally
+  useEffect(() => {
+    if (!hideFormChrome || !onFormButtonChange) return;
+    if (phase !== "form") {
+      onFormButtonChange(null);
+      return;
+    }
+    onFormButtonChange({ label: buttonLabel, disabled: buttonDisabled, onClick: handleConfirm });
+  });
 
   // Cross-fade between phases
   const [phaseOpacity, setPhaseOpacity] = useState(1);
@@ -426,10 +510,10 @@ export function SwapContent({
       return <SwapProcessing fromToken={fromToken} onClose={onClose} toToken={toToken} />;
     }
     if (p === "success" || p === "error") {
-      return <SwapResult fromToken={fromToken} onClose={onClose} onDetails={() => setPhase("details")} onDone={onDone} receivedAmount={resultAmount} toToken={toToken} variant={p} />;
+      return <SwapResult errorMessage={errorMessage} fromToken={fromToken} onClose={onClose} onDetails={() => setPhase("details")} onDone={onDone} receivedAmount={resultAmount} toToken={toToken} variant={p} />;
     }
     if (p === "details") {
-      return <SwapTransactionDetail fromToken={fromToken} onClose={onClose} onDone={onDone} receivedAmount={resultAmount} toToken={toToken} usdValue={resultUsd} />;
+      return <SwapTransactionDetail fromToken={fromToken} onClose={onClose} onDone={onDone} receivedAmount={resultAmount} signature={resultSignature} toToken={toToken} usdValue={resultUsd} />;
     }
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -440,20 +524,8 @@ export function SwapContent({
           .confirm-btn:not(:disabled):hover { background: #333 !important; }
         `}</style>
 
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px" }}>
-          <div style={{ flex: 1, paddingLeft: "12px", paddingTop: "4px", paddingBottom: "4px" }}>
-            <span style={{ fontFamily: font, fontSize: "18px", fontWeight: 600, lineHeight: "28px", color: "#000" }}>Swap</span>
-          </div>
-          <button
-            className="swap-close"
-            onClick={onClose}
-            style={{ width: "36px", height: "36px", display: "flex", justifyContent: "center", alignItems: "center", background: "rgba(0, 0, 0, 0.04)", border: "none", borderRadius: "9999px", cursor: "pointer", transition: "all 0.2s ease", color: "#3C3C43" }}
-            type="button"
-          >
-            <X size={24} />
-          </button>
-        </div>
+        {/* Header with tabs — hidden when parent owns chrome */}
+        {!hideFormChrome && <SwapShieldTabs mode={swapMode} onClose={onClose} onModeChange={onSwapModeChange} />}
 
         {/* Body */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px", overflow: "auto", padding: "8px 8px 16px" }}>
@@ -553,7 +625,7 @@ export function SwapContent({
                 <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, display: "block" }}>Rate</span>
                 <div style={{ display: "flex", gap: "4px", alignItems: "center", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", marginTop: "2px" }}>
                   <span style={{ color: "#000" }}>1 {toToken.symbol}</span>
-                  <span style={{ color: secondary }}>≈ {(toToken.price / fromToken.price).toFixed(2)}</span>
+                  <span style={{ color: secondary }}>≈ {fromToken.price > 0 ? (toToken.price / fromToken.price).toFixed(2) : "—"}</span>
                 </div>
               </div>
               <div style={{ padding: "10px 12px" }}>
@@ -571,32 +643,34 @@ export function SwapContent({
           )}
         </div>
 
-        {/* Bottom button */}
-        <div style={{ padding: "16px 20px" }}>
-          <button
-            className="confirm-btn"
-            disabled={buttonDisabled}
-            onClick={handleConfirm}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              borderRadius: "9999px",
-              background: buttonDisabled ? "#CCCDCD" : "#000",
-              border: "none",
-              cursor: buttonDisabled ? "default" : "pointer",
-              fontFamily: font,
-              fontSize: "16px",
-              fontWeight: 400,
-              lineHeight: "20px",
-              color: "#fff",
-              textAlign: "center",
-              transition: "background 0.15s ease",
-            }}
-            type="button"
-          >
-            {buttonLabel}
-          </button>
-        </div>
+        {/* Bottom button — hidden when parent owns chrome */}
+        {!hideFormChrome && (
+          <div style={{ padding: "16px 20px" }}>
+            <button
+              className="confirm-btn"
+              disabled={buttonDisabled}
+              onClick={handleConfirm}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: "9999px",
+                background: buttonDisabled ? "#CCCDCD" : "#000",
+                border: "none",
+                cursor: buttonDisabled ? "default" : "pointer",
+                fontFamily: font,
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "#fff",
+                textAlign: "center",
+                transition: "background 0.15s ease",
+              }}
+              type="button"
+            >
+              {buttonLabel}
+            </button>
+          </div>
+        )}
       </div>
     );
   };

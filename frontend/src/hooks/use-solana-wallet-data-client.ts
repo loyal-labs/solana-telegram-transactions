@@ -1,6 +1,6 @@
 "use client";
 
-import { LoyalPrivateTransactionsClient } from "@loyal-labs/private-transactions";
+import { findDepositPda } from "@loyal-labs/private-transactions";
 import {
   createSolanaWalletDataClient,
   NATIVE_SOL_MINT,
@@ -8,12 +8,25 @@ import {
   type SecureBalanceMap,
   type SolanaWalletDataClient,
 } from "@loyal-labs/solana-wallet";
-import { getPerEndpoints, getSolanaEndpoints } from "@loyal-labs/solana-rpc";
-import { PublicKey } from "@solana/web3.js";
+import { getSolanaEndpoints } from "@loyal-labs/solana-rpc";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useMemo } from "react";
 
 import { usePublicEnv } from "@/contexts/public-env-context";
+
+/** Deposit account layout: 8-byte discriminator + 32 user + 32 tokenMint + 8 amount (u64 LE) */
+const DEPOSIT_AMOUNT_OFFSET = 8 + 32 + 32; // 72
+
+function readDepositAmount(data: Buffer): bigint {
+  if (data.length < DEPOSIT_AMOUNT_OFFSET + 8) return BigInt(0);
+  // Read u64 little-endian
+  let value = BigInt(0);
+  for (let i = 0; i < 8; i++) {
+    value += BigInt(data[DEPOSIT_AMOUNT_OFFSET + i]) << BigInt(i * 8);
+  }
+  return value;
+}
 
 export function useSolanaWalletDataClient(): SolanaWalletDataClient {
   const publicEnv = usePublicEnv();
@@ -21,58 +34,12 @@ export function useSolanaWalletDataClient(): SolanaWalletDataClient {
   const walletPublicKey = wallet.publicKey ?? null;
 
   return useMemo(() => {
-    let privateClientPromise: Promise<LoyalPrivateTransactionsClient | null> | null =
-      null;
-
-    const getPrivateClient = async (): Promise<LoyalPrivateTransactionsClient | null> => {
-      if (privateClientPromise) {
-        return privateClientPromise;
-      }
-
-      if (
-        !walletPublicKey ||
-        typeof wallet.signTransaction !== "function" ||
-        typeof wallet.signAllTransactions !== "function" ||
-        typeof wallet.signMessage !== "function"
-      ) {
-        return null;
-      }
-
-      const { rpcEndpoint, websocketEndpoint } = getSolanaEndpoints(
-        publicEnv.solanaEnv
-      );
-      const { perRpcEndpoint, perWsEndpoint } = getPerEndpoints(
-        publicEnv.solanaEnv
-      );
-      const signer = {
-        publicKey: walletPublicKey,
-        signTransaction: wallet.signTransaction,
-        signAllTransactions: wallet.signAllTransactions,
-        signMessage: wallet.signMessage,
-      };
-
-      privateClientPromise = LoyalPrivateTransactionsClient.fromConfig({
-        signer,
-        baseRpcEndpoint: rpcEndpoint,
-        baseWsEndpoint: websocketEndpoint,
-        ephemeralRpcEndpoint: perRpcEndpoint,
-        ephemeralWsEndpoint: perWsEndpoint,
-      }).catch((error) => {
-        console.warn("Failed to create secure wallet client", error);
-        return null;
-      });
-
-      return privateClientPromise;
-    };
+    const { rpcEndpoint } = getSolanaEndpoints(publicEnv.solanaEnv);
+    const baseConnection = new Connection(rpcEndpoint, "confirmed");
 
     return createSolanaWalletDataClient({
       env: publicEnv.solanaEnv,
       secureBalanceProvider: async ({ owner, tokenMints, assetBalances }) => {
-        const privateClient = await getPrivateClient();
-        if (!privateClient) {
-          return new Map<string, bigint>();
-        }
-
         const nativeMint = new PublicKey(NATIVE_SOL_MINT);
         const uniqueMints = new Map<string, PublicKey>();
         uniqueMints.set(nativeMint.toBase58(), nativeMint);
@@ -80,19 +47,18 @@ export function useSolanaWalletDataClient(): SolanaWalletDataClient {
           uniqueMints.set(mint.toBase58(), mint);
         }
 
-        const rawDeposits = new Map<string, bigint>();
-        const results = await Promise.allSettled(
-          Array.from(uniqueMints.values()).map(async (mint) => {
-            const deposit = await privateClient.getEphemeralDeposit(owner, mint);
-            if (deposit && deposit.amount > BigInt(0)) {
-              rawDeposits.set(mint.toBase58(), deposit.amount);
-            }
-          })
-        );
+        // Compute all deposit PDAs and fetch account data in a single batch
+        const mintEntries = Array.from(uniqueMints.entries());
+        const pdas = mintEntries.map(([, mint]) => findDepositPda(owner, mint)[0]);
+        const accountInfos = await baseConnection.getMultipleAccountsInfo(pdas);
 
-        for (const result of results) {
-          if (result.status === "rejected") {
-            console.warn("Failed to fetch secure holding", result.reason);
+        const rawDeposits = new Map<string, bigint>();
+        for (let i = 0; i < mintEntries.length; i++) {
+          const info = accountInfos[i];
+          if (!info?.data) continue;
+          const amount = readDepositAmount(info.data as Buffer);
+          if (amount > BigInt(0)) {
+            rawDeposits.set(mintEntries[i][0], amount);
           }
         }
 
@@ -105,11 +71,5 @@ export function useSolanaWalletDataClient(): SolanaWalletDataClient {
         ) as SecureBalanceMap;
       },
     });
-  }, [
-    publicEnv.solanaEnv,
-    walletPublicKey,
-    wallet.signAllTransactions,
-    wallet.signMessage,
-    wallet.signTransaction,
-  ]);
+  }, [publicEnv.solanaEnv, walletPublicKey]);
 }

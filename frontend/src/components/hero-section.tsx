@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessages } from "@/components/chat-messages";
 import { HeroNav } from "@/components/hero-nav";
+import { useAuthSession } from "@/contexts/auth-session-context";
+import { useSignInModal } from "@/contexts/sign-in-modal-context";
 import { useWalletDesktopData } from "@/hooks/use-wallet-desktop-data";
 import {
   HeroRightSidebar,
@@ -30,11 +33,13 @@ export interface HeroSectionProps {
   isSignedIn: boolean;
   isConnected: boolean;
   truncatedAddress: string;
-  onOpenSignIn: () => void;
+  openSignInRef?: React.MutableRefObject<(() => void) | null>;
   isOnline: boolean;
 }
 
 export function HeroSection(props: HeroSectionProps) {
+  const { disconnect } = useWallet();
+  const { logout } = useAuthSession();
   const walletDesktopData = useWalletDesktopData();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
@@ -48,6 +53,68 @@ export function HeroSection(props: HeroSectionProps) {
   const [isScrolledToRoadmap, setIsScrolledToRoadmap] = useState(false);
   const [isScrolledToBlog, setIsScrolledToBlog] = useState(false);
   const [isScrolledToLinks, setIsScrolledToLinks] = useState(false);
+  const [dogCry, setDogCry] = useState(false);
+  const [dogNice, setDogNice] = useState(false);
+
+  const { registerHandler } = useSignInModal();
+
+  const openSignIn = useCallback(() => {
+    setRightSidebarTab(props.isSignedIn ? "portfolio" : "sign-in");
+    setIsRightSidebarOpen(true);
+  }, [props.isSignedIn]);
+
+  const closeSignIn = useCallback(() => {
+    setIsRightSidebarOpen(false);
+  }, []);
+
+  // Register sidebar as the sign-in handler so Header and other consumers route here
+  useEffect(() => {
+    registerHandler({ open: openSignIn, close: closeSignIn });
+    return () => registerHandler(null);
+  }, [registerHandler, openSignIn, closeSignIn]);
+
+  // Expose openSignIn to parent via ref
+  useEffect(() => {
+    if (props.openSignInRef) {
+      props.openSignInRef.current = openSignIn;
+    }
+  }, [openSignIn, props.openSignInRef]);
+
+  // Auto-switch from sign-in tab to portfolio when user signs in
+  const wasSignedInRef = useRef(props.isSignedIn);
+  const [pendingAutoClose, setPendingAutoClose] = useState(false);
+  useEffect(() => {
+    const justSignedIn = props.isSignedIn && !wasSignedInRef.current;
+    wasSignedInRef.current = props.isSignedIn;
+
+    if (justSignedIn && isRightSidebarOpen) {
+      setRightSidebarTab("portfolio");
+      setPendingAutoClose(true);
+    }
+  }, [props.isSignedIn, isRightSidebarOpen]);
+
+  // Close sidebar 2s after wallet data finishes loading post-sign-in
+  useEffect(() => {
+    if (pendingAutoClose && !walletDesktopData.isLoading) {
+      const t = setTimeout(() => {
+        setIsRightSidebarOpen(false);
+        setPendingAutoClose(false);
+      }, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [pendingAutoClose, walletDesktopData.isLoading]);
+
+  // Dog shows "nice" face whenever wallet finishes loading
+  const wasWalletLoadingRef = useRef(walletDesktopData.isLoading);
+  useEffect(() => {
+    const justFinished = wasWalletLoadingRef.current && !walletDesktopData.isLoading;
+    wasWalletLoadingRef.current = walletDesktopData.isLoading;
+
+    if (justFinished && walletDesktopData.isConnected) {
+      setDogNice(true);
+      setTimeout(() => setDogNice(false), 3000);
+    }
+  }, [walletDesktopData.isLoading, walletDesktopData.isConnected]);
 
   // Auto-focus input when entering chat mode with multiple fallback strategies
   useEffect(() => {
@@ -315,7 +382,7 @@ export function HeroSection(props: HeroSectionProps) {
         onSidebarOpenChange={setIsSidebarOpen}
         isConnected={props.isConnected}
         truncatedAddress={props.truncatedAddress}
-        onOpenSignIn={props.onOpenSignIn}
+        onOpenSignIn={openSignIn}
         messages={props.messages}
         onNewChat={() => {
           props.onChatModeChange(false);
@@ -385,14 +452,21 @@ export function HeroSection(props: HeroSectionProps) {
             isOnline={props.isOnline}
             isBalanceHidden={isBalanceHidden}
             onBalanceHiddenChange={setIsBalanceHidden}
+            isWalletConnected={walletDesktopData.isConnected}
+            isWalletLoading={walletDesktopData.isLoading}
+            walletAddress={walletDesktopData.walletAddress}
             walletLabel={walletDesktopData.walletLabel}
             balanceWhole={walletDesktopData.balanceWhole}
             balanceFraction={walletDesktopData.balanceFraction}
             balanceSolLabel={walletDesktopData.balanceSolLabel}
+            balanceHistory={walletDesktopData.balanceHistory.map((p) => p.valueUsd)}
             onOpenRightSidebar={(tab) => {
               setRightSidebarTab(tab);
               setIsRightSidebarOpen(true);
             }}
+            onOpenSignIn={openSignIn}
+            dogCry={dogCry}
+            dogNice={dogNice}
           />
 
           <HeroRightSidebar
@@ -404,6 +478,13 @@ export function HeroSection(props: HeroSectionProps) {
             onBalanceHiddenChange={setIsBalanceHidden}
             walletDesktopData={walletDesktopData}
             showQuickActions={props.isChatMode || isInputStuckToBottom}
+            onDisconnect={async () => {
+              setRightSidebarTab("sign-in");
+              setDogCry(true);
+              setTimeout(() => setDogCry(false), 3000);
+              await disconnect();
+              await logout();
+            }}
           />
         </div>
       </div>

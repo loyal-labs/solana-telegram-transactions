@@ -6,15 +6,21 @@ import {
   type WalletActivity,
 } from "@loyal-labs/solana-wallet";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   ActivityRow,
   TokenRow,
   TransactionDetail,
 } from "@/components/wallet-sidebar/types";
+import { getTokenIconUrl } from "@/lib/token-icon";
 
 import { useSolanaWalletDataClient } from "./use-solana-wallet-data-client";
+
+export type BalanceHistoryPoint = {
+  timestamp: number;
+  valueUsd: number;
+};
 
 export type WalletDesktopData = {
   walletAddress: string | null;
@@ -29,17 +35,14 @@ export type WalletDesktopData = {
   activityRows: ActivityRow[];
   allActivityRows: ActivityRow[];
   transactionDetails: Record<string, TransactionDetail>;
+  positions: PortfolioPosition[];
+  balanceHistory: BalanceHistoryPoint[];
 };
 
-const ICON_BY_SYMBOL: Record<string, string> = {
-  SOL: "/hero-new/solana.png",
-  USDC: "/hero-new/usdc.png",
-  BNB: "/hero-new/bnb.png",
-};
 const EMPTY_POSITIONS: PortfolioPosition[] = [];
 
 function resolveTokenIcon(position: PortfolioPosition): string {
-  return ICON_BY_SYMBOL[position.asset.symbol] ?? "/hero-new/Wallet-Cover.png";
+  return getTokenIconUrl(position.asset.symbol);
 }
 
 function formatUsd(value: number | null | undefined): string {
@@ -111,7 +114,7 @@ function getActivityDisplay(
       const fromPosition = resolvePositionByMint(positions, activity.fromToken.mint);
       return {
         symbol: fromPosition?.asset.symbol ?? "SOL",
-        icon: fromPosition ? resolveTokenIcon(fromPosition) : ICON_BY_SYMBOL.SOL,
+        icon: fromPosition ? resolveTokenIcon(fromPosition) : getTokenIconUrl("SOL"),
         amount: activity.fromToken.amount ?? formatSolAmount(activity.amountLamports),
         usdValue:
           typeof fromPosition?.priceUsd === "number"
@@ -162,7 +165,7 @@ function getActivityDisplay(
 
       return {
         symbol: "SOL",
-        icon: ICON_BY_SYMBOL.SOL,
+        icon: getTokenIconUrl("SOL"),
         amount: formatSolAmount(activity.amountLamports),
         usdValue:
           typeof solPriceUsd === "number"
@@ -175,7 +178,7 @@ function getActivityDisplay(
     default:
       return {
         symbol: "SOL",
-        icon: ICON_BY_SYMBOL.SOL,
+        icon: getTokenIconUrl("SOL"),
         amount: formatSolAmount(activity.amountLamports),
         usdValue:
           typeof solPriceUsd === "number"
@@ -188,6 +191,58 @@ function getActivityDisplay(
   }
 }
 
+function getActivityUsdDelta(
+  activity: WalletActivity,
+  positions: PortfolioPosition[],
+  solPriceUsd: number | null
+): number {
+  const sign = activity.direction === "in" ? 1 : -1;
+
+  switch (activity.type) {
+    case "swap": {
+      const fromPos = resolvePositionByMint(positions, activity.fromToken.mint);
+      const toPos = resolvePositionByMint(positions, activity.toToken.mint);
+      const fromUsd =
+        typeof fromPos?.priceUsd === "number"
+          ? parseFloat(activity.fromToken.amount) * fromPos.priceUsd
+          : 0;
+      const toUsd =
+        typeof toPos?.priceUsd === "number"
+          ? parseFloat(activity.toToken.amount) * toPos.priceUsd
+          : 0;
+      return toUsd - fromUsd;
+    }
+    case "token_transfer":
+    case "secure":
+    case "unshield": {
+      const pos = resolvePositionByMint(positions, activity.token.mint);
+      if (typeof pos?.priceUsd === "number") {
+        return sign * parseFloat(activity.token.amount) * pos.priceUsd;
+      }
+      return 0;
+    }
+    case "program_action": {
+      if (activity.token) {
+        const pos = resolvePositionByMint(positions, activity.token.mint);
+        if (typeof pos?.priceUsd === "number") {
+          return sign * parseFloat(activity.token.amount) * pos.priceUsd;
+        }
+        return 0;
+      }
+      if (typeof solPriceUsd === "number") {
+        return sign * (activity.amountLamports / 1_000_000_000) * solPriceUsd;
+      }
+      return 0;
+    }
+    case "sol_transfer":
+    default:
+      if (typeof solPriceUsd === "number") {
+        return sign * (activity.amountLamports / 1_000_000_000) * solPriceUsd;
+      }
+      return 0;
+  }
+}
+
 function mapActivityToRowAndDetail(
   activity: WalletActivity,
   positions: PortfolioPosition[],
@@ -196,16 +251,26 @@ function mapActivityToRowAndDetail(
   const display = getActivityDisplay(activity, positions, solPriceUsd);
   const isReceived = activity.direction === "in";
   const timestamp = formatTimestamp(activity.timestamp);
-  const amount = `${isReceived ? "+" : "-"}${display.amount} ${display.symbol}`;
+  const isShieldType = activity.type === "secure" || activity.type === "unshield";
+  const amount = isShieldType
+    ? `${display.amount} ${display.symbol}`
+    : `${isReceived ? "+" : "-"}${display.amount} ${display.symbol}`;
+
+  const rowType: ActivityRow["type"] =
+    activity.type === "secure" ? "shielded"
+    : activity.type === "unshield" ? "unshielded"
+    : isReceived ? "received" : "sent";
 
   const row: ActivityRow = {
     id: activity.signature,
-    type: isReceived ? "received" : "sent",
+    type: rowType,
     counterparty: display.counterparty,
     amount,
     timestamp: timestamp.time,
     date: timestamp.date,
-    icon: display.icon,
+    icon: activity.type === "secure" ? "/hero-new/Shield.png"
+      : activity.type === "unshield" ? "/hero-new/Unshield.svg"
+      : display.icon,
   };
 
   return {
@@ -232,6 +297,18 @@ function mapPositionToTokenRow(position: PortfolioPosition): TokenRow {
     amount: formatTokenBalance(position.totalBalance),
     value: formatUsd(position.totalValueUsd),
     icon: resolveTokenIcon(position),
+  };
+}
+
+function mapPositionToSecuredTokenRow(position: PortfolioPosition): TokenRow {
+  return {
+    id: `${position.asset.mint}-secured`,
+    symbol: position.asset.symbol,
+    price: formatUsd(position.priceUsd),
+    amount: formatTokenBalance(position.securedBalance),
+    value: formatUsd(position.securedValueUsd),
+    icon: resolveTokenIcon(position),
+    isSecured: true,
   };
 }
 
@@ -362,30 +439,111 @@ export function useWalletDesktopData(): WalletDesktopData {
     effectiveSolPriceUsd: null,
   };
 
-  const allTokenRows = useMemo(
-    () => positions.filter((position) => position.totalBalance > 0).map(mapPositionToTokenRow),
-    [positions]
-  );
+  const allTokenRows = useMemo(() => {
+    const rows: TokenRow[] = [];
+    for (const position of positions) {
+      if (position.totalBalance > 0) {
+        rows.push(mapPositionToTokenRow(position));
+      }
+      // Add secured row right after the public one
+      if (position.securedBalance > 0) {
+        rows.push(mapPositionToSecuredTokenRow(position));
+      }
+    }
+
+    // Ensure LOYL appears at 3rd position if not already present
+    const LOYL_MINT = "LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta";
+    if (!rows.some((r) => r.id === LOYL_MINT)) {
+      const loylPosition = positions.find((p) => p.asset.mint === LOYL_MINT);
+      const loylRow: TokenRow = loylPosition
+        ? mapPositionToTokenRow(loylPosition)
+        : {
+            id: LOYL_MINT,
+            symbol: "LOYAL",
+            price: "$0.00",
+            amount: "0",
+            value: "$0.00",
+            icon: "https://avatars.githubusercontent.com/u/210601628?s=200&v=4",
+          };
+      rows.splice(2, 0, loylRow);
+    }
+
+    return rows;
+  }, [positions]);
 
   const activityData = useMemo(() => {
     const details: Record<string, TransactionDetail> = {};
-    const rows = activities.map((activity) => {
-      const mapped = mapActivityToRowAndDetail(
-        activity,
-        positions,
-        totals.effectiveSolPriceUsd
-      );
-      details[mapped.row.id] = mapped.detail;
-      return mapped.row;
-    });
+    const SHIELD_PLUMBING_ACTIONS = new Set([
+      "initialize_deposit", "create_permission", "delegate", "undelegate",
+      "initialize_username_deposit", "create_username_permission",
+      "delegate_username_deposit", "undelegate_username_deposit",
+    ]);
+    const rows = activities
+      .filter((a) => !(a.type === "program_action" && SHIELD_PLUMBING_ACTIONS.has(a.action)))
+      .map((activity) => {
+        const mapped = mapActivityToRowAndDetail(
+          activity,
+          positions,
+          totals.effectiveSolPriceUsd
+        );
+        details[mapped.row.id] = mapped.detail;
+        return mapped.row;
+      });
 
     return { rows, details };
   }, [activities, positions, totals.effectiveSolPriceUsd]);
 
+  // Lock balance history to the initial fetch so WebSocket subscription
+  // updates don't cause jarring redraws of the sparkline.
+  const balanceHistoryRef = useRef<BalanceHistoryPoint[]>([]);
+  const balanceHistoryKeyRef = useRef<string | null>(null);
+
+  const balanceHistory = useMemo((): BalanceHistoryPoint[] => {
+    if (activities.length === 0 || totals.totalUsd <= 0) return [];
+
+    // Only recompute when the wallet changes, not on subscription updates
+    const key = walletAddress ?? "";
+    if (balanceHistoryKeyRef.current === key && balanceHistoryRef.current.length > 1) {
+      return balanceHistoryRef.current;
+    }
+
+    const now = Date.now();
+    const sorted = [...activities]
+      .filter((a) => a.timestamp !== null)
+      .sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
+
+    if (sorted.length === 0) return [{ timestamp: now, valueUsd: totals.totalUsd }];
+
+    const points: BalanceHistoryPoint[] = [{ timestamp: now, valueUsd: totals.totalUsd }];
+    let runningUsd = totals.totalUsd;
+
+    for (const activity of sorted) {
+      const delta = getActivityUsdDelta(
+        activity,
+        positions,
+        totals.effectiveSolPriceUsd
+      );
+      runningUsd -= delta;
+      points.push({
+        timestamp: activity.timestamp as number,
+        valueUsd: Math.max(0, runningUsd),
+      });
+    }
+
+    const result = points.reverse();
+    balanceHistoryRef.current = result;
+    balanceHistoryKeyRef.current = key;
+    return result;
+  }, [activities, positions, totals.totalUsd, totals.effectiveSolPriceUsd, walletAddress]);
+
   const formattedBalance = formatUsd(totals.totalUsd);
   const balanceParts = formattedBalance.split(".");
   const walletLabel = walletAddress
-    ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)} · Solana`
+    ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)} · ${
+        { mainnet: "Mainnet", devnet: "Devnet", localnet: "Localnet" }[
+          process.env.NEXT_PUBLIC_SOLANA_ENV ?? "mainnet"
+        ] ?? "Mainnet"
+      }`
     : "No account";
 
   return {
@@ -402,10 +560,12 @@ export function useWalletDesktopData(): WalletDesktopData {
             maximumFractionDigits: 5,
           })} SOL`,
     walletLabel,
-    tokenRows: allTokenRows.slice(0, 2),
+    tokenRows: allTokenRows.slice(0, 3),
     allTokenRows,
-    activityRows: activityData.rows.slice(0, 2),
+    activityRows: activityData.rows.slice(0, 5),
     allActivityRows: activityData.rows,
     transactionDetails: activityData.details,
+    positions,
+    balanceHistory,
   };
 }

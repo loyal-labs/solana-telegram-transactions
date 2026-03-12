@@ -5,14 +5,13 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuthCapability } from "@/lib/auth/capability";
 import { useAuthSession } from "@/contexts/auth-session-context";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BentoGridSection } from "@/components/bento-grid-section";
 import { BlogSection } from "@/components/blog-section";
 import { Footer } from "@/components/footer";
 import { HeroSection, type TimestampedMessage } from "@/components/hero-section";
 import { RoadmapSection } from "@/components/roadmap-section";
 import { useChatMode } from "@/contexts/chat-mode-context";
-import { useSignInModal } from "@/contexts/sign-in-modal-context";
 import { isSkillsEnabled } from "@/flags";
 
 export default function LandingPage() {
@@ -54,7 +53,8 @@ export default function LandingPage() {
   const { connected: isConnected, connecting: isWalletLoading, publicKey } = useWallet();
   const { isHydrated: isAuthHydrated } = useAuthSession();
   const { isSignedIn } = useAuthCapability();
-  const { open } = useSignInModal();
+  const openSignInRef = useRef<(() => void) | null>(null);
+  const openSignIn = useCallback(() => openSignInRef.current?.(), []);
   const solanaAddress = publicKey?.toBase58();
 
   // Truncate wallet address for display (e.g., "233Q..7ABE")
@@ -72,14 +72,14 @@ export default function LandingPage() {
       pendingText.length > 0
     ) {
       setHasPromptedAuth(true);
-      open();
+      openSignIn();
     }
   }, [
     hasPromptedAuth,
     isAuthHydrated,
     isSignedIn,
     isWalletLoading,
-    open,
+    openSignIn,
     pendingText,
   ]);
 
@@ -148,9 +148,9 @@ export default function LandingPage() {
   // Wait until wallet loading is complete to avoid false triggers during initialization
   useEffect(() => {
     if (!isWalletLoading && isAuthHydrated && isChatMode && !isSignedIn) {
-      open();
+      openSignIn();
     }
-  }, [isAuthHydrated, isChatMode, isSignedIn, isWalletLoading, open]);
+  }, [isAuthHydrated, isChatMode, isSignedIn, isWalletLoading, openSignIn]);
 
   // Pre-fill input from URL query parameter (e.g., ?req=hello)
   useEffect(() => {
@@ -225,7 +225,7 @@ export default function LandingPage() {
 
     // Check if wallet is connected before sending
     if (!isSignedIn) {
-      open();
+      openSignIn();
       return;
     }
 
@@ -287,7 +287,7 @@ export default function LandingPage() {
           isSignedIn={isSignedIn}
           isConnected={isConnected}
           truncatedAddress={truncatedAddress}
-          onOpenSignIn={open}
+          openSignInRef={openSignInRef}
           isOnline={isOnline}
         />
         {/* End of first section */}

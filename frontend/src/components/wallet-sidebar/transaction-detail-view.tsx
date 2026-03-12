@@ -1,9 +1,15 @@
 "use client";
 
-import { Globe, Share } from "lucide-react";
+import { Check, Globe, Share } from "lucide-react";
+import { useState } from "react";
 
 import { SubViewHeader } from "./shared";
 import type { TransactionDetail } from "./types";
+
+function truncateAddress(addr: string): string {
+  if (addr.length <= 12) return addr;
+  return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
+}
 
 export function TransactionDetailView({
   detail,
@@ -14,8 +20,12 @@ export function TransactionDetailView({
   onBack: () => void;
   onClose: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
   const isSent = detail.activity.type === "sent";
-  const title = isSent ? "Sent" : "Received";
+  const isShielded = detail.activity.type === "shielded";
+  const isUnshielded = detail.activity.type === "unshielded";
+  const isShieldType = isShielded || isUnshielded;
+  const title = isShielded ? "Shielded" : isUnshielded ? "Unshielded" : isSent ? "Sent" : "Received";
   // Strip the +/− prefix for the large display
   const rawAmount = detail.activity.amount.replace(/^[+\u2212-]/, "");
   const parts = rawAmount.split(" ");
@@ -81,10 +91,10 @@ export function TransactionDetailView({
                 style={{
                   fontSize: "40px",
                   lineHeight: "48px",
-                  color: isSent ? "#000" : "#34C759",
+                  color: isSent || isShieldType ? "#000" : "#34C759",
                 }}
               >
-                {isSent ? "\u2212" : "+"}{amountNum}
+                {isShieldType ? "" : isSent ? "\u2212" : "+"}{amountNum}
               </span>
               <span
                 style={{
@@ -174,7 +184,7 @@ export function TransactionDetailView({
                   display: "block",
                 }}
               >
-                {isSent ? "Recipient" : "Sender"}
+                {isShielded ? "Moved to" : isUnshielded ? "Moved from" : isSent ? "Recipient" : "Sender"}
               </span>
               <span
                 style={{
@@ -187,7 +197,7 @@ export function TransactionDetailView({
                   marginTop: "2px",
                 }}
               >
-                {detail.activity.counterparty}
+                {isShielded ? "Secure balance" : isUnshielded ? "Secure balance" : truncateAddress(detail.activity.counterparty)}
               </span>
             </div>
 
@@ -248,6 +258,7 @@ export function TransactionDetailView({
           >
             <button
               className="tx-action-btn"
+              onClick={() => window.open(`https://explorer.solana.com/tx/${detail.activity.id}`, "_blank")}
               style={{
                 width: "48px",
                 height: "48px",
@@ -290,6 +301,15 @@ export function TransactionDetailView({
           >
             <button
               className="tx-action-btn"
+              onClick={() => {
+                const text = isShieldType
+                  ? `${title} ${rawAmount} ${amountToken} (${detail.usdValue})\nhttps://explorer.solana.com/tx/${detail.activity.id}`
+                  : `${title} ${rawAmount} ${amountToken} (${detail.usdValue}) ${isSent ? "to" : "from"} ${truncateAddress(detail.activity.counterparty)}\nhttps://explorer.solana.com/tx/${detail.activity.id}`;
+                void navigator.clipboard.writeText(text).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                });
+              }}
               style={{
                 width: "48px",
                 height: "48px",
@@ -304,7 +324,11 @@ export function TransactionDetailView({
               }}
               type="button"
             >
-              <Share size={24} style={{ color: "#3C3C43" }} />
+              {copied ? (
+                <Check size={24} style={{ color: "#34C759" }} />
+              ) : (
+                <Share size={24} style={{ color: "#3C3C43" }} />
+              )}
             </button>
             <span
               style={{
@@ -312,11 +336,12 @@ export function TransactionDetailView({
                 fontSize: "13px",
                 fontWeight: 400,
                 lineHeight: "16px",
-                color: "rgba(60, 60, 67, 0.6)",
+                color: copied ? "#34C759" : "rgba(60, 60, 67, 0.6)",
                 textAlign: "center",
+                transition: "color 0.15s ease",
               }}
             >
-              Share
+              {copied ? "Copied" : "Share"}
             </span>
           </div>
         </div>

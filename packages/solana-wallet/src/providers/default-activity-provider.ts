@@ -61,43 +61,62 @@ export function createRpcActivityProvider(args: {
     options: GetActivityOptions = {}
   ): Promise<ActivityPage> => {
     const connection = getConnection();
-    const signatures = await connection.getSignaturesForAddress(owner, {
-      limit: options.limit ?? 10,
-      before: options.before,
-    });
-
-    if (signatures.length === 0) {
-      return { activities: [], nextCursor: undefined };
-    }
-
-    const signatureList = signatures.map((item) => item.signature);
-    const parsedTransactions = await connection.getParsedTransactions(signatureList, {
-      maxSupportedTransactionVersion: 0,
-    });
+    const desiredCount = options.limit ?? 10;
+    // Fetch more signatures per RPC call to account for filtered-out noise.
+    // Keep batch size moderate to avoid 429 rate limits from the RPC.
+    const batchSize = Math.max(desiredCount * 2, 30);
+    const maxPages = 3;
 
     const activities: WalletActivity[] = [];
-    for (let index = 0; index < parsedTransactions.length; index += 1) {
-      const parsedTransaction = parsedTransactions[index];
-      const signature = signatureList[index];
-      if (!parsedTransaction) {
-        continue;
-      }
+    let cursor = options.before;
+    let lastSignature: string | undefined;
 
-      const activity = normalizeParsedTransaction({
-        tx: parsedTransaction,
-        signature,
-        walletAddress: owner.toBase58(),
-        onlySystemTransfers: options.onlySystemTransfers ?? false,
+    for (let page = 0; page < maxPages; page += 1) {
+      const signatures = await connection.getSignaturesForAddress(owner, {
+        limit: batchSize,
+        before: cursor,
       });
 
-      if (activity) {
-        activities.push(activity);
+      if (signatures.length === 0) {
+        break;
+      }
+
+      const signatureList = signatures.map((item) => item.signature);
+      const parsedTransactions = await connection.getParsedTransactions(
+        signatureList,
+        { maxSupportedTransactionVersion: 0 }
+      );
+
+      for (let index = 0; index < parsedTransactions.length; index += 1) {
+        const parsedTransaction = parsedTransactions[index];
+        const signature = signatureList[index];
+        if (!parsedTransaction) {
+          continue;
+        }
+
+        const activity = normalizeParsedTransaction({
+          tx: parsedTransaction,
+          signature,
+          walletAddress: owner.toBase58(),
+          onlySystemTransfers: options.onlySystemTransfers ?? false,
+        });
+
+        if (activity) {
+          activities.push(activity);
+        }
+      }
+
+      lastSignature = signatures[signatures.length - 1]?.signature;
+      cursor = lastSignature;
+
+      if (activities.length >= desiredCount) {
+        break;
       }
     }
 
     return {
-      activities,
-      nextCursor: signatures[signatures.length - 1]?.signature,
+      activities: activities.slice(0, desiredCount),
+      nextCursor: lastSignature,
     };
   };
 

@@ -4,6 +4,9 @@ import { ArrowDownUp, ChevronRight, Globe, Send, Share, Wallet, X } from "lucide
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { usePrivateSend } from "@/hooks/use-private-send";
+import { useSend } from "@/hooks/use-send";
+
 import type { SubView, SwapToken } from "./types";
 
 const font = "var(--font-geist-sans), sans-serif";
@@ -115,6 +118,7 @@ function SendResult({
   amount,
   recipient,
   isTgRecipient,
+  errorMessage,
   onClose,
   onDone,
   onDetails,
@@ -124,6 +128,7 @@ function SendResult({
   amount: string;
   recipient: string;
   isTgRecipient: boolean;
+  errorMessage?: string;
   onClose: () => void;
   onDone: () => void;
   onDetails: () => void;
@@ -167,7 +172,7 @@ function SendResult({
               </span>
             ) : (
               <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary, maxWidth: "255px" }}>
-                Something went wrong. Please try again.
+                {errorMessage || "Something went wrong. Please try again."}
               </span>
             )}
           </div>
@@ -218,6 +223,7 @@ function SendTransactionDetail({
   recipient,
   isTgRecipient,
   usdValue,
+  signature,
   onClose,
   onDone,
 }: {
@@ -226,6 +232,7 @@ function SendTransactionDetail({
   recipient: string;
   isTgRecipient: boolean;
   usdValue: string;
+  signature?: string;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -283,7 +290,8 @@ function SendTransactionDetail({
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
             <button
               className="send-tx-action-btn"
-              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "background-color 0.15s ease" }}
+              onClick={() => signature && window.open(`https://explorer.solana.com/tx/${signature}`, "_blank")}
+              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: signature ? "pointer" : "default", opacity: signature ? 1 : 0.5, transition: "background-color 0.15s ease" }}
               type="button"
             >
               <Globe size={24} style={{ color: "#3C3C43" }} />
@@ -293,7 +301,8 @@ function SendTransactionDetail({
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
             <button
               className="send-tx-action-btn"
-              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "background-color 0.15s ease" }}
+              onClick={() => signature && void navigator.clipboard.writeText(`https://explorer.solana.com/tx/${signature}`)}
+              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: signature ? "pointer" : "default", opacity: signature ? 1 : 0.5, transition: "background-color 0.15s ease" }}
               type="button"
             >
               <Share size={24} style={{ color: "#3C3C43" }} />
@@ -329,6 +338,8 @@ export function SendContent({
   onNavigate: (view: SubView) => void;
   token: SwapToken;
 }) {
+  const { executeSend } = useSend();
+  const { executePrivateSend } = usePrivateSend();
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
@@ -337,6 +348,8 @@ export function SendContent({
   const [resultUsd, setResultUsd] = useState("");
   const [resultRecipient, setResultRecipient] = useState("");
   const [resultIsTg, setResultIsTg] = useState(false);
+  const [resultSignature, setResultSignature] = useState<string | undefined>();
+  const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
   const numericAmount = Number.parseFloat(amount) || 0;
   const hasAmount = numericAmount > 0;
@@ -352,6 +365,7 @@ export function SendContent({
   const isWallet = isValidSolanaAddress(recipientTrimmed);
   const isValidRecipient = isTg || isWallet;
   const showInvalidHint = hasRecipient && !isValidRecipient && !startsWithAt;
+  const isTgNonSol = isTg && token.symbol.toUpperCase() !== "SOL";
 
   const buttonLabel = !hasAmount
     ? "Enter Amount"
@@ -361,8 +375,10 @@ export function SendContent({
         ? "Enter Recipient"
         : !isValidRecipient
           ? "Invalid Address"
-          : "Send";
-  const buttonDisabled = !hasAmount || insufficientFunds || !isValidRecipient;
+          : isTgNonSol
+            ? "Only SOL for Telegram"
+            : "Send";
+  const buttonDisabled = !hasAmount || insufficientFunds || !isValidRecipient || isTgNonSol;
 
   const handlePercentage = useCallback(
     (pct: number) => {
@@ -372,24 +388,50 @@ export function SendContent({
     [token.balance],
   );
 
-  const handleConfirm = useCallback(() => {
-    setResultAmount(hasAmount ? String(numericAmount) : "0");
-    setResultUsd(`$${hasAmount ? (numericAmount * token.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0"}`);
+  const handleConfirm = useCallback(async () => {
+    const currentAmount = hasAmount ? String(numericAmount) : "0";
+    const currentUsd = `$${hasAmount ? (numericAmount * token.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0"}`;
+    setResultAmount(currentAmount);
+    setResultUsd(currentUsd);
     setResultRecipient(recipientTrimmed);
     setResultIsTg(isTg);
+    setResultSignature(undefined);
+    setErrorMessage(undefined);
     setPhase("processing");
-  }, [hasAmount, numericAmount, token.price, recipientTrimmed, isTg]);
 
-  // Processing → success after 2s (mock)
-  useEffect(() => {
-    if (phase !== "processing") return;
-    const t = setTimeout(() => {
+    const destinationType = isTg ? "telegram" : "wallet";
+    const cleanRecipient = isTg ? recipientTrimmed.replace(/^@/, "") : recipientTrimmed;
+
+    let result: { success: boolean; signature?: string; error?: string };
+
+    if (isPrivate) {
+      result = await executePrivateSend({
+        tokenSymbol: token.symbol,
+        amount: numericAmount,
+        recipient: cleanRecipient,
+        recipientType: destinationType,
+        tokenMint: token.mint,
+      });
+    } else {
+      result = await executeSend(
+        token.symbol,
+        currentAmount,
+        cleanRecipient,
+        destinationType,
+        token.mint,
+      );
+    }
+
+    if (result.success) {
+      setResultSignature(result.signature);
       setPhase("success");
       setAmount("");
       setRecipient("");
-    }, 2000);
-    return () => clearTimeout(t);
-  }, [phase]);
+    } else {
+      setErrorMessage(result.error);
+      setPhase("error");
+    }
+  }, [hasAmount, numericAmount, token.price, token.symbol, token.mint, recipientTrimmed, isTg, isPrivate, executeSend, executePrivateSend]);
 
   // Cross-fade between phases
   const [phaseOpacity, setPhaseOpacity] = useState(1);
@@ -415,6 +457,7 @@ export function SendContent({
       return (
         <SendResult
           amount={resultAmount}
+          errorMessage={errorMessage}
           isTgRecipient={resultIsTg}
           onClose={onClose}
           onDetails={() => setPhase("details")}
@@ -433,6 +476,7 @@ export function SendContent({
           onClose={onClose}
           onDone={onDone}
           recipient={resultRecipient}
+          signature={resultSignature}
           token={token}
           usdValue={resultUsd}
         />
@@ -536,24 +580,24 @@ export function SendContent({
             <div style={{ padding: "12px 12px 8px" }}>
               <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary }}>Recipient</span>
             </div>
-            <div style={{ background: "#fff", borderRadius: "16px", display: "flex", alignItems: "center", padding: "0 12px", overflow: "hidden" }}>
+            <div style={{ background: "#fff", borderRadius: "16px", display: "flex", alignItems: "flex-start", padding: "0 12px", overflow: "hidden" }}>
               {hasRecipient && (
-                <div style={{ display: "flex", alignItems: "center", paddingRight: "12px", flexShrink: 0, color: "#3C3C43" }}>
+                <div style={{ display: "flex", alignItems: "center", paddingRight: "12px", flexShrink: 0, color: "#3C3C43", paddingTop: "15px" }}>
                   {startsWithAt ? <Send size={20} /> : <Wallet size={20} />}
                 </div>
               )}
-              <input
-                onChange={(e) => setRecipient(e.target.value)}
+              <textarea
+                onChange={(e) => setRecipient(e.target.value.replace(/\n/g, ""))}
                 placeholder="Address or Telegram username"
-                style={{ flex: 1, fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#000", background: "none", border: "none", outline: "none", padding: "15px 0", minWidth: 0 }}
-                type="text"
+                rows={1}
+                style={{ flex: 1, fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#000", background: "none", border: "none", outline: "none", padding: "15px 0", minWidth: 0, resize: "none", overflow: "hidden", wordBreak: "break-all", fieldSizing: "content" } as React.CSSProperties}
                 value={recipient}
               />
               {hasRecipient && (
                 <button
                   className="clear-btn"
                   onClick={() => setRecipient("")}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 0 12px 12px", background: "none", border: "none", cursor: "pointer", color: "#3C3C43", flexShrink: 0 }}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "15px 0 15px 12px", background: "none", border: "none", cursor: "pointer", color: "#3C3C43", flexShrink: 0 }}
                   type="button"
                 >
                   <X size={20} />

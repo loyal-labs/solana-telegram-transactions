@@ -5,6 +5,11 @@ import { useState } from "react";
 
 import type { ActivityRow } from "./types";
 
+function truncateAddress(addr: string): string {
+  if (addr.length <= 12) return addr;
+  return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
+}
+
 export function ActivityRowItem({
   activity,
   isBalanceHidden,
@@ -80,7 +85,10 @@ export function ActivityRowItem({
             letterSpacing: "-0.176px",
           }}
         >
-          {activity.type === "received" ? "Received" : "Sent"}
+          {activity.type === "received" ? "Received"
+            : activity.type === "shielded" ? "Shielded"
+            : activity.type === "unshielded" ? "Unshielded"
+            : "Sent"}
         </span>
         <span
           style={{
@@ -91,8 +99,10 @@ export function ActivityRowItem({
             color: "rgba(60, 60, 67, 0.6)",
           }}
         >
-          {activity.type === "received" ? "from" : "to"}{" "}
-          {activity.counterparty}
+          {activity.type === "shielded" ? "to secure balance"
+            : activity.type === "unshielded" ? "to main balance"
+            : activity.type === "received" ? `from ${truncateAddress(activity.counterparty)}`
+            : `to ${truncateAddress(activity.counterparty)}`}
         </span>
       </div>
       <div
@@ -119,7 +129,9 @@ export function ActivityRowItem({
               ? "#BBBBC0"
               : activity.type === "received"
                 ? "#34C759"
-                : "#000",
+                : activity.type === "shielded" || activity.type === "unshielded"
+                  ? "#000"
+                  : "#000",
             textAlign: "right",
             filter: isBalanceHidden ? "url(#rs-pixelate-sm)" : "none",
             transition: "filter 0.15s ease, color 0.15s ease",

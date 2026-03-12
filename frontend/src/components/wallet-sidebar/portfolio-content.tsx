@@ -1,7 +1,8 @@
 "use client";
 
-import { Eye, EyeOff } from "lucide-react";
+import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
+import { useCallback, useState } from "react";
 
 import { ActivityRowItem } from "./activity-row-item";
 import { TokenRowItem } from "./token-row-item";
@@ -12,6 +13,52 @@ import type {
   TransactionDetail,
 } from "./types";
 
+const skeletonBar = (width: string, height: string) => ({
+  width,
+  height,
+  borderRadius: "6px",
+  background: "rgba(0, 0, 0, 0.06)",
+  animation: "skeleton-pulse 1.5s ease-in-out infinite",
+});
+
+const skeletonCircle = (size: string) => ({
+  width: size,
+  height: size,
+  borderRadius: "9999px",
+  background: "rgba(0, 0, 0, 0.06)",
+  flexShrink: 0 as const,
+  animation: "skeleton-pulse 1.5s ease-in-out infinite",
+});
+
+function SkeletonTokenRow() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 12px", width: "100%" }}>
+      <div style={skeletonCircle("40px")} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" as const, gap: "6px" }}>
+        <div style={skeletonBar("80px", "14px")} />
+        <div style={skeletonBar("50px", "12px")} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end" as const, gap: "6px" }}>
+        <div style={skeletonBar("60px", "14px")} />
+        <div style={skeletonBar("40px", "12px")} />
+      </div>
+    </div>
+  );
+}
+
+function SkeletonActivityRow() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 12px", width: "100%" }}>
+      <div style={skeletonCircle("36px")} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" as const, gap: "6px" }}>
+        <div style={skeletonBar("100px", "14px")} />
+        <div style={skeletonBar("60px", "12px")} />
+      </div>
+      <div style={skeletonBar("50px", "14px")} />
+    </div>
+  );
+}
+
 export function PortfolioContent({
   activityRows,
   balanceFraction,
@@ -20,9 +67,11 @@ export function PortfolioContent({
   isBalanceHidden,
   isLoading,
   onBalanceHiddenChange,
+  onDisconnect,
   onNavigate,
   tokenRows,
   transactionDetails,
+  walletAddress,
   walletLabel,
 }: {
   activityRows: ActivityRow[];
@@ -32,13 +81,74 @@ export function PortfolioContent({
   isBalanceHidden: boolean;
   isLoading: boolean;
   onBalanceHiddenChange: (hidden: boolean) => void;
+  onDisconnect?: () => void;
   onNavigate: (view: SubView) => void;
   tokenRows: TokenRow[];
   transactionDetails: Record<string, TransactionDetail>;
+  walletAddress: string | null;
   walletLabel: string;
 }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopyAddress = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!walletAddress) return;
+    void navigator.clipboard.writeText(walletAddress).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [walletAddress]);
+  if (isLoading) {
+    return (
+      <>
+        <style jsx>{`
+          @keyframes skeleton-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+          }
+        `}</style>
+
+        {/* Balance skeleton */}
+        <div style={{ display: "flex", gap: "16px", alignItems: "flex-start", padding: "20px 20px 12px", width: "100%" }}>
+          <div style={skeletonCircle("64px")} />
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={skeletonBar("100px", "16px")} />
+            <div style={skeletonBar("140px", "28px")} />
+            <div style={skeletonBar("70px", "14px")} />
+          </div>
+        </div>
+
+        {/* Tokens skeleton */}
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+          <div style={{ display: "flex", flexDirection: "column", padding: "8px", width: "100%" }}>
+            <div style={{ padding: "12px 12px 8px" }}>
+              <div style={skeletonBar("60px", "16px")} />
+            </div>
+            <SkeletonTokenRow />
+            <SkeletonTokenRow />
+            <SkeletonTokenRow />
+          </div>
+
+          {/* Activity skeleton */}
+          <div style={{ display: "flex", flexDirection: "column", padding: "8px", width: "100%" }}>
+            <div style={{ padding: "12px 12px 8px" }}>
+              <div style={skeletonBar("70px", "16px")} />
+            </div>
+            <SkeletonActivityRow />
+            <SkeletonActivityRow />
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
+      <style jsx>{`
+        .show-all-btn:hover {
+          background: rgba(249, 54, 60, 0.22) !important;
+        }
+      `}</style>
+
       {/* SVG pixelation filters */}
       <svg
         aria-hidden="true"
@@ -79,7 +189,7 @@ export function PortfolioContent({
           style={{
             width: "64px",
             height: "64px",
-            borderRadius: "12px",
+            borderRadius: "9999px",
             border: "0.533px solid rgba(0, 0, 0, 0.08)",
             overflow: "hidden",
             flexShrink: 0,
@@ -101,17 +211,70 @@ export function PortfolioContent({
             gap: "8px",
           }}
         >
-          <span
+          <div
             style={{
-              fontFamily: "var(--font-geist-sans), sans-serif",
-              fontSize: "14px",
-              fontWeight: 400,
-              lineHeight: "20px",
-              color: "rgba(60, 60, 67, 0.6)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
-            {walletLabel}
-          </span>
+            <span
+              style={{
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "14px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "rgba(60, 60, 67, 0.6)",
+                display: "flex",
+                alignItems: "center",
+                gap: "3px",
+              }}
+            >
+              {walletLabel}
+              {walletAddress && (
+                <button
+                  onClick={handleCopyAddress}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: "1px",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    color: copied ? "#34C759" : "rgba(60, 60, 67, 0.35)",
+                    transition: "color 0.15s ease",
+                    flexShrink: 0,
+                  }}
+                  type="button"
+                >
+                  {copied ? <Check size={12} /> : <Copy size={12} />}
+                </button>
+              )}
+            </span>
+            {onDisconnect && (
+              <button
+                onClick={onDisconnect}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  fontFamily: "var(--font-geist-sans), sans-serif",
+                  fontSize: "13px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: "rgba(60, 60, 67, 0.35)",
+                  cursor: "pointer",
+                  transition: "color 0.15s ease",
+                  textDecoration: "underline",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(60, 60, 67, 0.6)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(60, 60, 67, 0.35)"; }}
+                type="button"
+              >
+                Disconnect
+              </button>
+            )}
+          </div>
           <div
             style={{
               display: "flex",
@@ -355,6 +518,21 @@ export function PortfolioContent({
           </div>
         </div>
       </div>
+
+      <p
+        style={{
+          fontFamily: "var(--font-geist-sans), sans-serif",
+          fontSize: "11px",
+          fontWeight: 400,
+          lineHeight: "16px",
+          color: "rgba(60, 60, 67, 0.3)",
+          textAlign: "center",
+          padding: "8px 0 12px",
+          flexShrink: 0,
+        }}
+      >
+        Token logos by Logo.dev
+      </p>
     </>
   );
 }
