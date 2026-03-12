@@ -14,6 +14,11 @@
 
 ## Install & enable
 
+Before installing, update the `.service` files to replace placeholder paths with your actual paths:
+
+- `/path/to/loyal-app` → your repo checkout path
+- `/path/to/.bun/bin/bun` → your `bun` binary path (find with `which bun`)
+
 ```bash
 sudo cp loyal-userbot-sync.service loyal-userbot-sync.timer \
        loyal-userbot-summary-publish.service loyal-userbot-summary-publish.timer \

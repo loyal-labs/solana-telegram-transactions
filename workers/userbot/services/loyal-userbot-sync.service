@@ -3,6 +3,6 @@ Description=Loyal userbot sync once
 
 [Service]
 Type=oneshot
-WorkingDirectory=/home/zotho/Projects/Loyal/solana-telegram-transactions/workers/userbot
-EnvironmentFile=/home/zotho/Projects/Loyal/solana-telegram-transactions/workers/userbot/.env.local
-ExecStart=/home/zotho/.bun/bin/bun run sync:once
+WorkingDirectory=/path/to/loyal-app/workers/userbot
+EnvironmentFile=/path/to/loyal-app/workers/userbot/.env.local
+ExecStart=/path/to/.bun/bin/bun run sync:once
