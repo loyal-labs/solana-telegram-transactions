@@ -10,7 +10,7 @@ const config = {
   gridEnvironment: "sandbox" as const,
   allowedParentDomain: "askloyal.com",
   allowLocalhost: true,
-  sharedRpId: "askloyal.com",
+  rpId: "askloyal.com",
   gridApiBaseUrl: "https://grid.squads.xyz",
   appName: "askloyal",
 };

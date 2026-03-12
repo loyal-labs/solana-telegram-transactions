@@ -1,8 +1,6 @@
-import { proxyPasskeyOperation } from "@/lib/passkeys/grid-proxy";
+import { createPasskeyCorsRouteHandlers } from "@/lib/passkeys/cors-route";
 
-export async function POST(request: Request) {
-  return proxyPasskeyOperation({
-    operation: "createSession",
-    request,
-  });
-}
+const handlers = createPasskeyCorsRouteHandlers("createSession");
+
+export const OPTIONS = handlers.OPTIONS;
+export const POST = handlers.POST;

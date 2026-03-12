@@ -1,15 +1,8 @@
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 
-import { getWalletBalance } from "@/lib/solana/wallet/wallet-details";
-
-import {
-  cachedWalletAddress,
-  ensureWalletBalanceSubscription,
-  getCachedWalletBalance,
-  setCachedWalletBalance,
-  walletBalanceListeners,
-} from "../wallet-cache";
+import { getTelegramWalletDataClient } from "../solana-wallet-data-client";
+import { HOLDINGS_REFRESH_DEBOUNCE_MS } from "../wallet-cache";
 import { MOCK_BALANCE_LAMPORTS, USE_MOCK_DATA } from "../wallet-mock-data";
 
 export function useWalletBalance(walletAddress: string | null): {
@@ -18,20 +11,16 @@ export function useWalletBalance(walletAddress: string | null): {
   refreshBalance: (forceRefresh?: boolean) => Promise<void>;
 } {
   const [solBalanceLamports, setSolBalanceLamports] = useState<number | null>(
-    () =>
-      USE_MOCK_DATA
-        ? MOCK_BALANCE_LAMPORTS
-        : cachedWalletAddress
-        ? getCachedWalletBalance(cachedWalletAddress)
-        : null
+    () => (USE_MOCK_DATA ? MOCK_BALANCE_LAMPORTS : null)
   );
 
   const refreshBalance = useCallback(
-    async (forceRefresh = false) => {
+    async (_forceRefresh = false) => {
+      if (!walletAddress) return;
       try {
-        const balanceLamports = await getWalletBalance(forceRefresh);
-        setCachedWalletBalance(walletAddress, balanceLamports);
-        setSolBalanceLamports(balanceLamports);
+        setSolBalanceLamports(
+          await getTelegramWalletDataClient().getBalance(walletAddress)
+        );
       } catch (error) {
         console.error("Failed to refresh wallet balance", error);
       }
@@ -45,28 +34,31 @@ export function useWalletBalance(walletAddress: string | null): {
     if (!walletAddress) return;
 
     let isCancelled = false;
+    let unsubscribe: (() => Promise<void>) | null = null;
 
-    const handleBalanceUpdate = (lamports: number) => {
-      if (isCancelled) return;
-      setSolBalanceLamports((prev) => (prev === lamports ? prev : lamports));
-    };
-
-    const cachedBalance = getCachedWalletBalance(walletAddress);
-    if (cachedBalance !== null) {
-      setSolBalanceLamports((prev) =>
-        prev === cachedBalance ? prev : cachedBalance
-      );
-    }
-
-    walletBalanceListeners.add(handleBalanceUpdate);
-
-    void ensureWalletBalanceSubscription(walletAddress).catch((error) => {
-      console.error("Failed to subscribe to wallet balance", error);
-    });
+    void (async () => {
+      try {
+        unsubscribe = await getTelegramWalletDataClient().subscribePortfolio(
+          walletAddress,
+          (snapshot) => {
+            if (isCancelled) return;
+            setSolBalanceLamports(snapshot.nativeBalanceLamports);
+          },
+          {
+            debounceMs: HOLDINGS_REFRESH_DEBOUNCE_MS,
+            emitInitial: true,
+          }
+        );
+      } catch (error) {
+        console.error("Failed to subscribe to wallet balance", error);
+      }
+    })();
 
     return () => {
       isCancelled = true;
-      walletBalanceListeners.delete(handleBalanceUpdate);
+      if (unsubscribe) {
+        void unsubscribe();
+      }
     };
   }, [walletAddress]);
 

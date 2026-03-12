@@ -5,16 +5,36 @@ import { useSearchParams } from "next/navigation";
 import { startTransition, useState } from "react";
 
 import {
-  callPasskeyApi,
-  extractPasskeyErrorMessage,
-  parsePasskeyErrorDetails,
-} from "@/lib/passkeys/client-api";
+  buildAuthUrl,
+  extractApiErrorMessage,
+  parseApiErrorDetails,
+} from "@loyal-labs/auth-core";
 import {
   buildPasskeyFlowRequest,
   parsePasskeyFlowQuery,
   type PasskeyFlowMode,
 } from "@/lib/passkeys/flow-runner";
 import { isChallengeTimeoutError } from "@/lib/passkeys/webauthn";
+
+async function callLocalPasskeyApi(endpoint: string, payload: unknown) {
+  const response = await fetch(buildAuthUrl("", endpoint), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const bodyText = await response.text();
+  let body: unknown = bodyText;
+  try {
+    body = bodyText ? JSON.parse(bodyText) : null;
+  } catch {
+    body = bodyText;
+  }
+
+  return { ok: response.ok, status: response.status, body };
+}
 
 export function PasskeyFlowClient({ mode }: { mode: PasskeyFlowMode }) {
   const searchParams = useSearchParams();
@@ -39,13 +59,13 @@ export function PasskeyFlowClient({ mode }: { mode: PasskeyFlowMode }) {
 
     try {
       const request = await buildPasskeyFlowRequest(mode, parsed.data);
-      const outcome = await callPasskeyApi(request.endpoint, request.payload);
+      const outcome = await callLocalPasskeyApi(request.endpoint, request.payload);
       if (!outcome.ok) {
-        const details = parsePasskeyErrorDetails(outcome.body);
+        const details = parseApiErrorDetails(outcome.body);
         if (details.length > 0) {
           setErrorDetails(details);
         }
-        throw new Error(extractPasskeyErrorMessage(outcome.body));
+        throw new Error(extractApiErrorMessage(outcome.body));
       }
 
       startTransition(() => setResult(outcome.body));

@@ -1,0 +1,44 @@
+{
+  "name": "@loyal-labs/auth-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "default": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./auth": {
+      "import": "./dist/auth.js",
+      "default": "./dist/auth.js",
+      "types": "./dist/auth.d.ts"
+    },
+    "./types": {
+      "import": "./dist/types.js",
+      "default": "./dist/types.js",
+      "types": "./dist/types.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist",
+    "test": "bun test src"
+  },
+  "dependencies": {
+    "@loyal-labs/grid-core": "workspace:*",
+    "@sqds/grid": "^3.1.2",
+    "zod": "^4.0.17"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5"
+  }
+}

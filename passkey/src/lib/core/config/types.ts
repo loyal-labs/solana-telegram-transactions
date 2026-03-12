@@ -4,8 +4,10 @@ export type PasskeyServerConfig = {
   gridEnvironment: PasskeyGridEnvironment;
   allowedParentDomain: string;
   allowLocalhost: boolean;
-  sharedRpId: string;
+  rpId: string;
   gridApiBaseUrl: string;
   appName: string;
   gridApiKey?: string;
+  authJwtSecret: string;
+  authJwtTtlSeconds: number;
 };

@@ -21,6 +21,12 @@
     "passkey:dev": "bun run --cwd passkey dev",
     "passkey:build": "bun run --cwd passkey build",
     "passkey:lint": "bun run --cwd passkey lint",
+    "build:grid-packages": "bun run --cwd packages/grid-core build && bun run --cwd packages/auth-core build",
+    "typecheck:grid-packages": "bun run --cwd packages/grid-core typecheck && bun run --cwd packages/auth-core typecheck",
+    "build:solana-packages": "bun run --cwd packages/solana-rpc build && bun run --cwd packages/solana-wallet build",
+    "typecheck:solana-packages": "bun run --cwd packages/solana-rpc typecheck && bun run --cwd packages/solana-wallet typecheck",
+    "build:shared-packages": "bun run --cwd packages/shared build",
+    "typecheck:shared-packages": "bun run --cwd packages/shared typecheck",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "commitlint:head": "commitlint --from HEAD~1 --to HEAD --verbose",
@@ -37,6 +43,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
+    "@types/flubber": "^0.4.0",
+    "flubber": "^0.4.2",
     "lightningcss": "^1.30.2"
   },
   "devDependencies": {

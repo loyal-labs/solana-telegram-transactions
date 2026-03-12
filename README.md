@@ -14,7 +14,7 @@ the Loyal web frontend, shared packages/SDKs, and worker services.
 | [`passkey/`](./passkey) | Next.js passkey proxy app for Squads Grid custom-domain WebAuthn flow | [`passkey/README.md`](./passkey/README.md) |
 | [`programs/`](./programs) | Anchor smart contracts (`telegram-transfer`, `telegram-verification`, `telegram-private-transfer`) | [`programs/`](./programs) |
 | [`tests/`](./tests) | Anchor integration tests and fixtures | [`tests/`](./tests) |
-| [`packages/`](./packages) | Shared workspace libraries (`db-core`, `db-adapter-neon`, `llm-core`, `llm-server`) | [`packages/`](./packages) |
+| [`packages/`](./packages) | Shared workspace libraries (`db-core`, `db-adapter-neon`, `grid-core`, `llm-core`, `llm-server`, `shared`) | [`packages/`](./packages) |
 | [`sdk/`](./sdk) | Publishable SDKs for deposits and private transfers | [`sdk/transactions/README.md`](./sdk/transactions/README.md), [`sdk/private-transactions/README.md`](./sdk/private-transactions/README.md) |
 | [`workers/`](./workers) | Background workers and service runtimes | [`workers/userbot/README.md`](./workers/userbot/README.md) |
 | [`docs/`](./docs) | Internal engineering and operations documentation | [`docs/README.md`](./docs/README.md) |
@@ -48,9 +48,13 @@ For Vercel monorepo deploys, use separate projects with Root Directory set to `a
 ```bash
 bun run lint
 bun run lint:fix
+bun run build:grid-packages
 bun run build:db-packages
+bun run build:shared-packages
 bun run build:llm-packages
+bun run typecheck:grid-packages
 bun run typecheck:db-packages
+bun run typecheck:shared-packages
 bun run typecheck:llm-packages
 bun run guard:shared-boundaries
 bun run guard:llm-package-boundaries
@@ -170,3 +174,14 @@ echo "feat(scope): short description" | bunx commitlint --verbose
 ```
 
 GitHub pull requests also enforce commit messages and PR titles with the same rules.
+
+## Grid Auth Domain
+
+Runtime-agnostic Grid helpers now live in [`packages/grid-core/`](./packages/grid-core).
+The `passkey` workspace remains the auth-domain app for passkey session/account
+flows and owns WebAuthn/browser flow orchestration. Other clients should point
+at it with:
+
+- `NEXT_PUBLIC_GRID_AUTH_BASE_URL` in web workspaces
+- `EXPO_PUBLIC_GRID_AUTH_BASE_URL` in mobile
+- `GRID_*` variables inside `passkey`

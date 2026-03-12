@@ -1,4 +1,4 @@
-export type SolanaEnv = "mainnet" | "testnet" | "devnet" | "localnet";
+export type { SolanaEnv } from "@loyal-labs/solana-rpc";
 
 export type WalletTransfer = {
   signature: string;

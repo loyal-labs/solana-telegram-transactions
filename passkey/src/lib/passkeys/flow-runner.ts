@@ -5,10 +5,8 @@ import {
   parseAuthPasskeyQuery,
   parseCreatePasskeyQuery,
 } from "@/lib/passkeys/query-params";
-import {
-  toSessionKeyBackendObject,
-} from "@/lib/passkeys/session-key";
 import { resolveCurrentPasskeyBrowserContext } from "@/lib/passkeys/host-resolution";
+import { toSessionKeyBackendObject } from "@/lib/passkeys/session-key";
 import {
   runAuthPasskeyCeremony,
   runCreatePasskeyCeremony,

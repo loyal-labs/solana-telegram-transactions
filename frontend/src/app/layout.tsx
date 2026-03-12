@@ -3,9 +3,15 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
-import { PhantomWalletProvider } from "@/components/solana/phantom-provider";
+import { SignInModal } from "@/components/auth/sign-in-modal";
+import { WalletConnectionProvider } from "@/components/solana/wallet-provider";
 import { Header } from "@/components/ui/header";
+import { AuthSessionProvider } from "@/contexts/auth-session-context";
 import { ChatModeProvider } from "@/contexts/chat-mode-context";
+import { PublicEnvProvider } from "@/contexts/public-env-context";
+import { SignInModalProvider } from "@/contexts/sign-in-modal-context";
+import { UserChatsProvider } from "@/providers/user-chats";
+import { createPublicEnv } from "@/lib/core/config/public";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -64,17 +70,28 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const publicEnv = createPublicEnv(process.env);
+
   return (
     <html className="dark" lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <PhantomWalletProvider>
-          <ChatModeProvider>
-            <Header />
-            {children}
-          </ChatModeProvider>
-        </PhantomWalletProvider>
+        <PublicEnvProvider value={publicEnv}>
+          <WalletConnectionProvider>
+            <AuthSessionProvider>
+              <SignInModalProvider>
+                <UserChatsProvider>
+                  <ChatModeProvider>
+                    <Header />
+                    {children}
+                    <SignInModal />
+                  </ChatModeProvider>
+                </UserChatsProvider>
+              </SignInModalProvider>
+            </AuthSessionProvider>
+          </WalletConnectionProvider>
+        </PublicEnvProvider>
 
         {/* Umami Analytics */}
         <Script

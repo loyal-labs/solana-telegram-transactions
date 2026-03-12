@@ -1,4 +1,11 @@
-import type { WalletTransfer } from "../lib/solana/rpc/types";
+import type { ProgramActionType } from "@loyal-labs/solana-wallet";
+
+export type WalletTransactionTransferType =
+  | "transfer"
+  | "swap"
+  | "secure"
+  | "unshield"
+  | ProgramActionType;
 
 export type TransactionType = "incoming" | "outgoing" | "pending";
 
@@ -11,7 +18,7 @@ export type Transaction = {
   status?: TransactionStatus;
   networkFeeLamports?: number;
   signature?: string;
-  transferType?: WalletTransfer["type"];
+  transferType?: WalletTransactionTransferType;
   // Optional SPL token transfer fields
   tokenMint?: string;
   tokenAmount?: string;
@@ -48,7 +55,7 @@ export type TransactionDetailsData = {
   id: string;
   type: "incoming" | "outgoing";
   amountLamports: number;
-  transferType?: WalletTransfer["type"];
+  transferType?: WalletTransactionTransferType;
   // Optional SPL token transfer fields
   tokenMint?: string;
   tokenAmount?: string;

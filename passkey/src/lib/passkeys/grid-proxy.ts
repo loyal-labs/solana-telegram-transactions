@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
+import {
+  createAccountRequestSchema,
+  gridPasskeyUpstreamApiPaths,
+  findAccountRequestSchema,
+  passkeyAccountParamSchema,
+  startPasskeyRegistrationRequestSchema,
+  startPasskeySignInRequestSchema,
+  submitSessionRequestSchema,
+} from "@loyal-labs/grid-core";
 import { z } from "zod";
 
 import type { PasskeyServerConfig } from "@/lib/core/config/types";
-import {
-  authorizeSessionRequestSchema,
-  createAccountRequestSchema,
-  createSessionRequestSchema,
-  findAccountRequestSchema,
-  passkeyAccountParamSchema,
-  passkeyApiPaths,
-  submitSessionRequestSchema,
-} from "@/lib/passkeys/contracts";
 import {
   PasskeyHostResolutionError,
   resolvePasskeyRequestContext,
@@ -33,32 +33,33 @@ type OperationDefinition = {
 const operationDefinitions: Record<PasskeyOperation, OperationDefinition> = {
   createSession: {
     method: "POST",
-    path: () => passkeyApiPaths.createSession,
-    schema: createSessionRequestSchema,
+    path: () => gridPasskeyUpstreamApiPaths.createSession,
+    schema: startPasskeyRegistrationRequestSchema,
   },
   authorizeSession: {
     method: "POST",
-    path: () => passkeyApiPaths.authorizeSession,
-    schema: authorizeSessionRequestSchema,
+    path: () => gridPasskeyUpstreamApiPaths.authorizeSession,
+    schema: startPasskeySignInRequestSchema,
   },
   submitSession: {
     method: "POST",
-    path: () => passkeyApiPaths.submitSession,
+    path: () => gridPasskeyUpstreamApiPaths.submitSession,
     schema: submitSessionRequestSchema,
   },
   createAccount: {
     method: "POST",
-    path: () => passkeyApiPaths.createAccount,
+    path: () => gridPasskeyUpstreamApiPaths.createAccount,
     schema: createAccountRequestSchema,
   },
   findAccount: {
     method: "POST",
-    path: () => passkeyApiPaths.findAccount,
+    path: () => gridPasskeyUpstreamApiPaths.findAccount,
     schema: findAccountRequestSchema,
   },
   getAccount: {
     method: "GET",
-    path: (passkeyAddress?: string) => passkeyApiPaths.getAccount(passkeyAddress ?? ""),
+    path: (passkeyAddress?: string) =>
+      gridPasskeyUpstreamApiPaths.getAccount(passkeyAddress ?? ""),
   },
 };
 
@@ -273,7 +274,7 @@ export function preparePasskeyUpstreamRequest(
     options: {
       allowedParentDomain: args.config.allowedParentDomain,
       allowLocalhost: args.config.allowLocalhost,
-      sharedRpId: args.config.sharedRpId,
+      rpId: args.config.rpId,
     },
   });
 

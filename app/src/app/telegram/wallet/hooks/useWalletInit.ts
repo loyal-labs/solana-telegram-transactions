@@ -1,22 +1,17 @@
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  getWalletBalance,
-  resetWalletKeypairCache,
-} from "@/lib/solana/wallet/wallet-details";
+import { resetWalletKeypairCache } from "@/lib/solana/wallet/wallet-details";
 import {
   CloudStorageUnavailableError,
   ensureWalletKeypair,
 } from "@/lib/solana/wallet/wallet-keypair-logic";
 
+import { getTelegramWalletDataClient } from "../solana-wallet-data-client";
 import {
   cachedWalletAddress,
-  getCachedWalletBalance,
   hasCachedWalletData,
   setCachedWalletAddress,
-  setCachedWalletBalance,
-  walletBalanceListeners,
 } from "../wallet-cache";
 import { MOCK_WALLET_ADDRESS, USE_MOCK_DATA } from "../wallet-mock-data";
 
@@ -47,21 +42,13 @@ export function useWalletInit(): {
 
       setCachedWalletAddress(publicKeyBase58);
       setWalletAddress(publicKeyBase58);
+      setIsLoading(false);
 
-      const cachedBalance = getCachedWalletBalance(publicKeyBase58);
-
-      if (cachedBalance !== null) {
-        setIsLoading(false);
-        void getWalletBalance().then((freshBalance) => {
-          setCachedWalletBalance(publicKeyBase58, freshBalance);
-          walletBalanceListeners.forEach((listener) => listener(freshBalance));
+      void getTelegramWalletDataClient()
+        .getPortfolio(publicKeyBase58)
+        .catch((error) => {
+          console.warn("Failed to warm wallet portfolio cache", error);
         });
-      } else {
-        const balanceLamports = await getWalletBalance();
-        setCachedWalletBalance(publicKeyBase58, balanceLamports);
-        walletBalanceListeners.forEach((listener) => listener(balanceLamports));
-        setIsLoading(false);
-      }
     } catch (error) {
       console.error("Failed to ensure wallet keypair", error);
 
@@ -96,5 +83,11 @@ export function useWalletInit(): {
     setRetryCount((c) => c + 1);
   }, []);
 
-  return { walletAddress, setWalletAddress, isLoading, walletError, retryWalletInit };
+  return {
+    walletAddress,
+    setWalletAddress,
+    isLoading,
+    walletError,
+    retryWalletInit,
+  };
 }

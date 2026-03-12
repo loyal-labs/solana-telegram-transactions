@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const Confetti = dynamic(() => import("react-confetti"), { ssr: false });
 
+import { computePortfolioTotals } from "@loyal-labs/solana-wallet";
 import { NATIVE_MINT } from "@solana/spl-token";
 
 import { ScanIcon } from "@/components/ui/icons/ScanIcon";
@@ -46,10 +47,8 @@ import { invalidatePrivateClient } from "@/lib/solana/deposits/private-client";
 import { fetchDeposits } from "@/lib/solana/fetch-deposits";
 import { fetchSolUsdPrice } from "@/lib/solana/fetch-sol-price";
 import { getSolanaEnv } from "@/lib/solana/rpc/connection";
-import { computePortfolioTotals } from "@/lib/solana/token-holdings";
 import { formatAddress } from "@/lib/solana/wallet/formatters";
 import {
-  getWalletBalance,
   getWalletKeypair,
   getWalletProvider,
   getWalletPublicKey,
@@ -154,10 +153,13 @@ export default function Home() {
     walletError,
     retryWalletInit,
   } = useWalletInit();
-  const { solBalanceLamports, setSolBalanceLamports, refreshBalance } =
-    useWalletBalance(walletAddress);
-  const { tokenHoldings, isHoldingsLoading, refreshTokenHoldings } =
-    useTokenHoldings(walletAddress);
+  const { solBalanceLamports, refreshBalance } = useWalletBalance(walletAddress);
+  const {
+    portfolioSnapshot,
+    tokenHoldings,
+    isHoldingsLoading,
+    refreshTokenHoldings,
+  } = useTokenHoldings(walletAddress);
   const {
     walletTransactions,
     setWalletTransactions,
@@ -717,7 +719,7 @@ export default function Home() {
         setSelectedTransaction(null);
 
         // Refresh balance and transactions
-        void getWalletBalance(true).then(setSolBalanceLamports);
+        void refreshBalance(true);
       } catch (error) {
         console.error("Failed to refund deposit:", error);
         if (hapticFeedback.notificationOccurred.isAvailable()) {
@@ -726,7 +728,7 @@ export default function Home() {
         throw error; // Re-throw so the sheet can handle it
       }
     },
-    [setSolBalanceLamports]
+    [refreshBalance]
   );
 
   const handleShareAddress = useCallback(async () => {
@@ -891,8 +893,8 @@ export default function Home() {
   });
 
   const portfolioTotals = useMemo(
-    () => computePortfolioTotals(tokenHoldings, solPriceUsd),
-    [tokenHoldings, solPriceUsd]
+    () => computePortfolioTotals(portfolioSnapshot?.positions ?? [], solPriceUsd),
+    [portfolioSnapshot?.positions, solPriceUsd]
   );
 
   const showBalanceSkeleton =

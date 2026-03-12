@@ -1,19 +1,23 @@
+import {
+  flattenPortfolioPositions,
+  type PortfolioSnapshot,
+} from "@loyal-labs/solana-wallet";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  fetchTokenHoldings,
-  subscribeToTokenHoldings,
-  type TokenHolding,
-} from "@/lib/solana/token-holdings";
+import type { TokenHolding } from "@/lib/solana/token-holdings";
 
+import { getTelegramWalletDataClient } from "../solana-wallet-data-client";
 import { HOLDINGS_REFRESH_DEBOUNCE_MS } from "../wallet-cache";
 import { MOCK_TOKEN_HOLDINGS, USE_MOCK_DATA } from "../wallet-mock-data";
 
 export function useTokenHoldings(walletAddress: string | null): {
+  portfolioSnapshot: PortfolioSnapshot | null;
   tokenHoldings: TokenHolding[];
   isHoldingsLoading: boolean;
   refreshTokenHoldings: (forceRefresh?: boolean) => Promise<void>;
 } {
+  const [portfolioSnapshot, setPortfolioSnapshot] =
+    useState<PortfolioSnapshot | null>(null);
   const [tokenHoldings, setTokenHoldings] = useState<TokenHolding[]>(() =>
     USE_MOCK_DATA ? MOCK_TOKEN_HOLDINGS : []
   );
@@ -40,10 +44,17 @@ export function useTokenHoldings(walletAddress: string | null): {
     }
 
     try {
-      const holdings = await fetchTokenHoldings(addr, forceRefresh);
+      const snapshot = await getTelegramWalletDataClient().getPortfolio(addr, {
+        forceRefresh,
+      });
       if (walletAddressRef.current !== addr) return;
       if (holdingsFetchIdRef.current !== fetchId) return;
-      setTokenHoldings(holdings);
+      setPortfolioSnapshot(snapshot);
+      setTokenHoldings(
+        flattenPortfolioPositions(snapshot.positions, {
+          splitSecuredBalances: true,
+        })
+      );
       hasLoadedHoldingsRef.current = true;
     } catch (error) {
       console.error("Failed to fetch token holdings:", error);
@@ -66,6 +77,7 @@ export function useTokenHoldings(walletAddress: string | null): {
 
     hasLoadedHoldingsRef.current = false;
     setIsHoldingsLoading(true);
+    setPortfolioSnapshot(null);
     setTokenHoldings([]);
 
     void refreshTokenHoldings(false);
@@ -81,28 +93,33 @@ export function useTokenHoldings(walletAddress: string | null): {
 
     void (async () => {
       try {
-        unsubscribe = await subscribeToTokenHoldings(
-          walletAddress,
-          (holdings) => {
-            if (isCancelled) return;
-            holdingsFetchIdRef.current += 1;
-            setTokenHoldings(holdings);
-            hasLoadedHoldingsRef.current = true;
-            setIsHoldingsLoading(false);
-          },
-          {
-            debounceMs: HOLDINGS_REFRESH_DEBOUNCE_MS,
-            commitment: "confirmed",
-            includeNative: true,
-            emitInitial: false,
-            onError: (error) => {
-              console.error(
-                "Failed to refresh token holdings from websocket",
-                error
+        unsubscribe =
+          await getTelegramWalletDataClient().subscribePortfolio(
+            walletAddress,
+            (snapshot) => {
+              if (isCancelled) return;
+              holdingsFetchIdRef.current += 1;
+              setPortfolioSnapshot(snapshot);
+              setTokenHoldings(
+                flattenPortfolioPositions(snapshot.positions, {
+                  splitSecuredBalances: true,
+                })
               );
+              hasLoadedHoldingsRef.current = true;
+              setIsHoldingsLoading(false);
             },
-          }
-        );
+            {
+              debounceMs: HOLDINGS_REFRESH_DEBOUNCE_MS,
+              commitment: "confirmed",
+              emitInitial: false,
+              onError: (error) => {
+                console.error(
+                  "Failed to refresh token holdings from websocket",
+                  error
+                );
+              },
+            }
+          );
       } catch (error) {
         console.error("Failed to subscribe to token holdings", error);
       }
@@ -116,5 +133,10 @@ export function useTokenHoldings(walletAddress: string | null): {
     };
   }, [walletAddress]);
 
-  return { tokenHoldings, isHoldingsLoading, refreshTokenHoldings };
+  return {
+    portfolioSnapshot,
+    tokenHoldings,
+    isHoldingsLoading,
+    refreshTokenHoldings,
+  };
 }
