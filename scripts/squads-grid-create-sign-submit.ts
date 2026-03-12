@@ -25,6 +25,17 @@ type CliOptions = {
   perSignerKeypair?: string;
   selfManagedFees: boolean;
   skipSubmit: boolean;
+  noCache: boolean;
+};
+
+type AuthCache = {
+  email: string;
+  environment: "sandbox" | "production";
+  authProvider: "privy" | "turnkey";
+  accountAddress: string;
+  sessionSecrets: unknown[];
+  authentication: unknown[];
+  cachedAt: string;
 };
 
 const DEFAULT_BASE_URL = "https://grid.squads.xyz";
@@ -51,6 +62,7 @@ Options:
   --per-signer-keypair <path>  Local JSON keypair file used to sign for PER before Squads sign
   --self-managed-fees        Include selfManagedFees=true in fee config
   --skip-submit              Only sign (do not call submit/send)
+  --no-cache                 Skip cached auth and force OTP flow
   --help                     Show this help
 
 Env loading:
@@ -104,6 +116,7 @@ const parseArgs = (argv: string[]): CliOptions | null => {
     feeCurrency: "sol",
     selfManagedFees: false,
     skipSubmit: false,
+    noCache: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -176,6 +189,9 @@ const parseArgs = (argv: string[]): CliOptions | null => {
       case "--skip-submit":
         options.skipSubmit = true;
         break;
+      case "--no-cache":
+        options.noCache = true;
+        break;
       case "--help":
       case "-h":
         usage();
@@ -226,6 +242,33 @@ const getErrorMessage = (error: unknown): string => {
 const isEmailAlreadyExistsError = (error: unknown): boolean => {
   const message = getErrorMessage(error).toLowerCase();
   return message.includes("email") && message.includes("already exists");
+};
+
+const AUTH_CACHE_DIR = path.resolve(__dirname, ".state");
+
+const getAuthCachePath = (email: string, environment: string): string =>
+  path.join(AUTH_CACHE_DIR, `squads-grid-auth-${email}-${environment}.json`);
+
+const saveAuthCache = (cache: AuthCache): void => {
+  fs.mkdirSync(AUTH_CACHE_DIR, { recursive: true });
+  const cachePath = getAuthCachePath(cache.email, cache.environment);
+  fs.writeFileSync(cachePath, JSON.stringify(cache, null, 2), "utf8");
+  console.log(`Auth cached to ${cachePath}`);
+};
+
+const loadAuthCache = (
+  email: string,
+  environment: string
+): AuthCache | null => {
+  const cachePath = getAuthCachePath(email, environment);
+  if (!fs.existsSync(cachePath)) {
+    return null;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(cachePath, "utf8")) as AuthCache;
+  } catch {
+    return null;
+  }
 };
 
 const promptForOtp = async (): Promise<string> => {
@@ -321,62 +364,124 @@ const run = async (): Promise<void> => {
     baseUrl: options.baseUrl,
   });
 
-  console.log(
-    `[1/${totalSteps}] Generating session secrets (${options.environment}) and requesting OTP for ${email}`
-  );
-  const sessionSecrets = await grid.generateSessionSecrets();
+  let accountAddress: string;
+  let authentication: unknown[];
+  let sessionSecrets: Awaited<ReturnType<typeof grid.generateSessionSecrets>>;
 
-  let authMode: "create" | "existing" = "create";
-  let existingAccountOtpId: string | undefined;
-  try {
-    await grid.createAccount({ email });
-  } catch (error: unknown) {
-    if (!isEmailAlreadyExistsError(error)) {
-      throw error;
-    }
+  // Try cached auth first
+  const cached = options.noCache
+    ? null
+    : loadAuthCache(email, options.environment);
+  let usedCache = false;
 
-    authMode = "existing";
+  if (cached) {
     console.log(
-      `Email already exists in Grid, switching to existing-account auth (${options.authProvider})`
+      `[1/${totalSteps}] Found cached auth, attempting session refresh`
     );
-
-    const initAuth = await grid.initAuth({
-      email,
-      provider: options.authProvider,
-    });
-    if ("otpId" in initAuth.data) {
-      existingAccountOtpId = initAuth.data.otpId;
+    try {
+      sessionSecrets = cached.sessionSecrets as typeof sessionSecrets;
+      const privyProvider = (
+        cached.authentication as Array<{ provider: string; session?: unknown }>
+      ).find((p) => p.provider === "privy");
+      if (privyProvider?.session) {
+        const refreshed = await grid.refreshSession({
+          kmsPayload: {
+            provider: "privy",
+            session: privyProvider.session as never,
+          },
+          encryptionPublicKey: sessionSecrets[0]?.publicKey ?? "",
+        });
+        // Update the cached provider session with refreshed data
+        const refreshedAuth = cached.authentication as Array<{
+          provider: string;
+          session?: unknown;
+        }>;
+        const idx = refreshedAuth.findIndex((p) => p.provider === "privy");
+        if (idx >= 0 && refreshedAuth[idx]) {
+          refreshedAuth[idx].session = refreshed.data.kmsPayload.session;
+        }
+        authentication = refreshedAuth;
+      } else {
+        authentication = cached.authentication as unknown[];
+      }
+      accountAddress = cached.accountAddress;
+      usedCache = true;
+      console.log(`Session refreshed from cache for ${accountAddress}`);
+    } catch (err: unknown) {
+      console.log(
+        `Cache refresh failed (${getErrorMessage(err)}), falling back to OTP`
+      );
+      usedCache = false;
     }
   }
 
-  const otpCode = options.otp ?? (await promptForOtp());
+  if (!usedCache) {
+    console.log(
+      `[1/${totalSteps}] Generating session secrets (${options.environment}) and requesting OTP for ${email}`
+    );
+    sessionSecrets = await grid.generateSessionSecrets();
 
-  let accountAddress: string;
-  let authentication: unknown[];
-  if (authMode === "create") {
-    console.log(`[2/${totalSteps}] Completing auth + creating account`);
-    const createdAccount = await grid.completeAuthAndCreateAccount({
-      otpCode,
-      user: { email },
-      sessionSecrets,
-    });
-    accountAddress = createdAccount.data.address;
-    authentication = createdAccount.data.authentication;
-    console.log(`Created account: ${accountAddress}`);
-  } else {
-    console.log(`[2/${totalSteps}] Completing auth for existing account`);
-    const existingAccount = await grid.completeAuth({
-      otpCode,
-      user: {
+    let authMode: "create" | "existing" = "create";
+    let existingAccountOtpId: string | undefined;
+    try {
+      await grid.createAccount({ email });
+    } catch (error: unknown) {
+      if (!isEmailAlreadyExistsError(error)) {
+        throw error;
+      }
+
+      authMode = "existing";
+      console.log(
+        `Email already exists in Grid, switching to existing-account auth (${options.authProvider})`
+      );
+
+      const initAuth = await grid.initAuth({
         email,
         provider: options.authProvider,
-        otpId: existingAccountOtpId,
-      },
-      sessionSecrets,
+      });
+      if ("otpId" in initAuth.data) {
+        existingAccountOtpId = initAuth.data.otpId;
+      }
+    }
+
+    const otpCode = options.otp ?? (await promptForOtp());
+
+    if (authMode === "create") {
+      console.log(`[2/${totalSteps}] Completing auth + creating account`);
+      const createdAccount = await grid.completeAuthAndCreateAccount({
+        otpCode,
+        user: { email },
+        sessionSecrets,
+      });
+      accountAddress = createdAccount.data.address;
+      authentication = createdAccount.data.authentication;
+      console.log(`Created account: ${accountAddress}`);
+    } else {
+      console.log(`[2/${totalSteps}] Completing auth for existing account`);
+      const existingAccount = await grid.completeAuth({
+        otpCode,
+        user: {
+          email,
+          provider: options.authProvider,
+          otpId: existingAccountOtpId,
+        },
+        sessionSecrets,
+      });
+      accountAddress = existingAccount.data.address;
+      authentication = existingAccount.data.authentication;
+      console.log(`Authenticated account: ${accountAddress}`);
+    }
+
+    // Cache auth for future runs
+    saveAuthCache({
+      email,
+      environment: options.environment,
+      authProvider: options.authProvider,
+      accountAddress,
+      sessionSecrets: sessionSecrets as unknown[],
+      authentication: authentication as unknown[],
+      cachedAt: new Date().toISOString(),
     });
-    accountAddress = existingAccount.data.address;
-    authentication = existingAccount.data.authentication;
-    console.log(`Authenticated account: ${accountAddress}`);
   }
 
   const recipient = options.to ?? accountAddress;
@@ -394,6 +499,7 @@ const run = async (): Promise<void> => {
     options.lamports,
     rpcUrl
   );
+  console.log("unsignedBase64", unsignedBase64);
 
   console.log(
     `[4/${totalSteps}] Preparing transaction payload with Squads Grid`
@@ -407,6 +513,7 @@ const run = async (): Promise<void> => {
       ...(options.selfManagedFees ? { selfManagedFees: true } : {}),
     },
   });
+  console.log("prepared", prepared.data);
 
   let payloadForGridSign = prepared.data;
   if (perSigner) {
@@ -439,6 +546,7 @@ const run = async (): Promise<void> => {
     session: authentication,
     transactionPayload: payloadForGridSign,
   });
+  console.log("signed", signed);
   console.log(`Signed payload providers: ${signed.kmsPayloads.length}`);
 
   if (options.skipSubmit) {
@@ -457,6 +565,7 @@ const run = async (): Promise<void> => {
     address: accountAddress,
     signedTransactionPayload: signed,
   });
+  console.log("submitted", submitted.data);
 
   console.log(
     "Submitted transaction signature:",
