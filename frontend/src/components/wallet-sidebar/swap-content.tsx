@@ -37,15 +37,54 @@ function TokenPill({
       }}
       type="button"
     >
-      <div style={{ display: "flex", alignItems: "center", paddingRight: "6px", padding: "4px 6px 4px 4px" }}>
-        <div style={{ width: "28px", height: "28px", borderRadius: "9999px", overflow: "hidden" }}>
-          <Image alt={token.symbol} height={28} src={token.icon} style={{ width: "100%", height: "100%", objectFit: "cover" }} width={28} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          paddingRight: "6px",
+          padding: "4px 6px 4px 4px",
+        }}
+      >
+        <div
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "9999px",
+            overflow: "hidden",
+          }}
+        >
+          <Image
+            alt={token.symbol}
+            height={28}
+            src={token.icon}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            width={28}
+          />
         </div>
       </div>
-      <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 500, lineHeight: "20px", color: "#000", letterSpacing: "-0.176px", whiteSpace: "nowrap", padding: "8px 0" }}>
+      <span
+        style={{
+          fontFamily: font,
+          fontSize: "16px",
+          fontWeight: 500,
+          lineHeight: "20px",
+          color: "#000",
+          letterSpacing: "-0.176px",
+          whiteSpace: "nowrap",
+          padding: "8px 0",
+        }}
+      >
         {token.symbol}
       </span>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "36px", padding: "8px 0" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "36px",
+          padding: "8px 0",
+        }}
+      >
         <ChevronRight size={16} style={{ color: "#3C3C43" }} />
       </div>
     </button>
@@ -64,16 +103,50 @@ function SwapStatusHeader({
   onClose: () => void;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px" }}>
-      <div style={{ flex: 1, paddingLeft: "12px", paddingTop: "4px", paddingBottom: "4px" }}>
-        <span style={{ fontFamily: font, fontSize: "18px", fontWeight: 600, lineHeight: "28px", color: "#000" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px",
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          paddingLeft: "12px",
+          paddingTop: "4px",
+          paddingBottom: "4px",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: font,
+            fontSize: "18px",
+            fontWeight: 600,
+            lineHeight: "28px",
+            color: "#000",
+          }}
+        >
           Swap {fromToken.symbol} to {toToken.symbol}
         </span>
       </div>
       <button
         className="swap-status-close"
         onClick={onClose}
-        style={{ width: "36px", height: "36px", display: "flex", justifyContent: "center", alignItems: "center", background: "rgba(0, 0, 0, 0.04)", border: "none", borderRadius: "9999px", cursor: "pointer", transition: "all 0.2s ease", color: "#3C3C43" }}
+        style={{
+          width: "36px",
+          height: "36px",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          background: "rgba(0, 0, 0, 0.04)",
+          border: "none",
+          borderRadius: "9999px",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          color: "#3C3C43",
+        }}
         type="button"
       >
         <X size={24} />
@@ -94,30 +167,113 @@ function SwapProcessing({
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <style jsx>{`
-        .swap-status-close:hover { background: rgba(0, 0, 0, 0.08) !important; }
+        .swap-status-close:hover {
+          background: rgba(0, 0, 0, 0.08) !important;
+        }
         @keyframes chevronBounce {
-          0%, 100% { transform: translateX(0); }
-          50% { transform: translateX(4px); }
+          0%,
+          100% {
+            transform: translateX(0);
+          }
+          50% {
+            transform: translateX(4px);
+          }
         }
       `}</style>
 
-      <SwapStatusHeader fromToken={fromToken} onClose={onClose} toToken={toToken} />
+      <SwapStatusHeader
+        fromToken={fromToken}
+        onClose={onClose}
+        toToken={toToken}
+      />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", padding: "24px 32px" }}>
-          <div style={{ display: "flex", gap: "16px", alignItems: "center", padding: "8px 0" }}>
-            <div style={{ width: "64px", height: "64px", borderRadius: "9999px", overflow: "hidden", flexShrink: 0 }}>
-              <Image alt={fromToken.symbol} height={64} src={fromToken.icon} style={{ width: "100%", height: "100%", objectFit: "cover" }} width={64} />
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "20px",
+            alignItems: "center",
+            padding: "24px 32px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: "16px",
+              alignItems: "center",
+              padding: "8px 0",
+            }}
+          >
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "9999px",
+                overflow: "hidden",
+                flexShrink: 0,
+              }}
+            >
+              <Image
+                alt={fromToken.symbol}
+                height={64}
+                src={fromToken.icon}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                width={64}
+              />
             </div>
-            <ChevronRight size={16} style={{ color: secondary, animation: "chevronBounce 1s ease-in-out infinite" }} />
-            <div style={{ width: "64px", height: "64px", borderRadius: "9999px", overflow: "hidden", flexShrink: 0 }}>
-              <Image alt={toToken.symbol} height={64} src={toToken.icon} style={{ width: "100%", height: "100%", objectFit: "cover" }} width={64} />
+            <ChevronRight
+              size={16}
+              style={{
+                color: secondary,
+                animation: "chevronBounce 1s ease-in-out infinite",
+              }}
+            />
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "9999px",
+                overflow: "hidden",
+                flexShrink: 0,
+              }}
+            >
+              <Image
+                alt={toToken.symbol}
+                height={64}
+                src={toToken.icon}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                width={64}
+              />
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "center", textAlign: "center" }}>
-            <span style={{ fontFamily: font, fontSize: "20px", fontWeight: 600, lineHeight: "24px", color: "#000" }}>Swapping...</span>
-            <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary, maxWidth: "285px" }}>
-              You can close this screen and continue using the app
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              alignItems: "center",
+              textAlign: "center",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: font,
+                fontSize: "20px",
+                fontWeight: 600,
+                lineHeight: "24px",
+                color: "#000",
+              }}
+            >
+              Swapping...
             </span>
           </div>
         </div>
@@ -126,7 +282,20 @@ function SwapProcessing({
       <div style={{ padding: "16px 20px" }}>
         <button
           disabled
-          style={{ width: "100%", padding: "12px 16px", borderRadius: "9999px", background: "#CCCDCD", border: "none", cursor: "default", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#fff", textAlign: "center" }}
+          style={{
+            width: "100%",
+            padding: "12px 16px",
+            borderRadius: "9999px",
+            background: "#CCCDCD",
+            border: "none",
+            cursor: "default",
+            fontFamily: font,
+            fontSize: "16px",
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: "#fff",
+            textAlign: "center",
+          }}
           type="button"
         >
           In progress...
@@ -160,37 +329,111 @@ function SwapResult({
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <style jsx>{`
-        .swap-status-close:hover { background: rgba(0, 0, 0, 0.08) !important; }
-        .done-btn:hover { background: #333 !important; }
-        .done-secondary-btn:hover { background: rgba(0, 0, 0, 0.08) !important; }
+        .swap-status-close:hover {
+          background: rgba(0, 0, 0, 0.08) !important;
+        }
+        .done-btn:hover {
+          background: #333 !important;
+        }
+        .done-secondary-btn:hover {
+          background: rgba(0, 0, 0, 0.08) !important;
+        }
         @keyframes mascotNod {
-          0%, 100% { transform: rotate(0deg); }
-          25% { transform: rotate(4deg); }
-          75% { transform: rotate(-4deg); }
+          0%,
+          100% {
+            transform: rotate(0deg);
+          }
+          25% {
+            transform: rotate(4deg);
+          }
+          75% {
+            transform: rotate(-4deg);
+          }
         }
       `}</style>
 
-      <SwapStatusHeader fromToken={fromToken} onClose={onClose} toToken={toToken} />
+      <SwapStatusHeader
+        fromToken={fromToken}
+        onClose={onClose}
+        toToken={toToken}
+      />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", padding: "24px 32px" }}>
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "20px",
+            alignItems: "center",
+            padding: "24px 32px",
+          }}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             alt={isSuccess ? "Success" : "Error"}
             src={isSuccess ? "/hero-new/success.svg" : "/hero-new/error.svg"}
-            style={{ width: "100px", height: "80px", animation: "mascotNod 0.6s ease-in-out 2", transformOrigin: "center bottom" }}
+            style={{
+              width: "100px",
+              height: "80px",
+              animation: "mascotNod 0.6s ease-in-out 2",
+              transformOrigin: "center bottom",
+            }}
           />
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "center", textAlign: "center" }}>
-            <span style={{ fontFamily: font, fontSize: "20px", fontWeight: 600, lineHeight: "24px", color: "#000" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              alignItems: "center",
+              textAlign: "center",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: font,
+                fontSize: "20px",
+                fontWeight: 600,
+                lineHeight: "24px",
+                color: "#000",
+              }}
+            >
               {isSuccess ? "Swap Completed" : "Swap Failed"}
             </span>
             {isSuccess ? (
-              <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary, maxWidth: "255px" }}>
-                <span style={{ color: "#000" }}>{receivedAmount} {toToken.symbol}</span>
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: secondary,
+                  maxWidth: "255px",
+                }}
+              >
+                <span style={{ color: "#000" }}>
+                  {receivedAmount} {toToken.symbol}
+                </span>
                 {" has been deposited to your wallet"}
               </span>
             ) : (
-              <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary, maxWidth: "255px" }}>
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: secondary,
+                  maxWidth: "255px",
+                }}
+              >
                 {errorMessage || "Something went wrong. Please try again."}
               </span>
             )}
@@ -198,12 +441,33 @@ function SwapResult({
         </div>
       </div>
 
-      <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div
+        style={{
+          padding: "16px 20px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+        }}
+      >
         {isSuccess && (
           <button
             className="done-btn"
             onClick={onDetails}
-            style={{ width: "100%", padding: "12px 16px", borderRadius: "9999px", background: "#000", border: "none", cursor: "pointer", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#fff", textAlign: "center", transition: "background 0.15s ease" }}
+            style={{
+              width: "100%",
+              padding: "12px 16px",
+              borderRadius: "9999px",
+              background: "#000",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: font,
+              fontSize: "16px",
+              fontWeight: 400,
+              lineHeight: "20px",
+              color: "#fff",
+              textAlign: "center",
+              transition: "background 0.15s ease",
+            }}
             type="button"
           >
             Transaction Details
@@ -254,42 +518,183 @@ function SwapTransactionDetail({
   onDone: () => void;
 }) {
   const now = new Date();
-  const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const dateStr = now.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <style jsx>{`
-        .swap-status-close:hover { background: rgba(0, 0, 0, 0.08) !important; }
-        .swap-tx-action-btn:hover { background: rgba(249, 54, 60, 0.22) !important; }
-        .swap-tx-done-btn:hover { background: #333 !important; }
+        .swap-status-close:hover {
+          background: rgba(0, 0, 0, 0.08) !important;
+        }
+        .swap-tx-action-btn:hover {
+          background: rgba(249, 54, 60, 0.22) !important;
+        }
+        .swap-tx-done-btn:hover {
+          background: #333 !important;
+        }
       `}</style>
 
-      <SwapStatusHeader fromToken={fromToken} onClose={onClose} toToken={toToken} />
+      <SwapStatusHeader
+        fromToken={fromToken}
+        onClose={onClose}
+        toToken={toToken}
+      />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px", overflowY: "auto" }}>
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "8px",
+          overflowY: "auto",
+        }}
+      >
         {/* Amount hero */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 12px 24px", width: "100%" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "100%" }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: "8px", fontFamily: font, fontWeight: 600, whiteSpace: "nowrap" }}>
-              <span style={{ fontSize: "40px", lineHeight: "48px", color: "#34C759" }}>+{receivedAmount}</span>
-              <span style={{ fontSize: "28px", lineHeight: "32px", color: "rgba(60, 60, 67, 0.4)", letterSpacing: "0.4px" }}>{toToken.symbol}</span>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "32px 12px 24px",
+            width: "100%",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              width: "100%",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: "8px",
+                fontFamily: font,
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "40px",
+                  lineHeight: "48px",
+                  color: "#34C759",
+                }}
+              >
+                +{receivedAmount}
+              </span>
+              <span
+                style={{
+                  fontSize: "28px",
+                  lineHeight: "32px",
+                  color: "rgba(60, 60, 67, 0.4)",
+                  letterSpacing: "0.4px",
+                }}
+              >
+                {toToken.symbol}
+              </span>
             </div>
-            <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary }}>≈{usdValue}</span>
-            <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary }}>{dateStr}, {timeStr}</span>
+            <span
+              style={{
+                fontFamily: font,
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: secondary,
+              }}
+            >
+              ≈{usdValue}
+            </span>
+            <span
+              style={{
+                fontFamily: font,
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: secondary,
+              }}
+            >
+              {dateStr}, {timeStr}
+            </span>
           </div>
         </div>
 
         {/* Details card */}
         <div style={{ width: "100%" }}>
-          <div style={{ background: "rgba(0, 0, 0, 0.04)", borderRadius: "16px", padding: "4px 0", display: "flex", flexDirection: "column" }}>
+          <div
+            style={{
+              background: "rgba(0, 0, 0, 0.04)",
+              borderRadius: "16px",
+              padding: "4px 0",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             <div style={{ padding: "9px 12px" }}>
-              <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, display: "block" }}>Status</span>
-              <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#000", display: "block", marginTop: "2px" }}>Completed</span>
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "13px",
+                  fontWeight: 400,
+                  lineHeight: "16px",
+                  color: secondary,
+                  display: "block",
+                }}
+              >
+                Status
+              </span>
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: "#000",
+                  display: "block",
+                  marginTop: "2px",
+                }}
+              >
+                Completed
+              </span>
             </div>
             <div style={{ padding: "9px 12px" }}>
-              <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, display: "block" }}>Network Fee</span>
-              <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px" }}>
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "13px",
+                  fontWeight: 400,
+                  lineHeight: "16px",
+                  color: secondary,
+                  display: "block",
+                }}
+              >
+                Network Fee
+              </span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  marginTop: "2px",
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                }}
+              >
                 <span style={{ color: "#000" }}>0.00005 SOL</span>
                 <span style={{ color: secondary }}>≈ $0.00</span>
               </div>
@@ -298,28 +703,109 @@ function SwapTransactionDetail({
         </div>
 
         {/* Action buttons */}
-        <div style={{ display: "flex", alignItems: "center", paddingTop: "20px", paddingBottom: "16px", width: "100%" }}>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            paddingTop: "20px",
+            paddingBottom: "16px",
+            width: "100%",
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
             <button
               className="swap-tx-action-btn"
-              onClick={() => signature && window.open(`https://explorer.solana.com/tx/${signature}`, "_blank")}
-              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: signature ? "pointer" : "default", opacity: signature ? 1 : 0.5, transition: "background-color 0.15s ease" }}
+              onClick={() =>
+                signature &&
+                window.open(
+                  `https://explorer.solana.com/tx/${signature}`,
+                  "_blank"
+                )
+              }
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "9999px",
+                background: "rgba(249, 54, 60, 0.14)",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: signature ? "pointer" : "default",
+                opacity: signature ? 1 : 0.5,
+                transition: "background-color 0.15s ease",
+              }}
               type="button"
             >
               <Globe size={24} style={{ color: "#3C3C43" }} />
             </button>
-            <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, textAlign: "center" }}>View in explorer</span>
+            <span
+              style={{
+                fontFamily: font,
+                fontSize: "13px",
+                fontWeight: 400,
+                lineHeight: "16px",
+                color: secondary,
+                textAlign: "center",
+              }}
+            >
+              View in explorer
+            </span>
           </div>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
             <button
               className="swap-tx-action-btn"
-              onClick={() => signature && void navigator.clipboard.writeText(`https://explorer.solana.com/tx/${signature}`)}
-              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: signature ? "pointer" : "default", opacity: signature ? 1 : 0.5, transition: "background-color 0.15s ease" }}
+              onClick={() =>
+                signature &&
+                void navigator.clipboard.writeText(
+                  `https://explorer.solana.com/tx/${signature}`
+                )
+              }
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "9999px",
+                background: "rgba(249, 54, 60, 0.14)",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: signature ? "pointer" : "default",
+                opacity: signature ? 1 : 0.5,
+                transition: "background-color 0.15s ease",
+              }}
               type="button"
             >
               <Share size={24} style={{ color: "#3C3C43" }} />
             </button>
-            <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, textAlign: "center" }}>Share</span>
+            <span
+              style={{
+                fontFamily: font,
+                fontSize: "13px",
+                fontWeight: 400,
+                lineHeight: "16px",
+                color: secondary,
+                textAlign: "center",
+              }}
+            >
+              Share
+            </span>
           </div>
         </div>
       </div>
@@ -329,7 +815,21 @@ function SwapTransactionDetail({
         <button
           className="swap-tx-done-btn"
           onClick={onDone}
-          style={{ width: "100%", padding: "12px 16px", borderRadius: "9999px", background: "#000", border: "none", cursor: "pointer", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#fff", textAlign: "center", transition: "background 0.15s ease" }}
+          style={{
+            width: "100%",
+            padding: "12px 16px",
+            borderRadius: "9999px",
+            background: "#000",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: font,
+            fontSize: "16px",
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: "#fff",
+            textAlign: "center",
+            transition: "background 0.15s ease",
+          }}
           type="button"
         >
           Done
@@ -366,7 +866,15 @@ export function SwapContent({
   onFormActiveChange?: (isForm: boolean) => void;
   onFormButtonChange?: (props: FormButtonProps | null) => void;
 }) {
-  const { getQuote, executeSwap, resetQuote, quote, isAvailable, unavailableReason, error: swapError } = useSwap();
+  const {
+    getQuote,
+    executeSwap,
+    resetQuote,
+    quote,
+    isAvailable,
+    unavailableReason,
+    error: swapError,
+  } = useSwap();
   const [fromAmount, setFromAmount] = useState("");
   const [phase, setPhase] = useState<SwapPhase>("form");
   const [resultAmount, setResultAmount] = useState("");
@@ -414,26 +922,38 @@ export function SwapContent({
         fromToken.symbol,
         toToken.symbol,
         String(numericFrom),
-        fromToken.mint,
+        fromToken.mint
       ).finally(() => setIsQuoting(false));
     }, 500);
     return () => {
       if (quoteTimerRef.current) clearTimeout(quoteTimerRef.current);
     };
-  }, [fromAmount, fromToken.symbol, fromToken.mint, toToken.symbol, hasAmount, insufficientFunds, phase, getQuote, resetQuote, numericFrom]);
+  }, [
+    fromAmount,
+    fromToken.symbol,
+    fromToken.mint,
+    toToken.symbol,
+    hasAmount,
+    insufficientFunds,
+    phase,
+    getQuote,
+    resetQuote,
+    numericFrom,
+  ]);
 
   const buttonLabel = !isAvailable
-    ? (unavailableReason ?? "Swap unavailable")
+    ? unavailableReason ?? "Swap unavailable"
     : !hasAmount
-      ? "Enter Amount"
-      : insufficientFunds
-        ? "Insufficient Funds"
-        : isQuoting
-          ? "Getting quote..."
-          : !quote
-            ? "Enter Amount"
-            : "Confirm and Swap";
-  const buttonDisabled = !isAvailable || !hasAmount || insufficientFunds || isQuoting || !quote;
+    ? "Enter Amount"
+    : insufficientFunds
+    ? "Insufficient Funds"
+    : isQuoting
+    ? "Getting quote..."
+    : !quote
+    ? "Enter Amount"
+    : "Confirm and Swap";
+  const buttonDisabled =
+    !isAvailable || !hasAmount || insufficientFunds || isQuoting || !quote;
   const amountColor = insufficientFunds && hasAmount ? red : "#000";
 
   const handleSwapTokens = useCallback(() => {
@@ -453,7 +973,16 @@ export function SwapContent({
   const handleConfirm = useCallback(async () => {
     if (!quote) return;
     setResultAmount(hasAmount ? Number(toAmount.toFixed(6)).toString() : "0");
-    setResultUsd(`$${hasAmount ? (toAmount * toToken.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0"}`);
+    setResultUsd(
+      `$${
+        hasAmount
+          ? (toAmount * toToken.price).toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })
+          : "0"
+      }`
+    );
     setResultSignature(undefined);
     setErrorMessage(undefined);
     setPhase("processing");
@@ -478,7 +1007,11 @@ export function SwapContent({
       onFormButtonChange(null);
       return;
     }
-    onFormButtonChange({ label: buttonLabel, disabled: buttonDisabled, onClick: handleConfirm });
+    onFormButtonChange({
+      label: buttonLabel,
+      disabled: buttonDisabled,
+      onClick: handleConfirm,
+    });
   });
 
   // Cross-fade between phases
@@ -499,49 +1032,192 @@ export function SwapContent({
 
   const handlePercentage = useCallback(
     (pct: number) => {
-      const val = pct === 100 ? fromToken.balance : fromToken.balance * (pct / 100);
+      const val =
+        pct === 100 ? fromToken.balance : fromToken.balance * (pct / 100);
       setFromAmount(val > 0 ? String(Number(val.toFixed(6))) : "");
     },
-    [fromToken.balance],
+    [fromToken.balance]
   );
 
   const renderPhaseContent = (p: SwapPhase) => {
     if (p === "processing") {
-      return <SwapProcessing fromToken={fromToken} onClose={onClose} toToken={toToken} />;
+      return (
+        <SwapProcessing
+          fromToken={fromToken}
+          onClose={onClose}
+          toToken={toToken}
+        />
+      );
     }
     if (p === "success" || p === "error") {
-      return <SwapResult errorMessage={errorMessage} fromToken={fromToken} onClose={onClose} onDetails={() => setPhase("details")} onDone={onDone} receivedAmount={resultAmount} toToken={toToken} variant={p} />;
+      return (
+        <SwapResult
+          errorMessage={errorMessage}
+          fromToken={fromToken}
+          onClose={onClose}
+          onDetails={() => setPhase("details")}
+          onDone={onDone}
+          receivedAmount={resultAmount}
+          toToken={toToken}
+          variant={p}
+        />
+      );
     }
     if (p === "details") {
-      return <SwapTransactionDetail fromToken={fromToken} onClose={onClose} onDone={onDone} receivedAmount={resultAmount} signature={resultSignature} toToken={toToken} usdValue={resultUsd} />;
+      return (
+        <SwapTransactionDetail
+          fromToken={fromToken}
+          onClose={onClose}
+          onDone={onDone}
+          receivedAmount={resultAmount}
+          signature={resultSignature}
+          toToken={toToken}
+          usdValue={resultUsd}
+        />
+      );
     }
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <style jsx>{`
-          .swap-close:hover { background: rgba(0, 0, 0, 0.08) !important; }
-          .pct-btn:hover { opacity: 0.7; }
-          .swap-circle:hover { background: #333 !important; }
-          .confirm-btn:not(:disabled):hover { background: #333 !important; }
+          .swap-close:hover {
+            background: rgba(0, 0, 0, 0.08) !important;
+          }
+          .pct-btn:hover {
+            opacity: 0.7;
+          }
+          .swap-circle:hover {
+            background: #333 !important;
+          }
+          .confirm-btn:not(:disabled):hover {
+            background: #333 !important;
+          }
         `}</style>
 
         {/* Header with tabs — hidden when parent owns chrome */}
-        {!hideFormChrome && <SwapShieldTabs mode={swapMode} onClose={onClose} onModeChange={onSwapModeChange} />}
+        {!hideFormChrome && (
+          <SwapShieldTabs
+            mode={swapMode}
+            onClose={onClose}
+            onModeChange={onSwapModeChange}
+          />
+        )}
 
         {/* Body */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px", overflow: "auto", padding: "8px 8px 16px" }}>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: "16px",
+            overflow: "auto",
+            padding: "8px 8px 16px",
+          }}
+        >
           {/* Swap inputs container */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", position: "relative", isolation: "isolate", overflow: "visible" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+              position: "relative",
+              isolation: "isolate",
+              overflow: "visible",
+            }}
+          >
             {/* From card */}
-            <div style={{ background: "#fff", borderRadius: "16px", padding: "10px 12px", position: "relative", zIndex: 2 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: font, fontWeight: 400, lineHeight: "20px", whiteSpace: "nowrap" }}>
-                <span style={{ fontSize: "16px", color: secondary }}>You swap</span>
-                <div style={{ display: "flex", gap: "16px", alignItems: "center", fontSize: "14px", color: red }}>
-                  <button className="pct-btn" onClick={() => handlePercentage(25)} style={{ background: "none", border: "none", cursor: "pointer", color: red, fontFamily: font, fontSize: "14px", fontWeight: 400, padding: 0 }} type="button">25%</button>
-                  <button className="pct-btn" onClick={() => handlePercentage(50)} style={{ background: "none", border: "none", cursor: "pointer", color: red, fontFamily: font, fontSize: "14px", fontWeight: 400, padding: 0 }} type="button">50%</button>
-                  <button className="pct-btn" onClick={() => handlePercentage(100)} style={{ background: "none", border: "none", cursor: "pointer", color: red, fontFamily: font, fontSize: "14px", fontWeight: 400, padding: 0 }} type="button">Max</button>
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                padding: "10px 12px",
+                position: "relative",
+                zIndex: 2,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  fontFamily: font,
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ fontSize: "16px", color: secondary }}>
+                  You swap
+                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "16px",
+                    alignItems: "center",
+                    fontSize: "14px",
+                    color: red,
+                  }}
+                >
+                  <button
+                    className="pct-btn"
+                    onClick={() => handlePercentage(25)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: red,
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      padding: 0,
+                    }}
+                    type="button"
+                  >
+                    25%
+                  </button>
+                  <button
+                    className="pct-btn"
+                    onClick={() => handlePercentage(50)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: red,
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      padding: 0,
+                    }}
+                    type="button"
+                  >
+                    50%
+                  </button>
+                  <button
+                    className="pct-btn"
+                    onClick={() => handlePercentage(100)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: red,
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      padding: 0,
+                    }}
+                    type="button"
+                  >
+                    Max
+                  </button>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: "4px", height: "48px", alignItems: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "4px",
+                  height: "48px",
+                  alignItems: "center",
+                }}
+              >
                 <input
                   inputMode="decimal"
                   onChange={(e) => {
@@ -549,22 +1225,81 @@ export function SwapContent({
                     if (v === "" || /^\d*\.?\d*$/.test(v)) setFromAmount(v);
                   }}
                   placeholder="0"
-                  style={{ flex: 1, fontFamily: font, fontSize: "32px", fontWeight: 600, lineHeight: "36px", color: amountColor, background: "none", border: "none", outline: "none", padding: 0, minWidth: 0 }}
+                  style={{
+                    flex: 1,
+                    fontFamily: font,
+                    fontSize: "32px",
+                    fontWeight: 600,
+                    lineHeight: "36px",
+                    color: amountColor,
+                    background: "none",
+                    border: "none",
+                    outline: "none",
+                    padding: 0,
+                    minWidth: 0,
+                  }}
                   type="text"
                   value={fromAmount}
                 />
-                <TokenPill onClick={() => onNavigate({ type: "tokenSelect", field: "from" })} token={fromToken} variant="from" />
+                <TokenPill
+                  onClick={() =>
+                    onNavigate({ type: "tokenSelect", field: "from" })
+                  }
+                  token={fromToken}
+                  variant="from"
+                />
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                  <div style={{ width: "20px", height: "20px", borderRadius: "9999px", background: "#F5F5F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <ArrowDownUp size={12} style={{ color: secondary, opacity: 0.4 }} />
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div
+                  style={{ display: "flex", gap: "6px", alignItems: "center" }}
+                >
+                  <div
+                    style={{
+                      width: "20px",
+                      height: "20px",
+                      borderRadius: "9999px",
+                      background: "#F5F5F5",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <ArrowDownUp
+                      size={12}
+                      style={{ color: secondary, opacity: 0.4 }}
+                    />
                   </div>
-                  <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: secondary }}>
-                    1 {fromToken.symbol} ≈ ${fromToken.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                  <span
+                    style={{
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      lineHeight: "20px",
+                      color: secondary,
+                    }}
+                  >
+                    1 {fromToken.symbol} ≈ $
+                    {fromToken.price.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 4,
+                    })}
                   </span>
                 </div>
-                <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: secondary }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
                   Balance: {fromToken.balance.toLocaleString()}{" "}
                 </span>
               </div>
@@ -597,21 +1332,94 @@ export function SwapContent({
             </div>
 
             {/* To card */}
-            <div style={{ background: "#fff", borderRadius: "16px", padding: "12px", zIndex: 1 }}>
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                padding: "12px",
+                zIndex: 1,
+              }}
+            >
               <div style={{ display: "flex", alignItems: "center" }}>
-                <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary }}>You receive</span>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
+                  You receive
+                </span>
               </div>
-              <div style={{ display: "flex", gap: "4px", height: "48px", alignItems: "center" }}>
-                <span style={{ flex: 1, fontFamily: font, fontSize: "32px", fontWeight: 600, lineHeight: "36px", color: insufficientFunds && hasAmount ? red : hasAmount ? "#000" : secondary, minWidth: 0 }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "4px",
+                  height: "48px",
+                  alignItems: "center",
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    fontFamily: font,
+                    fontSize: "32px",
+                    fontWeight: 600,
+                    lineHeight: "36px",
+                    color:
+                      insufficientFunds && hasAmount
+                        ? red
+                        : hasAmount
+                        ? "#000"
+                        : secondary,
+                    minWidth: 0,
+                  }}
+                >
                   {hasAmount ? Number(toAmount.toFixed(6)).toString() : "0"}
                 </span>
-                <TokenPill onClick={() => onNavigate({ type: "tokenSelect", field: "to" })} token={toToken} variant="to" />
+                <TokenPill
+                  onClick={() =>
+                    onNavigate({ type: "tokenSelect", field: "to" })
+                  }
+                  token={toToken}
+                  variant="to"
+                />
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: secondary }}>
-                  ${hasAmount ? Number(toUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0"}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
+                  $
+                  {hasAmount
+                    ? Number(toUsd).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : "0"}
                 </span>
-                <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: secondary }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
                   Balance: {toToken.balance.toLocaleString()}{" "}
                 </span>
               </div>
@@ -620,21 +1428,99 @@ export function SwapContent({
 
           {/* Details card (only when amount entered) */}
           {hasAmount && (
-            <div style={{ background: "rgba(0, 0, 0, 0.04)", borderRadius: "16px", padding: "4px 0" }}>
+            <div
+              style={{
+                background: "rgba(0, 0, 0, 0.04)",
+                borderRadius: "16px",
+                padding: "4px 0",
+              }}
+            >
               <div style={{ padding: "10px 12px" }}>
-                <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, display: "block" }}>Rate</span>
-                <div style={{ display: "flex", gap: "4px", alignItems: "center", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", marginTop: "2px" }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    lineHeight: "16px",
+                    color: secondary,
+                    display: "block",
+                  }}
+                >
+                  Rate
+                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "4px",
+                    alignItems: "center",
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    marginTop: "2px",
+                  }}
+                >
                   <span style={{ color: "#000" }}>1 {toToken.symbol}</span>
-                  <span style={{ color: secondary }}>≈ {fromToken.price > 0 ? (toToken.price / fromToken.price).toFixed(2) : "—"}</span>
+                  <span style={{ color: secondary }}>
+                    ≈{" "}
+                    {fromToken.price > 0
+                      ? (toToken.price / fromToken.price).toFixed(2)
+                      : "—"}
+                  </span>
                 </div>
               </div>
               <div style={{ padding: "10px 12px" }}>
-                <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, display: "block" }}>Slippage</span>
-                <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#000", display: "block", marginTop: "2px" }}>1%</span>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    lineHeight: "16px",
+                    color: secondary,
+                    display: "block",
+                  }}
+                >
+                  Slippage
+                </span>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: "#000",
+                    display: "block",
+                    marginTop: "2px",
+                  }}
+                >
+                  1%
+                </span>
               </div>
               <div style={{ padding: "10px 12px" }}>
-                <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, display: "block" }}>Network Fee</span>
-                <div style={{ display: "flex", gap: "4px", alignItems: "center", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", marginTop: "2px" }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    lineHeight: "16px",
+                    color: secondary,
+                    display: "block",
+                  }}
+                >
+                  Network Fee
+                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "4px",
+                    alignItems: "center",
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    marginTop: "2px",
+                  }}
+                >
                   <span style={{ color: "#000" }}>0.00005 SOL</span>
                   <span style={{ color: secondary }}>≈ $0.00</span>
                 </div>
