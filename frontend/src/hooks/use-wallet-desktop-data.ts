@@ -6,7 +6,7 @@ import {
   type WalletActivity,
 } from "@loyal-labs/solana-wallet";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   ActivityRow,
@@ -37,6 +37,7 @@ export type WalletDesktopData = {
   transactionDetails: Record<string, TransactionDetail>;
   positions: PortfolioPosition[];
   balanceHistory: BalanceHistoryPoint[];
+  addLocalActivity: (row: ActivityRow, detail: TransactionDetail) => void;
 };
 
 const EMPTY_POSITIONS: PortfolioPosition[] = [];
@@ -320,6 +321,51 @@ export function useWalletDesktopData(): WalletDesktopData {
     useState<PortfolioSnapshot | null>(null);
   const [activities, setActivities] = useState<WalletActivity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [localRows, setLocalRows] = useState<ActivityRow[]>([]);
+  const [localDetails, setLocalDetails] = useState<Record<string, TransactionDetail>>({});
+
+  // Load persisted local activities from localStorage on wallet change
+  useEffect(() => {
+    if (!walletAddress) {
+      setLocalRows([]);
+      setLocalDetails({});
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(`loyal:local-activity:${walletAddress}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { rows: ActivityRow[]; details: Record<string, TransactionDetail> };
+        setLocalRows(parsed.rows);
+        setLocalDetails(parsed.details);
+      }
+    } catch {
+      // ignore corrupt data
+    }
+  }, [walletAddress]);
+
+  const addLocalActivity = useCallback(
+    (row: ActivityRow, detail: TransactionDetail) => {
+      setLocalRows((prev) => {
+        const next = [row, ...prev.filter((r) => r.id !== row.id)];
+        if (walletAddress) {
+          setLocalDetails((prevDetails) => {
+            const nextDetails = { ...prevDetails, [row.id]: detail };
+            try {
+              localStorage.setItem(
+                `loyal:local-activity:${walletAddress}`,
+                JSON.stringify({ rows: next, details: nextDetails }),
+              );
+            } catch {
+              // storage full — ignore
+            }
+            return nextDetails;
+          });
+        }
+        return next;
+      });
+    },
+    [walletAddress],
+  );
 
   useEffect(() => {
     if (!(wallet.connected && wallet.publicKey)) {
@@ -546,6 +592,15 @@ export function useWalletDesktopData(): WalletDesktopData {
       }`
     : "No account";
 
+  // Merge local (private send) activities with on-chain activities, deduped by id
+  const mergedActivityData = useMemo(() => {
+    const onChainIds = new Set(activityData.rows.map((r) => r.id));
+    const uniqueLocalRows = localRows.filter((r) => !onChainIds.has(r.id));
+    const allRows = [...uniqueLocalRows, ...activityData.rows];
+    const allDetails = { ...activityData.details, ...localDetails };
+    return { rows: allRows, details: allDetails };
+  }, [activityData, localRows, localDetails]);
+
   return {
     walletAddress,
     isConnected: Boolean(wallet.connected && walletAddress),
@@ -562,10 +617,11 @@ export function useWalletDesktopData(): WalletDesktopData {
     walletLabel,
     tokenRows: allTokenRows.slice(0, 3),
     allTokenRows,
-    activityRows: activityData.rows.slice(0, 5),
-    allActivityRows: activityData.rows,
-    transactionDetails: activityData.details,
+    activityRows: mergedActivityData.rows.slice(0, 5),
+    allActivityRows: mergedActivityData.rows,
+    transactionDetails: mergedActivityData.details,
     positions,
     balanceHistory,
+    addLocalActivity,
   };
 }

@@ -3,7 +3,9 @@
 import { ArrowDownLeft, ArrowUpRight, RefreshCw, Wallet, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { TurnstileWidget } from "@/components/auth/turnstile-widget";
 import { WalletTab } from "@/components/auth/wallet-tab";
+import { usePublicEnv } from "@/contexts/public-env-context";
 import type { WalletDesktopData } from "@/hooks/use-wallet-desktop-data";
 import { getTokenIconUrl } from "@/lib/token-icon";
 
@@ -43,6 +45,30 @@ export interface HeroRightSidebarProps {
 export function HeroRightSidebar(props: HeroRightSidebarProps) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const wasOpenRef = useRef(props.isOpen);
+  const publicEnv = usePublicEnv();
+
+  // Turnstile captcha gate for sign-in tab
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileMode = publicEnv.turnstile.mode;
+  const needsCaptchaWidget = turnstileMode === "widget";
+
+  // Auto-resolve captcha for bypass (local dev) and misconfigured environments
+  useEffect(() => {
+    if (!needsCaptchaWidget && captchaToken === null) {
+      setCaptchaToken(
+        turnstileMode === "bypass"
+          ? (publicEnv.turnstile as { mode: "bypass"; verificationToken: string }).verificationToken
+          : "captcha-skipped"
+      );
+    }
+  }, [captchaToken, needsCaptchaWidget, publicEnv.turnstile, turnstileMode]);
+
+  // Reset captcha when sidebar closes
+  useEffect(() => {
+    if (!props.isOpen) {
+      setCaptchaToken(null);
+    }
+  }, [props.isOpen]);
 
   // Trap wheel events inside the sidebar so page doesn't scroll
   useEffect(() => {
@@ -462,6 +488,7 @@ export function HeroRightSidebar(props: HeroRightSidebarProps) {
               )}
               {displayTab === "send" && (
                 <SendContent
+                  addLocalActivity={props.walletDesktopData.addLocalActivity}
                   onClose={props.onClose}
                   onDone={() => props.onTabChange("portfolio")}
                   onNavigate={setSubView}
@@ -608,29 +635,47 @@ export function HeroRightSidebar(props: HeroRightSidebarProps) {
                     </button>
                   </div>
                   <div style={{ padding: "8px 20px", flex: 1 }}>
-                    <p
-                      style={{
-                        fontFamily: "var(--font-geist-sans), sans-serif",
-                        fontSize: "14px",
-                        lineHeight: "20px",
-                        color: "rgba(60, 60, 67, 0.6)",
-                        marginBottom: "8px",
-                      }}
-                    >
-                      Connect your wallet to get started.
-                    </p>
-                    {props.walletDesktopData.isConnected ? (
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "24px 0" }}>
-                        <div style={{ width: "24px", height: "24px", border: "2px solid rgba(0,0,0,0.1)", borderTopColor: "#3C3C43", borderRadius: "9999px", animation: "sidebar-spin 0.8s linear infinite" }} />
+                    {captchaToken === null ? (
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", paddingTop: "16px" }}>
+                        <p
+                          style={{
+                            fontFamily: "var(--font-geist-sans), sans-serif",
+                            fontSize: "14px",
+                            lineHeight: "20px",
+                            color: "rgba(60, 60, 67, 0.6)",
+                          }}
+                        >
+                          Complete verification to continue
+                        </p>
+                        <TurnstileWidget onVerify={setCaptchaToken} />
                       </div>
                     ) : (
-                      <WalletTab />
+                      <>
+                        <p
+                          style={{
+                            fontFamily: "var(--font-geist-sans), sans-serif",
+                            fontSize: "14px",
+                            lineHeight: "20px",
+                            color: "rgba(60, 60, 67, 0.6)",
+                            marginBottom: "8px",
+                          }}
+                        >
+                          Connect your wallet to get started.
+                        </p>
+                        {props.walletDesktopData.isConnected ? (
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "24px 0" }}>
+                            <div style={{ width: "24px", height: "24px", border: "2px solid rgba(0,0,0,0.1)", borderTopColor: "#3C3C43", borderRadius: "9999px", animation: "sidebar-spin 0.8s linear infinite" }} />
+                          </div>
+                        ) : (
+                          <WalletTab />
+                        )}
+                        {/* TODO: Re-enable email and passkey auth */}
+                        {/* <Divider /> */}
+                        {/* <EmailTab captchaToken={captchaToken} onFlowStart={() => {}} /> */}
+                        {/* <Divider /> */}
+                        {/* <PasskeyTab onFlowStart={() => {}} /> */}
+                      </>
                     )}
-                    {/* TODO: Re-enable email and passkey auth */}
-                    {/* <Divider /> */}
-                    {/* <EmailTab captchaToken={captchaToken} onFlowStart={() => {}} /> */}
-                    {/* <Divider /> */}
-                    {/* <PasskeyTab onFlowStart={() => {}} /> */}
                   </div>
                 </div>
               )}

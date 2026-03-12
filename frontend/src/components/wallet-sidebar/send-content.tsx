@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivateSend } from "@/hooks/use-private-send";
 import { useSend } from "@/hooks/use-send";
 
-import type { SubView, SwapToken } from "./types";
+import type { ActivityRow, SubView, SwapToken, TransactionDetail } from "./types";
 
 const font = "var(--font-geist-sans), sans-serif";
 const secondary = "rgba(60, 60, 67, 0.6)";
@@ -224,6 +224,7 @@ function SendTransactionDetail({
   isTgRecipient,
   usdValue,
   signature,
+  isPrivate,
   onClose,
   onDone,
 }: {
@@ -233,6 +234,7 @@ function SendTransactionDetail({
   isTgRecipient: boolean;
   usdValue: string;
   signature?: string;
+  isPrivate?: boolean;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -287,22 +289,29 @@ function SendTransactionDetail({
 
         {/* Action buttons */}
         <div style={{ display: "flex", alignItems: "center", paddingTop: "20px", paddingBottom: "16px", width: "100%" }}>
+          {!isPrivate && (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+              <button
+                className="send-tx-action-btn"
+                onClick={() => signature && window.open(`https://explorer.solana.com/tx/${signature}`, "_blank")}
+                style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: signature ? "pointer" : "default", opacity: signature ? 1 : 0.5, transition: "background-color 0.15s ease" }}
+                type="button"
+              >
+                <Globe size={24} style={{ color: "#3C3C43" }} />
+              </button>
+              <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, textAlign: "center" }}>View in explorer</span>
+            </div>
+          )}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
             <button
               className="send-tx-action-btn"
-              onClick={() => signature && window.open(`https://explorer.solana.com/tx/${signature}`, "_blank")}
-              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: signature ? "pointer" : "default", opacity: signature ? 1 : 0.5, transition: "background-color 0.15s ease" }}
-              type="button"
-            >
-              <Globe size={24} style={{ color: "#3C3C43" }} />
-            </button>
-            <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, textAlign: "center" }}>View in explorer</span>
-          </div>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-            <button
-              className="send-tx-action-btn"
-              onClick={() => signature && void navigator.clipboard.writeText(`https://explorer.solana.com/tx/${signature}`)}
-              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: signature ? "pointer" : "default", opacity: signature ? 1 : 0.5, transition: "background-color 0.15s ease" }}
+              onClick={() => {
+                const shareText = isPrivate
+                  ? `Sent ${amount} ${token.symbol} to ${displayRecipient} (${usdValue})`
+                  : signature ? `https://explorer.solana.com/tx/${signature}` : "";
+                if (shareText) void navigator.clipboard.writeText(shareText);
+              }}
+              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: isPrivate || signature ? "pointer" : "default", opacity: isPrivate || signature ? 1 : 0.5, transition: "background-color 0.15s ease" }}
               type="button"
             >
               <Share size={24} style={{ color: "#3C3C43" }} />
@@ -332,11 +341,13 @@ export function SendContent({
   onDone,
   onNavigate,
   token,
+  addLocalActivity,
 }: {
   onClose: () => void;
   onDone: () => void;
   onNavigate: (view: SubView) => void;
   token: SwapToken;
+  addLocalActivity?: (row: ActivityRow, detail: TransactionDetail) => void;
 }) {
   const { executeSend } = useSend();
   const { executePrivateSend } = usePrivateSend();
@@ -425,13 +436,38 @@ export function SendContent({
     if (result.success) {
       setResultSignature(result.signature);
       setPhase("success");
+
+      // Inject synthetic activity for private sends
+      if (isPrivate && addLocalActivity && result.signature) {
+        const now = new Date();
+        const row: ActivityRow = {
+          id: result.signature,
+          type: "sent",
+          counterparty: isTg ? recipientTrimmed : cleanRecipient,
+          amount: `-${currentAmount} ${token.symbol}`,
+          timestamp: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
+          date: now.toLocaleDateString("en-US", { month: "long", day: "numeric" }),
+          icon: "/hero-new/Shield_40.svg",
+          isPrivate: true,
+        };
+        const detail: TransactionDetail = {
+          activity: row,
+          usdValue: currentUsd,
+          status: "Completed",
+          networkFee: "0.00005 SOL",
+          networkFeeUsd: "$0.00",
+          isPrivate: true,
+        };
+        addLocalActivity(row, detail);
+      }
+
       setAmount("");
       setRecipient("");
     } else {
       setErrorMessage(result.error);
       setPhase("error");
     }
-  }, [hasAmount, numericAmount, token.price, token.symbol, token.mint, recipientTrimmed, isTg, isPrivate, executeSend, executePrivateSend]);
+  }, [hasAmount, numericAmount, token.price, token.symbol, token.mint, recipientTrimmed, isTg, isPrivate, executeSend, executePrivateSend, addLocalActivity]);
 
   // Cross-fade between phases
   const [phaseOpacity, setPhaseOpacity] = useState(1);
@@ -472,6 +508,7 @@ export function SendContent({
       return (
         <SendTransactionDetail
           amount={resultAmount}
+          isPrivate={isPrivate}
           isTgRecipient={resultIsTg}
           onClose={onClose}
           onDone={onDone}
