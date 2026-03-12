@@ -322,6 +322,11 @@ export function useWalletDesktopData(): WalletDesktopData {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    console.log("[wallet-data] effect fired", {
+      connected: wallet.connected,
+      publicKey: wallet.publicKey?.toBase58() ?? null,
+    });
+
     if (!(wallet.connected && wallet.publicKey)) {
       setPortfolioSnapshot(null);
       setActivities([]);
@@ -331,6 +336,8 @@ export function useWalletDesktopData(): WalletDesktopData {
 
     let cancelled = false;
     setIsLoading(true);
+
+    console.log("[wallet-data] fetching portfolio for", wallet.publicKey.toBase58());
 
     void Promise.all([
       client.getPortfolio(wallet.publicKey),
