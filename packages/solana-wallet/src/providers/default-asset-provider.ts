@@ -66,6 +66,55 @@ const TOKEN_2022_PROGRAM_ID = new PublicKey(
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 );
 
+const JUPITER_PRICE_API_URL = "https://api.jup.ag/price/v2";
+
+type JupiterPriceResponse = {
+  data: Record<string, { id: string; price: string } | undefined>;
+};
+
+async function enrichAssetsWithJupiterPrices(
+  fetchImpl: typeof fetch,
+  assets: AssetBalance[]
+): Promise<AssetBalance[]> {
+  const unpricedMints = assets
+    .filter((a) => a.priceUsd === null && a.asset.mint !== NATIVE_SOL_MINT)
+    .map((a) => a.asset.mint);
+
+  if (unpricedMints.length === 0) return assets;
+
+  const uniqueMints = [...new Set(unpricedMints)];
+
+  let prices: Map<string, number>;
+  try {
+    const url = `${JUPITER_PRICE_API_URL}?ids=${uniqueMints.join(",")}`;
+    const response = await fetchJson<JupiterPriceResponse>(fetchImpl, url, {
+      method: "GET",
+    });
+    prices = new Map<string, number>();
+    for (const [mint, data] of Object.entries(response.data)) {
+      if (data?.price) {
+        const price = Number(data.price);
+        if (Number.isFinite(price) && price > 0) {
+          prices.set(mint, price);
+        }
+      }
+    }
+  } catch {
+    return assets;
+  }
+
+  return assets.map((a) => {
+    if (a.priceUsd !== null) return a;
+    const price = prices.get(a.asset.mint);
+    if (!price) return a;
+    return {
+      ...a,
+      priceUsd: price,
+      valueUsd: a.balance * price,
+    };
+  });
+}
+
 function getSafeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -244,10 +293,12 @@ export function createHeliusAssetProvider(args: {
         }
       }
 
+      const enrichedAssets = await enrichAssetsWithJupiterPrices(args.fetchImpl, assets);
+
       return {
         owner: owner.toBase58(),
         nativeBalanceLamports: response.result.nativeBalance?.lamports ?? 0,
-        assets,
+        assets: enrichedAssets,
         fetchedAt: Date.now(),
       };
     },
