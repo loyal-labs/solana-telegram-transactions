@@ -14,16 +14,12 @@ import type { SolanaEnv } from "@loyal-labs/solana-rpc";
 
 const WALLETCONNECT_PROJECT_ID = "9d9f57c5553496b42ac1b9977066559d";
 
-function toWalletAdapterNetwork(env: SolanaEnv): WalletAdapterNetwork {
-  switch (env) {
-    case "mainnet":
-      return WalletAdapterNetwork.Mainnet;
-    case "devnet":
-    case "localnet":
-      return WalletAdapterNetwork.Devnet;
-    case "testnet":
-      return WalletAdapterNetwork.Testnet;
-  }
+function toWalletConnectNetwork(
+  env: SolanaEnv
+): WalletAdapterNetwork.Mainnet | WalletAdapterNetwork.Devnet {
+  return env === "mainnet"
+    ? WalletAdapterNetwork.Mainnet
+    : WalletAdapterNetwork.Devnet;
 }
 
 type WalletConnectionProviderProps = {
@@ -39,7 +35,7 @@ export const WalletConnectionProvider: FC<WalletConnectionProviderProps> = ({
   const wallets = useMemo(
     () => [
       new WalletConnectWalletAdapter({
-        network: toWalletAdapterNetwork(solanaEnv),
+        network: toWalletConnectNetwork(solanaEnv),
         options: {
           projectId: WALLETCONNECT_PROJECT_ID,
         },
