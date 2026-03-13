@@ -2,21 +2,29 @@
 // light theme v1
 import { useChat } from "@ai-sdk/react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useAuthCapability } from "@/lib/auth/capability";
-import { useAuthSession } from "@/contexts/auth-session-context";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { BentoGridSection } from "@/components/bento-grid-section";
 import { BlogSection } from "@/components/blog-section";
 import { Footer } from "@/components/footer";
 import { HeroSection, type TimestampedMessage } from "@/components/hero-section";
 import { RoadmapSection } from "@/components/roadmap-section";
+import { useAuthSession } from "@/contexts/auth-session-context";
 import { useChatMode } from "@/contexts/chat-mode-context";
 import { isSkillsEnabled } from "@/flags";
+import { useAuthCapability } from "@/lib/auth/capability";
+import { useUserChats } from "@/providers/user-chats";
 
 export default function LandingPage() {
+  const [currentChatId, setCurrentChatId] = useState(() => crypto.randomUUID());
+  const { refreshUserChats, loadChatMessages } = useUserChats();
+  const prevStatusRef = useRef<string>("ready");
+  const pendingMessagesRef = useRef<TimestampedMessage[] | null>(null);
+
   const { messages, sendMessage, status, setMessages } =
     useChat<TimestampedMessage>({
+      id: currentChatId,
       transport: new DefaultChatTransport({
         api: "/api/chat",
       }),
@@ -56,6 +64,24 @@ export default function LandingPage() {
   const openSignInRef = useRef<(() => void) | null>(null);
   const openSignIn = useCallback(() => openSignInRef.current?.(), []);
   const solanaAddress = publicKey?.toBase58();
+
+  // Apply pending messages after useChat switches to the new ID.
+  // setMessages from useChat targets the CURRENT id, so we must wait for
+  // the re-render after setCurrentChatId before calling setMessages.
+  useEffect(() => {
+    if (pendingMessagesRef.current) {
+      const msgs = pendingMessagesRef.current;
+      pendingMessagesRef.current = null;
+      setMessages(msgs);
+    }
+  }, [currentChatId, setMessages]);
+
+  // Refresh chat history when user signs in
+  useEffect(() => {
+    if (isSignedIn) {
+      void refreshUserChats();
+    }
+  }, [isSignedIn, refreshUserChats]);
 
   // Truncate wallet address for display (e.g., "233Q..7ABE")
   const truncatedAddress = solanaAddress
@@ -215,6 +241,46 @@ export default function LandingPage() {
     }
   }, []);
 
+  // Refresh sidebar when streaming completes
+  useEffect(() => {
+    if (prevStatusRef.current === "streaming" && status === "ready") {
+      void refreshUserChats();
+    }
+    prevStatusRef.current = status;
+  }, [status, refreshUserChats]);
+
+  const onNewChat = useCallback(() => {
+    setCurrentChatId(crypto.randomUUID());
+    setIsChatModeLocal(false);
+    setPendingText("");
+    setMessages([]);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  }, [setMessages]);
+
+  const onSelectChat = useCallback(
+    async (chatId: string, clientChatId: string | null) => {
+      const dbMessages = await loadChatMessages(chatId);
+      const uiMessages: TimestampedMessage[] = dbMessages.map((msg) => ({
+        id: msg.clientMessageId ?? msg.id,
+        role: msg.role as "user" | "assistant",
+        parts: [{ type: "text" as const, text: msg.content }],
+        createdAt: new Date(msg.createdAt).getTime(),
+      }));
+
+      // Queue messages in a ref — they'll be applied by the useEffect
+      // after useChat re-initializes with the new ID.
+      pendingMessagesRef.current = uiMessages;
+      setCurrentChatId(clientChatId ?? chatId);
+      setIsChatModeLocal(true);
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    },
+    [loadChatMessages]
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -289,6 +355,9 @@ export default function LandingPage() {
           truncatedAddress={truncatedAddress}
           openSignInRef={openSignInRef}
           isOnline={isOnline}
+          onNewChat={onNewChat}
+          onSelectChat={onSelectChat}
+          currentChatId={currentChatId}
         />
         {/* End of first section */}
 

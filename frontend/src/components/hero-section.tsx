@@ -35,6 +35,9 @@ export interface HeroSectionProps {
   truncatedAddress: string;
   openSignInRef?: React.MutableRefObject<(() => void) | null>;
   isOnline: boolean;
+  onNewChat: () => void;
+  onSelectChat: (chatId: string, clientChatId: string | null) => Promise<void>;
+  currentChatId: string;
 }
 
 export function HeroSection(props: HeroSectionProps) {
@@ -384,14 +387,9 @@ export function HeroSection(props: HeroSectionProps) {
         truncatedAddress={props.truncatedAddress}
         onOpenSignIn={openSignIn}
         messages={props.messages}
-        onNewChat={() => {
-          props.onChatModeChange(false);
-          props.onPendingTextChange("");
-          props.setMessages([]);
-          setTimeout(() => {
-            props.inputRef.current?.focus();
-          }, 100);
-        }}
+        onNewChat={props.onNewChat}
+        onSelectChat={props.onSelectChat}
+        currentChatId={props.currentChatId}
       />
 
       {/* First section */}

@@ -3,9 +3,11 @@
 import { X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef } from "react";
+
+import type { TimestampedMessage } from "@/components/hero-section";
 import { MenuIcon, type MenuIconHandle } from "@/components/ui/menu";
 import { PlusIcon, type PlusIconHandle } from "@/components/ui/plus";
-import type { TimestampedMessage } from "@/components/hero-section";
+import { useUserChats } from "@/providers/user-chats";
 
 export interface HeroSidebarProps {
   isChatMode: boolean;
@@ -16,15 +18,12 @@ export interface HeroSidebarProps {
   onOpenSignIn: () => void;
   messages: TimestampedMessage[];
   onNewChat: () => void;
+  onSelectChat: (chatId: string, clientChatId: string | null) => Promise<void>;
+  currentChatId: string;
 }
 
-const previousChats = [
-  { id: "1", title: "What is quantum computing?", timestamp: "2 hours ago" },
-  { id: "2", title: "Explain blockchain technology", timestamp: "Yesterday" },
-  { id: "3", title: "How does AI work?", timestamp: "2 days ago" },
-];
-
 export function HeroSidebar(props: HeroSidebarProps) {
+  const { userChats } = useUserChats();
   const menuIconRef = useRef<MenuIconHandle>(null);
   const plusIconRef = useRef<PlusIconHandle>(null);
 
@@ -338,42 +337,49 @@ export function HeroSidebar(props: HeroSidebarProps) {
                   </span>
                 </div>
               )}
-              {previousChats.map((chat) => (
-                <div
-                  className="sidebar-history-item"
-                  key={chat.id}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background =
-                      "rgba(0, 0, 0, 0.04)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    height: "36px",
-                    padding: "0 12px",
-                    borderRadius: "9999px",
-                    cursor: "pointer",
-                    transition: "background 0.2s ease",
-                  }}
-                >
-                  <span
+              {userChats
+                .filter(
+                  (chat) => chat.clientChatId !== props.currentChatId
+                )
+                .map((chat) => (
+                  <div
+                    className="sidebar-history-item"
+                    key={chat.id}
+                    onClick={() =>
+                      props.onSelectChat(chat.id, chat.clientChatId)
+                    }
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background =
+                        "rgba(0, 0, 0, 0.04)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
                     style={{
-                      fontSize: "14px",
-                      fontWeight: 400,
-                      lineHeight: "20px",
-                      color: "#000",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      display: "flex",
+                      alignItems: "center",
+                      height: "36px",
+                      padding: "0 12px",
+                      borderRadius: "9999px",
+                      cursor: "pointer",
+                      transition: "background 0.2s ease",
                     }}
                   >
-                    {chat.title}
-                  </span>
-                </div>
-              ))}
+                    <span
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 400,
+                        lineHeight: "20px",
+                        color: "#000",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {chat.title ?? "Untitled"}
+                    </span>
+                  </div>
+                ))}
             </div>
           </div>
 

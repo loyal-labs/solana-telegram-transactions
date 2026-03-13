@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { SignInModal } from "@/components/auth/sign-in-modal";
+import { WalletAutoReauth } from "@/components/auth/wallet-auto-reauth";
 import { WalletConnectionProvider } from "@/components/solana/wallet-provider";
 import { Header } from "@/components/ui/header";
 import { AuthSessionProvider } from "@/contexts/auth-session-context";
@@ -81,6 +82,7 @@ export default function RootLayout({
           <WalletConnectionProvider>
             <AuthSessionProvider>
               <SignInModalProvider>
+                <WalletAutoReauth />
                 <UserChatsProvider>
                   <ChatModeProvider>
                     <Header />

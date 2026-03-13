@@ -20,6 +20,9 @@ export type ChatRuntimeConfig = {
 export type ServerEnv = {
   appEnvironment: AppEnvironment;
   chatRuntime: ChatRuntimeConfig;
+  databaseUrl: string;
+  gridAuthBaseUrl: string | undefined;
+  authSessionRs256PublicKey: string | undefined;
 };
 
 function createChatRuntimeConfig(env: EnvSource): ChatRuntimeConfig {
@@ -29,13 +32,24 @@ function createChatRuntimeConfig(env: EnvSource): ChatRuntimeConfig {
   };
 }
 
+function decodePemNewlines(value: string | undefined): string | undefined {
+  return value?.replace(/\\n/g, "\n");
+}
+
 export function createServerEnv(env: EnvSource): ServerEnv {
   return {
     appEnvironment: resolveAppEnvironment(
       getOptionalEnv(env, APP_ENVIRONMENT_ENV_NAME)
     ),
     chatRuntime: createChatRuntimeConfig(env),
+    databaseUrl: getRequiredEnv(env, "DATABASE_URL"),
+    gridAuthBaseUrl: getOptionalEnv(env, "NEXT_PUBLIC_GRID_AUTH_BASE_URL"),
+    authSessionRs256PublicKey: decodePemNewlines(
+      getOptionalEnv(env, "AUTH_SESSION_RS256_PUBLIC_KEY")
+    ),
   };
 }
 
-export const serverEnv = createServerEnv(process.env);
+export function getServerEnv(): ServerEnv {
+  return createServerEnv(process.env);
+}

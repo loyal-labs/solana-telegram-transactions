@@ -1,18 +1,34 @@
 "use client";
 
 import type { PropsWithChildren } from "react";
-import { createContext, useCallback, useContext, useMemo } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 
-// TODO: wire real implementations when @/lib/loyal/service is restored
-type UserContext = { nextChatId: number };
-type UserChat = { id: string; title: string };
+export type UserChat = {
+  id: string;
+  clientChatId: string | null;
+  title: string | null;
+  lastMessageAt: string | null;
+};
+
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  clientMessageId: string | null;
+  createdAt: string;
+};
 
 type UserChatsContextValue = {
-  userContext: UserContext | null;
   userChats: UserChat[];
   isLoading: boolean;
   refreshUserChats: () => Promise<void>;
-  ensureUserContext: () => Promise<UserContext>;
+  loadChatMessages: (chatId: string) => Promise<ChatMessage[]>;
 };
 
 const UserChatsContext = createContext<UserChatsContextValue | undefined>(
@@ -20,21 +36,52 @@ const UserChatsContext = createContext<UserChatsContextValue | undefined>(
 );
 
 export const UserChatsProvider = ({ children }: PropsWithChildren) => {
-  const refreshUserChats = useCallback(async () => {}, []);
-  const ensureUserContext = useCallback(
-    async (): Promise<UserContext> => ({ nextChatId: 0 }),
+  const [userChats, setUserChats] = useState<UserChat[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const refreshUserChats = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/chats");
+      if (!res.ok) {
+        return;
+      }
+      const data = (await res.json()) as { chats: UserChat[] };
+      setUserChats(data.chats);
+    } catch {
+      // Silently fail — sidebar just stays empty
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const loadChatMessages = useCallback(
+    async (chatId: string): Promise<ChatMessage[]> => {
+      try {
+        const res = await fetch(`/api/chats/${chatId}/messages`);
+        if (!res.ok) {
+          return [];
+        }
+        const data = (await res.json()) as { messages: ChatMessage[] };
+        return data.messages;
+      } catch {
+        return [];
+      }
+    },
     []
   );
 
+  // No auto-fetch on mount — consumers call refreshUserChats()
+  // when auth state is ready (avoids fetching before auth hydrates).
+
   const value = useMemo<UserChatsContextValue>(
     () => ({
-      userContext: null,
-      userChats: [],
-      isLoading: false,
+      userChats,
+      isLoading,
       refreshUserChats,
-      ensureUserContext,
+      loadChatMessages,
     }),
-    [refreshUserChats, ensureUserContext]
+    [userChats, isLoading, refreshUserChats, loadChatMessages]
   );
 
   return (
