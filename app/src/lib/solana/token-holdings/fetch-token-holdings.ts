@@ -2,6 +2,7 @@ import { getSolanaEndpoints } from "@loyal-labs/solana-rpc";
 import { PublicKey } from "@solana/web3.js";
 
 import { NATIVE_SOL_DECIMALS, NATIVE_SOL_MINT } from "@/lib/constants";
+import { fetchTokenPricesByMints } from "@/lib/jupiter/price";
 
 import { fetchJson } from "../../core/http";
 import { fetchLoyalDeposits } from "../deposits/loyal-deposits";
@@ -137,6 +138,36 @@ async function fetchHoldingsFromHelius(
   return holdings;
 }
 
+async function enrichHoldingsWithJupiterPrices(
+  holdings: TokenHolding[],
+): Promise<TokenHolding[]> {
+  const unpricedMints = holdings
+    .filter((h) => h.priceUsd === null && h.mint !== NATIVE_SOL_MINT)
+    .map((h) => h.mint);
+
+  if (unpricedMints.length === 0) return holdings;
+
+  const uniqueMints = [...new Set(unpricedMints)];
+
+  let prices: Map<string, number>;
+  try {
+    prices = await fetchTokenPricesByMints(uniqueMints);
+  } catch {
+    return holdings;
+  }
+
+  return holdings.map((h) => {
+    if (h.priceUsd !== null) return h;
+    const price = prices.get(h.mint);
+    if (!price) return h;
+    return {
+      ...h,
+      priceUsd: price,
+      valueUsd: h.balance * price,
+    };
+  });
+}
+
 // Fetch holdings from Helius and from Magic Block PER (Secure deposits)
 async function fetchCombinedHoldings(
   rpcUrl: string,
@@ -176,7 +207,8 @@ async function fetchCombinedHoldings(
     }
   }
 
-  return [...holdingsFromHelius, ...securedHoldings];
+  const allHoldings = [...holdingsFromHelius, ...securedHoldings];
+  return enrichHoldingsWithJupiterPrices(allHoldings);
 }
 
 export async function fetchTokenHoldings(
