@@ -20,6 +20,8 @@ export type ChatRuntimeConfig = {
 export type ServerEnv = {
   appEnvironment: AppEnvironment;
   chatRuntime: ChatRuntimeConfig;
+  databaseUrl: string;
+  gridAuthBaseUrl: string | undefined;
 };
 
 function createChatRuntimeConfig(env: EnvSource): ChatRuntimeConfig {
@@ -35,7 +37,11 @@ export function createServerEnv(env: EnvSource): ServerEnv {
       getOptionalEnv(env, APP_ENVIRONMENT_ENV_NAME)
     ),
     chatRuntime: createChatRuntimeConfig(env),
+    databaseUrl: getRequiredEnv(env, "DATABASE_URL"),
+    gridAuthBaseUrl: getOptionalEnv(env, "NEXT_PUBLIC_GRID_AUTH_BASE_URL"),
   };
 }
 
-export const serverEnv = createServerEnv(process.env);
+export function getServerEnv(): ServerEnv {
+  return createServerEnv(process.env);
+}

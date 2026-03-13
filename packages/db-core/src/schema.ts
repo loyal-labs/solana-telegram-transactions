@@ -98,6 +98,16 @@ export type GaslessClaimTransactionType =
  */
 export type GaslessClaimSolanaEnv = "mainnet" | "devnet";
 
+/**
+ * Supported app-level user providers.
+ */
+export type AppUserProvider = "solana";
+
+/**
+ * Stored app chat message roles.
+ */
+export type AppChatMessageRole = "user" | "assistant" | "system";
+
 // ============================================================================
 // TABLES
 // ============================================================================
@@ -523,6 +533,125 @@ export const pushTokens = pgTable(
 );
 
 /**
+ * Wallet-first users for the Loyal web frontend.
+ */
+export const appUsers = pgTable(
+  "app_users",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    provider: text("provider").$type<AppUserProvider>().notNull(),
+    subjectAddress: text("subject_address").notNull(),
+    gridUserId: text("grid_user_id"),
+    smartAccountAddress: text("smart_account_address"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("app_users_provider_subject_uidx").on(
+      table.provider,
+      table.subjectAddress
+    ),
+    check("app_users_provider_check", sql`${table.provider} IN ('solana')`),
+  ]
+);
+
+/**
+ * Verified wallet addresses attached to app users.
+ */
+export const appUserWallets = pgTable(
+  "app_user_wallets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => appUsers.id, { onDelete: "cascade" }),
+    walletAddress: text("wallet_address").notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [uniqueIndex("app_user_wallets_wallet_address_uidx").on(table.walletAddress)]
+);
+
+/**
+ * Persisted chat sessions per app user.
+ */
+export const appChats = pgTable(
+  "app_chats",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => appUsers.id, { onDelete: "cascade" }),
+    clientChatId: text("client_chat_id"),
+    title: text("title"),
+    model: text("model").notNull(),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("app_chats_user_client_chat_uidx")
+      .on(table.userId, table.clientChatId)
+      .where(sql`${table.clientChatId} IS NOT NULL`),
+    index("app_chats_user_last_message_idx").on(
+      table.userId,
+      table.lastMessageAt
+    ),
+  ]
+);
+
+/**
+ * Persisted user and assistant messages for app chats.
+ */
+export const appChatMessages = pgTable(
+  "app_chat_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chatId: uuid("chat_id")
+      .notNull()
+      .references(() => appChats.id, { onDelete: "cascade" }),
+    role: text("role").$type<AppChatMessageRole>().notNull(),
+    content: text("content").notNull(),
+    clientMessageId: text("client_message_id"),
+    turnId: text("turn_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("app_chat_messages_chat_client_message_uidx")
+      .on(table.chatId, table.clientMessageId)
+      .where(sql`${table.clientMessageId} IS NOT NULL`),
+    uniqueIndex("app_chat_messages_chat_role_turn_uidx")
+      .on(table.chatId, table.role, table.turnId)
+      .where(sql`${table.turnId} IS NOT NULL`),
+    index("app_chat_messages_chat_created_idx").on(table.chatId, table.createdAt),
+    check(
+      "app_chat_messages_role_check",
+      sql`${table.role} IN ('user', 'assistant', 'system')`
+    ),
+  ]
+);
+
+/**
  * Sync state for telegram-private-transfer analytics ingestion.
  * Tracks head sync and long-running historical backfill progress.
  */
@@ -803,6 +932,33 @@ export const botMessagesRelations = relations(botMessages, ({ one }) => ({
   }),
 }));
 
+export const appUsersRelations = relations(appUsers, ({ many }) => ({
+  wallets: many(appUserWallets),
+  chats: many(appChats),
+}));
+
+export const appUserWalletsRelations = relations(appUserWallets, ({ one }) => ({
+  user: one(appUsers, {
+    fields: [appUserWallets.userId],
+    references: [appUsers.id],
+  }),
+}));
+
+export const appChatsRelations = relations(appChats, ({ one, many }) => ({
+  user: one(appUsers, {
+    fields: [appChats.userId],
+    references: [appUsers.id],
+  }),
+  messages: many(appChatMessages),
+}));
+
+export const appChatMessagesRelations = relations(appChatMessages, ({ one }) => ({
+  chat: one(appChats, {
+    fields: [appChatMessages.chatId],
+    references: [appChats.id],
+  }),
+}));
+
 // ============================================================================
 // TYPE EXPORTS
 // ============================================================================
@@ -847,6 +1003,18 @@ export type InsertBotMessage = typeof botMessages.$inferInsert;
 
 export type PushToken = typeof pushTokens.$inferSelect;
 export type InsertPushToken = typeof pushTokens.$inferInsert;
+
+export type AppUser = typeof appUsers.$inferSelect;
+export type InsertAppUser = typeof appUsers.$inferInsert;
+
+export type AppUserWallet = typeof appUserWallets.$inferSelect;
+export type InsertAppUserWallet = typeof appUserWallets.$inferInsert;
+
+export type AppChat = typeof appChats.$inferSelect;
+export type InsertAppChat = typeof appChats.$inferInsert;
+
+export type AppChatMessage = typeof appChatMessages.$inferSelect;
+export type InsertAppChatMessage = typeof appChatMessages.$inferInsert;
 
 export type Topic = { title: string; content: string; sources: string[] };
 

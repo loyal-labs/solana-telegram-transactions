@@ -1,1 +1,6 @@
-export { UserChatsProvider, useUserChats } from "./user-chats-provider";
+export {
+  UserChatsProvider,
+  useUserChats,
+  type ChatMessage,
+  type UserChat,
+} from "./user-chats-provider";
