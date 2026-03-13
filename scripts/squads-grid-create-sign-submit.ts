@@ -296,6 +296,17 @@ const buildUnsignedTransferBase64 = async (
   const connection = new Connection(rpcUrl, "confirmed");
   const { blockhash } = await connection.getLatestBlockhash("confirmed");
 
+  const teeConnection = new Connection(
+    "https://tee.magicblock.app",
+    "confirmed"
+  );
+  const { blockhash: teeBlockhash } = await teeConnection.getLatestBlockhash(
+    "confirmed"
+  );
+
+  console.log("blockhash", blockhash);
+  console.log("teeBlockhash", teeBlockhash);
+
   const payer = new PublicKey(accountAddress);
   const to = new PublicKey(recipientAddress);
 
@@ -308,6 +319,7 @@ const buildUnsignedTransferBase64 = async (
   const messageV0 = new TransactionMessage({
     payerKey: payer,
     recentBlockhash: blockhash,
+    // recentBlockhash: teeBlockhash, // blockhash got overwritten anyway
     instructions: [instruction],
   }).compileToV0Message();
 
