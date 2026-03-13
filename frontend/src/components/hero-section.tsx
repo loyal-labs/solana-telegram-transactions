@@ -459,8 +459,12 @@ export function HeroSection(props: HeroSectionProps) {
             balanceSolLabel={walletDesktopData.balanceSolLabel}
             balanceHistory={walletDesktopData.balanceHistory.map((p) => p.valueUsd)}
             onOpenRightSidebar={(tab) => {
-              setRightSidebarTab(tab);
-              setIsRightSidebarOpen(true);
+              if (isRightSidebarOpen && rightSidebarTab === tab) {
+                setIsRightSidebarOpen(false);
+              } else {
+                setRightSidebarTab(tab);
+                setIsRightSidebarOpen(true);
+              }
             }}
             onOpenSignIn={openSignIn}
             dogCry={dogCry}
