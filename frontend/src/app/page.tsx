@@ -18,7 +18,7 @@ import { useUserChats } from "@/providers/user-chats";
 
 export default function LandingPage() {
   const [currentChatId, setCurrentChatId] = useState(() => crypto.randomUUID());
-  const { refreshUserChats, loadChatMessages } = useUserChats();
+  const { refreshUserChats, clearUserChats, loadChatMessages } = useUserChats();
   const prevStatusRef = useRef<string>("ready");
   const pendingMessagesRef = useRef<TimestampedMessage[] | null>(null);
 
@@ -61,6 +61,19 @@ export default function LandingPage() {
   const { connected: isConnected, connecting: isWalletLoading, publicKey } = useWallet();
   const { isHydrated: isAuthHydrated } = useAuthSession();
   const { isSignedIn } = useAuthCapability();
+
+  // Toggle body class for mobile header visibility
+  useEffect(() => {
+    if (isChatModeLocal && isSignedIn) {
+      document.body.classList.add("chat-mode-active");
+    } else {
+      document.body.classList.remove("chat-mode-active");
+    }
+    return () => {
+      document.body.classList.remove("chat-mode-active");
+    };
+  }, [isChatModeLocal, isSignedIn]);
+
   const openSignInRef = useRef<(() => void) | null>(null);
   const openSignIn = useCallback(() => openSignInRef.current?.(), []);
   const solanaAddress = publicKey?.toBase58();
@@ -76,12 +89,14 @@ export default function LandingPage() {
     }
   }, [currentChatId, setMessages]);
 
-  // Refresh chat history when user signs in
+  // Sync chat history with auth state
   useEffect(() => {
     if (isSignedIn) {
       void refreshUserChats();
+    } else {
+      clearUserChats();
     }
-  }, [isSignedIn, refreshUserChats]);
+  }, [isSignedIn, refreshUserChats, clearUserChats]);
 
   // Truncate wallet address for display (e.g., "233Q..7ABE")
   const truncatedAddress = solanaAddress

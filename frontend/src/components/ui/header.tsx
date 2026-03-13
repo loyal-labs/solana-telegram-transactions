@@ -5,12 +5,10 @@ import { useEffect, useState } from "react";
 
 import { useAuthCapability } from "@/lib/auth/capability";
 import { useAuthSession } from "@/contexts/auth-session-context";
-import { useChatMode } from "@/contexts/chat-mode-context";
 import { useSignInModal } from "@/contexts/sign-in-modal-context";
 
 export function Header() {
   const [mounted, setMounted] = useState(false);
-  const { isChatMode } = useChatMode();
   const { publicKey } = useWallet();
   const { hasWalletConnection } = useAuthCapability();
   const { user } = useAuthSession();
@@ -29,10 +27,7 @@ export function Header() {
     setMounted(true);
   }, []);
 
-  // Hide when: chat mode AND connected (wallet button is in sidebar)
-  const shouldHide = isChatMode && hasWalletConnection;
-
-  if (!mounted || shouldHide) {
+  if (!mounted) {
     return null;
   }
 
@@ -88,9 +83,10 @@ export function Header() {
           }
         }
 
-        /* Hide header when sidebar is open on mobile */
+        /* Hide header on mobile when in chat mode and connected (wallet icon is in sidebar) */
         @media (max-width: 767px) {
-          :global(body.sidebar-open) .header-wallet {
+          :global(body.sidebar-open) .header-wallet,
+          :global(body.chat-mode-active) .header-wallet {
             opacity: 0;
             pointer-events: none;
           }
