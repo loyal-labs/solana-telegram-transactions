@@ -77,7 +77,12 @@ export function useWalletProofAuth({
   const verifyAttemptedForAddressRef = useRef<string | null>(null);
 
   const installedWallets = useMemo(
-    () => wallets.filter((candidate) => candidate.readyState === "Installed"),
+    () =>
+      wallets.filter(
+        (candidate) =>
+          candidate.readyState === "Installed" ||
+          candidate.adapter.name === "WalletConnect"
+      ),
     [wallets]
   );
 

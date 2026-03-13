@@ -1,8 +1,57 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useWalletProofAuth } from "./use-wallet-proof-auth";
+
+const MOBILE_WALLETS = [
+  {
+    name: "Phantom",
+    icon: "https://phantom.app/favicon.ico",
+    browseUrl: (url: string) =>
+      `https://phantom.app/ul/browse/${encodeURIComponent(url)}?ref=${encodeURIComponent(url)}`,
+  },
+  {
+    name: "Solflare",
+    icon: "https://solflare.com/favicon.ico",
+    browseUrl: (url: string) =>
+      `https://solflare.com/ul/v1/browse/${encodeURIComponent(url)}?ref=${encodeURIComponent(url)}`,
+  },
+] as const;
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    setIsMobile(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+  }, []);
+  return isMobile;
+}
+
+function MobileWalletList() {
+  const currentUrl = useMemo(
+    () => (typeof window !== "undefined" ? window.location.href : ""),
+    []
+  );
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-neutral-500 text-sm">
+        Open this page in your wallet&apos;s built-in browser:
+      </p>
+      {MOBILE_WALLETS.map((wallet) => (
+        <a
+          className="flex items-center gap-3 rounded-lg border border-neutral-200 px-4 py-3 text-neutral-900 text-sm transition hover:bg-neutral-50"
+          href={wallet.browseUrl(currentUrl)}
+          key={wallet.name}
+          rel="noopener noreferrer"
+        >
+          <img alt={wallet.name} className="h-6 w-6" src={wallet.icon} />
+          <span>Open in {wallet.name}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
 
 export function WalletTab({ onFlowStart }: { onFlowStart?: () => void }) {
   const {
@@ -16,6 +65,8 @@ export function WalletTab({ onFlowStart }: { onFlowStart?: () => void }) {
   } = useWalletProofAuth({
     onFlowStart,
   });
+
+  const isMobile = useIsMobile();
 
   // Delay showing errors so transient failures during connection don't flash
   const isErrorState =
@@ -104,9 +155,11 @@ export function WalletTab({ onFlowStart }: { onFlowStart?: () => void }) {
               <span>{installedWallet.adapter.name}</span>
             </button>
           ))}
-          {installedWallets.length === 0 && (
+          {installedWallets.length === 0 && isMobile && <MobileWalletList />}
+          {installedWallets.length === 0 && !isMobile && (
             <p className="py-4 text-center text-neutral-500 text-sm">
-              No wallet extensions detected.
+              No wallet extensions detected. Install a Solana wallet extension
+              to continue.
             </p>
           )}
         </div>
