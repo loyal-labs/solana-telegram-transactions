@@ -32,13 +32,35 @@ const skeletonCircle = (size: string) => ({
 
 function SkeletonTokenRow() {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 12px", width: "100%" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        padding: "10px 12px",
+        width: "100%",
+      }}
+    >
       <div style={skeletonCircle("40px")} />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" as const, gap: "6px" }}>
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column" as const,
+          gap: "6px",
+        }}
+      >
         <div style={skeletonBar("80px", "14px")} />
         <div style={skeletonBar("50px", "12px")} />
       </div>
-      <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end" as const, gap: "6px" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column" as const,
+          alignItems: "flex-end" as const,
+          gap: "6px",
+        }}
+      >
         <div style={skeletonBar("60px", "14px")} />
         <div style={skeletonBar("40px", "12px")} />
       </div>
@@ -48,9 +70,24 @@ function SkeletonTokenRow() {
 
 function SkeletonActivityRow() {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 12px", width: "100%" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        padding: "10px 12px",
+        width: "100%",
+      }}
+    >
       <div style={skeletonCircle("36px")} />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" as const, gap: "6px" }}>
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column" as const,
+          gap: "6px",
+        }}
+      >
         <div style={skeletonBar("100px", "14px")} />
         <div style={skeletonBar("60px", "12px")} />
       </div>
@@ -89,28 +126,51 @@ export function PortfolioContent({
   walletLabel: string;
 }) {
   const [copied, setCopied] = useState(false);
-  const handleCopyAddress = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!walletAddress) return;
-    void navigator.clipboard.writeText(walletAddress).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  }, [walletAddress]);
+  const handleCopyAddress = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!walletAddress) return;
+      void navigator.clipboard.writeText(walletAddress).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    },
+    [walletAddress]
+  );
   if (isLoading) {
     return (
       <>
         <style jsx>{`
           @keyframes skeleton-pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
+            0%,
+            100% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.4;
+            }
           }
         `}</style>
 
         {/* Balance skeleton */}
-        <div style={{ display: "flex", gap: "16px", alignItems: "flex-start", padding: "20px 20px 12px", width: "100%" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "16px",
+            alignItems: "flex-start",
+            padding: "20px 20px 12px",
+            width: "100%",
+          }}
+        >
           <div style={skeletonCircle("64px")} />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}
+          >
             <div style={skeletonBar("100px", "16px")} />
             <div style={skeletonBar("140px", "28px")} />
             <div style={skeletonBar("70px", "14px")} />
@@ -119,7 +179,14 @@ export function PortfolioContent({
 
         {/* Tokens skeleton */}
         <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
-          <div style={{ display: "flex", flexDirection: "column", padding: "8px", width: "100%" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              padding: "8px",
+              width: "100%",
+            }}
+          >
             <div style={{ padding: "12px 12px 8px" }}>
               <div style={skeletonBar("60px", "16px")} />
             </div>
@@ -129,7 +196,14 @@ export function PortfolioContent({
           </div>
 
           {/* Activity skeleton */}
-          <div style={{ display: "flex", flexDirection: "column", padding: "8px", width: "100%" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              padding: "8px",
+              width: "100%",
+            }}
+          >
             <div style={{ padding: "12px 12px 8px" }}>
               <div style={skeletonBar("70px", "16px")} />
             </div>
@@ -153,7 +227,12 @@ export function PortfolioContent({
       <svg
         aria-hidden="true"
         height="0"
-        style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+        style={{
+          position: "absolute",
+          width: 0,
+          height: 0,
+          overflow: "hidden",
+        }}
         width="0"
       >
         <defs>
@@ -255,20 +334,26 @@ export function PortfolioContent({
               <button
                 onClick={onDisconnect}
                 style={{
-                  background: "none",
+                  background: "rgba(60, 60, 67, 0.06)",
                   border: "none",
-                  padding: 0,
+                  borderRadius: "6px",
+                  padding: "2px 8px",
                   fontFamily: "var(--font-geist-sans), sans-serif",
-                  fontSize: "13px",
-                  fontWeight: 400,
-                  lineHeight: "20px",
-                  color: "rgba(60, 60, 67, 0.35)",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  lineHeight: "18px",
+                  color: "rgba(60, 60, 67, 0.45)",
                   cursor: "pointer",
-                  transition: "color 0.15s ease",
-                  textDecoration: "underline",
+                  transition: "background 0.15s ease, color 0.15s ease",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(60, 60, 67, 0.6)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(60, 60, 67, 0.35)"; }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(60, 60, 67, 0.1)";
+                  e.currentTarget.style.color = "rgba(60, 60, 67, 0.6)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(60, 60, 67, 0.06)";
+                  e.currentTarget.style.color = "rgba(60, 60, 67, 0.45)";
+                }}
                 type="button"
               >
                 Disconnect
@@ -299,7 +384,9 @@ export function PortfolioContent({
                 {balanceWhole}
                 <span
                   style={{
-                    color: isBalanceHidden ? "#BBBBC0" : "rgba(60, 60, 67, 0.6)",
+                    color: isBalanceHidden
+                      ? "#BBBBC0"
+                      : "rgba(60, 60, 67, 0.6)",
                     transition: "color 0.15s ease",
                   }}
                 >
@@ -322,15 +409,15 @@ export function PortfolioContent({
             >
               {isBalanceHidden ? (
                 <EyeOff
-                  size={28}
-                  strokeWidth={1.75}
-                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  size={22}
+                  strokeWidth={1.5}
+                  style={{ color: "rgba(60, 60, 67, 0.5)" }}
                 />
               ) : (
                 <Eye
-                  size={28}
-                  strokeWidth={1.75}
-                  style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                  size={22}
+                  strokeWidth={1.5}
+                  style={{ color: "rgba(60, 60, 67, 0.5)" }}
                 />
               )}
             </button>

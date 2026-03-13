@@ -122,8 +122,24 @@ const REACTION_DURATION = 2000;
 const SCARED_CLICK_THRESHOLD = 3;
 const MORPH_DURATION = 0.4; // seconds
 
-const WHITES: Record<DogMood, string> = { main: WHITE_MAIN, upset: WHITE_UPSET, scared: WHITE_SCARED, huh: WHITE_HUH, excited: WHITE_EXCITED, cry: WHITE_CRY, nice: WHITE_NICE };
-const BLACKS: Record<DogMood, string> = { main: BLACK_MAIN, upset: BLACK_UPSET, scared: BLACK_SCARED, huh: BLACK_HUH, excited: BLACK_EXCITED, cry: BLACK_CRY, nice: BLACK_NICE };
+const WHITES: Record<DogMood, string> = {
+  main: WHITE_MAIN,
+  upset: WHITE_UPSET,
+  scared: WHITE_SCARED,
+  huh: WHITE_HUH,
+  excited: WHITE_EXCITED,
+  cry: WHITE_CRY,
+  nice: WHITE_NICE,
+};
+const BLACKS: Record<DogMood, string> = {
+  main: BLACK_MAIN,
+  upset: BLACK_UPSET,
+  scared: BLACK_SCARED,
+  huh: BLACK_HUH,
+  excited: BLACK_EXCITED,
+  cry: BLACK_CRY,
+  nice: BLACK_NICE,
+};
 
 function useMorphPath(paths: Record<DogMood, string>, mood: DogMood) {
   const [current, setCurrent] = useState(paths[mood]);
@@ -147,7 +163,10 @@ function useMorphPath(paths: Record<DogMood, string>, mood: DogMood) {
 
       const tick = (now: number) => {
         if (cancelled) return;
-        const t = Math.min((now - startRef.current) / (MORPH_DURATION * 1000), 1);
+        const t = Math.min(
+          (now - startRef.current) / (MORPH_DURATION * 1000),
+          1
+        );
         // Ease-in-out cubic
         const eased = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
         setCurrent(interp(eased));
@@ -165,7 +184,15 @@ function useMorphPath(paths: Record<DogMood, string>, mood: DogMood) {
   return current;
 }
 
-function DogWithMood({ squint, cry, nice }: { squint?: boolean; cry?: boolean; nice?: boolean }) {
+function DogWithMood({
+  squint,
+  cry,
+  nice,
+}: {
+  squint?: boolean;
+  cry?: boolean;
+  nice?: boolean;
+}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [mood, setMood] = useState<DogMood>("main");
   const [eyeOffset, setEyeOffset] = useState({ x: 0, y: 0 });
@@ -273,7 +300,13 @@ function DogWithMood({ squint, cry, nice }: { squint?: boolean; cry?: boolean; n
       resetIdleTimer();
     };
 
-    const events = ["mousemove", "keydown", "mousedown", "touchstart", "scroll"] as const;
+    const events = [
+      "mousemove",
+      "keydown",
+      "mousedown",
+      "touchstart",
+      "scroll",
+    ] as const;
     for (const evt of events) {
       window.addEventListener(evt, handleActivity, { passive: true });
     }
@@ -340,12 +373,14 @@ function DogWithMood({ squint, cry, nice }: { squint?: boolean; cry?: boolean; n
         d={blackPath}
         fill="black"
         style={{
-          transform: isMain && !squint
-            ? `translate(${eyeOffset.x}px, ${eyeOffset.y}px)`
-            : "translate(0, 0)",
-          transition: isMain && !squint
-            ? "transform 0.08s ease-out"
-            : "transform 0.25s ease",
+          transform:
+            isMain && !squint
+              ? `translate(${eyeOffset.x}px, ${eyeOffset.y}px)`
+              : "translate(0, 0)",
+          transition:
+            isMain && !squint
+              ? "transform 0.08s ease-out"
+              : "transform 0.25s ease",
         }}
       />
 
@@ -363,7 +398,10 @@ function DogWithMood({ squint, cry, nice }: { squint?: boolean; cry?: boolean; n
           height={EYELID_TOP.h}
           fill="#F9363C"
           style={{
-            transform: squint && isMain ? `translateY(${EYELID_TOP_SQUINT_Y}px)` : "translateY(0)",
+            transform:
+              squint && isMain
+                ? `translateY(${EYELID_TOP_SQUINT_Y}px)`
+                : "translateY(0)",
             opacity: isMain ? 1 : 0,
             transition: "transform 0.25s ease, opacity 0.3s ease",
           }}
@@ -375,7 +413,10 @@ function DogWithMood({ squint, cry, nice }: { squint?: boolean; cry?: boolean; n
           height={EYELID_BOT.h}
           fill="#F9363C"
           style={{
-            transform: squint && isMain ? `translateY(${EYELID_BOT_SQUINT_Y}px)` : "translateY(0)",
+            transform:
+              squint && isMain
+                ? `translateY(${EYELID_BOT_SQUINT_Y}px)`
+                : "translateY(0)",
             opacity: isMain ? 1 : 0,
             transition: "transform 0.25s ease, opacity 0.3s ease",
           }}
@@ -401,21 +442,30 @@ function DogWithMood({ squint, cry, nice }: { squint?: boolean; cry?: boolean; n
       <path
         d={EXCITED_STAR}
         fill="white"
-        style={{ opacity: showExcitedExtras ? 1 : 0, transition: "opacity 0.3s ease" }}
+        style={{
+          opacity: showExcitedExtras ? 1 : 0,
+          transition: "opacity 0.3s ease",
+        }}
       />
       <circle
         cx={EXCITED_HIGHLIGHT.cx}
         cy={EXCITED_HIGHLIGHT.cy}
         r={EXCITED_HIGHLIGHT.r}
         fill="white"
-        style={{ opacity: showExcitedExtras ? 1 : 0, transition: "opacity 0.3s ease" }}
+        style={{
+          opacity: showExcitedExtras ? 1 : 0,
+          transition: "opacity 0.3s ease",
+        }}
       />
 
       {/* Cry teardrop */}
       <path
         d={CRY_TEARDROP}
         fill="white"
-        style={{ opacity: showTeardrop ? 1 : 0, transition: "opacity 0.3s ease" }}
+        style={{
+          opacity: showTeardrop ? 1 : 0,
+          transition: "opacity 0.3s ease",
+        }}
       />
     </svg>
   );
@@ -516,7 +566,11 @@ export function ChatInput(props: ChatInputProps) {
               pointerEvents: "auto",
             }}
           >
-            <DogWithMood squint={isBalanceHidden} cry={props.dogCry} nice={props.dogNice} />
+            <DogWithMood
+              squint={isBalanceHidden}
+              cry={props.dogCry}
+              nice={props.dogNice}
+            />
             {/* Red loading spinner on dog's ear */}
             <div
               style={{
@@ -891,7 +945,7 @@ export function ChatInput(props: ChatInputProps) {
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: "12px",
+                            gap: "8px",
                           }}
                         >
                           <div
@@ -946,15 +1000,15 @@ export function ChatInput(props: ChatInputProps) {
                           >
                             {isBalanceHidden ? (
                               <EyeOff
-                                size={28}
-                                strokeWidth={1.75}
-                                style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                size={22}
+                                strokeWidth={1.5}
+                                style={{ color: "rgba(60, 60, 67, 0.5)" }}
                               />
                             ) : (
                               <Eye
-                                size={28}
-                                strokeWidth={1.75}
-                                style={{ color: "rgba(60, 60, 67, 0.6)" }}
+                                size={22}
+                                strokeWidth={1.5}
+                                style={{ color: "rgba(60, 60, 67, 0.5)" }}
                               />
                             )}
                           </button>
