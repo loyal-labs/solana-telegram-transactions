@@ -21,6 +21,8 @@ export interface ActivityRow {
   date: string;
   icon: string;
   isPrivate?: boolean;
+  /** Epoch milliseconds for sort order — absent in legacy localStorage rows */
+  rawTimestamp?: number;
 }
 
 export interface TransactionDetail {

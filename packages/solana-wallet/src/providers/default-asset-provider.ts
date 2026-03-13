@@ -66,10 +66,11 @@ const TOKEN_2022_PROGRAM_ID = new PublicKey(
   "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 );
 
-const JUPITER_PRICE_API_URL = "https://api.jup.ag/price/v2";
+const JUPITER_TOKEN_SEARCH_URL = "https://lite-api.jup.ag/tokens/v2/search";
 
-type JupiterPriceResponse = {
-  data: Record<string, { id: string; price: string } | undefined>;
+type JupiterTokenSearchResult = {
+  id: string;
+  usdPrice?: number;
 };
 
 async function enrichAssetsWithJupiterPrices(
@@ -86,17 +87,23 @@ async function enrichAssetsWithJupiterPrices(
 
   let prices: Map<string, number>;
   try {
-    const url = `${JUPITER_PRICE_API_URL}?ids=${uniqueMints.join(",")}`;
-    const response = await fetchJson<JupiterPriceResponse>(fetchImpl, url, {
-      method: "GET",
-    });
+    // Fetch prices in parallel using the token search endpoint (no auth required)
+    const results = await Promise.all(
+      uniqueMints.map(async (mint) => {
+        const url = `${JUPITER_TOKEN_SEARCH_URL}?query=${mint}`;
+        const tokens = await fetchJson<JupiterTokenSearchResult[]>(
+          fetchImpl,
+          url,
+          { method: "GET" }
+        );
+        const match = tokens.find((t) => t.id === mint);
+        return { mint, price: match?.usdPrice ?? null };
+      })
+    );
     prices = new Map<string, number>();
-    for (const [mint, data] of Object.entries(response.data)) {
-      if (data?.price) {
-        const price = Number(data.price);
-        if (Number.isFinite(price) && price > 0) {
-          prices.set(mint, price);
-        }
+    for (const { mint, price } of results) {
+      if (typeof price === "number" && Number.isFinite(price) && price > 0) {
+        prices.set(mint, price);
       }
     }
   } catch {
