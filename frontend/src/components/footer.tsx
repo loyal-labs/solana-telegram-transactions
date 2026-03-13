@@ -1,25 +1,6 @@
 "use client";
 
 import { motion } from "motion/react";
-import { IBM_Plex_Sans } from "next/font/google";
-import localFont from "next/font/local";
-
-const instrumentSerif = localFont({
-  src: [
-    {
-      path: "../../public/fonts/InstrumentSerif-Regular.woff2",
-      weight: "400",
-      style: "normal",
-    },
-  ],
-  display: "swap",
-});
-
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  display: "swap",
-});
 
 const socialLinks = [
   {
@@ -117,8 +98,8 @@ export function Footer() {
     <footer
       id="footer-section"
       style={{
-        background: "rgba(0, 0, 0, 0.95)",
-        borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+        background: "#FFFFFF",
+        borderTop: "1px solid rgba(0, 0, 0, 0.08)",
         position: "relative",
         overflow: "hidden",
       }}
@@ -128,18 +109,17 @@ export function Footer() {
         style={{
           maxWidth: "1200px",
           margin: "0 auto",
-          padding: "4rem 2rem 2rem",
+          padding: "64px 16px 32px",
         }}
       >
         {/* Social Links */}
         <div
-          className={ibmPlexSans.className}
           style={{
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            gap: "2rem",
-            marginBottom: "3rem",
+            gap: "32px",
+            marginBottom: "48px",
           }}
         >
           {socialLinks.map((link) => (
@@ -147,27 +127,17 @@ export function Footer() {
               aria-label={link.name}
               href={link.url}
               key={link.name}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
-                e.currentTarget.style.color = "rgba(255, 255, 255, 0.95)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)";
-              }}
               rel="noopener noreferrer"
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: "3rem",
-                height: "3rem",
+                width: "48px",
+                height: "48px",
                 flexShrink: 0,
-                borderRadius: "50%",
-                background: "rgba(255, 255, 255, 0.08)",
-                backdropFilter: "blur(20px)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                color: "rgba(255, 255, 255, 0.7)",
+                borderRadius: "9999px",
+                background: "rgba(249, 54, 60, 0.08)",
+                color: "rgba(60, 60, 67, 0.6)",
                 transition: "all 0.3s ease",
                 textDecoration: "none",
               }}
@@ -182,112 +152,111 @@ export function Footer() {
 
         {/* Regular Links */}
         <div
-          className={ibmPlexSans.className}
           style={{
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            gap: "2rem",
+            gap: "32px",
             flexWrap: "wrap",
-            marginBottom: "4rem",
+            marginBottom: "48px",
           }}
         >
-          {legalLinks.map((link, index) => (
-            <motion.a
+          {legalLinks.map((link) => (
+            <a
               href={link.url}
               key={link.name}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = "rgba(255, 255, 255, 0.9)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = "rgba(255, 255, 255, 0.5)";
-              }}
               rel="noopener noreferrer"
               style={{
-                fontSize: "0.875rem",
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "16px",
                 fontWeight: 400,
-                color: "rgba(255, 255, 255, 0.5)",
+                lineHeight: "20px",
+                color: "rgba(60, 60, 67, 0.6)",
+                fontFeatureSettings: "'liga' off, 'clig' off",
                 textDecoration: "none",
-                transition: "all 0.3s ease",
-                position: "relative",
+                transition: "color 0.2s ease",
               }}
               target="_blank"
-              whileHover={{ y: -2 }}
             >
               {link.name}
-              {index < legalLinks.length - 1 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    right: "-1rem",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "rgba(255, 255, 255, 0.2)",
-                  }}
-                >
-                  •
-                </span>
-              )}
-            </motion.a>
+            </a>
           ))}
         </div>
 
-        {/* Stay Loyal */}
+        {/* Stay Loyal + Copyright wrapper */}
         <div
           style={{
             position: "relative",
-            paddingBottom: "2rem",
           }}
         >
-          <h2
-            className={instrumentSerif.className}
+          {/* Stay Loyal - large background text */}
+          <div
             style={{
-              fontSize: "clamp(4rem, 12vw, 10rem)",
-              fontWeight: 400,
-              textAlign: "center",
-              background:
-                "linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-              lineHeight: 1,
-              margin: 0,
-              letterSpacing: "-0.02em",
+              position: "relative",
+              overflow: "hidden",
             }}
           >
-            Stay Loyal
-          </h2>
-        </div>
+            <h2
+              style={{
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "clamp(6rem, 16vw, 220px)",
+                fontWeight: 700,
+                textAlign: "center",
+                color: "rgba(249, 54, 60, 0.08)",
+                lineHeight: 0.85,
+                margin: 0,
+                letterSpacing: "-0.02em",
+                paddingBottom: "48px",
+              }}
+            >
+              Stay Loyal
+            </h2>
+            {/* Gradient fade to white at bottom */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: "40%",
+                background:
+                  "linear-gradient(to bottom, transparent, #FFFFFF)",
+                pointerEvents: "none",
+              }}
+            />
+          </div>
 
-        {/* Copyright and Status */}
-        <div
-          className={ibmPlexSans.className}
-          id="footer-copyright"
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            fontSize: "0.75rem",
-            color: "rgba(255, 255, 255, 0.3)",
-            paddingTop: "2rem",
-            borderTop: "1px solid rgba(255, 255, 255, 0.05)",
-            flexWrap: "wrap",
-            gap: "1rem",
-          }}
-        >
-          <div>© {new Date().getFullYear()} Loyal. All rights reserved.</div>
-          <iframe
-            frameBorder="0"
-            height="30"
-            scrolling="no"
-            src="https://status.askloyal.com/badge?theme=dark"
+          {/* Copyright and Status */}
+          <div
+            id="footer-copyright"
             style={{
-              colorScheme: "normal",
-              border: "none",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              fontFamily: "var(--font-geist-sans), sans-serif",
+              fontSize: "14px",
+              fontWeight: 400,
+              lineHeight: "20px",
+              color: "rgba(60, 60, 67, 0.6)",
+              paddingTop: "16px",
+              flexWrap: "wrap",
+              gap: "16px",
             }}
-            title="Status Badge"
-            width="250"
-          />
+          >
+            <div>© {new Date().getFullYear()} Loyal. All rights reserved.</div>
+            <iframe
+              frameBorder="0"
+              height="30"
+              scrolling="no"
+              src="https://status.askloyal.com/badge?theme=light"
+              style={{
+                colorScheme: "normal",
+                border: "none",
+              }}
+              title="Status Badge"
+              width="250"
+            />
+          </div>
         </div>
       </div>
       <style jsx>{`

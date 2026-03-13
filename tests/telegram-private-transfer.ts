@@ -32,7 +32,7 @@ import {
 import { sign } from "tweetnacl";
 import bs58 from "bs58";
 
-const DEPOSIT_PDA_SEED = Buffer.from("deposit");
+const DEPOSIT_PDA_SEED = Buffer.from("deposit_v2");
 const USERNAME_DEPOSIT_PDA_SEED = Buffer.from("username_deposit");
 const VAULT_PDA_SEED = Buffer.from("vault");
 
@@ -261,6 +261,7 @@ describe("telegram-private-transfer", () => {
       process.env.EPHEMERAL_AUTH === "true" ||
       (!hasEphemeralToken &&
         (ephemeralProviderEndpoint.includes("tee.magicblock.app") ||
+          ephemeralProviderEndpoint.includes("mainnet-tee.magicblock.app") ||
           ephemeralProviderEndpoint.includes("magicblock.app")));
     const ephemeralRpcBase = ephemeralProviderEndpoint;
     const ephemeralWsBase = ephemeralWsEndpoint;

@@ -408,7 +408,7 @@ export default function SummariesPage() {
 
   return (
     <main
-      className="text-foreground font-sans overflow-y-auto relative flex flex-col"
+      className="text-foreground font-sans overflow-y-auto relative flex flex-col max-w-md mx-auto w-full"
       style={{ background: "#fff", height: `calc(100vh - ${headerHeight}px)` }}
     >
       {/* Header - fixed at top */}

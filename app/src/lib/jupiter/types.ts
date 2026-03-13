@@ -51,6 +51,27 @@ export type JupiterOrderErrorResponse = {
   code?: number;
 };
 
+export type JupiterTokenSearchResult = {
+  id: string;
+  name: string;
+  symbol: string;
+  usdPrice: number;
+  mcap: number;
+  fdv?: number;
+  holderCount?: number;
+  liquidity?: number;
+  updatedAt?: string;
+};
+
+export type JupiterTokenMetrics = {
+  priceUsd: number;
+  marketCapUsd: number;
+  fdvUsd?: number;
+  holderCount?: number;
+  liquidityUsd?: number;
+  updatedAt?: string;
+};
+
 /** POST /ultra/v1/execute request */
 export type JupiterExecuteRequest = {
   signedTransaction: string;

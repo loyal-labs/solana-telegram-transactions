@@ -126,7 +126,7 @@ describe.only("telegram-verification test suite", () => {
 
     [depositPda] = PublicKey.findProgramAddressSync(
       [
-        Buffer.from("deposit"),
+        Buffer.from("deposit_v2"),
         user.toBuffer(),
         Buffer.from(VALIDATION_USERNAME),
       ],

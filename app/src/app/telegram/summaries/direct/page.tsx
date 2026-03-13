@@ -543,7 +543,7 @@ function DirectFeedContent() {
 
   return (
     <main
-      className="font-sans overflow-hidden relative flex flex-col"
+      className="font-sans overflow-hidden relative flex flex-col max-w-md mx-auto w-full"
       style={{ background: "#ffffff", height: `calc(100vh - ${headerHeight}px)` }}
     >
       {/* Header */}

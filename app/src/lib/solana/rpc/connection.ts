@@ -1,18 +1,13 @@
+import {
+  getPerEndpoints as getSharedPerEndpoints,
+  getSolanaEndpoints as getSharedSolanaEndpoints,
+  type SolanaEnv,
+} from "@loyal-labs/solana-rpc";
 import { Connection } from "@solana/web3.js";
 
 import { publicEnv } from "@/lib/core/config/public";
 
-import {
-  LOCALNET_RPC_URL,
-  LOCALNET_RPC_WS,
-  SECURE_DEVNET_RPC_URL,
-  SECURE_DEVNET_RPC_WS,
-  SECURE_MAINNET_RPC_URL,
-  SECURE_MAINNET_RPC_WS,
-  TESTNET_RPC_URL,
-  TESTNET_RPC_WS,
-} from "./constants";
-import type { SolanaEnv } from "./types";
+import { attachWsDebugLogging } from "./ws-debug";
 
 export const getSolanaEnv = (): SolanaEnv => {
   if (typeof window !== "undefined") {
@@ -33,34 +28,20 @@ export const getSolanaEnv = (): SolanaEnv => {
 export const getEndpoints = (
   env: SolanaEnv
 ): { rpcEndpoint: string; websocketEndpoint: string } => {
-  switch (env) {
-    case "mainnet":
-      return {
-        rpcEndpoint: SECURE_MAINNET_RPC_URL,
-        websocketEndpoint: SECURE_MAINNET_RPC_WS,
-      };
-    case "testnet":
-      return {
-        rpcEndpoint: TESTNET_RPC_URL,
-        websocketEndpoint: TESTNET_RPC_WS,
-      };
-    case "localnet":
-      return {
-        rpcEndpoint: LOCALNET_RPC_URL,
-        websocketEndpoint: LOCALNET_RPC_WS,
-      };
-    case "devnet":
-    default:
-      return {
-        rpcEndpoint: SECURE_DEVNET_RPC_URL,
-        websocketEndpoint: SECURE_DEVNET_RPC_WS,
-      };
-  }
+  return getSharedSolanaEndpoints(env);
+};
+
+export const getPerEndpoints = (
+  env: SolanaEnv
+): { perRpcEndpoint: string; perWsEndpoint: string } => {
+  return getSharedPerEndpoints(env);
 };
 
 const selectedSolanaEnv = getSolanaEnv();
 export const { rpcEndpoint, websocketEndpoint } =
   getEndpoints(selectedSolanaEnv);
+export const { perRpcEndpoint, perWsEndpoint } =
+  getPerEndpoints(selectedSolanaEnv);
 
 let cachedConnection: Connection | null = null;
 let cachedWebsocketConnection: Connection | null = null;
@@ -69,6 +50,7 @@ const connectionConfig = { commitment: "confirmed" as const };
 export const getConnection = (): Connection => {
   if (cachedConnection) return cachedConnection;
   cachedConnection = new Connection(rpcEndpoint, connectionConfig);
+  attachWsDebugLogging(cachedConnection, "app:solana:rpc");
   return cachedConnection;
 };
 
@@ -78,5 +60,6 @@ export const getWebsocketConnection = (): Connection => {
     ...connectionConfig,
     wsEndpoint: websocketEndpoint,
   });
+  attachWsDebugLogging(cachedWebsocketConnection, "app:solana:websocket");
   return cachedWebsocketConnection;
 };

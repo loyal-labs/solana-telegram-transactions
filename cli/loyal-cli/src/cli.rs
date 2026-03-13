@@ -1,8 +1,7 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::constants::{
-    DEFAULT_ER_VALIDATOR_STR, DEFAULT_OWNER_WAIT_INTERVAL_SECONDS,
-    DEFAULT_OWNER_WAIT_TIMEOUT_SECONDS, DEFAULT_PER_RPC, DEFAULT_ROUTER_RPC, NATIVE_MINT_STR,
+    DEFAULT_OWNER_WAIT_INTERVAL_SECONDS, DEFAULT_OWNER_WAIT_TIMEOUT_SECONDS, NATIVE_MINT_STR,
 };
 
 #[derive(Parser, Debug)]
@@ -23,8 +22,8 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) commitment: Option<String>,
 
-    #[arg(long, global = true, default_value = DEFAULT_PER_RPC)]
-    pub(crate) per_rpc: String,
+    #[arg(long, global = true)]
+    pub(crate) per_rpc: Option<String>,
 
     #[arg(long, global = true)]
     pub(crate) per_ws: Option<String>,
@@ -32,17 +31,25 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) per_auth_token: Option<String>,
 
-    #[arg(long, global = true, default_value = DEFAULT_ROUTER_RPC)]
-    pub(crate) router_url: String,
+    #[arg(long, global = true)]
+    pub(crate) router_url: Option<String>,
 
-    #[arg(long, global = true, default_value = DEFAULT_ER_VALIDATOR_STR)]
-    pub(crate) validator: String,
+    #[arg(long, global = true)]
+    pub(crate) validator: Option<String>,
 
     #[arg(long, global = true, default_value = "display")]
     pub(crate) output: OutputFormat,
 
     #[arg(long, global = true)]
     pub(crate) debug: bool,
+
+    /// Simulate the transaction before sending.
+    #[arg(long, global = true, conflicts_with = "simulate_only")]
+    pub(crate) simulate: bool,
+
+    /// Simulate only — do not send the transaction.
+    #[arg(long, global = true, conflicts_with = "simulate")]
+    pub(crate) simulate_only: bool,
 
     #[command(subcommand)]
     pub(crate) command: Command,

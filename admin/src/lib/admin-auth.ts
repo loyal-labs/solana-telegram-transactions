@@ -65,6 +65,10 @@ function decodeJson<T>(value: string) {
   }
 }
 
+function encodeText(value: string) {
+  return Uint8Array.from(textEncoder.encode(value));
+}
+
 function constantTimeEqual(a: string, b: string) {
   if (a.length !== b.length) {
     return false;
@@ -85,7 +89,7 @@ async function getSigningKey() {
 
   return crypto.subtle.importKey(
     "raw",
-    textEncoder.encode(secret),
+    encodeText(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign", "verify"],
@@ -127,7 +131,7 @@ export async function signSessionToken(payload: SessionPayload) {
   const signature = await crypto.subtle.sign(
     "HMAC",
     key,
-    textEncoder.encode(unsignedToken),
+    encodeText(unsignedToken),
   );
   const encodedSignature = encodeBase64Url(new Uint8Array(signature));
 
@@ -163,7 +167,7 @@ export async function verifySessionToken(token: string | undefined | null) {
   const expectedSignatureBuffer = await crypto.subtle.sign(
     "HMAC",
     key,
-    textEncoder.encode(unsignedToken),
+    encodeText(unsignedToken),
   );
   const expectedSignature = encodeBase64Url(
     new Uint8Array(expectedSignatureBuffer),

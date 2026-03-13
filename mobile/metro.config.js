@@ -8,11 +8,15 @@ const config = getDefaultConfig(__dirname);
 
 // Resolve the shared package outside /mobile
 const sharedRoot = path.resolve(__dirname, "../packages/shared");
-config.watchFolders = [sharedRoot];
+const solanaRpcRoot = path.resolve(__dirname, "../packages/solana-rpc/src");
+config.watchFolders = [sharedRoot, solanaRpcRoot];
 config.resolver.nodeModulesPaths = [
   path.resolve(__dirname, "node_modules"),
   path.resolve(__dirname, ".."),
 ];
+config.resolver.extraNodeModules = {
+  "@loyal-labs/solana-rpc": solanaRpcRoot,
+};
 
 // SVG transformer
 config.transformer.babelTransformerPath = require.resolve(

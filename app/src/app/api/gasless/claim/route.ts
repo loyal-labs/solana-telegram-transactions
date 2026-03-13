@@ -1,6 +1,6 @@
 import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
-import { LoyalPrivateTransactionsClient } from "@loyal-labs/private-transactions";
 import {
+  Connection,
   Ed25519Program,
   PublicKey,
   SystemProgram,
@@ -10,17 +10,17 @@ import {
 import { SYSVAR_INSTRUCTIONS_PUBKEY } from "@solana/web3.js";
 import { NextResponse } from "next/server";
 
-import { rpcEndpoint, websocketEndpoint } from "@/lib/solana/rpc/connection";
-import { PER_RPC_ENDPOINT, PER_WS_ENDPOINT } from "@/lib/solana/rpc/constants";
+import { RECIPIENT_TARGET_LAMPORTS } from "@/features/private-transfer-analytics/server/constants";
+import {
+  recordGaslessClaimTransactionBySignature,
+} from "@/features/private-transfer-analytics/server/gasless-claims";
+import { getEndpoints } from "@/lib/solana/rpc/connection";
 import {
   getSessionPda,
   getTelegramVerificationProgram,
 } from "@/lib/solana/solana-helpers";
 import { getGaslessKeypair } from "@/lib/solana/wallet/gasless-keypair.server";
-import {
-  getCustomWalletProvider,
-  getGaslessPublicKey,
-} from "@/lib/solana/wallet/wallet-details";
+import { getGaslessPublicKey } from "@/lib/solana/wallet/wallet-details";
 import { SimpleWallet } from "@/lib/solana/wallet/wallet-implementation";
 
 import { TelegramVerification } from "../../../../../../target/types/telegram_verification";
@@ -31,29 +31,26 @@ type TransactionSendResult =
   | { ok: true; signature: string }
   | { ok: false; message: string; logs?: string[] };
 
-let cachedPrivateClient: LoyalPrivateTransactionsClient | null = null;
-let cachedPrivateClientPromise: Promise<LoyalPrivateTransactionsClient> | null =
-  null;
+type ClaimSolanaEnv = "mainnet" | "devnet";
 
-export const getPrivateClient =
-  async (): Promise<LoyalPrivateTransactionsClient> => {
-    const keypair = await getGaslessKeypair();
+const parseClaimSolanaEnv = (value: unknown): ClaimSolanaEnv | null => {
+  if (value === "mainnet" || value === "devnet") {
+    return value;
+  }
+  return null;
+};
 
-    if (cachedPrivateClient) return cachedPrivateClient;
-    if (!cachedPrivateClientPromise) {
-      cachedPrivateClientPromise = LoyalPrivateTransactionsClient.fromConfig({
-        signer: keypair,
-        baseRpcEndpoint: rpcEndpoint,
-        baseWsEndpoint: websocketEndpoint,
-        ephemeralRpcEndpoint: PER_RPC_ENDPOINT,
-        ephemeralWsEndpoint: PER_WS_ENDPOINT,
-      }).then((client) => {
-        cachedPrivateClient = client;
-        return client;
-      });
-    }
-    return cachedPrivateClientPromise;
-  };
+const createProviderForEnv = (
+  keypairWallet: Wallet,
+  solanaEnv: ClaimSolanaEnv,
+): AnchorProvider => {
+  const { rpcEndpoint, websocketEndpoint } = getEndpoints(solanaEnv);
+  const connection = new Connection(rpcEndpoint, {
+    commitment: "confirmed",
+    wsEndpoint: websocketEndpoint,
+  });
+  return new AnchorProvider(connection, keypairWallet);
+};
 
 const normalizeBytes = (value: unknown): Uint8Array => {
   if (typeof value === "string") {
@@ -73,14 +70,14 @@ const normalizeBytes = (value: unknown): Uint8Array => {
 };
 
 const extractUsernameFromValidationBytes = (
-  validationBytes: Uint8Array
+  validationBytes: Uint8Array,
 ): string => {
   const payload = new TextDecoder().decode(validationBytes);
   const userStart = payload.includes("\nuser=")
     ? payload.indexOf("\nuser=") + "\nuser=".length
     : payload.startsWith("user=")
-    ? "user=".length
-    : -1;
+      ? "user=".length
+      : -1;
 
   if (userStart < 0) {
     throw new Error("Invalid Telegram init data: missing user payload");
@@ -113,7 +110,7 @@ const extractUsernameFromValidationBytes = (
 };
 
 const parseTransactionError = async (
-  error: unknown
+  error: unknown,
 ): Promise<{ message: string; logs?: string[] }> => {
   let message =
     error instanceof Error ? error.message : "Transaction simulation failed";
@@ -140,11 +137,11 @@ const parseTransactionError = async (
 
     if (Array.isArray(candidate.transactionLogs)) {
       logs = candidate.transactionLogs.filter(
-        (line): line is string => typeof line === "string"
+        (line): line is string => typeof line === "string",
       );
     } else if (Array.isArray(candidate.logs)) {
       logs = candidate.logs.filter(
-        (line): line is string => typeof line === "string"
+        (line): line is string => typeof line === "string",
       );
     }
 
@@ -158,7 +155,7 @@ const parseTransactionError = async (
         )();
         if (Array.isArray(fetchedLogs)) {
           logs = fetchedLogs.filter(
-            (line): line is string => typeof line === "string"
+            (line): line is string => typeof line === "string",
           );
         }
       } catch {
@@ -187,7 +184,7 @@ const isInvalidTelegramUsernameFailure = ({
 };
 
 const deserializeTransaction = (
-  serializedTx: string
+  serializedTx: string,
 ): Transaction | VersionedTransaction => {
   const buffer = Buffer.from(serializedTx, "base64");
   try {
@@ -200,7 +197,7 @@ const deserializeTransaction = (
 const sendSignedTransaction = async (
   provider: AnchorProvider,
   transaction: Transaction | VersionedTransaction,
-  payerWallet: Wallet
+  payerWallet: Wallet,
 ): Promise<TransactionSendResult> => {
   await payerWallet.signTransaction(transaction);
 
@@ -209,7 +206,7 @@ const sendSignedTransaction = async (
       transaction.serialize(),
       {
         skipPreflight: false,
-      }
+      },
     );
     await provider.connection.confirmTransaction(sig, "confirmed");
     return { ok: true, signature: sig };
@@ -230,8 +227,8 @@ const verifyInitDataGasless = async (
   recipientPubKey: PublicKey,
   telegramPublicKeyBytes: Uint8Array,
   telegramSignatureBytes: Uint8Array,
-  processedInitDataBytes: Uint8Array
-): Promise<boolean> => {
+  processedInitDataBytes: Uint8Array,
+): Promise<TransactionSendResult> => {
   const sessionPda = getSessionPda(recipientPubKey, verificationProgram);
   const payerPubKey = payerWallet.publicKey;
   const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
@@ -260,21 +257,19 @@ const verifyInitDataGasless = async (
   const verifyResult = await sendSignedTransaction(
     provider,
     verifyTx,
-    payerWallet
+    payerWallet,
   );
-  return verifyResult.ok;
+  return verifyResult;
 };
-
-const RECIPIENT_TARGET_LAMPORTS = 10_000_000;
 
 const ensureRecipientBalance = async (
   provider: AnchorProvider,
   payerWallet: Wallet,
-  recipient: PublicKey
-): Promise<void> => {
+  recipient: PublicKey,
+): Promise<string | null> => {
   const balance = await provider.connection.getBalance(recipient);
   if (balance >= RECIPIENT_TARGET_LAMPORTS) {
-    return;
+    return null;
   }
 
   const deficit = RECIPIENT_TARGET_LAMPORTS - balance;
@@ -283,7 +278,7 @@ const ensureRecipientBalance = async (
       fromPubkey: payerWallet.publicKey,
       toPubkey: recipient,
       lamports: deficit,
-    })
+    }),
   );
 
   const { blockhash, lastValidBlockHeight } =
@@ -296,6 +291,8 @@ const ensureRecipientBalance = async (
   if (!result.ok) {
     throw new Error(`Failed to fund recipient: ${result.message}`);
   }
+
+  return result.signature;
 };
 
 const verifyAndClaimDeposit = async (
@@ -306,7 +303,7 @@ const verifyAndClaimDeposit = async (
   amount: number,
   processedInitDataBytes: Uint8Array,
   telegramSignatureBytes: Uint8Array,
-  telegramPublicKeyBytes: Uint8Array
+  telegramPublicKeyBytes: Uint8Array,
 ) => {
   if (amount <= 0) {
     throw new Error("Amount must be greater than 0");
@@ -321,10 +318,10 @@ const verifyAndClaimDeposit = async (
     recipient,
     telegramPublicKeyBytes,
     telegramSignatureBytes,
-    processedInitDataBytes
+    processedInitDataBytes,
   );
-  if (!verified) {
-    return false;
+  if (!verified.ok) {
+    return { ok: false as const };
   }
 
   // FIXME: `claimUsernameDeposit` is not working with PER, create gasless claim for PER
@@ -338,11 +335,36 @@ const verifyAndClaimDeposit = async (
   //   username,
   //   perAuthToken
   // );
-  await ensureRecipientBalance(provider, payerWallet, recipient);
+  const topUpSignature = await ensureRecipientBalance(
+    provider,
+    payerWallet,
+    recipient,
+  );
 
-  const claimed = true;
+  return {
+    ok: true as const,
+    topUpSignature,
+    verifySignature: verified.signature,
+  };
+};
 
-  return claimed;
+const recordGaslessClaimAnalyticsBestEffort = async (args: {
+  connection: Connection;
+  payerAddress: string;
+  recipientAddress?: string | null;
+  signature: string;
+  solanaEnv: ClaimSolanaEnv;
+  transactionType: "store" | "verify_telegram_init_data" | "top_up_to_0_01_sol";
+}): Promise<void> => {
+  try {
+    await recordGaslessClaimTransactionBySignature(args);
+  } catch (error) {
+    console.error("[gasless][claim][analytics] failed to record transaction", {
+      error,
+      signature: args.signature,
+      transactionType: args.transactionType,
+    });
+  }
 };
 
 export async function POST(req: Request) {
@@ -351,11 +373,19 @@ export async function POST(req: Request) {
     if (!body || body.byteLength === 0) {
       return NextResponse.json(
         { error: "initData bytes are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const bodyString = new TextDecoder().decode(body);
     const bodyJson = JSON.parse(bodyString);
+
+    const parsedSolanaEnv = parseClaimSolanaEnv(bodyJson.solanaEnv);
+    if (!parsedSolanaEnv) {
+      return NextResponse.json(
+        { error: "Invalid solana env. Supported values: mainnet, devnet" },
+        { status: 400 },
+      );
+    }
 
     const {
       storeTx,
@@ -395,21 +425,21 @@ export async function POST(req: Request) {
       });
       return NextResponse.json(
         { error: "transaction and payer are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (typeof storeTx !== "string") {
       return NextResponse.json(
         { error: "Invalid transaction format" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (typeof recipientPubKey !== "string" || typeof username !== "string") {
       return NextResponse.json(
         { error: "Invalid recipient or username format" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -418,12 +448,12 @@ export async function POST(req: Request) {
     if (!payer.publicKey.equals(configuredGaslessPublicKey)) {
       return NextResponse.json(
         { error: "Gasless keypair does not match configured public key" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
-    const provider = await getCustomWalletProvider(payer);
     const payerWallet = new SimpleWallet(payer);
+    const provider = createProviderForEnv(payerWallet, parsedSolanaEnv);
 
     const parsedStoreTx = deserializeTransaction(storeTx);
     const parsedRecipient = new PublicKey(recipientPubKey);
@@ -449,14 +479,14 @@ export async function POST(req: Request) {
             "Telegram init-data username does not match the deposit username",
           details: `initData=${initDataUsername}, deposit=${username}`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const storeResult = await sendSignedTransaction(
       provider,
       parsedStoreTx,
-      payerWallet
+      payerWallet,
     );
     if (!storeResult.ok) {
       const invalidUsername = isInvalidTelegramUsernameFailure(storeResult);
@@ -467,9 +497,17 @@ export async function POST(req: Request) {
             : "Failed to store init data",
           details: storeResult.message,
         },
-        { status: invalidUsername ? 400 : 500 }
+        { status: invalidUsername ? 400 : 500 },
       );
     }
+    // fire and forget — errors are already caught inside the helper
+    void recordGaslessClaimAnalyticsBestEffort({
+      connection: provider.connection,
+      payerAddress: payerWallet.publicKey.toBase58(),
+      signature: storeResult.signature,
+      solanaEnv: parsedSolanaEnv,
+      transactionType: "store",
+    });
 
     const result = await verifyAndClaimDeposit(
       provider,
@@ -479,13 +517,33 @@ export async function POST(req: Request) {
       parsedAmount,
       processedInitData,
       telegramSignature,
-      telegramPublicKey
+      telegramPublicKey,
     );
-    if (!result) {
+    if (!result.ok) {
       return NextResponse.json(
         { error: "Failed to claim deposit" },
-        { status: 500 }
+        { status: 500 },
       );
+    }
+
+    // fire and forget — errors are already caught inside the helper
+    void recordGaslessClaimAnalyticsBestEffort({
+      connection: provider.connection,
+      payerAddress: payerWallet.publicKey.toBase58(),
+      signature: result.verifySignature,
+      solanaEnv: parsedSolanaEnv,
+      transactionType: "verify_telegram_init_data",
+    });
+    if (result.topUpSignature) {
+      // fire and forget — errors are already caught inside the helper
+      void recordGaslessClaimAnalyticsBestEffort({
+        connection: provider.connection,
+        payerAddress: payerWallet.publicKey.toBase58(),
+        recipientAddress: parsedRecipient.toBase58(),
+        signature: result.topUpSignature,
+        solanaEnv: parsedSolanaEnv,
+        transactionType: "top_up_to_0_01_sol",
+      });
     }
 
     return NextResponse.json({ success: true });
@@ -493,7 +551,7 @@ export async function POST(req: Request) {
     console.error("[gasless][claim] failed to claim deposit", error);
     return NextResponse.json(
       { error: "Failed to claim deposit" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

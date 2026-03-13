@@ -37,6 +37,8 @@ pub(crate) struct AppContext {
     pub(crate) router_url: String,
     pub(crate) commitment: CommitmentConfig,
     pub(crate) validator: Pubkey,
+    pub(crate) simulate: bool,
+    pub(crate) simulate_only: bool,
 }
 
 #[derive(Debug, Clone)]

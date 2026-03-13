@@ -1,49 +1,9 @@
-import { subscribeToWalletBalance } from "@/lib/solana/wallet/wallet-details";
 import type { TelegramDeposit } from "@/types/deposits";
 import type { IncomingTransaction, Transaction } from "@/types/wallet";
 
 export const walletTransactionsCache = new Map<string, Transaction[]>();
-const walletBalanceCache = new Map<string, number>();
-export const walletBalanceListeners = new Set<(lamports: number) => void>();
-export let walletBalanceSubscriptionPromise: Promise<
-  () => Promise<void>
-> | null = null;
 
 export const HOLDINGS_REFRESH_DEBOUNCE_MS = 750;
-
-export const getCachedWalletBalance = (
-  walletAddress: string | null
-): number | null => {
-  if (!walletAddress) return null;
-  const cached = walletBalanceCache.get(walletAddress);
-  return typeof cached === "number" ? cached : null;
-};
-
-export const setCachedWalletBalance = (
-  walletAddress: string | null,
-  lamports: number
-): void => {
-  if (!walletAddress) return;
-  walletBalanceCache.set(walletAddress, lamports);
-};
-
-export const ensureWalletBalanceSubscription = async (
-  walletAddress: string
-) => {
-  if (walletBalanceSubscriptionPromise) {
-    return walletBalanceSubscriptionPromise;
-  }
-
-  walletBalanceSubscriptionPromise = subscribeToWalletBalance((lamports) => {
-    setCachedWalletBalance(walletAddress, lamports);
-    walletBalanceListeners.forEach((listener) => listener(lamports));
-  }).catch((error) => {
-    walletBalanceSubscriptionPromise = null;
-    throw error;
-  });
-
-  return walletBalanceSubscriptionPromise;
-};
 
 // SOL price cache (shared across page visits)
 export let cachedSolPriceUsd: number | null = null;
@@ -123,7 +83,6 @@ export const setCachedBalanceBg = (bg: string | null | undefined): void => {
 // Check if we have enough cached data to skip loading
 export const hasCachedWalletData = (): boolean => {
   if (!cachedWalletAddress) return false;
-  const hasBalance = getCachedWalletBalance(cachedWalletAddress) !== null;
   const hasPrice = getCachedSolPrice() !== null;
-  return hasBalance && hasPrice;
+  return hasPrice;
 };

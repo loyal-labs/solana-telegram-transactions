@@ -4,6 +4,10 @@ import { EncryptedData } from "./types";
 const ALGORITHM = "AES-GCM";
 const IV_LENGTH = 12;
 
+function encodeText(value: string) {
+  return Uint8Array.from(new TextEncoder().encode(value));
+}
+
 async function getKey(): Promise<CryptoKey | null> {
   const keyBase64 = serverEnv.messageEncryptionKey;
   if (!keyBase64) {
@@ -39,8 +43,7 @@ export async function encrypt(plaintext: string): Promise<EncryptedData | null> 
 
   try {
     const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
-    const encoder = new TextEncoder();
-    const data = encoder.encode(plaintext);
+    const data = encodeText(plaintext);
 
     const ciphertext = await crypto.subtle.encrypt(
       { name: ALGORITHM, iv },

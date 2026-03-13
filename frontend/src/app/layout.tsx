@@ -3,10 +3,15 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
-import { PhantomWalletProvider } from "@/components/solana/phantom-provider";
+import { SignInModal } from "@/components/auth/sign-in-modal";
+import { WalletConnectionProvider } from "@/components/solana/wallet-provider";
 import { Header } from "@/components/ui/header";
+import { AuthSessionProvider } from "@/contexts/auth-session-context";
 import { ChatModeProvider } from "@/contexts/chat-mode-context";
+import { PublicEnvProvider } from "@/contexts/public-env-context";
+import { SignInModalProvider } from "@/contexts/sign-in-modal-context";
 import { UserChatsProvider } from "@/providers/user-chats";
+import { createPublicEnv } from "@/lib/core/config/public";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,9 +32,9 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   icons: {
-    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
-    shortcut: "/favicon.svg",
-    apple: [{ url: "/favicon.svg" }],
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
   },
   openGraph: {
     type: "website",
@@ -39,9 +44,9 @@ export const metadata: Metadata = {
       "True private intelligence network: open-source privacy-preserving AI with confidential compute in TEE and attested runtimes.",
     images: [
       {
-        url: "/card1.jpg",
-        width: 1033,
-        height: 542,
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
         alt: "Loyal network visual",
       },
     ],
@@ -53,7 +58,7 @@ export const metadata: Metadata = {
       "True private intelligence network: open-source privacy-preserving AI with confidential compute in TEE and attested runtimes.",
     images: [
       {
-        url: "/card2.jpg",
+        url: "/og-image.png",
         alt: "Loyal private intelligence preview",
       },
     ],
@@ -65,19 +70,28 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const publicEnv = createPublicEnv(process.env);
+
   return (
     <html className="dark" lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <PhantomWalletProvider>
-          <UserChatsProvider>
-            <ChatModeProvider>
-              <Header />
-              {children}
-            </ChatModeProvider>
-          </UserChatsProvider>
-        </PhantomWalletProvider>
+        <PublicEnvProvider value={publicEnv}>
+          <WalletConnectionProvider>
+            <AuthSessionProvider>
+              <SignInModalProvider>
+                <UserChatsProvider>
+                  <ChatModeProvider>
+                    <Header />
+                    {children}
+                    <SignInModal />
+                  </ChatModeProvider>
+                </UserChatsProvider>
+              </SignInModalProvider>
+            </AuthSessionProvider>
+          </WalletConnectionProvider>
+        </PublicEnvProvider>
 
         {/* Umami Analytics */}
         <Script
@@ -85,28 +99,6 @@ export default function RootLayout({
           defer
           src="https://cloud.umami.is/script.js"
           strategy="afterInteractive"
-        />
-
-        {/* Productlane Widget */}
-        <Script id="productlane-init" strategy="afterInteractive">
-          {`
-            (function(w){
-              const P=(w.Productlane={queue:{}});
-              ["set","open","close","toggle","on","off","init","enable","disable"].forEach(m=>{
-                P[m]=(n=>function(){P.queue[n]={args:arguments}})(m)
-              })
-            })(window);
-
-            Productlane.init({
-              widgetKey: "a1926941-a6d8-47b8-baa8-794d3f75303d",
-              position: "left"
-            });
-          `}
-        </Script>
-        <Script
-          crossOrigin="anonymous"
-          src="https://widget.productlane.com/latest.productlane-widget.min.js"
-          strategy="lazyOnload"
         />
       </body>
     </html>

@@ -1,9 +1,10 @@
 import { admins, communities, type Community, userSettings } from "@loyal-labs/db-core/schema";
 import { eq } from "drizzle-orm";
 import type { CommandContext, Context } from "grammy";
-import { Bot, InlineKeyboard } from "grammy";
+import { Bot } from "grammy";
 
 import { getDatabase } from "@/lib/core/database";
+import { fetchTokenMetricsByMint } from "@/lib/jupiter/server";
 import { captureCommunityPhotoToCdn } from "@/lib/telegram/community-photo-service";
 import { getOrCreateUser } from "@/lib/telegram/user-service";
 import { getTelegramDisplayName, isCommunityChat } from "@/lib/telegram/utils";
@@ -13,6 +14,11 @@ import {
   type MixpanelTrackProperties,
   trackBotEvent,
 } from "./analytics";
+import {
+  createCaCommandKeyboard,
+  formatCaCommandMessage,
+  LOYAL_CA_ADDRESS,
+} from "./ca-command";
 import { CA_COMMAND_CHAT_ID } from "./constants";
 import { replyWithAutoCleanup } from "./helper-message-cleanup";
 import { evictActiveCommunityCache } from "./message-handlers";
@@ -187,20 +193,8 @@ export async function handleCaCommand(
   ctx: CommandContext<Context>,
   bot: Bot
 ): Promise<void> {
-  const caAddress = "LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta";
-  const caAddressMarkdown = `\`${caAddress}\``;
-  const cmcEndpoint =
-    "https://api.coinmarketcap.com/data-api/v3.3/cryptocurrency/detail/chart?id=39037&interval=3h&convertId=2781&range=All";
-  const currencyFormatter = new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
-  });
-
-  const keyboard = new InlineKeyboard()
-    .url("Jupiter", `https://jup.ag/tokens/${caAddress}`)
-    .url("Dexscreener", `https://dexscreener.com/solana/${caAddress}`)
-    .row()
-    .copyText("Copy CA to clipboard", caAddress);
+  const caAddress = LOYAL_CA_ADDRESS;
+  const keyboard = createCaCommandKeyboard(caAddress);
 
   const chatId = ctx.chat?.id;
   if (!chatId) {
@@ -213,45 +207,17 @@ export async function handleCaCommand(
     return;
   }
 
-  let priceValue = "N/A";
-  let marketCapValue = "N/A";
+  let metrics = null;
 
   try {
-    const response = await fetch(cmcEndpoint);
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch CMC data: ${response.status} ${response.statusText}`
-      );
-    }
-    const data = await response.json();
-    const points = data?.data?.points;
-    const latestPoint =
-      Array.isArray(points) && points.length > 0
-        ? points[points.length - 1]
-        : null;
-    const latestValues = latestPoint?.v;
-    const latestPrice = Array.isArray(latestValues)
-      ? Number(latestValues[0])
-      : NaN;
-    const latestMarketCap = Array.isArray(latestValues)
-      ? Number(latestValues[2])
-      : NaN;
-
-    if (Number.isFinite(latestPrice)) {
-      priceValue = `$${currencyFormatter.format(latestPrice)}`;
-    }
-    if (Number.isFinite(latestMarketCap)) {
-      marketCapValue = `$${currencyFormatter.format(latestMarketCap)}`;
-    }
+    metrics = await fetchTokenMetricsByMint(caAddress);
   } catch (error) {
-    console.error("Failed to fetch CMC data for ca command", error);
+    console.error("Failed to fetch Jupiter data for ca command", error);
   }
-
-  const priceLine = `\n\nPrice: **${priceValue}**\nMarket cap: **${marketCapValue}**`;
 
   await bot.api.sendMessage(
     chatId,
-    `$LOYAL's CA: ${caAddressMarkdown}${priceLine}`,
+    formatCaCommandMessage(caAddress, metrics),
     {
       parse_mode: "Markdown",
       reply_markup: keyboard,

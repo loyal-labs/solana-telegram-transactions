@@ -33,7 +33,7 @@ import { TelegramPrivateTransfer } from "../target/types/telegram_private_transf
 import { TelegramVerification } from "../target/types/telegram_verification";
 import { sign } from "tweetnacl";
 
-const DEPOSIT_PDA_SEED = Buffer.from("deposit");
+const DEPOSIT_PDA_SEED = Buffer.from("deposit_v2");
 const USERNAME_DEPOSIT_PDA_SEED = Buffer.from("username_deposit");
 const VAULT_PDA_SEED = Buffer.from("vault");
 
@@ -220,7 +220,8 @@ const buildEphemeralProvider = async (
     process.env.EPHEMERAL_AUTH === "true" ||
     (!hasToken &&
       (config.rpcEndpoint.includes("magicblock.app") ||
-        config.rpcEndpoint.includes("tee.magicblock.app")));
+        config.rpcEndpoint.includes("tee.magicblock.app") ||
+        config.rpcEndpoint.includes("mainnet-tee.magicblock.app")));
   let rpcEndpoint = config.rpcEndpoint;
   let wsEndpoint = config.wsEndpoint;
   if (useAuth) {

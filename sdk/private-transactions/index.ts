@@ -9,6 +9,7 @@
  * import { Keypair, PublicKey } from "@solana/web3.js";
  * import {
  *   ER_VALIDATOR,
+ *   ER_VALIDATOR_MAINNET,
  *   LoyalPrivateTransactionsClient,
  *   MAGIC_CONTEXT_ID,
  *   MAGIC_PROGRAM_ID,
@@ -20,12 +21,12 @@
  * const client = await LoyalPrivateTransactionsClient.fromConfig({
  *   signer,
  *   baseRpcEndpoint: "https://api.devnet.solana.com",
- *   ephemeralRpcEndpoint: "https://tee.magicblock.app",
- *   ephemeralWsEndpoint: "wss://tee.magicblock.app",
+ *   ephemeralRpcEndpoint: "https://mainnet-tee.magicblock.app",
+ *   ephemeralWsEndpoint: "wss://mainnet-tee.magicblock.app",
  * });
  *
  * await client.createPermission({ user: signer.publicKey, tokenMint, payer: signer.publicKey });
- * await client.delegateDeposit({ user: signer.publicKey, tokenMint, payer: signer.publicKey, validator: ER_VALIDATOR });
+ * await client.delegateDeposit({ user: signer.publicKey, tokenMint, payer: signer.publicKey, validator: ER_VALIDATOR_MAINNET });
  * await client.transferToUsernameDeposit({ username: "alice_user", tokenMint, amount: 100_000, user: signer.publicKey, payer: signer.publicKey, sessionToken: null });
  * await client.undelegateDeposit({ user: signer.publicKey, tokenMint, payer: signer.publicKey, sessionToken: null, magicProgram: MAGIC_PROGRAM_ID, magicContext: MAGIC_CONTEXT_ID });
  */
@@ -66,6 +67,10 @@ export { isKeypair, isAnchorProvider, isWalletLike } from "./src/types";
 // Constants
 export {
   ER_VALIDATOR,
+  ER_VALIDATOR_DEVNET,
+  ER_VALIDATOR_MAINNET,
+  getErValidatorForSolanaEnv,
+  getErValidatorForRpcEndpoint,
   PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,

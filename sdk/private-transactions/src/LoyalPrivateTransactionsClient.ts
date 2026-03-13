@@ -24,7 +24,7 @@ import {
   PROGRAM_ID,
   DELEGATION_PROGRAM_ID,
   PERMISSION_PROGRAM_ID,
-  ER_VALIDATOR,
+  getErValidatorForRpcEndpoint,
 } from "./constants";
 import {
   findDepositPda,
@@ -205,8 +205,8 @@ export function waitForAccountOwnerChange(
  * const client = await LoyalPrivateTransactionsClient.fromConfig({
  *   signer: keypair,
  *   baseRpcEndpoint: "https://api.devnet.solana.com",
- *   ephemeralRpcEndpoint: "https://tee.magicblock.app",
- *   ephemeralWsEndpoint: "wss://tee.magicblock.app",
+ *   ephemeralRpcEndpoint: "https://mainnet-tee.magicblock.app",
+ *   ephemeralWsEndpoint: "wss://mainnet-tee.magicblock.app",
  * });
  *
  * // Base-layer setup
@@ -234,6 +234,22 @@ export class LoyalPrivateTransactionsClient {
     this.baseProgram = baseProgram;
     this.ephemeralProgram = ephemeralProgram;
     this.wallet = wallet;
+  }
+
+  private getExpectedErValidator(): PublicKey {
+    return getErValidatorForRpcEndpoint(
+      this.ephemeralProgram.provider.connection.rpcEndpoint
+    );
+  }
+
+  getExpectedValidator(): PublicKey {
+    return this.getExpectedErValidator();
+  }
+
+  async getAccountDelegationStatus(
+    account: PublicKey
+  ): Promise<DelegationStatusResponse> {
+    return this.getDelegationStatus(account);
   }
 
   // ============================================================
@@ -1147,8 +1163,9 @@ export class LoyalPrivateTransactionsClient {
         prettyStringify(ephemeralAccountInfo)
       );
 
+      const expectedValidator = this.getExpectedErValidator();
       const authority = delegationStatus.result?.delegationRecord?.authority;
-      if (authority && authority !== ER_VALIDATOR.toString()) {
+      if (authority && authority !== expectedValidator.toString()) {
         console.error(
           `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${authority}`
         );
@@ -1201,7 +1218,7 @@ export class LoyalPrivateTransactionsClient {
     } else if (
       !skipValidatorCheck &&
       delegationStatus.result.delegationRecord.authority !==
-        ER_VALIDATOR.toString()
+        this.getExpectedErValidator().toString()
     ) {
       console.error(
         `Account is delegated on wrong validator: ${displayName}${account.toString()} - validator: ${
@@ -1241,9 +1258,15 @@ export class LoyalPrivateTransactionsClient {
       body,
     };
 
-    // Try TEE first
+    const expectedValidator = this.getExpectedErValidator();
+
+    // Try TEE first — pick mainnet or devnet TEE based on ephemeral RPC URL
+    const ephemeralUrl = this.ephemeralProgram.provider.connection.rpcEndpoint;
+    const teeBaseUrl = ephemeralUrl.includes("mainnet-tee")
+      ? "https://mainnet-tee.magicblock.app/"
+      : "https://tee.magicblock.app/";
     try {
-      const teeRes = await fetch("https://tee.magicblock.app/", options);
+      const teeRes = await fetch(teeBaseUrl, options);
       const teeData = (await teeRes.json()) as DelegationStatusResponse;
       if (teeData.result?.isDelegated) {
         // TEE confirmed delegation — synthesize authority so validator check passes
@@ -1252,36 +1275,38 @@ export class LoyalPrivateTransactionsClient {
           result: {
             ...teeData.result,
             delegationRecord: {
-              authority: ER_VALIDATOR.toString(),
+              authority: expectedValidator.toString(),
             },
           },
         };
       }
     } catch (e) {
       console.error(
-        "[getDelegationStatus] TEE fetch failed, falling back to devnet-router:",
+        "[getDelegationStatus] TEE fetch failed, falling back to devnet-router: Options:",
+        options,
+        "Error:",
         e
       );
     }
 
     // Fallback to devnet-router
-    const res = await fetch(
-      "https://devnet-router.magicblock.app/getDelegationStatus",
-      options
-    );
+    const routerBaseUrl = ephemeralUrl.includes("mainnet-tee")
+      ? "https://router.magicblock.app/"
+      : "https://devnet-router.magicblock.app/";
+    const res = await fetch(routerBaseUrl, options);
     const routerData = (await res.json()) as DelegationStatusResponse;
 
     // WORKAROUND: devnet-router returns an error for accounts delegated to the
     // PER validator it doesn't recognize, e.g.:
     //   {"error":{"code":-32604,"message":"account has been delegated to unknown ER node: FnE6..."}}
     // Treat as valid delegation if it mentions our PER validator.
-    if (routerData.error?.message?.includes(ER_VALIDATOR.toString())) {
+    if (routerData.error?.message?.includes(expectedValidator.toString())) {
       return {
         ...routerData,
         result: {
           isDelegated: true,
           delegationRecord: {
-            authority: ER_VALIDATOR.toString(),
+            authority: expectedValidator.toString(),
           },
         },
       };

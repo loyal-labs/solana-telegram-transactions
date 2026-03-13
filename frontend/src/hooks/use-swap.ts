@@ -1,4 +1,7 @@
-import { usePhantom, useSolana } from "@phantom/react-sdk";
+import {
+  useConnection,
+  useWallet,
+} from "@solana/wallet-adapter-react";
 import {
   type ParsedAccountData,
   PublicKey,
@@ -6,7 +9,7 @@ import {
 } from "@solana/web3.js";
 import { useCallback, useState } from "react";
 
-import { useConnection } from "@/components/solana/phantom-provider";
+import { usePublicEnv } from "@/contexts/public-env-context";
 
 // Debug logger that only emits in development
 const logger = {
@@ -39,17 +42,6 @@ export type SwapResult = {
 // Use Jupiter Swap v1 API with paid tier endpoint
 const JUPITER_QUOTE_API_URL = "https://api.jup.ag/swap/v1/quote";
 const JUPITER_SWAP_API_URL = "https://api.jup.ag/swap/v1/swap";
-
-// Get Jupiter API key from environment variable
-const getJupiterApiKey = (): string => {
-  const apiKey = process.env.NEXT_PUBLIC_JUPITER_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "NEXT_PUBLIC_JUPITER_API_KEY environment variable is not set. Please add it to your .env file."
-    );
-  }
-  return apiKey;
-};
 
 // Token mint address mapping for Solana mainnet
 const TOKEN_MINTS: Record<string, string> = {
@@ -108,8 +100,8 @@ type JupiterSwapResponse = {
 
 export function useSwap() {
   const { connection } = useConnection();
-  const { solana, isAvailable } = useSolana();
-  const { isConnected } = usePhantom();
+  const { publicKey, connected: isConnected, sendTransaction } = useWallet();
+  const { swap: swapConfig } = usePublicEnv();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quote, setQuote] = useState<SwapQuote | null>(null);
@@ -147,6 +139,10 @@ export function useSwap() {
     ): Promise<SwapQuote | null> => {
       try {
         setError(null);
+
+        if (swapConfig.mode === "disabled") {
+          throw new Error(swapConfig.reason);
+        }
 
         // Convert token symbols to mint addresses
         // Use provided mints if available, otherwise look up
@@ -191,7 +187,7 @@ export function useSwap() {
 
         const response = await fetch(url, {
           headers: {
-            "x-api-key": getJupiterApiKey(),
+            "x-api-key": swapConfig.apiKey,
           },
         });
 
@@ -238,11 +234,16 @@ export function useSwap() {
         return null;
       }
     },
-    [getTokenDecimals]
+    [getTokenDecimals, swapConfig]
   );
 
   const executeSwap = useCallback(async (): Promise<SwapResult> => {
-    if (!(isConnected && isAvailable && solana)) {
+    if (swapConfig.mode === "disabled") {
+      setError(swapConfig.reason);
+      return { success: false, error: swapConfig.reason };
+    }
+
+    if (!(isConnected && publicKey)) {
       const errorMsg = "Wallet not connected";
       setError(errorMsg);
       return { success: false, error: errorMsg };
@@ -258,16 +259,6 @@ export function useSwap() {
     setError(null);
 
     try {
-      // Prefer the current public key; reconnect if the provider needs refresh.
-      let publicKeyString = solana.publicKey;
-      if (!publicKeyString) {
-        const connectionResult = await solana.connect();
-        publicKeyString = connectionResult.publicKey;
-      }
-      if (!publicKeyString) {
-        throw new Error("Failed to get public key from wallet");
-      }
-      const publicKey = new PublicKey(publicKeyString);
 
       logger.debug("Executing swap with quote:", quoteResponse);
 
@@ -278,7 +269,7 @@ export function useSwap() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": getJupiterApiKey(),
+          "x-api-key": swapConfig.apiKey,
         },
         body: JSON.stringify({
           userPublicKey: publicKey.toBase58(),
@@ -313,13 +304,13 @@ export function useSwap() {
       const txBuffer = Buffer.from(serializedTx, "base64");
       const transaction = VersionedTransaction.deserialize(txBuffer);
 
-      // Step 3: Sign and send transaction using Phantom
+      // Step 3: Sign and send transaction using wallet-adapter
       logger.debug("Signing and sending transaction...");
-      const result = await solana.signAndSendTransaction(transaction);
+      const signature = await sendTransaction(transaction, connection);
 
-      logger.debug("Transaction sent:", result.signature);
+      logger.debug("Transaction sent:", signature);
       logger.debug(
-        `View transaction: https://orbmarkets.io/tx/${result.signature}?tab=summary`
+        `View transaction: https://orbmarkets.io/tx/${signature}?tab=summary`
       );
 
       // Step 4: Confirm transaction with proper strategy
@@ -327,7 +318,7 @@ export function useSwap() {
       const latestBlockhash = await connection.getLatestBlockhash("confirmed");
       const confirmation = await connection.confirmTransaction(
         {
-          signature: result.signature,
+          signature,
           blockhash: latestBlockhash.blockhash,
           lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
         },
@@ -343,7 +334,7 @@ export function useSwap() {
       logger.debug("Transaction confirmed!");
       setLoading(false);
       return {
-        signature: result.signature,
+        signature,
         success: true,
       };
     } catch (err) {
@@ -369,7 +360,7 @@ export function useSwap() {
       setLoading(false);
       return { success: false, error: errorMessage };
     }
-  }, [isConnected, isAvailable, solana, connection, quoteResponse]);
+  }, [connection, isConnected, publicKey, quoteResponse, sendTransaction, swapConfig]);
 
   const resetQuote = useCallback(() => {
     setQuote(null);
@@ -384,5 +375,8 @@ export function useSwap() {
     quote,
     loading,
     error,
+    isAvailable: swapConfig.mode === "enabled",
+    unavailableReason:
+      swapConfig.mode === "disabled" ? swapConfig.reason : null,
   };
 }

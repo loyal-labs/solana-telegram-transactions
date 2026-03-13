@@ -16,6 +16,10 @@ const getHeaders = () => {
   return { Authorization: `Bearer ${apiKey}` };
 };
 
+function encodeText(value: string) {
+  return Uint8Array.from(new TextEncoder().encode(value));
+}
+
 export function generateNonce(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return Array.from(bytes)
@@ -47,7 +51,7 @@ export async function fetchSignature(
 }
 
 async function sha256Hex(data: string): Promise<string> {
-  const encoded = new TextEncoder().encode(data);
+  const encoded = encodeText(data);
   const hash = await crypto.subtle.digest("SHA-256", encoded);
   return Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, "0"))

@@ -1,0 +1,52 @@
+export { buildAuthUrl, callAuthEndpoint, createAuthClient } from "./auth";
+export {
+  authMethodSchema,
+  authRoutePaths,
+  authSessionUserSchema,
+  emailAuthModeSchema,
+  embeddedPasskeyErrorMessageSchema,
+  embeddedPasskeyMessageSchema,
+  embeddedPasskeyMessageTypeSchema,
+  embeddedPasskeySuccessMessageSchema,
+  getAuthSessionResponseSchema,
+  sessionKeyBackendSchema,
+  sessionKeySchema,
+  startEmailAuthRequestSchema,
+  startEmailAuthResponseSchema,
+  startPasskeySessionResponseSchema,
+  verifyEmailAuthRequestSchema,
+  verifyEmailAuthResponseSchema,
+  walletChallengeRequestSchema,
+  walletChallengeResponseSchema,
+  walletCompleteRequestSchema,
+  walletCompleteResponseSchema,
+} from "./contracts";
+export {
+  extractApiErrorMessage,
+  extractSessionUrl,
+  parseApiErrorDetails,
+} from "./errors";
+export type {
+  AuthMethod,
+  AuthSessionUser,
+  EmailAuthMode,
+  EmbeddedPasskeyMessage,
+  GetAuthSessionResponse,
+  StartEmailAuthRequest,
+  StartEmailAuthResponse,
+  StartPasskeySessionResponse,
+  VerifyEmailAuthRequest,
+  VerifyEmailAuthResponse,
+  WalletChallengeRequest,
+  WalletChallengeResponse,
+  WalletCompleteRequest,
+  WalletCompleteResponse,
+} from "./contracts";
+export type {
+  ApiOutcome,
+  AuthClient,
+  AuthRuntimeConfig,
+  FetchLike,
+  StartPasskeyRegistrationInput,
+  StartPasskeySignInInput,
+} from "./types";

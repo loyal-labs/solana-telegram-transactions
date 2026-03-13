@@ -3,8 +3,6 @@ title: "Quick Start"
 description: "Quick start guide for Loyal's Private Transactions SDK"
 ---
 
-`@loyal-labs/private-transactions` is the SDK for private SPL token transfer flows backed by the `telegram-private-transfer` program and MagicBlock Private Ephemeral Rollups (PER).
-
 ## Installation
 
 ```bash
@@ -19,9 +17,9 @@ npm install @loyal-labs/private-transactions
 bun add @coral-xyz/anchor @solana/web3.js @solana/spl-token @magicblock-labs/ephemeral-rollups-sdk
 ```
 
-## Create a Client with `fromConfig`
+## Create a Client
 
-`fromConfig(...)` is the canonical SDK entrypoint.
+`fromConfig(...)` creates a client with connections to both base Solana and the MagicBlock PER endpoint. It handles TEE integrity verification and PER auth token acquisition automatically.
 
 ```typescript
 import { Keypair, PublicKey } from "@solana/web3.js";
@@ -37,8 +35,10 @@ const signer = Keypair.fromSecretKey(Uint8Array.from([...secretBytes]));
 const client = await LoyalPrivateTransactionsClient.fromConfig({
   signer,
   baseRpcEndpoint: "https://api.devnet.solana.com",
-  ephemeralRpcEndpoint: "https://tee.magicblock.app",
-  ephemeralWsEndpoint: "wss://tee.magicblock.app",
+  // Mainnet: https://mainnet-tee.magicblock.app
+  // Devnet: https://tee.magicblock.app
+  ephemeralRpcEndpoint: "https://mainnet-tee.magicblock.app",
+  ephemeralWsEndpoint: "wss://mainnet-tee.magicblock.app",
   commitment: "confirmed",
 });
 
@@ -46,17 +46,17 @@ const tokenMint = new PublicKey("<token-mint>");
 const user = signer.publicKey;
 ```
 
-## Private Transfer Flow
+## Shield: Move Tokens into Private Deposit
 
-### 1. Initialize and fund the sender deposit (base layer)
+Shield moves tokens from your wallet into the private layer (PER).
+
+### 1. Initialize and fund the deposit (base layer)
 
 ```typescript
-await client.initializeDeposit({
-  tokenMint,
-  user,
-  payer: user,
-});
+// Create deposit account (no-op if already exists)
+await client.initializeDeposit({ tokenMint, user, payer: user });
 
+// Transfer tokens from your ATA into the program vault
 await client.modifyBalance({
   tokenMint,
   user,
@@ -70,12 +70,10 @@ await client.modifyBalance({
 ### 2. Create permission and delegate to PER
 
 ```typescript
-await client.createPermission({
-  tokenMint,
-  user,
-  payer: user,
-});
+// Set up PER access control (idempotent — returns null if already exists)
+await client.createPermission({ tokenMint, user, payer: user });
 
+// Delegate deposit to TEE validator — account moves into PER
 await client.delegateDeposit({
   tokenMint,
   user,
@@ -84,9 +82,11 @@ await client.delegateDeposit({
 });
 ```
 
-### 3. Run the private transfer on PER
+Your deposit is now private — only you can see it inside PER.
 
-The destination username deposit must already exist and be delegated.
+## Private Transfers
+
+Transfer to another user by Telegram username. The destination username deposit must already exist and be delegated.
 
 ```typescript
 await client.transferToUsernameDeposit({
@@ -99,18 +99,39 @@ await client.transferToUsernameDeposit({
 });
 ```
 
-### 4. Claim and undelegate/commit
+Or transfer directly to another wallet address:
 
 ```typescript
-await client.claimUsernameDeposit({
+await client.transferDeposit({
+  tokenMint,
+  user,
+  destinationUser: new PublicKey("<recipient-wallet>"),
+  amount: 100_000,
+  payer: user,
+  sessionToken: null,
+});
+```
+
+## Claim and Unshield
+
+### Claim from username deposit
+
+The recipient proves Telegram identity via a verified session PDA and claims to their own deposit:
+
+```typescript
+await client.claimUsernameDepositToDeposit({
   username: "alice_user",
   tokenMint,
   amount: 100_000,
   recipient: new PublicKey("<recipient-wallet>"),
-  recipientTokenAccount: new PublicKey("<recipient-ata>"),
   session: new PublicKey("<telegram-session-pda>"),
 });
+```
 
+### Unshield: move tokens back to wallet
+
+```typescript
+// Commit PER state and return deposit to base layer
 await client.undelegateDeposit({
   tokenMint,
   user,
@@ -119,9 +140,20 @@ await client.undelegateDeposit({
   magicProgram: MAGIC_PROGRAM_ID,
   magicContext: MAGIC_CONTEXT_ID,
 });
+
+// Withdraw tokens from vault back to your ATA
+await client.modifyBalance({
+  tokenMint,
+  user,
+  payer: user,
+  userTokenAccount: new PublicKey("<sender-ata>"),
+  amount: 1_000_000,
+  increase: false,
+});
 ```
 
 ## Next Steps
 
-- Read [How It Works](/sdk/private-transactions/how-it-works) for the full base-layer + PER lifecycle.
-- Use [CLI Guide](/sdk/private-transactions/cli) if you want to execute the same flow via `bun scripts/telegram-private-transfer.ts`.
+- Read [How It Works](/sdk/private-transactions/how-it-works) for the full base-layer + PER lifecycle and smart contract details.
+- See [API Reference](/sdk/private-transactions/reference) for all method signatures and types.
+- Use [CLI](/sdk/private-transactions/cli) to execute the same flow via `bun scripts/telegram-private-transfer.ts`.

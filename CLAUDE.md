@@ -74,7 +74,9 @@ anchor test --provider.cluster localnet --skip-local-validator --skip-build --sk
 ```bash
 bun run lint               # prettier --check
 bun run lint:fix           # prettier -w
+bun run build:grid-packages  # build Grid workspace packages
 bun run build:db-packages  # build shared DB workspace packages
+bun run typecheck:grid-packages  # typecheck Grid workspace packages
 bun run typecheck:db-packages  # typecheck shared DB workspace packages
 bun run guard:shared-boundaries  # ensure shared packages stay app-env agnostic
 bun run guard:admin-shared-schema  # prevent admin-local schema duplication
@@ -104,7 +106,7 @@ bun run admin:build        # build admin workspace from repo root
 - **`/app`** - Next.js 15 frontend + API routes
 - **`/mobile`** - Expo React Native mobile app (iOS/Android)
 - **`/admin`** - Next.js 15 internal admin dashboard
-- **`/packages`** - Internal shared workspace packages (e.g. `db-core`, `db-adapter-neon`, `shared`)
+- **`/packages`** - Internal shared workspace packages (e.g. `db-core`, `db-adapter-neon`, `grid-core`, `shared`)
 - **`/sdk/transactions`** - Publishable `@loyal-labs/transactions` NPM package
 - **`/workers`** - Runtime services/workers
 - **`/tests`** - Anchor test suite (Mocha/Chai)
@@ -185,6 +187,14 @@ Use `/app/src/lib` for cross-slice infrastructure and integration primitives. Ex
 - Do not reintroduce `/admin/schema`; use shared schema/docs as source of truth.
 - Run `bun run guard:admin-shared-schema` after admin schema/DB changes.
 - For Vercel monorepo deploys, set Root Directory to `admin` (config in `admin/vercel.json`).
+
+### Grid + Passkey Boundary
+
+- Keep runtime-agnostic Grid code in `packages/grid-core`.
+- Keep `packages/shared` for generic shared types only; do not place WebAuthn or passkey browser-flow helpers there.
+- `passkey` is the auth-domain app for `/api/passkeys/*` and should remain the only workspace that owns WebAuthn ceremony code, host/RP resolution, and passkey flow orchestration.
+- Consumer apps should integrate against the passkey domain via `NEXT_PUBLIC_GRID_AUTH_BASE_URL` or `EXPO_PUBLIC_GRID_AUTH_BASE_URL`.
+- Server-side Grid upstream config stays in `passkey` under `GRID_*`; browser code should use only public envs such as `NEXT_PUBLIC_GRID_RP_ID` when needed.
 
 ### Key Patterns
 

@@ -1,6 +1,5 @@
 // components/topics-sidebar.tsx
 "use client";
-import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area"; // shadcn/ui
@@ -104,18 +103,22 @@ export function TopicsSidebar({ topics, onNewChat }: TopicsSidebarProps) {
       </div>
 
       <ScrollArea className="flex-1">
-        <ul className="p-2">
-          {topics.map((t) => (
-            <li className="rounded px-2 py-1 hover:bg-muted" key={t.id}>
-              <Link className="block" href={`/chat/${t.id}`}>
+        {topics.length === 0 ? (
+          <div className="p-4 text-muted-foreground text-sm">
+            Recent chats are no longer persisted in the desktop app.
+          </div>
+        ) : (
+          <ul className="p-2">
+            {topics.map((t) => (
+              <li className="rounded px-2 py-1" key={t.id}>
                 <div className="truncate font-medium">{t.title}</div>
                 <div className="text-muted-foreground text-xs">
                   {new Date(t.updatedAt).toLocaleString()}
                 </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        )}
       </ScrollArea>
     </aside>
   );

@@ -1,15 +1,12 @@
+import { getSolanaEndpoints } from "@loyal-labs/solana-rpc";
 import { PublicKey } from "@solana/web3.js";
 
 import { NATIVE_SOL_DECIMALS, NATIVE_SOL_MINT } from "@/lib/constants";
+import { fetchTokenPricesByMints } from "@/lib/jupiter/price";
 
 import { fetchJson } from "../../core/http";
 import { fetchLoyalDeposits } from "../deposits/loyal-deposits";
 import { getSolanaEnv } from "../rpc/connection";
-import {
-  SECURE_DEVNET_RPC_URL,
-  SECURE_MAINNET_RPC_URL,
-  TESTNET_RPC_URL,
-} from "../rpc/constants";
 import { CACHE_TTL_MS } from "./constants";
 import { resolveTokenIcon } from "./resolve-token-info";
 import type {
@@ -30,10 +27,8 @@ function isCacheValid(cached: CachedHoldings | undefined): boolean {
 
 function getRpcUrl(): string | null {
   const env = getSolanaEnv();
-  if (env === "mainnet") return SECURE_MAINNET_RPC_URL;
-  if (env === "testnet") return TESTNET_RPC_URL;
-  if (env === "devnet") return SECURE_DEVNET_RPC_URL;
-  return null;
+  if (env === "localnet") return null;
+  return getSolanaEndpoints(env).rpcEndpoint;
 }
 
 function getSafeString(value: unknown): string {
@@ -143,6 +138,36 @@ async function fetchHoldingsFromHelius(
   return holdings;
 }
 
+async function enrichHoldingsWithJupiterPrices(
+  holdings: TokenHolding[],
+): Promise<TokenHolding[]> {
+  const unpricedMints = holdings
+    .filter((h) => h.priceUsd === null && h.mint !== NATIVE_SOL_MINT)
+    .map((h) => h.mint);
+
+  if (unpricedMints.length === 0) return holdings;
+
+  const uniqueMints = [...new Set(unpricedMints)];
+
+  let prices: Map<string, number>;
+  try {
+    prices = await fetchTokenPricesByMints(uniqueMints);
+  } catch {
+    return holdings;
+  }
+
+  return holdings.map((h) => {
+    if (h.priceUsd !== null) return h;
+    const price = prices.get(h.mint);
+    if (!price) return h;
+    return {
+      ...h,
+      priceUsd: price,
+      valueUsd: h.balance * price,
+    };
+  });
+}
+
 // Fetch holdings from Helius and from Magic Block PER (Secure deposits)
 async function fetchCombinedHoldings(
   rpcUrl: string,
@@ -182,7 +207,8 @@ async function fetchCombinedHoldings(
     }
   }
 
-  return [...holdingsFromHelius, ...securedHoldings];
+  const allHoldings = [...holdingsFromHelius, ...securedHoldings];
+  return enrichHoldingsWithJupiterPrices(allHoldings);
 }
 
 export async function fetchTokenHoldings(

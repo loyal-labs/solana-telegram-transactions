@@ -1,31 +1,36 @@
 "use client";
 
-import { useAccounts, useModal, usePhantom } from "@phantom/react-sdk";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
 
+import { useAuthCapability } from "@/lib/auth/capability";
+import { useAuthSession } from "@/contexts/auth-session-context";
 import { useChatMode } from "@/contexts/chat-mode-context";
+import { useSignInModal } from "@/contexts/sign-in-modal-context";
 
 export function Header() {
   const [mounted, setMounted] = useState(false);
   const { isChatMode } = useChatMode();
-  const { isConnected } = usePhantom();
-  const { open } = useModal();
-  const accounts = useAccounts();
-  const solanaAddress = accounts?.find(
-    (acc) => acc.addressType === "Solana"
-  )?.address;
+  const { publicKey } = useWallet();
+  const { hasWalletConnection } = useAuthCapability();
+  const { user } = useAuthSession();
+  const { open } = useSignInModal();
 
-  // Truncate wallet address for display
+  const solanaAddress = publicKey?.toBase58();
+  const sessionAddress = user?.displayAddress ?? null;
   const truncatedAddress = solanaAddress
     ? `${solanaAddress.slice(0, 4)}...${solanaAddress.slice(-4)}`
-    : null;
+    : sessionAddress
+      ? `${sessionAddress.slice(0, 4)}...${sessionAddress.slice(-4)}`
+      : null;
+  const emailLabel = user?.email ?? null;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   // Hide when: chat mode AND connected (wallet button is in sidebar)
-  const shouldHide = isChatMode && isConnected;
+  const shouldHide = isChatMode && hasWalletConnection;
 
   if (!mounted || shouldHide) {
     return null;
@@ -33,48 +38,31 @@ export function Header() {
 
   return (
     <>
-      <header className="header-wallet fixed top-6 right-6 z-[100]">
+      <header className="header-wallet fixed top-4 right-6 z-[100]">
         <button
-          onClick={() => open()}
+          onClick={open}
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "8px",
-            background: "rgba(255, 255, 255, 0.06)",
-            backdropFilter: "blur(48px)",
+            background: "rgba(0, 0, 0, 0.04)",
             border: "none",
             borderRadius: "32px",
             cursor: "pointer",
             transition: "all 0.2s ease",
-            boxShadow:
-              "0px 4px 8px 0px rgba(0, 0, 0, 0.04), 0px 2px 4px 0px rgba(0, 0, 0, 0.02)",
-            mixBlendMode: "lighten",
-            padding: "4px",
+            padding: "8px 16px",
           }}
         >
-          <div
-            style={{
-              width: "36px",
-              height: "36px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "rgba(255, 255, 255, 0.06)",
-              borderRadius: "9999px",
-            }}
-          >
-            <img alt="Wallet" height={28} src="/Wallet-Icon.svg" width={28} />
-          </div>
           <span
             style={{
-              fontSize: "16px",
+              fontSize: "14px",
               fontWeight: 400,
               lineHeight: "20px",
-              color: "#fff",
-              paddingRight: "12px",
+              color: "#000",
             }}
           >
-            {isConnected && truncatedAddress ? truncatedAddress : "Sign in"}
+            {hasWalletConnection && truncatedAddress
+              ? truncatedAddress
+              : emailLabel ?? "Sign In"}
           </span>
         </button>
       </header>
