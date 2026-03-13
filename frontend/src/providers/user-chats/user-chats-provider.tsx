@@ -28,6 +28,7 @@ type UserChatsContextValue = {
   userChats: UserChat[];
   isLoading: boolean;
   refreshUserChats: () => Promise<void>;
+  clearUserChats: () => void;
   loadChatMessages: (chatId: string) => Promise<ChatMessage[]>;
 };
 
@@ -71,6 +72,10 @@ export const UserChatsProvider = ({ children }: PropsWithChildren) => {
     []
   );
 
+  const clearUserChats = useCallback(() => {
+    setUserChats([]);
+  }, []);
+
   // No auto-fetch on mount — consumers call refreshUserChats()
   // when auth state is ready (avoids fetching before auth hydrates).
 
@@ -79,9 +84,10 @@ export const UserChatsProvider = ({ children }: PropsWithChildren) => {
       userChats,
       isLoading,
       refreshUserChats,
+      clearUserChats,
       loadChatMessages,
     }),
-    [userChats, isLoading, refreshUserChats, loadChatMessages]
+    [userChats, isLoading, refreshUserChats, clearUserChats, loadChatMessages]
   );
 
   return (
