@@ -451,6 +451,7 @@ export function SendContent({
           date: now.toLocaleDateString("en-US", { month: "long", day: "numeric" }),
           icon: "/hero-new/Shield_40.svg",
           isPrivate: true,
+          rawTimestamp: now.getTime(),
         };
         const syntheticDetail: TransactionDetail = {
           activity: syntheticRow,

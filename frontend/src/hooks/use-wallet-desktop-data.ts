@@ -41,8 +41,18 @@ export type WalletDesktopData = {
 };
 
 const EMPTY_POSITIONS: PortfolioPosition[] = [];
+const LOYL_MINT = "LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta";
+const JUPITER_TOKEN_SEARCH_URL = "https://lite-api.jup.ag/tokens/v2/search";
+
+const LOYL_ICON_URL = "https://avatars.githubusercontent.com/u/210601628?s=200&v=4";
 
 function resolveTokenIcon(position: PortfolioPosition): string {
+  if (position.asset.imageUrl) {
+    return position.asset.imageUrl;
+  }
+  if (position.asset.mint === LOYL_MINT) {
+    return LOYL_ICON_URL;
+  }
   return getTokenIconUrl(position.asset.symbol);
 }
 
@@ -272,6 +282,7 @@ function mapActivityToRowAndDetail(
     icon: activity.type === "secure" ? "/hero-new/Shield.png"
       : activity.type === "unshield" ? "/hero-new/Unshield.svg"
       : display.icon,
+    rawTimestamp: activity.timestamp ?? undefined,
   };
 
   return {
@@ -483,6 +494,24 @@ export function useWalletDesktopData(): WalletDesktopData {
     };
   }, [client, wallet.connected, wallet.publicKey]);
 
+  // Fetch LOYAL token price from Jupiter for the always-visible placeholder row
+  const [loylPriceUsd, setLoylPriceUsd] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${JUPITER_TOKEN_SEARCH_URL}?query=${LOYL_MINT}`)
+      .then((res) => res.json())
+      .then((tokens: { id: string; usdPrice?: number }[]) => {
+        if (cancelled) return;
+        const match = tokens.find((t) => t.id === LOYL_MINT);
+        const price = match?.usdPrice;
+        if (typeof price === "number" && Number.isFinite(price) && price > 0) {
+          setLoylPriceUsd(price);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const positions = portfolioSnapshot?.positions ?? EMPTY_POSITIONS;
   const totals = portfolioSnapshot?.totals ?? {
     totalUsd: 0,
@@ -502,25 +531,32 @@ export function useWalletDesktopData(): WalletDesktopData {
       }
     }
 
-    // Ensure LOYL appears at 3rd position if not already present
-    const LOYL_MINT = "LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta";
-    if (!rows.some((r) => r.id === LOYL_MINT)) {
+    // Ensure LOYL appears at 3rd position (index 2) always
+    const existingLoylIndex = rows.findIndex((r) => r.id === LOYL_MINT);
+    if (existingLoylIndex >= 0) {
+      // Already in rows (has balance) — move to index 2 if not there
+      if (existingLoylIndex !== 2) {
+        const [loylRow] = rows.splice(existingLoylIndex, 1);
+        rows.splice(Math.min(2, rows.length), 0, loylRow);
+      }
+    } else {
+      // Not in rows — create placeholder with Jupiter price
       const loylPosition = positions.find((p) => p.asset.mint === LOYL_MINT);
       const loylRow: TokenRow = loylPosition
         ? mapPositionToTokenRow(loylPosition)
         : {
             id: LOYL_MINT,
             symbol: "LOYAL",
-            price: "$0.00",
+            price: formatUsd(loylPriceUsd),
             amount: "0",
             value: "$0.00",
-            icon: "https://avatars.githubusercontent.com/u/210601628?s=200&v=4",
+            icon: LOYL_ICON_URL,
           };
-      rows.splice(2, 0, loylRow);
+      rows.splice(Math.min(2, rows.length), 0, loylRow);
     }
 
     return rows;
-  }, [positions]);
+  }, [positions, loylPriceUsd]);
 
   const activityData = useMemo(() => {
     const details: Record<string, TransactionDetail> = {};
@@ -545,10 +581,13 @@ export function useWalletDesktopData(): WalletDesktopData {
   }, [activities, positions, totals.effectiveSolPriceUsd]);
 
   // Merge local (private send) rows with on-chain activity, deduping by id
+  // and sorting by rawTimestamp descending so newest activity appears first
   const mergedActivityData = useMemo(() => {
     const onChainIds = new Set(activityData.rows.map((r) => r.id));
     const uniqueLocalRows = localRows.filter((r) => !onChainIds.has(r.id));
-    const rows = [...uniqueLocalRows, ...activityData.rows];
+    const rows = [...uniqueLocalRows, ...activityData.rows].sort(
+      (a, b) => (b.rawTimestamp ?? 0) - (a.rawTimestamp ?? 0)
+    );
     const details = { ...activityData.details, ...localDetails };
     return { rows, details };
   }, [activityData, localRows, localDetails]);
