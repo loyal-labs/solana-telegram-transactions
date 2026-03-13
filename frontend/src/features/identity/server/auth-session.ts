@@ -6,6 +6,7 @@ import {
   getAuthSessionResponseSchema,
 } from "@loyal-labs/auth-core";
 import type { AuthSessionUser } from "@loyal-labs/auth-core";
+import { importSPKI, jwtVerify, type CryptoKey as JoseCryptoKey } from "jose";
 
 import { getServerEnv } from "@/lib/core/config/server";
 
@@ -38,8 +39,79 @@ export class AuthGatewayError extends Error {
   }
 }
 
+const SESSION_COOKIE_NAME = "loyal_email_session";
+
+let cachedPublicKey: JoseCryptoKey | null = null;
+let cachedPublicKeyPem: string | null = null;
+
+async function getPublicKey(pem: string): Promise<JoseCryptoKey> {
+  if (cachedPublicKey && cachedPublicKeyPem === pem) {
+    return cachedPublicKey;
+  }
+  cachedPublicKey = await importSPKI(pem, "RS256");
+  cachedPublicKeyPem = pem;
+  return cachedPublicKey;
+}
+
+function extractCookieValue(
+  cookieHeader: string,
+  name: string
+): string | undefined {
+  for (const part of cookieHeader.split(";")) {
+    const [key, ...rest] = part.trim().split("=");
+    if (key === name && rest.length > 0) {
+      return rest.join("=");
+    }
+  }
+  return undefined;
+}
+
+async function verifySessionLocally(
+  request: Request
+): Promise<AuthenticatedPrincipal | null> {
+  const { authSessionRs256PublicKey } = getServerEnv();
+  if (!authSessionRs256PublicKey) return null;
+
+  const cookieHeader = request.headers.get("cookie");
+  if (!cookieHeader) return null;
+
+  const token = extractCookieValue(cookieHeader, SESSION_COOKIE_NAME);
+  if (!token) return null;
+
+  try {
+    const key = await getPublicKey(authSessionRs256PublicKey);
+    const { payload } = await jwtVerify(token, key, { algorithms: ["RS256"] });
+
+    const session: AuthSessionUser = {
+      authMethod: payload.authMethod as AuthSessionUser["authMethod"],
+      subjectAddress: payload.subjectAddress as string,
+      displayAddress: payload.displayAddress as string,
+      ...(payload.email ? { email: payload.email as string } : {}),
+      ...(payload.sub ? { gridUserId: payload.sub } : {}),
+      ...(payload.provider ? { provider: payload.provider as string } : {}),
+      ...(payload.passkeyAccount
+        ? { passkeyAccount: payload.passkeyAccount as string }
+        : {}),
+      ...(payload.walletAddress
+        ? { walletAddress: payload.walletAddress as string }
+        : {}),
+      ...(payload.smartAccountAddress
+        ? { smartAccountAddress: payload.smartAccountAddress as string }
+        : {}),
+      ...(payload.sessionKey
+        ? { sessionKey: payload.sessionKey as AuthSessionUser["sessionKey"] }
+        : {}),
+    };
+
+    return mapAuthSessionUserToAuthenticatedPrincipal(session);
+  } catch {
+    return null;
+  }
+}
+
 type AuthSessionResolverDependencies = {
   authBaseUrl?: string;
+  authSessionRs256PublicKey?: string;
   fetchFn?: typeof fetch;
 };
 
@@ -114,6 +186,11 @@ export async function resolveAuthenticatedPrincipalFromRequest(
     return null;
   }
 
+  // Try local RS256 verification first (no network hop)
+  const localResult = await verifySessionLocally(request);
+  if (localResult) return localResult;
+
+  // Fall back to HTTP call to passkey service
   const authBaseUrl = getRequiredAuthBaseUrl(
     dependencies.authBaseUrl ?? getServerEnv().gridAuthBaseUrl
   );

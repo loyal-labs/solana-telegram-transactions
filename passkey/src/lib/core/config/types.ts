@@ -9,5 +9,7 @@ export type PasskeyServerConfig = {
   appName: string;
   gridApiKey?: string;
   authJwtSecret: string;
+  authRs256PrivateKey?: string;
+  authRs256PublicKey?: string;
   authJwtTtlSeconds: number;
 };

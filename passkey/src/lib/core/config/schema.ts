@@ -32,6 +32,8 @@ const serverConfigSchema = z.object({
   GRID_APP_NAME: z.string().min(1).default("askloyal"),
   GRID_API_KEY: z.string().min(1).optional(),
   AUTH_JWT_SECRET: z.string().min(32),
+  AUTH_JWT_RS256_PRIVATE_KEY: z.string().min(1).optional(),
+  AUTH_JWT_RS256_PUBLIC_KEY: z.string().min(1).optional(),
   AUTH_JWT_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 60 * 24 * 7),
 }).superRefine((value, ctx) => {
   if (value.GRID_ALLOWED_PARENT_DOMAIN !== value.GRID_RP_ID) {
@@ -60,6 +62,8 @@ export function parsePasskeyServerConfig(
     appName: parsed.GRID_APP_NAME,
     gridApiKey: parsed.GRID_API_KEY,
     authJwtSecret: parsed.AUTH_JWT_SECRET,
+    authRs256PrivateKey: parsed.AUTH_JWT_RS256_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    authRs256PublicKey: parsed.AUTH_JWT_RS256_PUBLIC_KEY?.replace(/\\n/g, "\n"),
     authJwtTtlSeconds: parsed.AUTH_JWT_TTL_SECONDS,
   };
 }

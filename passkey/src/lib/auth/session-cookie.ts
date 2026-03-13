@@ -5,7 +5,8 @@ import { resolvePasskeyRequestContext } from "@/lib/passkeys/host-resolution";
 
 import {
   issueAuthSessionToken,
-  verifyAuthSessionToken,
+  issueAuthSessionTokenRS256,
+  verifyAuthSessionTokenMulti,
 } from "./session-token";
 
 export const AUTH_SESSION_COOKIE_NAME = "loyal_email_session";
@@ -80,21 +81,31 @@ export function createAuthSessionCookieService(
   return {
     async issueSessionToken(user: AuthSessionUser) {
       const config = dependencies.getConfig();
+      const claims = {
+        authMethod: user.authMethod,
+        subjectAddress: user.subjectAddress,
+        displayAddress: user.displayAddress,
+        ...(user.gridUserId ? { sub: user.gridUserId } : {}),
+        ...(user.email ? { email: user.email } : {}),
+        ...(user.provider ? { provider: user.provider } : {}),
+        ...(user.passkeyAccount ? { passkeyAccount: user.passkeyAccount } : {}),
+        ...(user.walletAddress ? { walletAddress: user.walletAddress } : {}),
+        ...(user.smartAccountAddress
+          ? { smartAccountAddress: user.smartAccountAddress }
+          : {}),
+        ...(user.sessionKey ? { sessionKey: user.sessionKey } : {}),
+      };
+
+      if (config.authRs256PrivateKey) {
+        return issueAuthSessionTokenRS256(
+          claims,
+          config.authRs256PrivateKey,
+          config.authJwtTtlSeconds
+        );
+      }
+
       return issueAuthSessionToken(
-        {
-          authMethod: user.authMethod,
-          subjectAddress: user.subjectAddress,
-          displayAddress: user.displayAddress,
-          ...(user.gridUserId ? { sub: user.gridUserId } : {}),
-          ...(user.email ? { email: user.email } : {}),
-          ...(user.provider ? { provider: user.provider } : {}),
-          ...(user.passkeyAccount ? { passkeyAccount: user.passkeyAccount } : {}),
-          ...(user.walletAddress ? { walletAddress: user.walletAddress } : {}),
-          ...(user.smartAccountAddress
-            ? { smartAccountAddress: user.smartAccountAddress }
-            : {}),
-          ...(user.sessionKey ? { sessionKey: user.sessionKey } : {}),
-        },
+        claims,
         config.authJwtSecret,
         config.authJwtTtlSeconds
       );
@@ -110,7 +121,10 @@ export function createAuthSessionCookieService(
       }
 
       try {
-        const claims = await verifyAuthSessionToken(token, config.authJwtSecret);
+        const claims = await verifyAuthSessionTokenMulti(token, {
+          rs256PublicKey: config.authRs256PublicKey,
+          hs256Secret: config.authJwtSecret,
+        });
         return {
           authMethod: claims.authMethod,
           subjectAddress: claims.subjectAddress,

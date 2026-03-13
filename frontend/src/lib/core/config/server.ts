@@ -22,6 +22,7 @@ export type ServerEnv = {
   chatRuntime: ChatRuntimeConfig;
   databaseUrl: string;
   gridAuthBaseUrl: string | undefined;
+  authSessionRs256PublicKey: string | undefined;
 };
 
 function createChatRuntimeConfig(env: EnvSource): ChatRuntimeConfig {
@@ -29,6 +30,10 @@ function createChatRuntimeConfig(env: EnvSource): ChatRuntimeConfig {
     apiKey: getRequiredEnv(env, "PHALA_API_KEY"),
     modelId: getOptionalEnv(env, "PHALA_MODEL_ID"),
   };
+}
+
+function decodePemNewlines(value: string | undefined): string | undefined {
+  return value?.replace(/\\n/g, "\n");
 }
 
 export function createServerEnv(env: EnvSource): ServerEnv {
@@ -39,6 +44,9 @@ export function createServerEnv(env: EnvSource): ServerEnv {
     chatRuntime: createChatRuntimeConfig(env),
     databaseUrl: getRequiredEnv(env, "DATABASE_URL"),
     gridAuthBaseUrl: getOptionalEnv(env, "NEXT_PUBLIC_GRID_AUTH_BASE_URL"),
+    authSessionRs256PublicKey: decodePemNewlines(
+      getOptionalEnv(env, "AUTH_SESSION_RS256_PUBLIC_KEY")
+    ),
   };
 }
 

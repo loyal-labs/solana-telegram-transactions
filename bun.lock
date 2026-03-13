@@ -192,6 +192,7 @@
         "embla-carousel-react": "^8.6.0",
         "flags": "^4.0.2",
         "highlight.js": "^11.11.1",
+        "jose": "^6.0.13",
         "katex": "^0.16.22",
         "lucide-react": "^0.553.0",
         "magic-router-sdk": "^1.0.10",
