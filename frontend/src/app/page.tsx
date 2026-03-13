@@ -59,7 +59,7 @@ export default function LandingPage() {
 
   // Wallet hooks
   const { connected: isConnected, connecting: isWalletLoading, publicKey } = useWallet();
-  const { isHydrated: isAuthHydrated } = useAuthSession();
+  const { isHydrated: isAuthHydrated, isAuthenticated } = useAuthSession();
   const { isSignedIn } = useAuthCapability();
 
   // Toggle body class for mobile header visibility
@@ -89,14 +89,15 @@ export default function LandingPage() {
     }
   }, [currentChatId, setMessages]);
 
-  // Sync chat history with auth state
+  // Sync chat history with auth state — use isAuthenticated (session cookie exists)
+  // rather than isSignedIn (wallet-only connection won't have a session yet)
   useEffect(() => {
-    if (isSignedIn) {
+    if (isAuthenticated) {
       void refreshUserChats();
     } else {
       clearUserChats();
     }
-  }, [isSignedIn, refreshUserChats, clearUserChats]);
+  }, [isAuthenticated, refreshUserChats, clearUserChats]);
 
   // Truncate wallet address for display (e.g., "233Q..7ABE")
   const truncatedAddress = solanaAddress
