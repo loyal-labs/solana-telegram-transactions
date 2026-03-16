@@ -199,7 +199,7 @@ fn verify_previous_ed25519_ix(instructions_ai: &AccountInfo, expected_msg: &[u8]
     Ok(())
 }
 
-/// Extracts username and converts to username
+/// Extracts username and converts to lowercase
 fn extract_username(bytes: &[u8]) -> Result<String> {
     // We expect ASCII only.
     let s = core::str::from_utf8(bytes).map_err(|_| error!(ErrorCode::InvalidTelegramMessage))?;
