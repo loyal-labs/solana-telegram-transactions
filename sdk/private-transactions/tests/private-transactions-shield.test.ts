@@ -72,7 +72,7 @@ async function getOrCacheAuthToken(
   const cache = await loadTokenCache();
   const cached = cache[cacheKey];
 
-  if (cached && cached.expiresAt > Date.now() / 1000 + 60) {
+  if (cached && cached.expiresAt > Date.now() + 60_000) {
     console.log(`Using cached auth token for ${keypair.publicKey.toBase58()}`);
     return cached;
   }
@@ -853,12 +853,16 @@ describe("private-transactions shield SDK (PER)", async () => {
 
   const showSession = async (tag: string) => {
     const telegramSessionAccountInfo =
-      await verificationProgram.account.telegramSession.fetch(sessionPda);
+      await verificationProgram.account.telegramSession.fetchNullable(
+        sessionPda
+      );
     console.log(
       "telegramSessionAccountInfo",
       tag,
       sessionPda.toString(),
-      telegramSessionAccountInfo.verified
+      telegramSessionAccountInfo !== null
+        ? telegramSessionAccountInfo.verified
+        : "not exist"
     );
   };
 

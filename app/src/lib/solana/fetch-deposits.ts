@@ -14,6 +14,9 @@ export const fetchDeposits = async (
   if (username.length > 32 || username.length < 5) {
     throw new Error("Username must be between 5 and 32 characters");
   }
+  if (username !== username.toLowerCase()) {
+    throw new Error("Username must be lowercase");
+  }
 
   const deposits = await getDepositWithUsername(user, username);
 

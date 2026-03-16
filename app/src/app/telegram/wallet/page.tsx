@@ -509,9 +509,10 @@ export default function Home() {
       // Refresh incoming transactions
       if (rawInitData) {
         const cleanInitDataResult = cleanInitData(rawInitData);
-        const username = parseUsernameFromInitData(cleanInitDataResult);
+        const mixedCaseUsername = parseUsernameFromInitData(cleanInitDataResult);
 
-        if (username) {
+        if (mixedCaseUsername) {
+          const username = mixedCaseUsername.toLowerCase();
           const provider = await getWalletProvider();
           const deposits = await fetchDeposits(
             provider.wallet.publicKey,
@@ -602,7 +603,7 @@ export default function Home() {
           signature = await sendSolTransaction(trimmedRecipient, lamports);
         }
       } else if (sendMethod === SEND_METHODS.telegram) {
-        const username = trimmedRecipient.replace(/^@/, "");
+        const username = trimmedRecipient.replace(/^@/, "").toLowerCase();
         signature = await transferTokensToUsername({
           tokenMint: NATIVE_MINT,
           amount: lamports,

@@ -744,6 +744,8 @@ pub struct Deposit {
 }
 
 /// A deposit account for a telegram username and token mint.
+///
+/// Telegram username is always lowercase (a-z, 0-9 and underscores)
 #[account]
 #[derive(InitSpace)]
 pub struct UsernameDeposit {
@@ -796,10 +798,9 @@ fn validate_username(username: &str) -> Result<()> {
         ErrorCode::InvalidUsername
     );
     require!(
-        username.bytes().all(|b| (b'A'..=b'Z').contains(&b)
-            || (b'a'..=b'z').contains(&b)
-            || (b'0'..=b'9').contains(&b)
-            || b == b'_'),
+        username
+            .bytes()
+            .all(|b| (b'a'..=b'z').contains(&b) || (b'0'..=b'9').contains(&b) || b == b'_'),
         ErrorCode::InvalidUsername
     );
     Ok(())

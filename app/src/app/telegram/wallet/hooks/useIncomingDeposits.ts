@@ -117,7 +117,7 @@ export function useIncomingDeposits(params: {
         const { validationBytes, signatureBytes } =
           createValidationBytesFromRawInitData(rawInitData);
 
-        const username = transaction.username;
+        const username = transaction.username.toLowerCase();
         const amountLamports = transaction.amountLamports;
         const payerPublicKey = await getGaslessPublicKey();
         console.log("payerPublicKey", payerPublicKey);
@@ -241,13 +241,15 @@ export function useIncomingDeposits(params: {
     const subscribeAndFetchDeposits = async () => {
       try {
         const cleanInitDataResult = cleanInitData(rawInitData);
-        const username = parseUsernameFromInitData(cleanInitDataResult);
+        const mixedCaseUsername =
+          parseUsernameFromInitData(cleanInitDataResult);
 
-        if (!username) {
+        if (!mixedCaseUsername) {
           setIncomingTransactions([]);
           setIsFetchingDeposits(false);
           return;
         }
+        const username = mixedCaseUsername.toLowerCase();
 
         // Check cache first - state may have been initialized from it
         const cached = getCachedIncomingTransactions(username);

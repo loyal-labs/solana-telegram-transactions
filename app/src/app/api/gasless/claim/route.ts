@@ -106,7 +106,7 @@ const extractUsernameFromValidationBytes = (
     throw new Error("Invalid Telegram username in init data");
   }
 
-  return username;
+  return username.toLowerCase();
 };
 
 const parseTransactionError = async (
@@ -439,6 +439,17 @@ export async function POST(req: Request) {
     if (typeof recipientPubKey !== "string" || typeof username !== "string") {
       return NextResponse.json(
         { error: "Invalid recipient or username format" },
+        { status: 400 },
+      );
+    }
+
+    if (
+      username.length < 5 ||
+      username.length > 32 ||
+      !/^[a-z0-9_]+$/.test(username)
+    ) {
+      return NextResponse.json(
+        { error: "Invalid username" },
         { status: 400 },
       );
     }
