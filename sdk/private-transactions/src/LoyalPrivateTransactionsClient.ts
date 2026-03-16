@@ -93,13 +93,6 @@ function programFromRpc(
   return new Program(idl as TelegramPrivateTransfer, baseProvider);
 }
 
-type MagicRouterConnection = Connection & {
-  getLatestBlockhashForTransaction: (
-    transaction: Transaction,
-    options?: ConfirmOptions
-  ) => Promise<BlockhashWithExpiryBlockHeight>;
-};
-
 /**
  * Derive a message signing function from any supported signer type.
  * Required for PER auth token acquisition.
