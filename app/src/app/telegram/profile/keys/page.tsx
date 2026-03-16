@@ -22,6 +22,7 @@ import {
   PUBLIC_KEY_STORAGE_KEY,
   SECRET_KEY_STORAGE_KEY,
 } from "@/lib/constants";
+import { invalidatePrivateClient } from "@/lib/solana/deposits/private-client";
 import {
   getWalletKeypair,
   getWalletPublicKey,
@@ -622,6 +623,7 @@ function ImportWalletSheet({
       if (!storedSecret) throw new Error("Failed to save secret key");
 
       resetWalletKeypairCache();
+      await invalidatePrivateClient();
 
       if (hapticFeedback.notificationOccurred.isAvailable()) {
         hapticFeedback.notificationOccurred("success");
