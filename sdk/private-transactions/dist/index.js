@@ -22265,7 +22265,9 @@ var telegram_private_transfer_default = {
     {
       name: "UsernameDeposit",
       docs: [
-        "A deposit account for a telegram username and token mint."
+        "A deposit account for a telegram username and token mint.",
+        "",
+        "Telegram username is always lowercase (a-z, 0-9 and underscores)"
       ],
       type: {
         kind: "struct",
@@ -22756,7 +22758,18 @@ class LoyalPrivateTransactionsClient {
       delegationProgram: DELEGATION_PROGRAM_ID,
       systemProgram: SystemProgram.programId
     };
-    const signature = await this.baseProgram.methods.delegate(user, tokenMint).accountsPartial(accounts).rpc(rpcOptions);
+    const delegationWatcher = waitForAccountOwnerChange(this.baseProgram.provider.connection, depositPda, DELEGATION_PROGRAM_ID);
+    let signature;
+    try {
+      console.log("delegateDeposit Accounts:", prettyStringify(accounts));
+      signature = await this.baseProgram.methods.delegate(user, tokenMint).accountsPartial(accounts).rpc(rpcOptions);
+      console.log("delegateDeposit: waiting for depositPda owner to be DELEGATION_PROGRAM_ID on base connection...");
+      await delegationWatcher.wait();
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    } catch (e) {
+      await delegationWatcher.cancel();
+      throw e;
+    }
     return signature;
   }
   async delegateUsernameDeposit(params) {
@@ -22784,7 +22797,18 @@ class LoyalPrivateTransactionsClient {
       systemProgram: SystemProgram.programId
     };
     accounts.validator = validator ?? null;
-    const signature = await this.baseProgram.methods.delegateUsernameDeposit(username, tokenMint).accountsPartial(accounts).rpc(rpcOptions);
+    const delegationWatcher = waitForAccountOwnerChange(this.baseProgram.provider.connection, depositPda, DELEGATION_PROGRAM_ID);
+    let signature;
+    try {
+      console.log("delegateUsernameDeposit Accounts:", prettyStringify(accounts));
+      signature = await this.baseProgram.methods.delegateUsernameDeposit(username, tokenMint).accountsPartial(accounts).rpc(rpcOptions);
+      console.log("delegateUsernameDeposit: waiting for depositPda owner to be DELEGATION_PROGRAM_ID on base connection...");
+      await delegationWatcher.wait();
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    } catch (e) {
+      await delegationWatcher.cancel();
+      throw e;
+    }
     return signature;
   }
   async undelegateDeposit(params) {
