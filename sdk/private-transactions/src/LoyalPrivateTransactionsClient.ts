@@ -676,10 +676,28 @@ export class LoyalPrivateTransactionsClient {
       systemProgram: SystemProgram.programId,
     };
 
-    const signature = await this.baseProgram.methods
-      .delegate(user, tokenMint)
-      .accountsPartial(accounts)
-      .rpc(rpcOptions);
+    const delegationWatcher = waitForAccountOwnerChange(
+      this.baseProgram.provider.connection,
+      depositPda,
+      DELEGATION_PROGRAM_ID
+    );
+
+    let signature;
+    try {
+      console.log("delegateDeposit Accounts:", prettyStringify(accounts));
+      signature = await this.baseProgram.methods
+        .delegate(user, tokenMint)
+        .accountsPartial(accounts)
+        .rpc(rpcOptions);
+      console.log(
+        "delegateDeposit: waiting for depositPda owner to be DELEGATION_PROGRAM_ID on base connection..."
+      );
+      await delegationWatcher.wait();
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+    } catch (e) {
+      await delegationWatcher.cancel();
+      throw e;
+    }
 
     return signature;
   }
@@ -725,10 +743,31 @@ export class LoyalPrivateTransactionsClient {
 
     accounts.validator = validator ?? null;
 
-    const signature = await this.baseProgram.methods
-      .delegateUsernameDeposit(username, tokenMint)
-      .accountsPartial(accounts)
-      .rpc(rpcOptions);
+    const delegationWatcher = waitForAccountOwnerChange(
+      this.baseProgram.provider.connection,
+      depositPda,
+      DELEGATION_PROGRAM_ID
+    );
+
+    let signature;
+    try {
+      console.log(
+        "delegateUsernameDeposit Accounts:",
+        prettyStringify(accounts)
+      );
+      signature = await this.baseProgram.methods
+        .delegateUsernameDeposit(username, tokenMint)
+        .accountsPartial(accounts)
+        .rpc(rpcOptions);
+      console.log(
+        "delegateUsernameDeposit: waiting for depositPda owner to be DELEGATION_PROGRAM_ID on base connection..."
+      );
+      await delegationWatcher.wait();
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+    } catch (e) {
+      await delegationWatcher.cancel();
+      throw e;
+    }
 
     return signature;
   }

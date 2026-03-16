@@ -1820,7 +1820,9 @@ export type TelegramPrivateTransfer = {
     {
       "name": "usernameDeposit",
       "docs": [
-        "A deposit account for a telegram username and token mint."
+        "A deposit account for a telegram username and token mint.",
+        "",
+        "Telegram username is always lowercase (a-z, 0-9 and underscores)"
       ],
       "type": {
         "kind": "struct",
