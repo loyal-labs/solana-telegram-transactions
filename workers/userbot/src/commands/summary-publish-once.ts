@@ -179,6 +179,7 @@ function recordCommunityFailure(params: {
 async function fetchInlineSummaryResult(params: {
   bundle: UserbotClientBundle;
   community: ActiveSummaryCommunity;
+  deps: SummaryPublishOnceDeps;
   peerOverride: SummaryPeerOverride | null;
   botInputUser: Awaited<ReturnType<UserbotClientBundle["client"]["resolveUser"]>>;
 }): Promise<{
@@ -186,9 +187,30 @@ async function fetchInlineSummaryResult(params: {
   queryId: bigint;
   resultId: string | null;
 }> {
-  const destinationPeer = await params.bundle.client.resolvePeer(
-    Number(params.community.chatId)
-  );
+  let destinationPeer;
+  try {
+    destinationPeer = await params.bundle.client.resolvePeer(
+      Number(params.community.chatId)
+    );
+  } catch (err) {
+    params.deps.logger.warn(
+      `[userbot] resolvePeer cache miss for chatId=${params.community.chatId}, retrying with force`,
+      { chatId: String(params.community.chatId), error: String(err) }
+    );
+    await params.deps.sleep(3000);
+    try {
+      destinationPeer = await params.bundle.client.resolvePeer(
+        Number(params.community.chatId),
+        true
+      );
+    } catch (forceErr) {
+      params.deps.logger.error(
+        `[userbot] resolvePeer force failed for chatId=${params.community.chatId}`,
+        { chatId: String(params.community.chatId), error: String(forceErr) }
+      );
+      throw forceErr;
+    }
+  }
   const sourceChatId = resolveSummarySourceChatId(
     params.community.chatId,
     params.peerOverride
@@ -376,6 +398,7 @@ export async function runSummaryPublishOnce(
               botInputUser,
               bundle,
               community,
+              deps,
               peerOverride: envOptions.peerOverride,
             });
           },
