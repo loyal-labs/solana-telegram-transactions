@@ -23,8 +23,10 @@ use crate::{
     },
     solana_ops::{
         account_owner_is, close_wsol_ata, ensure_ata_exists, fetch_deposit_amount,
-        fetch_username_deposit_amount, get_account_opt, print_signature, send_ix,
-        send_ix_with_opts, wait_for_account_exists, wait_for_owner, wrap_sol_to_wsol,
+        fetch_deposit_amount_allow_not_found, fetch_username_deposit_amount,
+        fetch_username_deposit_amount_allow_not_found, get_account_opt,
+        get_account_opt_allow_not_found, print_signature, send_ix, send_ix_with_opts,
+        wait_for_account_exists, wait_for_owner, wrap_sol_to_wsol,
     },
     types::{AppContext, DisplayResult, Target},
 };
@@ -35,18 +37,23 @@ pub(crate) fn cmd_display(ctx: &AppContext, args: &TargetArgs) -> Result<()> {
     let (target_type, account, base_amount, per_amount) = match &target {
         Target::Deposit { deposit, .. } => {
             let base = fetch_deposit_amount(&ctx.base_client, deposit, ctx.commitment)?;
-            let per = fetch_deposit_amount(&ctx.per_client, deposit, ctx.commitment)?;
+            let per =
+                fetch_deposit_amount_allow_not_found(&ctx.per_client, deposit, ctx.commitment)?;
             ("deposit".to_string(), *deposit, base, per)
         }
         Target::UsernameDeposit { deposit, .. } => {
             let base = fetch_username_deposit_amount(&ctx.base_client, deposit, ctx.commitment)?;
-            let per = fetch_username_deposit_amount(&ctx.per_client, deposit, ctx.commitment)?;
+            let per = fetch_username_deposit_amount_allow_not_found(
+                &ctx.per_client,
+                deposit,
+                ctx.commitment,
+            )?;
             ("username_deposit".to_string(), *deposit, base, per)
         }
     };
 
     let base_account = get_account_opt(&ctx.base_client, &account, ctx.commitment)?;
-    let per_account = get_account_opt(&ctx.per_client, &account, ctx.commitment)?;
+    let per_account = get_account_opt_allow_not_found(&ctx.per_client, &account, ctx.commitment)?;
 
     let base_owner = base_account.as_ref().map(|a| a.owner.to_string());
     let per_owner = per_account.as_ref().map(|a| a.owner.to_string());

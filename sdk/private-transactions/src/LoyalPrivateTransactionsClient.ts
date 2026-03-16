@@ -1166,8 +1166,6 @@ export class LoyalPrivateTransactionsClient {
   ): Promise<void> {
     const baseAccountInfo =
       await this.baseProgram.provider.connection.getAccountInfo(account);
-    const ephemeralAccountInfo =
-      await this.ephemeralProgram.provider.connection.getAccountInfo(account);
 
     if (!baseAccountInfo) {
       if (passNotExist) {
@@ -1178,6 +1176,10 @@ export class LoyalPrivateTransactionsClient {
         `Account is not exists: ${displayName}${account.toString()}`
       );
     }
+
+    const ephemeralAccountInfo =
+      await this.ephemeralProgram.provider.connection.getAccountInfo(account);
+
     const isDelegated = baseAccountInfo!.owner.equals(DELEGATION_PROGRAM_ID);
     const displayName = name ? `${name} - ` : "";
     if (isDelegated) {

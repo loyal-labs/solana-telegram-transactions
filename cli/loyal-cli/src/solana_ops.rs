@@ -124,6 +124,18 @@ pub(crate) fn get_account_opt(
     Ok(response.value)
 }
 
+pub(crate) fn get_account_opt_allow_not_found(
+    client: &RpcClient,
+    address: &Pubkey,
+    commitment: CommitmentConfig,
+) -> Result<Option<solana_sdk::account::Account>> {
+    match get_account_opt(client, address, commitment) {
+        Ok(account) => Ok(account),
+        Err(err) if is_account_not_found_error(&err) => Ok(None),
+        Err(err) => Err(err),
+    }
+}
+
 pub(crate) fn fetch_deposit_amount(
     client: &RpcClient,
     address: &Pubkey,
@@ -142,6 +154,30 @@ pub(crate) fn fetch_deposit_amount(
     }
     let parsed = decode_deposit_account(&account.data)?;
     debug!("fetch_deposit_amount result: account={}, amount={}", address, parsed.amount);
+    Ok(Some(parsed.amount))
+}
+
+pub(crate) fn fetch_deposit_amount_allow_not_found(
+    client: &RpcClient,
+    address: &Pubkey,
+    commitment: CommitmentConfig,
+) -> Result<Option<u64>> {
+    debug!("fetch_deposit_amount_allow_not_found: account={address}");
+    let Some(account) = get_account_opt_allow_not_found(client, address, commitment)? else {
+        return Ok(None);
+    };
+    if !is_deposit_state_owner(&account.owner) {
+        debug!(
+            "fetch_deposit_amount_allow_not_found skip: account={}, unexpected_owner={}",
+            address, account.owner
+        );
+        return Ok(None);
+    }
+    let parsed = decode_deposit_account(&account.data)?;
+    debug!(
+        "fetch_deposit_amount_allow_not_found result: account={}, amount={}",
+        address, parsed.amount
+    );
     Ok(Some(parsed.amount))
 }
 
@@ -211,6 +247,39 @@ fn decode_username_deposit_account(data: &[u8]) -> Result<UsernameDepositAccount
     );
 
     Ok(UsernameDepositAccountData { amount })
+}
+
+pub(crate) fn fetch_username_deposit_amount_allow_not_found(
+    client: &RpcClient,
+    address: &Pubkey,
+    commitment: CommitmentConfig,
+) -> Result<Option<u64>> {
+    debug!("fetch_username_deposit_amount_allow_not_found: account={address}");
+    let Some(account) = get_account_opt_allow_not_found(client, address, commitment)? else {
+        return Ok(None);
+    };
+    if !is_deposit_state_owner(&account.owner) {
+        debug!(
+            "fetch_username_deposit_amount_allow_not_found skip: account={}, unexpected_owner={}",
+            address, account.owner
+        );
+        return Ok(None);
+    }
+    let parsed = decode_username_deposit_account(&account.data)?;
+    debug!(
+        "fetch_username_deposit_amount_allow_not_found result: account={}, amount={}",
+        address, parsed.amount
+    );
+    Ok(Some(parsed.amount))
+}
+
+fn is_account_not_found_error(err: &anyhow::Error) -> bool {
+    err.chain()
+        .any(|cause| is_account_not_found_message(&cause.to_string()))
+}
+
+fn is_account_not_found_message(message: &str) -> bool {
+    message.contains("AccountNotFound")
 }
 
 pub(crate) fn send_ix(
@@ -952,4 +1021,21 @@ pub(crate) fn print_signature(output: OutputFormat, signature: Signature) -> Res
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_account_not_found_message;
+
+    #[test]
+    fn detects_account_not_found_messages() {
+        assert!(is_account_not_found_message(
+            "AccountNotFound: pubkey=2oBc...: error sending request for url (...)"
+        ));
+    }
+
+    #[test]
+    fn ignores_other_messages() {
+        assert!(!is_account_not_found_message("401 unauthorized"));
+    }
 }
