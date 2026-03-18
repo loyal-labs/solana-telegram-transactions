@@ -1,0 +1,15 @@
+name: Extension CI
+on:
+  push:
+    paths: ["extension/**", "packages/wallet-core/**"]
+  pull_request:
+    paths: ["extension/**", "packages/wallet-core/**"]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: cd packages/wallet-core && bun run typecheck && bun run build
+      - run: cd extension && bun run build
