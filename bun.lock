@@ -148,8 +148,10 @@
       "name": "@loyal-labs/extension",
       "version": "0.0.0",
       "dependencies": {
+        "@solana/web3.js": "^1.98.4",
         "react": "^19.2.4",
         "react-dom": "^19.2.4",
+        "tweetnacl": "^1.0.3",
       },
       "devDependencies": {
         "@tailwindcss/postcss": "^4.2.1",
