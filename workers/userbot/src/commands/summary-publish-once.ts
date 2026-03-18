@@ -227,6 +227,11 @@ async function fetchInlineSummaryResult(params: {
   });
 
   const firstResult = inlineResults.results[0];
+  if (!firstResult) {
+    throw new Error(
+      "[userbot] summary:publish:once Inline bot returned no results"
+    );
+  }
 
   return {
     destinationPeer,
