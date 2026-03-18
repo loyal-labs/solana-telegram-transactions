@@ -3,6 +3,7 @@ import {
   ArrowDownLeft,
   ArrowLeftRight,
   ArrowUpRight,
+  Settings as SettingsIcon,
   Shield,
   Wallet,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import { AllTokensView } from "./all-tokens-view";
 import { AllActivityView } from "./all-activity-view";
 import { TokenSelectView } from "./token-select-view";
 import { TransactionDetailView } from "./transaction-detail-view";
+import { Settings } from "./settings";
 
 // ---------------------------------------------------------------------------
 // Default token constants
@@ -516,6 +518,7 @@ function WalletInterface() {
   const [toToken, setToToken] = useState<SwapToken>(LOYL_TOKEN);
   const [sendToken, setSendToken] = useState<SwapToken>(SOL_TOKEN);
   const [shieldToken, setShieldToken] = useState<SwapToken>(SOL_TOKEN);
+  const [showSettings, setShowSettings] = useState(false);
 
   const activeLayer = getActiveLayer(subView);
 
@@ -821,6 +824,25 @@ function WalletInterface() {
         >
           {renderTransactionDetail()}
         </div>
+
+        {/* Settings overlay */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            background: "#F5F5F5",
+            borderRadius: "20px",
+            overflow: "hidden",
+            transform: showSettings ? "translateX(0)" : "translateX(105%)",
+            opacity: showSettings ? 1 : 0,
+            transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+            pointerEvents: showSettings ? "auto" : "none",
+          }}
+        >
+          <Settings onBack={() => setShowSettings(false)} />
+        </div>
       </div>
 
       {/* Bottom tab bar */}
@@ -835,12 +857,12 @@ function WalletInterface() {
         }}
       >
         {TABS.map(({ id, label, Icon }) => {
-          const isActive = activeTab === id;
+          const isActive = activeTab === id && !showSettings;
           return (
             <button
               key={id}
               type="button"
-              onClick={() => handleTabChange(id)}
+              onClick={() => { handleTabChange(id); setShowSettings(false); }}
               style={{
                 display: "flex",
                 flexDirection: "column",
@@ -868,6 +890,34 @@ function WalletInterface() {
             </button>
           );
         })}
+        <button
+          type="button"
+          onClick={() => setShowSettings(true)}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "2px",
+            padding: "4px 8px",
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            transition: "color 0.15s ease",
+            color: showSettings ? "#F9363C" : "rgba(60, 60, 67, 0.4)",
+          }}
+        >
+          <SettingsIcon size={20} />
+          <span
+            style={{
+              fontFamily: "var(--font-geist-sans), sans-serif",
+              fontSize: "10px",
+              fontWeight: 500,
+              lineHeight: "12px",
+            }}
+          >
+            Settings
+          </span>
+        </button>
       </nav>
     </div>
   );
