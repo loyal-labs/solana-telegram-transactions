@@ -1,44 +1,17 @@
-import { ArrowDownUp, ChevronRight, Globe, Share } from "lucide-react";
+import { ArrowDownUp, ChevronRight, Globe, Share, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type {
-  FormButtonProps,
-  SubView,
-  SwapMode,
-  SwapToken,
-} from "@loyal-labs/wallet-core/types";
 import { useSwap } from "@loyal-labs/wallet-core/hooks";
 import type { SwapConfig } from "@loyal-labs/wallet-core/hooks";
 
+import { SwapShieldTabs } from "~/src/components/wallet/shield-content";
+import type { FormButtonProps, SubView, SwapMode, SwapToken } from "@loyal-labs/wallet-core/types";
+
 import { useWalletContext } from "~/src/components/wallet/wallet-provider";
 
-// ---------------------------------------------------------------------------
-// Helpers / constants
-// ---------------------------------------------------------------------------
-
+const font = "var(--font-geist-sans), sans-serif";
+const secondary = "rgba(60, 60, 67, 0.6)";
 const red = "#F9363C";
-
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
-export interface SwapContentProps {
-  fromToken: SwapToken;
-  toToken: SwapToken;
-  onFromTokenChange: (token: SwapToken) => void;
-  onToTokenChange: (token: SwapToken) => void;
-  onNavigate: (view: SubView) => void;
-  onDone: () => void;
-  swapMode: SwapMode;
-  onSwapModeChange: (mode: SwapMode) => void;
-  onFormActiveChange?: (active: boolean) => void;
-  onFormButtonChange?: (props: FormButtonProps | null) => void;
-  hideFormChrome?: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Token pill
-// ---------------------------------------------------------------------------
 
 function TokenPill({
   token,
@@ -51,96 +24,278 @@ function TokenPill({
 }) {
   return (
     <button
-      className={`flex shrink-0 cursor-pointer items-center rounded-full border-none px-1 ${
-        variant === "from" ? "bg-white/[0.08]" : "bg-white/[0.12]"
-      }`}
       onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        background: variant === "from" ? "rgba(0, 0, 0, 0.08)" : "#F5F5F5",
+        borderRadius: "54px",
+        padding: "0 4px",
+        border: "none",
+        cursor: "pointer",
+        flexShrink: 0,
+      }}
       type="button"
     >
-      <div className="flex items-center px-1 py-1 pr-1.5">
-        <div className="h-7 w-7 overflow-hidden rounded-full">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          paddingRight: "6px",
+          padding: "4px 6px 4px 4px",
+        }}
+      >
+        <div
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "9999px",
+            overflow: "hidden",
+          }}
+        >
           <img
             alt={token.symbol}
-            className="h-full w-full object-cover"
             height={28}
             src={token.icon}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
             width={28}
           />
         </div>
       </div>
-      <span className="whitespace-nowrap py-2 font-sans text-base font-medium leading-5 text-white">
+      <span
+        style={{
+          fontFamily: font,
+          fontSize: "16px",
+          fontWeight: 500,
+          lineHeight: "20px",
+          color: "#000",
+          letterSpacing: "-0.176px",
+          whiteSpace: "nowrap",
+          padding: "8px 0",
+        }}
+      >
         {token.symbol}
       </span>
-      <div className="flex h-9 items-center justify-center py-2">
-        <ChevronRight className="text-gray-400" size={16} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "36px",
+          padding: "8px 0",
+        }}
+      >
+        <ChevronRight size={16} style={{ color: "#3C3C43" }} />
       </div>
     </button>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Swap phase types
-// ---------------------------------------------------------------------------
-
 type SwapPhase = "form" | "processing" | "success" | "error" | "details";
 
-// ---------------------------------------------------------------------------
-// Processing state
-// ---------------------------------------------------------------------------
+function SwapStatusHeader({
+  fromToken,
+  toToken,
+  onClose,
+}: {
+  fromToken: SwapToken;
+  toToken: SwapToken;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px",
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          paddingLeft: "12px",
+          paddingTop: "4px",
+          paddingBottom: "4px",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: font,
+            fontSize: "18px",
+            fontWeight: 600,
+            lineHeight: "28px",
+            color: "#000",
+          }}
+        >
+          Swap {fromToken.symbol} to {toToken.symbol}
+        </span>
+      </div>
+      <button
+        className="swap-status-close"
+        onClick={onClose}
+        style={{
+          width: "36px",
+          height: "36px",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          background: "rgba(0, 0, 0, 0.04)",
+          border: "none",
+          borderRadius: "9999px",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          color: "#3C3C43",
+        }}
+        type="button"
+      >
+        <X size={24} />
+      </button>
+    </div>
+  );
+}
 
 function SwapProcessing({
   fromToken,
   toToken,
+  onClose,
 }: {
   fromToken: SwapToken;
   toToken: SwapToken;
+  onClose: () => void;
 }) {
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="px-4 py-2">
-        <span className="font-sans text-lg font-semibold leading-7 text-white">
-          Swap {fromToken.symbol} to {toToken.symbol}
-        </span>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <style>{`
+        .swap-status-close:hover {
+          background: rgba(0, 0, 0, 0.08) !important;
+        }
+        @keyframes chevronBounce {
+          0%,
+          100% {
+            transform: translateX(0);
+          }
+          50% {
+            transform: translateX(4px);
+          }
+        }
+      `}</style>
 
-      <div className="flex flex-1 flex-col items-center justify-center">
-        <div className="flex flex-col items-center gap-5 px-8 py-6">
-          <div className="flex items-center gap-4 py-2">
-            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full">
+      <SwapStatusHeader
+        fromToken={fromToken}
+        onClose={onClose}
+        toToken={toToken}
+      />
+
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "20px",
+            alignItems: "center",
+            padding: "24px 32px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: "16px",
+              alignItems: "center",
+              padding: "8px 0",
+            }}
+          >
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "9999px",
+                overflow: "hidden",
+                flexShrink: 0,
+              }}
+            >
               <img
                 alt={fromToken.symbol}
-                className="h-full w-full object-cover"
                 height={64}
                 src={fromToken.icon}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
                 width={64}
               />
             </div>
             <ChevronRight
-              className="animate-bounce-x text-gray-400"
               size={16}
+              style={{
+                color: secondary,
+                animation: "chevronBounce 1s ease-in-out infinite",
+              }}
             />
-            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full">
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "9999px",
+                overflow: "hidden",
+                flexShrink: 0,
+              }}
+            >
               <img
                 alt={toToken.symbol}
-                className="h-full w-full object-cover"
                 height={64}
                 src={toToken.icon}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
                 width={64}
               />
             </div>
           </div>
-          <div className="flex flex-col items-center gap-1 text-center">
-            <span className="font-sans text-xl font-semibold leading-6 text-white">
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              alignItems: "center",
+              textAlign: "center",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: font,
+                fontSize: "20px",
+                fontWeight: 600,
+                lineHeight: "24px",
+                color: "#000",
+              }}
+            >
               Swapping...
             </span>
           </div>
         </div>
       </div>
 
-      <div className="px-5 py-4">
+      <div style={{ padding: "16px 20px" }}>
         <button
-          className="w-full cursor-default rounded-full bg-gray-600 px-4 py-3 font-sans text-base font-normal leading-5 text-white"
           disabled
+          style={{
+            width: "100%",
+            padding: "12px 16px",
+            borderRadius: "9999px",
+            background: "#CCCDCD",
+            border: "none",
+            cursor: "default",
+            fontFamily: font,
+            fontSize: "16px",
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: "#fff",
+            textAlign: "center",
+          }}
           type="button"
         >
           In progress...
@@ -150,16 +305,13 @@ function SwapProcessing({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Result (success / error)
-// ---------------------------------------------------------------------------
-
-function SwapResultView({
+function SwapResult({
   variant,
   fromToken,
   toToken,
   receivedAmount,
   errorMessage,
+  onClose,
   onDone,
   onDetails,
 }: {
@@ -168,46 +320,119 @@ function SwapResultView({
   toToken: SwapToken;
   receivedAmount: string;
   errorMessage?: string;
+  onClose: () => void;
   onDone: () => void;
   onDetails: () => void;
 }) {
   const isSuccess = variant === "success";
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="px-4 py-2">
-        <span className="font-sans text-lg font-semibold leading-7 text-white">
-          Swap {fromToken.symbol} to {toToken.symbol}
-        </span>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <style>{`
+        .swap-status-close:hover {
+          background: rgba(0, 0, 0, 0.08) !important;
+        }
+        .done-btn:hover {
+          background: #333 !important;
+        }
+        .done-secondary-btn:hover {
+          background: rgba(0, 0, 0, 0.08) !important;
+        }
+        @keyframes mascotNod {
+          0%,
+          100% {
+            transform: rotate(0deg);
+          }
+          25% {
+            transform: rotate(4deg);
+          }
+          75% {
+            transform: rotate(-4deg);
+          }
+        }
+      `}</style>
 
-      <div className="flex flex-1 flex-col items-center justify-center">
-        <div className="flex flex-col items-center gap-5 px-8 py-6">
-          {/* Status icon */}
-          <div className="flex h-20 w-20 items-center justify-center">
-            {isSuccess ? (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20">
-                <span className="text-3xl text-green-400">&#10003;</span>
-              </div>
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20">
-                <span className="text-3xl text-red-400">!</span>
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col items-center gap-1 text-center">
-            <span className="font-sans text-xl font-semibold leading-6 text-white">
+      <SwapStatusHeader
+        fromToken={fromToken}
+        onClose={onClose}
+        toToken={toToken}
+      />
+
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "20px",
+            alignItems: "center",
+            padding: "24px 32px",
+          }}
+        >
+          <img
+            alt={isSuccess ? "Success" : "Error"}
+            src={isSuccess ? "/hero-new/success.svg" : "/hero-new/error.svg"}
+            style={{
+              width: "100px",
+              height: "80px",
+              animation: "mascotNod 0.6s ease-in-out 2",
+              transformOrigin: "center bottom",
+            }}
+          />
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              alignItems: "center",
+              textAlign: "center",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: font,
+                fontSize: "20px",
+                fontWeight: 600,
+                lineHeight: "24px",
+                color: "#000",
+              }}
+            >
               {isSuccess ? "Swap Completed" : "Swap Failed"}
             </span>
             {isSuccess ? (
-              <span className="max-w-[255px] font-sans text-base font-normal leading-5 text-gray-400">
-                <span className="text-white">
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: secondary,
+                  maxWidth: "255px",
+                }}
+              >
+                <span style={{ color: "#000" }}>
                   {receivedAmount} {toToken.symbol}
                 </span>
                 {" has been deposited to your wallet"}
               </span>
             ) : (
-              <span className="max-w-[255px] font-sans text-base font-normal leading-5 text-gray-400">
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: secondary,
+                  maxWidth: "255px",
+                }}
+              >
                 {errorMessage || "Something went wrong. Please try again."}
               </span>
             )}
@@ -215,23 +440,56 @@ function SwapResultView({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 px-5 py-4">
+      <div
+        style={{
+          padding: "16px 20px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+        }}
+      >
         {isSuccess && (
           <button
-            className="w-full cursor-pointer rounded-full bg-purple-600 px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors hover:bg-purple-700"
+            className="done-btn"
             onClick={onDetails}
+            style={{
+              width: "100%",
+              padding: "12px 16px",
+              borderRadius: "9999px",
+              background: "#000",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: font,
+              fontSize: "16px",
+              fontWeight: 400,
+              lineHeight: "20px",
+              color: "#fff",
+              textAlign: "center",
+              transition: "background 0.15s ease",
+            }}
             type="button"
           >
             Transaction Details
           </button>
         )}
         <button
-          className={
-            isSuccess
-              ? "w-full cursor-pointer rounded-full bg-white/[0.08] px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors hover:bg-white/[0.12]"
-              : "w-full cursor-pointer rounded-full bg-purple-600 px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors hover:bg-purple-700"
-          }
+          className={isSuccess ? "done-secondary-btn" : "done-btn"}
           onClick={onDone}
+          style={{
+            width: "100%",
+            padding: "12px 16px",
+            borderRadius: "9999px",
+            background: isSuccess ? "rgba(0, 0, 0, 0.04)" : "#000",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: font,
+            fontSize: "16px",
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: isSuccess ? "#000" : "#fff",
+            textAlign: "center",
+            transition: "background 0.15s ease",
+          }}
           type="button"
         >
           Done
@@ -241,16 +499,13 @@ function SwapResultView({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Transaction detail view
-// ---------------------------------------------------------------------------
-
 function SwapTransactionDetail({
   fromToken,
   toToken,
   receivedAmount,
   usdValue,
   signature,
+  onClose,
   onDone,
 }: {
   fromToken: SwapToken;
@@ -258,6 +513,7 @@ function SwapTransactionDetail({
   receivedAmount: string;
   usdValue: string;
   signature?: string;
+  onClose: () => void;
   onDone: () => void;
 }) {
   const now = new Date();
@@ -272,94 +528,281 @@ function SwapTransactionDetail({
   });
 
   return (
-    <div className="flex flex-1 flex-col">
-      {/* Header */}
-      <div className="px-4 py-2">
-        <span className="font-sans text-lg font-semibold leading-7 text-white">
-          Swap {fromToken.symbol} to {toToken.symbol}
-        </span>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <style>{`
+        .swap-status-close:hover {
+          background: rgba(0, 0, 0, 0.08) !important;
+        }
+        .swap-tx-action-btn:hover {
+          background: rgba(249, 54, 60, 0.22) !important;
+        }
+        .swap-tx-done-btn:hover {
+          background: #333 !important;
+        }
+      `}</style>
 
-      <div className="flex flex-1 flex-col items-center overflow-y-auto p-2">
+      <SwapStatusHeader
+        fromToken={fromToken}
+        onClose={onClose}
+        toToken={toToken}
+      />
+
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "8px",
+          overflowY: "auto",
+        }}
+      >
         {/* Amount hero */}
-        <div className="flex w-full flex-col px-3 pb-6 pt-8">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-baseline gap-2 whitespace-nowrap font-sans font-semibold">
-              <span className="text-[40px] leading-[48px] text-green-400">
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "32px 12px 24px",
+            width: "100%",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              width: "100%",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: "8px",
+                fontFamily: font,
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "40px",
+                  lineHeight: "48px",
+                  color: "#34C759",
+                }}
+              >
                 +{receivedAmount}
               </span>
-              <span className="text-[28px] leading-8 text-gray-500">
+              <span
+                style={{
+                  fontSize: "28px",
+                  lineHeight: "32px",
+                  color: "rgba(60, 60, 67, 0.4)",
+                  letterSpacing: "0.4px",
+                }}
+              >
                 {toToken.symbol}
               </span>
             </div>
-            <span className="font-sans text-base font-normal leading-5 text-gray-400">
-              ~{usdValue}
+            <span
+              style={{
+                fontFamily: font,
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: secondary,
+              }}
+            >
+              ≈{usdValue}
             </span>
-            <span className="font-sans text-base font-normal leading-5 text-gray-400">
+            <span
+              style={{
+                fontFamily: font,
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: secondary,
+              }}
+            >
               {dateStr}, {timeStr}
             </span>
           </div>
         </div>
 
         {/* Details card */}
-        <div className="w-full">
-          <div className="flex flex-col rounded-2xl bg-white/[0.06] py-1">
-            <div className="px-3 py-2">
-              <span className="block font-sans text-[13px] font-normal leading-4 text-gray-400">
+        <div style={{ width: "100%" }}>
+          <div
+            style={{
+              background: "rgba(0, 0, 0, 0.04)",
+              borderRadius: "16px",
+              padding: "4px 0",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div style={{ padding: "9px 12px" }}>
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "13px",
+                  fontWeight: 400,
+                  lineHeight: "16px",
+                  color: secondary,
+                  display: "block",
+                }}
+              >
                 Status
               </span>
-              <span className="mt-0.5 block font-sans text-base font-normal leading-5 text-white">
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: "#000",
+                  display: "block",
+                  marginTop: "2px",
+                }}
+              >
                 Completed
               </span>
             </div>
-            <div className="px-3 py-2">
-              <span className="block font-sans text-[13px] font-normal leading-4 text-gray-400">
+            <div style={{ padding: "9px 12px" }}>
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "13px",
+                  fontWeight: 400,
+                  lineHeight: "16px",
+                  color: secondary,
+                  display: "block",
+                }}
+              >
                 Network Fee
               </span>
-              <div className="mt-0.5 flex items-center gap-1 font-sans text-base font-normal leading-5">
-                <span className="text-white">0.00005 SOL</span>
-                <span className="text-gray-400">~ $0.00</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  marginTop: "2px",
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                }}
+              >
+                <span style={{ color: "#000" }}>0.00005 SOL</span>
+                <span style={{ color: secondary }}>≈ $0.00</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Action buttons */}
-        <div className="flex w-full items-center pb-4 pt-5">
-          <div className="flex flex-1 flex-col items-center gap-2">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            paddingTop: "20px",
+            paddingBottom: "16px",
+            width: "100%",
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
             <button
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-600/20 transition-colors hover:bg-purple-600/30"
+              className="swap-tx-action-btn"
               onClick={() =>
                 signature &&
                 window.open(
                   `https://explorer.solana.com/tx/${signature}`,
-                  "_blank",
+                  "_blank"
                 )
               }
-              style={{ opacity: signature ? 1 : 0.5 }}
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "9999px",
+                background: "rgba(249, 54, 60, 0.14)",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: signature ? "pointer" : "default",
+                opacity: signature ? 1 : 0.5,
+                transition: "background-color 0.15s ease",
+              }}
               type="button"
             >
-              <Globe className="text-gray-300" size={24} />
+              <Globe size={24} style={{ color: "#3C3C43" }} />
             </button>
-            <span className="text-center font-sans text-[13px] font-normal leading-4 text-gray-400">
+            <span
+              style={{
+                fontFamily: font,
+                fontSize: "13px",
+                fontWeight: 400,
+                lineHeight: "16px",
+                color: secondary,
+                textAlign: "center",
+              }}
+            >
               View in explorer
             </span>
           </div>
-          <div className="flex flex-1 flex-col items-center gap-2">
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
             <button
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-600/20 transition-colors hover:bg-purple-600/30"
+              className="swap-tx-action-btn"
               onClick={() =>
                 signature &&
                 void navigator.clipboard.writeText(
-                  `https://explorer.solana.com/tx/${signature}`,
+                  `https://explorer.solana.com/tx/${signature}`
                 )
               }
-              style={{ opacity: signature ? 1 : 0.5 }}
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "9999px",
+                background: "rgba(249, 54, 60, 0.14)",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: signature ? "pointer" : "default",
+                opacity: signature ? 1 : 0.5,
+                transition: "background-color 0.15s ease",
+              }}
               type="button"
             >
-              <Share className="text-gray-300" size={24} />
+              <Share size={24} style={{ color: "#3C3C43" }} />
             </button>
-            <span className="text-center font-sans text-[13px] font-normal leading-4 text-gray-400">
+            <span
+              style={{
+                fontFamily: font,
+                fontSize: "13px",
+                fontWeight: 400,
+                lineHeight: "16px",
+                color: secondary,
+                textAlign: "center",
+              }}
+            >
               Share
             </span>
           </div>
@@ -367,10 +810,25 @@ function SwapTransactionDetail({
       </div>
 
       {/* Done button */}
-      <div className="px-5 py-4">
+      <div style={{ padding: "16px 20px" }}>
         <button
-          className="w-full cursor-pointer rounded-full bg-purple-600 px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors hover:bg-purple-700"
+          className="swap-tx-done-btn"
           onClick={onDone}
+          style={{
+            width: "100%",
+            padding: "12px 16px",
+            borderRadius: "9999px",
+            background: "#000",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: font,
+            fontSize: "16px",
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: "#fff",
+            textAlign: "center",
+            transition: "background 0.15s ease",
+          }}
           type="button"
         >
           Done
@@ -380,28 +838,36 @@ function SwapTransactionDetail({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main SwapContent
-// ---------------------------------------------------------------------------
-
 export function SwapContent({
+  onClose,
   onDone,
   onNavigate,
   fromToken: fromTokenProp,
   toToken: toTokenProp,
   onFromTokenChange,
   onToTokenChange,
-  swapMode: _swapMode,
-  onSwapModeChange: _onSwapModeChange,
+  swapMode,
+  onSwapModeChange,
   hideFormChrome,
   onFormActiveChange,
   onFormButtonChange,
-}: SwapContentProps) {
+}: {
+  onClose: () => void;
+  onDone: () => void;
+  onNavigate: (view: SubView) => void;
+  fromToken: SwapToken;
+  toToken: SwapToken;
+  onFromTokenChange: (t: SwapToken) => void;
+  onToTokenChange: (t: SwapToken) => void;
+  swapMode: SwapMode;
+  onSwapModeChange: (mode: SwapMode) => void;
+  hideFormChrome?: boolean;
+  onFormActiveChange?: (isForm: boolean) => void;
+  onFormButtonChange?: (props: FormButtonProps | null) => void;
+}) {
   const { signer, connection } = useWalletContext();
 
   // Jupiter public API does not require a key for basic operations.
-  // The wallet-core useSwap hook accepts SwapConfig; pass enabled with empty
-  // key so the hook does not short-circuit with "disabled".
   const swapConfig: SwapConfig = { mode: "enabled", apiKey: "" };
 
   const {
@@ -413,7 +879,6 @@ export function SwapContent({
     unavailableReason,
     error: swapError,
   } = useSwap(signer, connection, swapConfig);
-
   const [fromAmount, setFromAmount] = useState("");
   const [phase, setPhase] = useState<SwapPhase>("form");
   const [resultAmount, setResultAmount] = useState("");
@@ -432,7 +897,7 @@ export function SwapContent({
 
   const numericFrom = Number.parseFloat(fromAmount) || 0;
 
-  // Use quote output when available, fall back to price ratio estimate
+  // Use quote output amount when available, fall back to price ratio estimate
   const toAmount = useMemo(() => {
     if (numericFrom <= 0) return 0;
     if (quote?.outputAmount) return Number.parseFloat(quote.outputAmount);
@@ -444,7 +909,6 @@ export function SwapContent({
     const val = toAmount * toToken.price;
     return Number.isFinite(val) ? val.toFixed(2) : "0.00";
   }, [toAmount, toToken.price]);
-
   const hasAmount = numericFrom > 0;
   const insufficientFunds = numericFrom > fromToken.balance;
 
@@ -462,7 +926,7 @@ export function SwapContent({
         fromToken.symbol,
         toToken.symbol,
         String(numericFrom),
-        fromToken.mint,
+        fromToken.mint
       ).finally(() => setIsQuoting(false));
     }, 500);
     return () => {
@@ -482,19 +946,19 @@ export function SwapContent({
   ]);
 
   const buttonLabel = !isAvailable
-    ? (unavailableReason ?? "Swap unavailable")
+    ? unavailableReason ?? "Swap unavailable"
     : !hasAmount
-      ? "Enter Amount"
-      : insufficientFunds
-        ? "Insufficient Funds"
-        : isQuoting
-          ? "Getting quote..."
-          : !quote
-            ? "Enter Amount"
-            : "Confirm and Swap";
-
+    ? "Enter Amount"
+    : insufficientFunds
+    ? "Insufficient Funds"
+    : isQuoting
+    ? "Getting quote..."
+    : !quote
+    ? "Enter Amount"
+    : "Confirm and Swap";
   const buttonDisabled =
     !isAvailable || !hasAmount || insufficientFunds || isQuoting || !quote;
+  const amountColor = insufficientFunds && hasAmount ? red : "#000";
 
   const handleSwapTokens = useCallback(() => {
     const prevFrom = fromToken;
@@ -521,7 +985,7 @@ export function SwapContent({
               maximumFractionDigits: 2,
             })
           : "0"
-      }`,
+      }`
     );
     setResultSignature(undefined);
     setErrorMessage(undefined);
@@ -576,22 +1040,25 @@ export function SwapContent({
         pct === 100 ? fromToken.balance : fromToken.balance * (pct / 100);
       setFromAmount(val > 0 ? String(Number(val.toFixed(6))) : "");
     },
-    [fromToken.balance],
+    [fromToken.balance]
   );
-
-  // ---------------------------------------------------------------------------
-  // Phase renderer
-  // ---------------------------------------------------------------------------
 
   const renderPhaseContent = (p: SwapPhase) => {
     if (p === "processing") {
-      return <SwapProcessing fromToken={fromToken} toToken={toToken} />;
+      return (
+        <SwapProcessing
+          fromToken={fromToken}
+          onClose={onClose}
+          toToken={toToken}
+        />
+      );
     }
     if (p === "success" || p === "error") {
       return (
-        <SwapResultView
+        <SwapResult
           errorMessage={errorMessage}
           fromToken={fromToken}
+          onClose={onClose}
           onDetails={() => setPhase("details")}
           onDone={onDone}
           receivedAmount={resultAmount}
@@ -604,6 +1071,7 @@ export function SwapContent({
       return (
         <SwapTransactionDetail
           fromToken={fromToken}
+          onClose={onClose}
           onDone={onDone}
           receivedAmount={resultAmount}
           signature={resultSignature}
@@ -612,65 +1080,168 @@ export function SwapContent({
         />
       );
     }
-
-    // -----------------------------------------------------------------------
-    // Form phase
-    // -----------------------------------------------------------------------
-    const amountTextColor =
-      insufficientFunds && hasAmount ? "text-red-400" : "text-white";
-    const toAmountColor =
-      insufficientFunds && hasAmount
-        ? "text-red-400"
-        : hasAmount
-          ? "text-white"
-          : "text-gray-400";
-
     return (
-      <div className="flex flex-1 flex-col">
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <style>{`
+          .swap-close:hover {
+            background: rgba(0, 0, 0, 0.08) !important;
+          }
+          .pct-btn:hover {
+            opacity: 0.7;
+          }
+          .swap-circle:hover {
+            background: #333 !important;
+          }
+          .confirm-btn:not(:disabled):hover {
+            background: #333 !important;
+          }
+        `}</style>
+
+        {/* Header with tabs — hidden when parent owns chrome */}
+        {!hideFormChrome && (
+          <SwapShieldTabs
+            mode={swapMode}
+            onClose={onClose}
+            onModeChange={onSwapModeChange}
+          />
+        )}
+
         {/* Body */}
-        <div className="flex flex-1 flex-col gap-4 overflow-auto px-2 pb-4 pt-2">
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: "16px",
+            overflow: "auto",
+            padding: "8px 8px 16px",
+          }}
+        >
           {/* Swap inputs container */}
-          <div className="relative isolate flex flex-col gap-2 overflow-visible">
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+              position: "relative",
+              isolation: "isolate",
+              overflow: "visible",
+            }}
+          >
             {/* From card */}
-            <div className="relative z-[2] rounded-2xl bg-white/[0.06] px-3 py-2.5">
-              <div className="flex items-center justify-between whitespace-nowrap font-sans font-normal leading-5">
-                <span className="text-base text-gray-400">You swap</span>
-                <div className="flex items-center gap-4 text-sm" style={{ color: red }}>
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                padding: "10px 12px",
+                position: "relative",
+                zIndex: 2,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  fontFamily: font,
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ fontSize: "16px", color: secondary }}>
+                  You swap
+                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "16px",
+                    alignItems: "center",
+                    fontSize: "14px",
+                    color: red,
+                  }}
+                >
                   <button
-                    className="cursor-pointer border-none bg-transparent p-0 font-sans text-sm font-normal opacity-80 hover:opacity-100"
+                    className="pct-btn"
                     onClick={() => handlePercentage(25)}
-                    style={{ color: red }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: red,
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      padding: 0,
+                    }}
                     type="button"
                   >
                     25%
                   </button>
                   <button
-                    className="cursor-pointer border-none bg-transparent p-0 font-sans text-sm font-normal opacity-80 hover:opacity-100"
+                    className="pct-btn"
                     onClick={() => handlePercentage(50)}
-                    style={{ color: red }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: red,
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      padding: 0,
+                    }}
                     type="button"
                   >
                     50%
                   </button>
                   <button
-                    className="cursor-pointer border-none bg-transparent p-0 font-sans text-sm font-normal opacity-80 hover:opacity-100"
+                    className="pct-btn"
                     onClick={() => handlePercentage(100)}
-                    style={{ color: red }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: red,
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      padding: 0,
+                    }}
                     type="button"
                   >
                     Max
                   </button>
                 </div>
               </div>
-              <div className="flex h-12 items-center gap-1">
+              <div
+                style={{
+                  display: "flex",
+                  gap: "4px",
+                  height: "48px",
+                  alignItems: "center",
+                }}
+              >
                 <input
-                  className={`min-w-0 flex-1 border-none bg-transparent p-0 font-sans text-[32px] font-semibold leading-9 outline-none placeholder:text-gray-500 ${amountTextColor}`}
                   inputMode="decimal"
                   onChange={(e) => {
                     const v = e.target.value;
                     if (v === "" || /^\d*\.?\d*$/.test(v)) setFromAmount(v);
                   }}
                   placeholder="0"
+                  style={{
+                    flex: 1,
+                    fontFamily: font,
+                    fontSize: "32px",
+                    fontWeight: 600,
+                    lineHeight: "36px",
+                    color: amountColor,
+                    background: "none",
+                    border: "none",
+                    outline: "none",
+                    padding: 0,
+                    minWidth: 0,
+                  }}
                   type="text"
                   value={fromAmount}
                 />
@@ -682,47 +1253,133 @@ export function SwapContent({
                   variant="from"
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/[0.08]">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div
+                  style={{ display: "flex", gap: "6px", alignItems: "center" }}
+                >
+                  <div
+                    style={{
+                      width: "20px",
+                      height: "20px",
+                      borderRadius: "9999px",
+                      background: "#F5F5F5",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
                     <ArrowDownUp
-                      className="text-gray-400 opacity-40"
                       size={12}
+                      style={{ color: secondary, opacity: 0.4 }}
                     />
                   </div>
-                  <span className="font-sans text-sm font-normal leading-5 text-gray-400">
-                    1 {fromToken.symbol} ~ $
+                  <span
+                    style={{
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      lineHeight: "20px",
+                      color: secondary,
+                    }}
+                  >
+                    1 {fromToken.symbol} ≈ $
                     {fromToken.price.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 4,
                     })}
                   </span>
                 </div>
-                <span className="font-sans text-sm font-normal leading-5 text-gray-400">
-                  Balance: {fromToken.balance.toLocaleString()}
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
+                  Balance: {fromToken.balance.toLocaleString()}{" "}
                 </span>
               </div>
 
               {/* Swap circle */}
               <button
-                className="absolute -bottom-[18px] left-[calc(50%+4px)] z-[3] flex h-7 w-7 -translate-x-1/2 cursor-pointer items-center justify-center rounded-full border-none bg-purple-600 transition-colors hover:bg-purple-700"
+                className="swap-circle"
                 onClick={handleSwapTokens}
+                style={{
+                  position: "absolute",
+                  bottom: "-18px",
+                  left: "calc(50% + 4px)",
+                  transform: "translateX(-50%)",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "9999px",
+                  background: "#000",
+                  border: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  zIndex: 3,
+                  transition: "background 0.15s ease",
+                }}
                 type="button"
               >
-                <ArrowDownUp className="text-white" size={16} />
+                <ArrowDownUp size={16} style={{ color: "#fff" }} />
               </button>
             </div>
 
             {/* To card */}
-            <div className="z-[1] rounded-2xl bg-white/[0.06] p-3">
-              <div className="flex items-center">
-                <span className="font-sans text-base font-normal leading-5 text-gray-400">
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                padding: "12px",
+                zIndex: 1,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
                   You receive
                 </span>
               </div>
-              <div className="flex h-12 items-center gap-1">
+              <div
+                style={{
+                  display: "flex",
+                  gap: "4px",
+                  height: "48px",
+                  alignItems: "center",
+                }}
+              >
                 <span
-                  className={`min-w-0 flex-1 font-sans text-[32px] font-semibold leading-9 ${toAmountColor}`}
+                  style={{
+                    flex: 1,
+                    fontFamily: font,
+                    fontSize: "32px",
+                    fontWeight: 600,
+                    lineHeight: "36px",
+                    color:
+                      insufficientFunds && hasAmount
+                        ? red
+                        : hasAmount
+                        ? "#000"
+                        : secondary,
+                    minWidth: 0,
+                  }}
                 >
                   {hasAmount ? Number(toAmount.toFixed(6)).toString() : "0"}
                 </span>
@@ -734,8 +1391,22 @@ export function SwapContent({
                   variant="to"
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="font-sans text-sm font-normal leading-5 text-gray-400">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
                   $
                   {hasAmount
                     ? Number(toUsd).toLocaleString(undefined, {
@@ -744,54 +1415,118 @@ export function SwapContent({
                       })
                     : "0"}
                 </span>
-                <span className="font-sans text-sm font-normal leading-5 text-gray-400">
-                  Balance: {toToken.balance.toLocaleString()}
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
+                  Balance: {toToken.balance.toLocaleString()}{" "}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Swap error */}
-          {swapError && (
-            <div className="rounded-xl bg-red-500/10 px-3 py-2">
-              <span className="font-sans text-sm font-normal leading-5 text-red-400">
-                {swapError}
-              </span>
-            </div>
-          )}
-
-          {/* Details card */}
+          {/* Details card (only when amount entered) */}
           {hasAmount && (
-            <div className="flex flex-col rounded-2xl bg-white/[0.06] py-1">
-              <div className="px-3 py-2.5">
-                <span className="block font-sans text-[13px] font-normal leading-4 text-gray-400">
+            <div
+              style={{
+                background: "rgba(0, 0, 0, 0.04)",
+                borderRadius: "16px",
+                padding: "4px 0",
+              }}
+            >
+              <div style={{ padding: "10px 12px" }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    lineHeight: "16px",
+                    color: secondary,
+                    display: "block",
+                  }}
+                >
                   Rate
                 </span>
-                <div className="mt-0.5 flex items-center gap-1 font-sans text-base font-normal leading-5">
-                  <span className="text-white">1 {toToken.symbol}</span>
-                  <span className="text-gray-400">
-                    ~{" "}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "4px",
+                    alignItems: "center",
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    marginTop: "2px",
+                  }}
+                >
+                  <span style={{ color: "#000" }}>1 {toToken.symbol}</span>
+                  <span style={{ color: secondary }}>
+                    ≈{" "}
                     {fromToken.price > 0
                       ? (toToken.price / fromToken.price).toFixed(2)
-                      : "\u2014"}
+                      : "—"}
                   </span>
                 </div>
               </div>
-              <div className="px-3 py-2.5">
-                <span className="block font-sans text-[13px] font-normal leading-4 text-gray-400">
+              <div style={{ padding: "10px 12px" }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    lineHeight: "16px",
+                    color: secondary,
+                    display: "block",
+                  }}
+                >
                   Slippage
                 </span>
-                <span className="mt-0.5 block font-sans text-base font-normal leading-5 text-white">
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: "#000",
+                    display: "block",
+                    marginTop: "2px",
+                  }}
+                >
                   1%
                 </span>
               </div>
-              <div className="px-3 py-2.5">
-                <span className="block font-sans text-[13px] font-normal leading-4 text-gray-400">
+              <div style={{ padding: "10px 12px" }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    lineHeight: "16px",
+                    color: secondary,
+                    display: "block",
+                  }}
+                >
                   Network Fee
                 </span>
-                <div className="mt-0.5 flex items-center gap-1 font-sans text-base font-normal leading-5">
-                  <span className="text-white">0.00005 SOL</span>
-                  <span className="text-gray-400">~ $0.00</span>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "4px",
+                    alignItems: "center",
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    marginTop: "2px",
+                  }}
+                >
+                  <span style={{ color: "#000" }}>0.00005 SOL</span>
+                  <span style={{ color: secondary }}>≈ $0.00</span>
                 </div>
               </div>
             </div>
@@ -800,15 +1535,26 @@ export function SwapContent({
 
         {/* Bottom button — hidden when parent owns chrome */}
         {!hideFormChrome && (
-          <div className="px-5 py-4">
+          <div style={{ padding: "16px 20px" }}>
             <button
-              className={`w-full rounded-full px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors ${
-                buttonDisabled
-                  ? "cursor-default bg-gray-600"
-                  : "cursor-pointer bg-purple-600 hover:bg-purple-700"
-              }`}
+              className="confirm-btn"
               disabled={buttonDisabled}
               onClick={handleConfirm}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: "9999px",
+                background: buttonDisabled ? "#CCCDCD" : "#000",
+                border: "none",
+                cursor: buttonDisabled ? "default" : "pointer",
+                fontFamily: font,
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "#fff",
+                textAlign: "center",
+                transition: "background 0.15s ease",
+              }}
               type="button"
             >
               {buttonLabel}
@@ -821,8 +1567,11 @@ export function SwapContent({
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col"
       style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
         opacity: phaseOpacity,
         transition: "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
       }}

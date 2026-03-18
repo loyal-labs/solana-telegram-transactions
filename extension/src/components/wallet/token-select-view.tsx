@@ -1,8 +1,7 @@
 import { useState } from "react";
 
-import type { SwapToken } from "@loyal-labs/wallet-core/types";
-
 import { SearchInput, SubViewHeader } from "~/src/components/wallet/shared";
+import type { SwapToken } from "@loyal-labs/wallet-core/types";
 
 function SelectableTokenRow({
   token,
@@ -17,51 +16,40 @@ function SelectableTokenRow({
 
   return (
     <div
-      className="flex w-full cursor-pointer items-center overflow-hidden rounded-2xl px-3 transition-colors"
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: isSelected
-          ? "rgba(255, 255, 255, 0.08)"
-          : hovered
-            ? "rgba(255, 255, 255, 0.06)"
-            : "transparent",
+        display: "flex",
+        alignItems: "center",
+        padding: "0 12px",
+        borderRadius: "16px",
+        width: "100%",
+        overflow: "hidden",
+        background: isSelected ? "rgba(0, 0, 0, 0.04)" : hovered ? "rgba(0, 0, 0, 0.04)" : "transparent",
+        transition: "background-color 0.15s ease",
+        cursor: "pointer",
       }}
     >
-      <div className="shrink-0 pr-3 py-1.5">
-        <div className="h-12 w-12 overflow-hidden rounded-full">
-          <img
-            alt={token.symbol}
-            className="h-full w-full object-cover"
-            height={48}
-            src={token.icon}
-            width={48}
-          />
+      <div style={{ display: "flex", alignItems: "center", paddingRight: "12px", paddingTop: "6px", paddingBottom: "6px", flexShrink: 0 }}>
+        <div style={{ width: "48px", height: "48px", borderRadius: "9999px", overflow: "hidden" }}>
+          <img alt={token.symbol} height={48} src={token.icon} style={{ width: "100%", height: "100%", objectFit: "cover" }} width={48} />
         </div>
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-2.5">
-        <span className="font-sans text-base font-medium leading-5 tracking-tight text-white">
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px", padding: "10px 0", minWidth: 0 }}>
+        <span style={{ fontFamily: "var(--font-geist-sans), sans-serif", fontSize: "16px", fontWeight: 500, lineHeight: "20px", color: "#000", letterSpacing: "-0.176px" }}>
           {token.symbol}
         </span>
-        <span className="font-sans text-[13px] leading-4 text-gray-400">
-          $
-          {token.price.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
+        <span style={{ fontFamily: "var(--font-geist-sans), sans-serif", fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: "rgba(60, 60, 67, 0.6)" }}>
+          ${token.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
       </div>
-      <div className="flex shrink-0 flex-col items-end justify-center gap-0.5 py-2.5 pl-3">
-        <span className="text-right font-sans text-base leading-5 text-white">
+      <div style={{ display: "flex", flexDirection: "column", gap: "2px", alignItems: "flex-end", justifyContent: "center", padding: "10px 0", paddingLeft: "12px", flexShrink: 0 }}>
+        <span style={{ fontFamily: "var(--font-geist-sans), sans-serif", fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#000", textAlign: "right" }}>
           {token.balance.toLocaleString()}
         </span>
-        <span className="font-sans text-[13px] leading-4 text-gray-400">
-          $
-          {(token.balance * token.price).toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
+        <span style={{ fontFamily: "var(--font-geist-sans), sans-serif", fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: "rgba(60, 60, 67, 0.6)" }}>
+          ${(token.balance * token.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
       </div>
     </div>
@@ -73,24 +61,25 @@ export function TokenSelectView({
   currentToken,
   onSelect,
   onBack,
+  onClose,
   tokens,
 }: {
   title: string;
   currentToken: SwapToken;
   onSelect: (token: SwapToken) => void;
   onBack: () => void;
+  onClose: () => void;
   tokens: SwapToken[];
 }) {
   const [search, setSearch] = useState("");
-  const filtered = tokens.filter((t) =>
-    t.symbol.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = tokens
+    .filter((t) => t.symbol.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="flex h-full flex-col">
-      <SubViewHeader onBack={onBack} title={title} />
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <SubViewHeader onBack={onBack} onClose={onClose} title={title} />
       <SearchInput onChange={setSearch} value={search} />
-      <div className="flex-1 overflow-x-hidden overflow-y-auto px-2">
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 8px" }}>
         {filtered.map((token, i) => (
           <SelectableTokenRow
             isSelected={token.symbol === currentToken.symbol}
@@ -103,7 +92,7 @@ export function TokenSelectView({
           />
         ))}
         {filtered.length === 0 && (
-          <div className="py-8 text-center font-sans text-sm text-gray-400">
+          <div style={{ padding: "32px 20px", textAlign: "center", fontFamily: "var(--font-geist-sans), sans-serif", fontSize: "14px", color: "rgba(60, 60, 67, 0.6)" }}>
             No tokens found
           </div>
         )}

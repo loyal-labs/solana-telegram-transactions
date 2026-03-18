@@ -1,101 +1,243 @@
-import { ArrowDownUp, ChevronRight, Globe, Share, Shield } from "lucide-react";
+import { ArrowDownUp, ChevronRight, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type {
-  FormButtonProps,
-  SubView,
-  SwapMode,
-  SwapToken,
-} from "@loyal-labs/wallet-core/types";
 import { useShield } from "@loyal-labs/wallet-core/hooks";
+
+import type { FormButtonProps, SubView, SwapMode, SwapToken } from "@loyal-labs/wallet-core/types";
 
 import { useWalletContext } from "~/src/components/wallet/wallet-provider";
 
-// ---------------------------------------------------------------------------
-// Helpers / constants
-// ---------------------------------------------------------------------------
-
+const font = "var(--font-geist-sans), sans-serif";
+const secondary = "rgba(60, 60, 67, 0.6)";
 const red = "#F9363C";
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
-export interface ShieldContentProps {
-  token: SwapToken;
-  onTokenChange: (token: SwapToken) => void;
-  onNavigate: (view: SubView) => void;
-  onDone: () => void;
-  securedBalance: number;
-  swapMode: SwapMode;
-  onSwapModeChange: (mode: SwapMode) => void;
-  onFormActiveChange?: (active: boolean) => void;
-  onFormButtonChange?: (props: FormButtonProps | null) => void;
-  hideFormChrome?: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// SwapShieldTabs — exported for use by parent WalletApp
-// ---------------------------------------------------------------------------
-
-export function SwapShieldTabs({
+function SwapShieldTabs({
   mode,
   onModeChange,
+  onClose,
 }: {
   mode: SwapMode;
   onModeChange: (mode: SwapMode) => void;
+  onClose: () => void;
 }) {
   return (
-    <div className="flex items-center p-2">
-      <div className="flex items-center overflow-hidden rounded-full bg-white/[0.06] p-1">
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          background: "rgba(0, 0, 0, 0.04)",
+          borderRadius: "9999px",
+          padding: "4px",
+          overflow: "hidden",
+        }}
+      >
         <button
-          className={`flex items-center justify-center gap-1.5 rounded-full border-none px-4 py-2 font-sans text-[15px] leading-5 transition-colors ${
-            mode === "swap"
-              ? "bg-white/[0.12] font-medium text-white"
-              : "cursor-pointer bg-transparent font-normal text-gray-400"
-          }`}
           onClick={() => onModeChange("swap")}
+          style={{
+            display: "flex",
+            gap: "6px",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "8px 16px",
+            borderRadius: "9999px",
+            border: "none",
+            cursor: "pointer",
+            background: mode === "swap" ? "#fff" : "transparent",
+            fontFamily: font,
+            fontSize: "15px",
+            fontWeight: mode === "swap" ? 500 : 400,
+            lineHeight: "20px",
+            color: mode === "swap" ? "#000" : secondary,
+            transition: "background 0.2s ease, color 0.2s ease",
+          }}
           type="button"
         >
           Swap
         </button>
         <button
-          className={`flex items-center justify-center gap-1.5 rounded-full border-none py-2 pl-2 pr-4 font-sans text-[15px] leading-5 transition-colors ${
-            mode === "shield"
-              ? "bg-white/[0.12] font-medium text-white"
-              : "cursor-pointer bg-transparent font-normal text-gray-400"
-          }`}
           onClick={() => onModeChange("shield")}
+          style={{
+            display: "flex",
+            gap: "6px",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "8px 16px 8px 8px",
+            borderRadius: "9999px",
+            border: "none",
+            cursor: "pointer",
+            background: mode === "shield" ? "#fff" : "transparent",
+            fontFamily: font,
+            fontSize: "15px",
+            fontWeight: mode === "shield" ? 500 : 400,
+            lineHeight: "20px",
+            color: mode === "shield" ? "#000" : secondary,
+            transition: "background 0.2s ease, color 0.2s ease",
+          }}
           type="button"
         >
-          <Shield className="h-5 w-5" />
+          <img
+            alt=""
+            src="/hero-new/Shield.png"
+            style={{ width: "20px", height: "20px" }}
+          />
           Shield
+        </button>
+      </div>
+      <div style={{ paddingLeft: "12px" }}>
+        <button
+          className="shield-close"
+          onClick={onClose}
+          style={{
+            width: "36px",
+            height: "36px",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            background: "rgba(0, 0, 0, 0.04)",
+            border: "none",
+            borderRadius: "9999px",
+            cursor: "pointer",
+            transition: "background 0.2s ease",
+            color: "#3C3C43",
+          }}
+          type="button"
+        >
+          <X size={24} />
         </button>
       </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Token pills
-// ---------------------------------------------------------------------------
+export { SwapShieldTabs };
+
+function StatusHeader({
+  title,
+  onClose,
+}: {
+  title: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px",
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          paddingLeft: "12px",
+          paddingTop: "4px",
+          paddingBottom: "4px",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: font,
+            fontSize: "18px",
+            fontWeight: 600,
+            lineHeight: "28px",
+            color: "#000",
+          }}
+        >
+          {title}
+        </span>
+      </div>
+      <button
+        className="shield-close"
+        onClick={onClose}
+        style={{
+          width: "36px",
+          height: "36px",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          background: "rgba(0, 0, 0, 0.04)",
+          border: "none",
+          borderRadius: "9999px",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          color: "#3C3C43",
+        }}
+        type="button"
+      >
+        <X size={24} />
+      </button>
+    </div>
+  );
+}
 
 function ShieldedTokenPill({ token }: { token: SwapToken }) {
   return (
-    <div className="flex shrink-0 items-center px-1">
-      <div className="relative flex items-center px-1 py-1 pr-3.5">
-        <div className="mr-[-8px] h-7 w-7 overflow-hidden rounded-full">
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        padding: "0 4px",
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          padding: "4px 14px 4px 4px",
+          position: "relative",
+        }}
+      >
+        <div
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "9999px",
+            overflow: "hidden",
+            marginRight: "-8px",
+          }}
+        >
           <img
             alt={token.symbol}
-            className="h-full w-full object-cover"
             height={28}
             src={token.icon}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
             width={28}
           />
         </div>
-        <Shield className="absolute bottom-0.5 right-0.5 h-4 w-4 text-purple-400" />
+        <img
+          alt="Shielded"
+          src="/hero-new/Shield.png"
+          style={{
+            width: "16px",
+            height: "16px",
+            position: "absolute",
+            bottom: "2px",
+            right: "2px",
+          }}
+        />
       </div>
-      <span className="whitespace-nowrap py-2 font-sans text-base font-medium leading-5 text-white">
+      <span
+        style={{
+          fontFamily: font,
+          fontSize: "16px",
+          fontWeight: 500,
+          lineHeight: "20px",
+          color: "#000",
+          letterSpacing: "-0.176px",
+          whiteSpace: "nowrap",
+          padding: "8px 0",
+        }}
+      >
         {token.symbol}
       </span>
     </div>
@@ -111,26 +253,68 @@ function SelectableTokenPill({
 }) {
   return (
     <button
-      className="flex shrink-0 cursor-pointer items-center rounded-full border-none bg-white/[0.08] px-1"
       onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        background: "#F5F5F5",
+        borderRadius: "54px",
+        padding: "0 4px",
+        border: "none",
+        cursor: "pointer",
+        flexShrink: 0,
+      }}
       type="button"
     >
-      <div className="flex items-center px-1 py-1 pr-1.5">
-        <div className="h-7 w-7 overflow-hidden rounded-full">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          paddingRight: "6px",
+          padding: "4px 6px 4px 4px",
+        }}
+      >
+        <div
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "9999px",
+            overflow: "hidden",
+          }}
+        >
           <img
             alt={token.symbol}
-            className="h-full w-full object-cover"
             height={28}
             src={token.icon}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
             width={28}
           />
         </div>
       </div>
-      <span className="whitespace-nowrap py-2 font-sans text-base font-medium leading-5 text-white">
+      <span
+        style={{
+          fontFamily: font,
+          fontSize: "16px",
+          fontWeight: 500,
+          lineHeight: "20px",
+          color: "#000",
+          letterSpacing: "-0.176px",
+          whiteSpace: "nowrap",
+          padding: "8px 0",
+        }}
+      >
         {token.symbol}
       </span>
-      <div className="flex h-9 items-center justify-center py-2">
-        <ChevronRight className="text-gray-400" size={16} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "36px",
+          padding: "8px 0",
+        }}
+      >
+        <ChevronRight size={16} style={{ color: "#3C3C43" }} />
       </div>
     </button>
   );
@@ -145,346 +329,118 @@ function ShieldedSelectableTokenPill({
 }) {
   return (
     <button
-      className="flex shrink-0 cursor-pointer items-center rounded-full border-none bg-white/[0.08] px-1"
       onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        background: "#F5F5F5",
+        borderRadius: "54px",
+        padding: "0 4px",
+        border: "none",
+        cursor: "pointer",
+        flexShrink: 0,
+      }}
       type="button"
     >
-      <div className="relative flex items-center px-1 py-1 pr-3.5">
-        <div className="mr-[-8px] h-7 w-7 overflow-hidden rounded-full">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          padding: "4px 14px 4px 4px",
+          position: "relative",
+        }}
+      >
+        <div
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "9999px",
+            overflow: "hidden",
+            marginRight: "-8px",
+          }}
+        >
           <img
             alt={token.symbol}
-            className="h-full w-full object-cover"
             height={28}
             src={token.icon}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
             width={28}
           />
         </div>
-        <Shield className="absolute bottom-0.5 right-0.5 h-4 w-4 text-purple-400" />
+        <img
+          alt="Shielded"
+          src="/hero-new/Shield.png"
+          style={{
+            width: "16px",
+            height: "16px",
+            position: "absolute",
+            bottom: "2px",
+            right: "2px",
+          }}
+        />
       </div>
-      <span className="whitespace-nowrap py-2 font-sans text-base font-medium leading-5 text-white">
+      <span
+        style={{
+          fontFamily: font,
+          fontSize: "16px",
+          fontWeight: 500,
+          lineHeight: "20px",
+          color: "#000",
+          letterSpacing: "-0.176px",
+          whiteSpace: "nowrap",
+          padding: "8px 0",
+        }}
+      >
         {token.symbol}
       </span>
-      <div className="flex h-9 items-center justify-center py-2">
-        <ChevronRight className="text-gray-400" size={16} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "36px",
+          padding: "8px 0",
+        }}
+      >
+        <ChevronRight size={16} style={{ color: "#3C3C43" }} />
       </div>
     </button>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Phase types
-// ---------------------------------------------------------------------------
-
 type ShieldPhase = "form" | "processing" | "success" | "error" | "details";
 
-// ---------------------------------------------------------------------------
-// Processing state
-// ---------------------------------------------------------------------------
-
-function ShieldProcessing({
-  token,
-  direction,
-}: {
-  token: SwapToken;
-  direction: "shield" | "unshield";
-}) {
-  return (
-    <div className="flex flex-1 flex-col">
-      <div className="px-4 py-2">
-        <span className="font-sans text-lg font-semibold leading-7 text-white">
-          {direction === "shield" ? "Shield" : "Unshield"}
-        </span>
-      </div>
-
-      <div className="flex flex-1 flex-col items-center justify-center">
-        <div className="flex flex-col items-center gap-5 px-8 py-6">
-          <div className="flex items-center gap-4 py-2">
-            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full">
-              <img
-                alt={token.symbol}
-                className="h-full w-full object-cover"
-                height={64}
-                src={token.icon}
-                width={64}
-              />
-            </div>
-            <ChevronRight
-              className="animate-bounce-x text-gray-400"
-              size={16}
-            />
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center">
-              <Shield className="h-12 w-12 text-purple-400" />
-            </div>
-          </div>
-          <div className="flex flex-col items-center gap-1 text-center">
-            <span className="font-sans text-xl font-semibold leading-6 text-white">
-              {direction === "shield" ? "Shielding..." : "Unshielding..."}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="px-5 py-4">
-        <button
-          className="w-full cursor-default rounded-full bg-gray-600 px-4 py-3 font-sans text-base font-normal leading-5 text-white"
-          disabled
-          type="button"
-        >
-          In progress...
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Result (success / error)
-// ---------------------------------------------------------------------------
-
-function ShieldResultView({
-  variant,
-  token,
-  direction,
-  resultAmount,
-  errorMessage,
-  onDone,
-  onDetails,
-}: {
-  variant: "success" | "error";
-  token: SwapToken;
-  direction: "shield" | "unshield";
-  resultAmount: string;
-  errorMessage?: string;
-  onDone: () => void;
-  onDetails: () => void;
-}) {
-  const isSuccess = variant === "success";
-
-  return (
-    <div className="flex flex-1 flex-col">
-      <div className="px-4 py-2">
-        <span className="font-sans text-lg font-semibold leading-7 text-white">
-          {isSuccess
-            ? direction === "shield"
-              ? "Shield"
-              : "Unshield"
-            : "Shield/Unshield"}
-        </span>
-      </div>
-
-      <div className="flex flex-1 flex-col items-center justify-center">
-        <div className="flex flex-col items-center gap-5 px-8 py-6">
-          {/* Status icon */}
-          <div className="flex h-20 w-20 items-center justify-center">
-            {isSuccess ? (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20">
-                <span className="text-3xl text-green-400">&#10003;</span>
-              </div>
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20">
-                <span className="text-3xl text-red-400">!</span>
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col items-center gap-1 text-center">
-            <span className="font-sans text-xl font-semibold leading-6 text-white">
-              {isSuccess
-                ? `${token.symbol} ${direction === "shield" ? "Shielded" : "Unshielded"}`
-                : direction === "shield"
-                  ? "Shielding Failed"
-                  : "Unshielding Failed"}
-            </span>
-            {isSuccess ? (
-              <span className="max-w-[255px] font-sans text-base font-normal leading-5 text-gray-400">
-                <span className="text-white">
-                  {resultAmount} {token.symbol}
-                </span>
-                {` moved to your ${direction === "shield" ? "secure" : "main"} balance`}
-              </span>
-            ) : (
-              <span className="max-w-[255px] font-sans text-base font-normal leading-5 text-gray-400">
-                {errorMessage || "Something went wrong. Please try again."}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2 px-5 py-4">
-        {isSuccess && (
-          <button
-            className="w-full cursor-pointer rounded-full bg-purple-600 px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors hover:bg-purple-700"
-            onClick={onDetails}
-            type="button"
-          >
-            Transaction Details
-          </button>
-        )}
-        <button
-          className={
-            isSuccess
-              ? "w-full cursor-pointer rounded-full bg-white/[0.08] px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors hover:bg-white/[0.12]"
-              : "w-full cursor-pointer rounded-full bg-purple-600 px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors hover:bg-purple-700"
-          }
-          onClick={onDone}
-          type="button"
-        >
-          Done
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Transaction detail view
-// ---------------------------------------------------------------------------
-
-function ShieldTransactionDetail({
-  token,
-  direction,
-  resultAmount,
-  usdValue,
-  onDone,
-}: {
-  token: SwapToken;
-  direction: "shield" | "unshield";
-  resultAmount: string;
-  usdValue: string;
-  onDone: () => void;
-}) {
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-  const timeStr = now.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-
-  return (
-    <div className="flex flex-1 flex-col">
-      {/* Header */}
-      <div className="px-4 py-2">
-        <span className="font-sans text-lg font-semibold leading-7 text-white">
-          {direction === "shield" ? "Shielded" : "Unshielded"}
-        </span>
-      </div>
-
-      <div className="flex flex-1 flex-col items-center overflow-y-auto p-2">
-        {/* Token icon with badge */}
-        <div className="w-full px-3 pt-2">
-          <div className="relative h-14 w-12">
-            <div className="h-12 w-12 overflow-hidden rounded-full">
-              <img
-                alt={token.symbol}
-                className="h-full w-full object-cover"
-                height={48}
-                src={token.icon}
-                width={48}
-              />
-            </div>
-            <Shield className="absolute bottom-0 left-4 h-6 w-6 text-purple-400" />
-          </div>
-        </div>
-
-        {/* Amount hero */}
-        <div className="flex w-full flex-col px-3 pb-6 pt-3">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-baseline gap-2 whitespace-nowrap font-sans font-semibold">
-              <span className="text-[40px] leading-[48px] text-white">
-                {resultAmount}
-              </span>
-              <span className="text-[28px] leading-8 text-gray-500">
-                {token.symbol}
-              </span>
-            </div>
-            <span className="font-sans text-base font-normal leading-5 text-gray-400">
-              ~{usdValue}
-            </span>
-            <span className="font-sans text-base font-normal leading-5 text-gray-400">
-              {dateStr}, {timeStr}
-            </span>
-          </div>
-        </div>
-
-        {/* Details card */}
-        <div className="w-full">
-          <div className="flex flex-col rounded-2xl bg-white/[0.06] py-1">
-            <div className="px-3 py-2">
-              <span className="block font-sans text-[13px] font-normal leading-4 text-gray-400">
-                Status
-              </span>
-              <span className="mt-0.5 block font-sans text-base font-normal leading-5 text-white">
-                Completed
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex w-full items-center pb-4 pt-5">
-          <div className="flex flex-1 flex-col items-center gap-2">
-            <button
-              className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-purple-600/20 transition-colors hover:bg-purple-600/30"
-              onClick={() =>
-                void navigator.clipboard.writeText(
-                  `${direction} ${resultAmount} ${token.symbol}`,
-                )
-              }
-              type="button"
-            >
-              <Share className="text-gray-300" size={24} />
-            </button>
-            <span className="text-center font-sans text-[13px] font-normal leading-4 text-gray-400">
-              Share
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Done button */}
-      <div className="px-5 py-4">
-        <button
-          className="w-full cursor-pointer rounded-full bg-purple-600 px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors hover:bg-purple-700"
-          onClick={onDone}
-          type="button"
-        >
-          Done
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main ShieldContent
-// ---------------------------------------------------------------------------
-
 export function ShieldContent({
+  onClose,
   onDone,
   onNavigate,
   token: tokenProp,
-  onTokenChange: _onTokenChange,
+  onTokenChange,
   securedBalance,
-  swapMode: _swapMode,
-  onSwapModeChange: _onSwapModeChange,
+  swapMode,
+  onSwapModeChange,
   hideFormChrome,
   onFormActiveChange,
   onFormButtonChange,
-}: ShieldContentProps) {
+}: {
+  onClose: () => void;
+  onDone: () => void;
+  onNavigate: (view: SubView) => void;
+  token: SwapToken;
+  onTokenChange: (t: SwapToken) => void;
+  securedBalance: number;
+  swapMode: SwapMode;
+  onSwapModeChange: (mode: SwapMode) => void;
+  hideFormChrome?: boolean;
+  onFormActiveChange?: (isForm: boolean) => void;
+  onFormButtonChange?: (props: FormButtonProps | null) => void;
+}) {
   const { signer, connection, network } = useWalletContext();
 
   // Map extension network to SolanaEnv expected by hooks
   const solanaEnv = network === "mainnet" ? "mainnet" : "devnet";
 
-  const {
-    executeShield: shieldFn,
-    executeUnshield: unshieldFn,
-  } = useShield(signer, connection, solanaEnv);
-
+  const { executeShield: shieldFn, executeUnshield: unshieldFn } = useShield(signer, connection, solanaEnv);
   const [direction, setDirection] = useState<"shield" | "unshield">("shield");
   const [amount, setAmount] = useState("");
   const [phase, setPhase] = useState<ShieldPhase>("form");
@@ -500,10 +456,8 @@ export function ShieldContent({
   const numericAmount = Number.parseFloat(amount) || 0;
   const hasAmount = numericAmount > 0;
 
-  const sourceBalance =
-    direction === "shield" ? token.balance : securedBalance;
-  const destBalance =
-    direction === "shield" ? securedBalance : token.balance;
+  const sourceBalance = direction === "shield" ? token.balance : securedBalance;
+  const destBalance = direction === "shield" ? securedBalance : token.balance;
   const insufficientFunds = numericAmount > sourceBalance;
 
   const usdValue = useMemo(
@@ -512,26 +466,27 @@ export function ShieldContent({
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }),
-    [numericAmount, token.price],
+    [numericAmount, token.price]
   );
 
   const exchangeRate = useMemo(
     () =>
-      `1 ${token.symbol} ~ $${token.price.toLocaleString("en-US", {
+      `1 ${token.symbol} ≈ $${token.price.toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 4,
       })}`,
-    [token.symbol, token.price],
+    [token.symbol, token.price]
   );
 
   const buttonLabel = !hasAmount
     ? "Enter Amount"
     : insufficientFunds
-      ? "Insufficient Funds"
-      : direction === "shield"
-        ? "Confirm and Shield"
-        : "Confirm and Unshield";
+    ? "Insufficient Funds"
+    : direction === "shield"
+    ? "Confirm and Shield"
+    : "Confirm and Unshield";
   const buttonDisabled = !hasAmount || insufficientFunds;
+  const amountColor = insufficientFunds && hasAmount ? red : "#000";
 
   const handleToggleDirection = useCallback(() => {
     setDirection((d) => (d === "shield" ? "unshield" : "shield"));
@@ -543,7 +498,7 @@ export function ShieldContent({
       const val = pct === 100 ? bal : bal * (pct / 100);
       setAmount(val > 0 ? String(Number(val.toFixed(6))) : "");
     },
-    [sourceBalance],
+    [sourceBalance]
   );
 
   const handleConfirm = useCallback(async () => {
@@ -554,7 +509,7 @@ export function ShieldContent({
       `$${(numericAmount * token.price).toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      })}`,
+      })}`
     );
     setErrorMessage(undefined);
     setPhase("processing");
@@ -619,213 +574,998 @@ export function ShieldContent({
     }
   }, [phase]);
 
-  // ---------------------------------------------------------------------------
-  // Phase renderer
-  // ---------------------------------------------------------------------------
-
   const renderPhaseContent = (p: ShieldPhase) => {
     if (p === "processing") {
-      return <ShieldProcessing direction={direction} token={token} />;
+      return (
+        <div
+          style={{ display: "flex", flexDirection: "column", height: "100%" }}
+        >
+          <style>{`
+            .shield-close:hover {
+              background: rgba(0, 0, 0, 0.08) !important;
+            }
+            @keyframes chevronBounce {
+              0%,
+              100% {
+                transform: translateX(0);
+              }
+              50% {
+                transform: translateX(4px);
+              }
+            }
+          `}</style>
+
+          <StatusHeader
+            onClose={onClose}
+            title={direction === "shield" ? "Shield" : "Unshield"}
+          />
+
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "20px",
+                alignItems: "center",
+                padding: "24px 32px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  gap: "16px",
+                  alignItems: "center",
+                  padding: "8px 0",
+                }}
+              >
+                <div
+                  style={{
+                    width: "64px",
+                    height: "64px",
+                    borderRadius: "9999px",
+                    overflow: "hidden",
+                    flexShrink: 0,
+                  }}
+                >
+                  <img
+                    alt={token.symbol}
+                    height={64}
+                    src={token.icon}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                    width={64}
+                  />
+                </div>
+                <ChevronRight
+                  size={16}
+                  style={{
+                    color: secondary,
+                    animation: "chevronBounce 1s ease-in-out infinite",
+                  }}
+                />
+                <img
+                  alt={direction === "shield" ? "Shield" : "Unshield"}
+                  src={
+                    direction === "shield"
+                      ? "/hero-new/Shield.png"
+                      : "/hero-new/Unshield.svg"
+                  }
+                  style={{ width: "64px", height: "64px", flexShrink: 0 }}
+                />
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "4px",
+                  alignItems: "center",
+                  textAlign: "center",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "20px",
+                    fontWeight: 600,
+                    lineHeight: "24px",
+                    color: "#000",
+                  }}
+                >
+                  {direction === "shield" ? "Shielding..." : "Unshielding..."}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: "16px 20px" }}>
+            <button
+              disabled
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: "9999px",
+                background: "#CCCDCD",
+                border: "none",
+                cursor: "default",
+                fontFamily: font,
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "#fff",
+                textAlign: "center",
+              }}
+              type="button"
+            >
+              In progress...
+            </button>
+          </div>
+        </div>
+      );
     }
+
     if (p === "success" || p === "error") {
+      const isSuccess = p === "success";
       return (
-        <ShieldResultView
-          direction={direction}
-          errorMessage={errorMessage}
-          onDetails={() => setPhase("details")}
-          onDone={() => {
-            setPhase("form");
-            onDone();
-          }}
-          resultAmount={resultAmount}
-          token={token}
-          variant={p}
-        />
+        <div
+          style={{ display: "flex", flexDirection: "column", height: "100%" }}
+        >
+          <style>{`
+            .shield-close:hover {
+              background: rgba(0, 0, 0, 0.08) !important;
+            }
+            .shield-done-btn:hover {
+              background: #333 !important;
+            }
+            .shield-done-secondary-btn:hover {
+              background: rgba(0, 0, 0, 0.08) !important;
+            }
+            @keyframes mascotNod {
+              0%,
+              100% {
+                transform: rotate(0deg);
+              }
+              25% {
+                transform: rotate(4deg);
+              }
+              75% {
+                transform: rotate(-4deg);
+              }
+            }
+          `}</style>
+
+          <StatusHeader
+            onClose={onClose}
+            title={
+              isSuccess
+                ? direction === "shield"
+                  ? "Shield"
+                  : "Unshield"
+                : "Shield/Unshield"
+            }
+          />
+
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "20px",
+                alignItems: "center",
+                padding: "24px 32px",
+              }}
+            >
+              <img
+                alt={isSuccess ? "Success" : "Error"}
+                src={
+                  isSuccess ? "/hero-new/success.svg" : "/hero-new/error.svg"
+                }
+                style={{
+                  width: "100px",
+                  height: "80px",
+                  animation: "mascotNod 0.6s ease-in-out 2",
+                  transformOrigin: "center bottom",
+                }}
+              />
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "4px",
+                  alignItems: "center",
+                  textAlign: "center",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "20px",
+                    fontWeight: 600,
+                    lineHeight: "24px",
+                    color: "#000",
+                  }}
+                >
+                  {isSuccess
+                    ? `${token.symbol} ${
+                        direction === "shield" ? "Shielded" : "Unshielded"
+                      }`
+                    : direction === "shield"
+                    ? "Shielding Failed"
+                    : "Unshielding Failed"}
+                </span>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                    maxWidth: "255px",
+                  }}
+                >
+                  {isSuccess ? (
+                    <>
+                      <span style={{ color: "#000" }}>
+                        {resultAmount} {token.symbol}
+                      </span>
+                      {` moved to your ${
+                        direction === "shield" ? "secure" : "main"
+                      } balance`}
+                    </>
+                  ) : (
+                    errorMessage || "Something went wrong. Please try again."
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: "16px 20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}
+          >
+            {isSuccess && (
+              <button
+                className="shield-done-btn"
+                onClick={() => setPhase("details")}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  borderRadius: "9999px",
+                  background: "#000",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: "#fff",
+                  textAlign: "center",
+                  transition: "background 0.15s ease",
+                }}
+                type="button"
+              >
+                Transaction Details
+              </button>
+            )}
+            <button
+              className={
+                isSuccess ? "shield-done-secondary-btn" : "shield-done-btn"
+              }
+              onClick={() => {
+                setPhase("form");
+                onDone();
+              }}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: "9999px",
+                background: isSuccess ? "rgba(0, 0, 0, 0.04)" : "#000",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: font,
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: isSuccess ? "#000" : "#fff",
+                textAlign: "center",
+                transition: "background 0.15s ease",
+              }}
+              type="button"
+            >
+              Done
+            </button>
+          </div>
+        </div>
       );
     }
+
     if (p === "details") {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      const timeStr = now.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
       return (
-        <ShieldTransactionDetail
-          direction={direction}
-          onDone={() => {
-            setPhase("form");
-            onDone();
-          }}
-          resultAmount={resultAmount}
-          token={token}
-          usdValue={resultUsd}
-        />
+        <div
+          style={{ display: "flex", flexDirection: "column", height: "100%" }}
+        >
+          <style>{`
+            .shield-close:hover {
+              background: rgba(0, 0, 0, 0.08) !important;
+            }
+            .shield-done-btn:hover {
+              background: #333 !important;
+            }
+          `}</style>
+
+          <StatusHeader
+            onClose={onClose}
+            title={direction === "shield" ? "Shielded" : "Unshielded"}
+          />
+
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              padding: "8px",
+              overflowY: "auto",
+            }}
+          >
+            {/* Token icon with badge */}
+            <div style={{ padding: "8px 12px 0" }}>
+              <div
+                style={{ position: "relative", width: "48px", height: "56px" }}
+              >
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "9999px",
+                    overflow: "hidden",
+                  }}
+                >
+                  <img
+                    alt={token.symbol}
+                    height={48}
+                    src={token.icon}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                    width={48}
+                  />
+                </div>
+                <img
+                  alt={direction === "shield" ? "Shielded" : "Unshielded"}
+                  src={
+                    direction === "shield"
+                      ? "/hero-new/Shield.png"
+                      : "/hero-new/Unshield.svg"
+                  }
+                  style={{
+                    width: "24px",
+                    height: "24px",
+                    position: "absolute",
+                    bottom: "0",
+                    left: "16px",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Amount hero */}
+            <div style={{ padding: "12px 12px 24px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: "8px",
+                  fontFamily: font,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "40px",
+                    lineHeight: "48px",
+                    color: "#000",
+                  }}
+                >
+                  {resultAmount}
+                </span>
+                <span
+                  style={{
+                    fontSize: "28px",
+                    lineHeight: "32px",
+                    color: "rgba(60, 60, 67, 0.4)",
+                    letterSpacing: "0.4px",
+                  }}
+                >
+                  {token.symbol}
+                </span>
+              </div>
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: secondary,
+                  display: "block",
+                  marginTop: "4px",
+                }}
+              >
+                ≈{resultUsd}
+              </span>
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "16px",
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  color: secondary,
+                  display: "block",
+                }}
+              >
+                {dateStr}, {timeStr}
+              </span>
+            </div>
+
+            {/* Status card */}
+            <div
+              style={{
+                background: "rgba(0, 0, 0, 0.04)",
+                borderRadius: "16px",
+                padding: "4px 0",
+              }}
+            >
+              <div style={{ padding: "9px 12px" }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    lineHeight: "16px",
+                    color: secondary,
+                    display: "block",
+                  }}
+                >
+                  Status
+                </span>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: "#000",
+                    display: "block",
+                    marginTop: "2px",
+                  }}
+                >
+                  Completed
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Done button */}
+          <div style={{ padding: "16px 20px" }}>
+            <button
+              className="shield-done-btn"
+              onClick={() => {
+                setPhase("form");
+                onDone();
+              }}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: "9999px",
+                background: "#000",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: font,
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "#fff",
+                textAlign: "center",
+                transition: "background 0.15s ease",
+              }}
+              type="button"
+            >
+              Done
+            </button>
+          </div>
+        </div>
       );
     }
 
-    // -----------------------------------------------------------------------
     // Form phase
-    // -----------------------------------------------------------------------
-    const amountTextColor =
-      insufficientFunds && hasAmount ? "text-red-400" : "text-white";
-    const toAmountColor =
-      insufficientFunds && hasAmount
-        ? "text-red-400"
-        : hasAmount
-          ? "text-white"
-          : "text-gray-400";
-
     return (
-      <div className="flex flex-1 flex-col">
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <style>{`
+          .shield-close:hover {
+            background: rgba(0, 0, 0, 0.08) !important;
+          }
+          .pct-btn:hover {
+            opacity: 0.7;
+          }
+          .swap-circle:hover {
+            background: #333 !important;
+          }
+          .confirm-btn:not(:disabled):hover {
+            background: #333 !important;
+          }
+        `}</style>
+
+        {/* Header with tabs — hidden when parent owns chrome */}
+        {!hideFormChrome && (
+          <SwapShieldTabs
+            mode={swapMode}
+            onClose={onClose}
+            onModeChange={onSwapModeChange}
+          />
+        )}
+
         {/* Body */}
-        <div className="flex flex-1 flex-col gap-0 overflow-auto px-2 pb-4 pt-2">
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: "0",
+            overflow: "auto",
+            padding: "8px 8px 16px",
+          }}
+        >
           {/* Input cards container */}
-          <div className="relative isolate flex flex-col gap-2 overflow-visible">
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+              position: "relative",
+              isolation: "isolate",
+              overflow: "visible",
+            }}
+          >
             {/* From card */}
-            <div className="relative z-[2] rounded-2xl bg-white/[0.06] px-3 py-2.5">
-              <div className="flex items-center justify-between whitespace-nowrap font-sans font-normal leading-5">
-                <span className="text-base text-gray-400">
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                padding: "10px 12px",
+                position: "relative",
+                zIndex: 2,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  fontFamily: font,
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ fontSize: "16px", color: secondary }}>
                   {direction === "shield" ? "You shield" : "You unshield"}
                 </span>
                 <div
-                  className="flex items-center gap-4 text-sm"
-                  style={{ color: red }}
+                  style={{
+                    display: "flex",
+                    gap: "16px",
+                    alignItems: "center",
+                    fontSize: "14px",
+                    color: red,
+                  }}
                 >
                   <button
-                    className="cursor-pointer border-none bg-transparent p-0 font-sans text-sm font-normal opacity-80 hover:opacity-100"
+                    className="pct-btn"
                     onClick={() => handlePercentage(25)}
-                    style={{ color: red }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: red,
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      padding: 0,
+                    }}
                     type="button"
                   >
                     25%
                   </button>
                   <button
-                    className="cursor-pointer border-none bg-transparent p-0 font-sans text-sm font-normal opacity-80 hover:opacity-100"
+                    className="pct-btn"
                     onClick={() => handlePercentage(50)}
-                    style={{ color: red }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: red,
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      padding: 0,
+                    }}
                     type="button"
                   >
                     50%
                   </button>
                   <button
-                    className="cursor-pointer border-none bg-transparent p-0 font-sans text-sm font-normal opacity-80 hover:opacity-100"
+                    className="pct-btn"
                     onClick={() => handlePercentage(100)}
-                    style={{ color: red }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: red,
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      padding: 0,
+                    }}
                     type="button"
                   >
                     Max
                   </button>
                 </div>
               </div>
-              <div className="flex h-12 items-center gap-1">
+              <div
+                style={{
+                  display: "flex",
+                  gap: "4px",
+                  height: "48px",
+                  alignItems: "center",
+                }}
+              >
                 <input
-                  className={`min-w-0 flex-1 border-none bg-transparent p-0 font-sans text-[32px] font-semibold leading-9 outline-none placeholder:text-gray-500 ${amountTextColor}`}
                   inputMode="decimal"
                   onChange={(e) => {
                     const v = e.target.value;
                     if (v === "" || /^\d*\.?\d*$/.test(v)) setAmount(v);
                   }}
                   placeholder="0"
+                  style={{
+                    flex: 1,
+                    fontFamily: font,
+                    fontSize: "32px",
+                    fontWeight: 600,
+                    lineHeight: "36px",
+                    color: amountColor,
+                    background: "none",
+                    border: "none",
+                    outline: "none",
+                    padding: 0,
+                    minWidth: 0,
+                  }}
                   type="text"
                   value={amount}
                 />
                 {direction === "shield" ? (
                   <SelectableTokenPill
-                    onClick={() =>
-                      onNavigate({ type: "shieldTokenSelect" })
-                    }
+                    onClick={() => onNavigate({ type: "shieldTokenSelect" })}
                     token={token}
                   />
                 ) : (
                   <ShieldedSelectableTokenPill
-                    onClick={() =>
-                      onNavigate({ type: "shieldTokenSelect" })
-                    }
+                    onClick={() => onNavigate({ type: "shieldTokenSelect" })}
                     token={token}
                   />
                 )}
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/[0.08]">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div
+                  style={{ display: "flex", gap: "6px", alignItems: "center" }}
+                >
+                  <div
+                    style={{
+                      width: "20px",
+                      height: "20px",
+                      borderRadius: "9999px",
+                      background: "#F5F5F5",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
                     <ArrowDownUp
-                      className="text-gray-400 opacity-40"
                       size={12}
+                      style={{ color: secondary, opacity: 0.4 }}
                     />
                   </div>
-                  <span className="font-sans text-sm font-normal leading-5 text-gray-400">
+                  <span
+                    style={{
+                      fontFamily: font,
+                      fontSize: "14px",
+                      fontWeight: 400,
+                      lineHeight: "20px",
+                      color: secondary,
+                    }}
+                  >
                     {exchangeRate}
                   </span>
                 </div>
-                <span className="font-sans text-sm font-normal leading-5 text-gray-400">
-                  Balance: {sourceBalance.toLocaleString()}
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
+                  Balance: {sourceBalance.toLocaleString()}{" "}
                 </span>
               </div>
 
               {/* Swap circle — toggles shield/unshield */}
               <button
-                className="absolute -bottom-[18px] left-[calc(50%+4px)] z-[3] flex h-7 w-7 -translate-x-1/2 cursor-pointer items-center justify-center rounded-full border-none bg-purple-600 transition-colors hover:bg-purple-700"
+                className="swap-circle"
                 onClick={handleToggleDirection}
+                style={{
+                  position: "absolute",
+                  bottom: "-18px",
+                  left: "calc(50% + 4px)",
+                  transform: "translateX(-50%)",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "9999px",
+                  background: "#000",
+                  border: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  zIndex: 3,
+                  transition: "background 0.15s ease",
+                }}
                 type="button"
               >
-                <ArrowDownUp className="text-white" size={16} />
+                <ArrowDownUp size={16} style={{ color: "#fff" }} />
               </button>
             </div>
 
             {/* To card */}
-            <div className="z-[1] rounded-2xl border border-white/[0.08] p-3">
-              <div className="flex items-center">
-                <span className="font-sans text-base font-normal leading-5 text-gray-400">
+            <div
+              style={{
+                border: "1px solid rgba(0, 0, 0, 0.08)",
+                borderRadius: "16px",
+                padding: "12px",
+                zIndex: 1,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
                   You receive
                 </span>
               </div>
-              <div className="flex h-12 items-center gap-1">
+              <div
+                style={{
+                  display: "flex",
+                  gap: "4px",
+                  height: "48px",
+                  alignItems: "center",
+                }}
+              >
                 <span
-                  className={`min-w-0 flex-1 font-sans text-[32px] font-semibold leading-9 ${toAmountColor}`}
+                  style={{
+                    flex: 1,
+                    fontFamily: font,
+                    fontSize: "32px",
+                    fontWeight: 600,
+                    lineHeight: "36px",
+                    color:
+                      insufficientFunds && hasAmount
+                        ? red
+                        : hasAmount
+                        ? "#000"
+                        : "rgba(60, 60, 67, 0.4)",
+                    minWidth: 0,
+                  }}
                 >
                   {hasAmount ? amount : "0"}
                 </span>
                 {direction === "shield" ? (
                   <ShieldedTokenPill token={token} />
                 ) : (
-                  <div className="flex shrink-0 items-center px-1">
-                    <div className="flex items-center px-1 py-1 pr-1.5">
-                      <div className="h-7 w-7 overflow-hidden rounded-full">
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "0 4px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        paddingRight: "6px",
+                        padding: "4px 6px 4px 4px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "9999px",
+                          overflow: "hidden",
+                        }}
+                      >
                         <img
                           alt={token.symbol}
-                          className="h-full w-full object-cover"
                           height={28}
                           src={token.icon}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
                           width={28}
                         />
                       </div>
                     </div>
-                    <span className="whitespace-nowrap py-2 font-sans text-base font-medium leading-5 text-white">
+                    <span
+                      style={{
+                        fontFamily: font,
+                        fontSize: "16px",
+                        fontWeight: 500,
+                        lineHeight: "20px",
+                        color: "#000",
+                        letterSpacing: "-0.176px",
+                        whiteSpace: "nowrap",
+                        padding: "8px 0",
+                      }}
+                    >
                       {token.symbol}
                     </span>
                   </div>
                 )}
               </div>
-              <div className="flex items-center justify-between">
-                <span className="font-sans text-sm font-normal leading-5 text-gray-400">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
                   ${hasAmount ? usdValue : "0"}
                 </span>
-                <span className="font-sans text-sm font-normal leading-5 text-gray-400">
-                  Balance: {destBalance.toLocaleString()}
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "14px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: secondary,
+                  }}
+                >
+                  Balance: {destBalance.toLocaleString()}{" "}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Spacer */}
-          <div className="flex-1" />
+          {/* Spacer to push info card to bottom */}
+          <div style={{ flex: 1 }} />
 
           {/* Info card about shielded assets */}
-          <div className="px-3">
-            <div className="flex items-center overflow-hidden rounded-2xl bg-white/[0.06] px-3">
-              <div className="shrink-0 py-1 pr-3">
-                <Shield className="h-10 w-10 text-purple-400" />
+          <div style={{ padding: "0 12px" }}>
+            <div
+              style={{
+                background: "rgba(0, 0, 0, 0.04)",
+                borderRadius: "16px",
+                display: "flex",
+                alignItems: "center",
+                padding: "0 12px",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  paddingRight: "12px",
+                  padding: "4px 12px 4px 0",
+                  flexShrink: 0,
+                }}
+              >
+                <img
+                  alt=""
+                  src="/hero-new/Shield.png"
+                  style={{ width: "40px", height: "40px" }}
+                />
               </div>
-              <div className="flex flex-1 flex-col gap-0.5 py-2.5">
-                <span className="font-sans text-base font-normal leading-5 text-white">
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "2px",
+                  padding: "10px 0",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "16px",
+                    fontWeight: 400,
+                    lineHeight: "20px",
+                    color: "#000",
+                  }}
+                >
                   What are Shielded Assets?
                 </span>
-                <span className="font-sans text-[13px] font-normal leading-4 text-gray-400">
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    lineHeight: "16px",
+                    color: secondary,
+                  }}
+                >
                   When you shield assets, they move to your private balance.
                   This enables private transactions without revealing your
                   address or sensitive data on-chain.
@@ -837,15 +1577,26 @@ export function ShieldContent({
 
         {/* Bottom button — hidden when parent owns chrome */}
         {!hideFormChrome && (
-          <div className="px-5 py-4">
+          <div style={{ padding: "16px 20px" }}>
             <button
-              className={`w-full rounded-full px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors ${
-                buttonDisabled
-                  ? "cursor-default bg-gray-600"
-                  : "cursor-pointer bg-purple-600 hover:bg-purple-700"
-              }`}
+              className="confirm-btn"
               disabled={buttonDisabled}
               onClick={handleConfirm}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                borderRadius: "9999px",
+                background: buttonDisabled ? "#CCCDCD" : "#000",
+                border: "none",
+                cursor: buttonDisabled ? "default" : "pointer",
+                fontFamily: font,
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "#fff",
+                textAlign: "center",
+                transition: "background 0.15s ease",
+              }}
               type="button"
             >
               {buttonLabel}
@@ -858,8 +1609,11 @@ export function ShieldContent({
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col"
       style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
         opacity: phaseOpacity,
         transition: "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
       }}

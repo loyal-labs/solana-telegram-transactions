@@ -1,29 +1,14 @@
-import {
-  ArrowDownUp,
-  ChevronRight,
-  Globe,
-  Send,
-  Share,
-  Wallet,
-  X,
-} from "lucide-react";
+import { ArrowDownUp, ChevronRight, Globe, Send, Share, Wallet, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type {
-  ActivityRow,
-  SubView,
-  SwapToken,
-  TransactionDetail,
-} from "@loyal-labs/wallet-core/types";
-import { useSend } from "@loyal-labs/wallet-core/hooks";
-import { usePrivateSend } from "@loyal-labs/wallet-core/hooks";
+import { useSend, usePrivateSend } from "@loyal-labs/wallet-core/hooks";
+
+import type { ActivityRow, SubView, SwapToken, TransactionDetail } from "@loyal-labs/wallet-core/types";
 
 import { useWalletContext } from "~/src/components/wallet/wallet-provider";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
+const font = "var(--font-geist-sans), sans-serif";
+const secondary = "rgba(60, 60, 67, 0.6)";
 const red = "#F9363C";
 
 function isValidSolanaAddress(value: string): boolean {
@@ -36,52 +21,86 @@ function isTelegramUsername(value: string): boolean {
 
 function truncateAddress(addr: string): string {
   if (addr.length <= 10) return addr;
-  return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
+  return `${addr.slice(0, 4)}…${addr.slice(-4)}`;
 }
 
 type SendPhase = "form" | "processing" | "success" | "error" | "details";
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
-export interface SendContentProps {
-  token: SwapToken;
-  onNavigate: (view: SubView) => void;
-  onDone: () => void;
-  addLocalActivity?: (row: ActivityRow, detail: TransactionDetail) => void;
+function SendStatusHeader({
+  title,
+  onClose,
+}: {
+  title: string;
+  onClose: () => void;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px" }}>
+      <div style={{ flex: 1, paddingLeft: "12px", paddingTop: "4px", paddingBottom: "4px", minWidth: 0 }}>
+        <span style={{ fontFamily: font, fontSize: "18px", fontWeight: 600, lineHeight: "28px", color: "#000", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {title}
+        </span>
+      </div>
+      <button
+        className="send-status-close"
+        onClick={onClose}
+        style={{ width: "36px", height: "36px", display: "flex", justifyContent: "center", alignItems: "center", background: "rgba(0, 0, 0, 0.04)", border: "none", borderRadius: "9999px", cursor: "pointer", transition: "all 0.2s ease", color: "#3C3C43", flexShrink: 0 }}
+        type="button"
+      >
+        <X size={24} />
+      </button>
+    </div>
+  );
 }
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function SendProcessing({ token }: { token: SwapToken }) {
+function SendProcessing({
+  token,
+  onClose,
+}: {
+  token: SwapToken;
+  onClose: () => void;
+}) {
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex flex-1 flex-col items-center justify-center">
-        <div className="flex flex-col items-center gap-5 px-8 py-6">
-          <div className="flex h-20 w-20 items-center justify-center">
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <style>{`
+        .send-status-close:hover { background: rgba(0, 0, 0, 0.08) !important; }
+        @keyframes sendSpin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
+
+      <SendStatusHeader onClose={onClose} title="Send" />
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", padding: "24px 32px" }}>
+          <div style={{ width: "80px", height: "80px", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div
-              className="h-12 w-12 animate-spin rounded-full border-4 border-transparent"
-              style={{ borderTopColor: red, borderRightColor: red }}
+              style={{
+                width: "48px",
+                height: "48px",
+                border: "4px solid transparent",
+                borderTopColor: red,
+                borderRightColor: red,
+                borderRadius: "9999px",
+                animation: "sendSpin 1s linear infinite",
+              }}
             />
           </div>
-          <div className="flex flex-col items-center gap-1 text-center">
-            <span className="font-sans text-xl font-semibold leading-6 text-white">
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "center", textAlign: "center" }}>
+            <span style={{ fontFamily: font, fontSize: "20px", fontWeight: 600, lineHeight: "24px", color: "#000" }}>
               {token.symbol} is on its way
             </span>
-            <span className="max-w-[285px] font-sans text-base font-normal leading-5 text-gray-400">
+            <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary, maxWidth: "285px" }}>
               Your transaction is being processed and will be completed shortly
             </span>
           </div>
         </div>
       </div>
 
-      <div className="px-5 py-4">
+      <div style={{ padding: "16px 20px" }}>
         <button
-          className="w-full cursor-default rounded-full bg-gray-600 px-4 py-3 font-sans text-base font-normal leading-5 text-white"
           disabled
+          style={{ width: "100%", padding: "12px 16px", borderRadius: "9999px", background: "#CCCDCD", border: "none", cursor: "default", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#fff", textAlign: "center" }}
           type="button"
         >
           In progress...
@@ -98,6 +117,7 @@ function SendResult({
   recipient,
   isTgRecipient,
   errorMessage,
+  onClose,
   onDone,
   onDetails,
 }: {
@@ -107,44 +127,48 @@ function SendResult({
   recipient: string;
   isTgRecipient: boolean;
   errorMessage?: string;
+  onClose: () => void;
   onDone: () => void;
   onDetails: () => void;
 }) {
   const isSuccess = variant === "success";
-  const displayRecipient = isTgRecipient
-    ? recipient
-    : truncateAddress(recipient);
+  const displayRecipient = isTgRecipient ? recipient : truncateAddress(recipient);
+  const headerTitle = isSuccess ? `Send to ${displayRecipient}` : "Send";
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex flex-1 flex-col items-center justify-center">
-        <div className="flex flex-col items-center gap-5 px-8 py-6">
-          {/* Status icon */}
-          <div className="flex h-20 w-20 items-center justify-center">
-            {isSuccess ? (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20">
-                <span className="text-3xl text-green-400">&#10003;</span>
-              </div>
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20">
-                <span className="text-3xl text-red-400">!</span>
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col items-center gap-1 text-center">
-            <span className="font-sans text-xl font-semibold leading-6 text-white">
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <style>{`
+        .send-status-close:hover { background: rgba(0, 0, 0, 0.08) !important; }
+        .send-done-btn:hover { background: #333 !important; }
+        .send-done-secondary-btn:hover { background: rgba(0, 0, 0, 0.08) !important; }
+        @keyframes mascotNod {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(4deg); }
+          75% { transform: rotate(-4deg); }
+        }
+      `}</style>
+
+      <SendStatusHeader onClose={onClose} title={headerTitle} />
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", padding: "24px 32px" }}>
+          <img
+            alt={isSuccess ? "Success" : "Error"}
+            src={isSuccess ? "/hero-new/success.svg" : "/hero-new/error.svg"}
+            style={{ width: "100px", height: "80px", animation: "mascotNod 0.6s ease-in-out 2", transformOrigin: "center bottom" }}
+          />
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "center", textAlign: "center" }}>
+            <span style={{ fontFamily: font, fontSize: "20px", fontWeight: 600, lineHeight: "24px", color: "#000" }}>
               {isSuccess ? `${token.symbol} sent` : "Send failed"}
             </span>
             {isSuccess ? (
-              <span className="max-w-[255px] font-sans text-base font-normal leading-5 text-gray-400">
-                <span className="text-white">
-                  {amount} {token.symbol}
-                </span>
+              <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary, maxWidth: "255px" }}>
+                <span style={{ color: "#000" }}>{amount} {token.symbol}</span>
                 {" successfully sent to "}
-                <span className="text-white">{displayRecipient}</span>
+                <span style={{ color: "#000" }}>{displayRecipient}</span>
               </span>
             ) : (
-              <span className="max-w-[255px] font-sans text-base font-normal leading-5 text-gray-400">
+              <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary, maxWidth: "255px" }}>
                 {errorMessage || "Something went wrong. Please try again."}
               </span>
             )}
@@ -152,23 +176,35 @@ function SendResult({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 px-5 py-4">
+      <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: "8px" }}>
         {isSuccess && (
           <button
-            className="w-full cursor-pointer rounded-full bg-purple-600 px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors hover:bg-purple-700"
+            className="send-done-btn"
             onClick={onDetails}
+            style={{ width: "100%", padding: "12px 16px", borderRadius: "9999px", background: "#000", border: "none", cursor: "pointer", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#fff", textAlign: "center", transition: "background 0.15s ease" }}
             type="button"
           >
             Transaction Details
           </button>
         )}
         <button
-          className={
-            isSuccess
-              ? "w-full cursor-pointer rounded-full bg-white/[0.08] px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors hover:bg-white/[0.12]"
-              : "w-full cursor-pointer rounded-full bg-purple-600 px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors hover:bg-purple-700"
-          }
+          className={isSuccess ? "send-done-secondary-btn" : "send-done-btn"}
           onClick={onDone}
+          style={{
+            width: "100%",
+            padding: "12px 16px",
+            borderRadius: "9999px",
+            background: isSuccess ? "rgba(0, 0, 0, 0.04)" : "#000",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: font,
+            fontSize: "16px",
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: isSuccess ? "#000" : "#fff",
+            textAlign: "center",
+            transition: "background 0.15s ease",
+          }}
           type="button"
         >
           Done
@@ -186,6 +222,7 @@ function SendTransactionDetail({
   usdValue,
   signature,
   isPrivate,
+  onClose,
   onDone,
 }: {
   token: SwapToken;
@@ -195,137 +232,99 @@ function SendTransactionDetail({
   usdValue: string;
   signature?: string;
   isPrivate?: boolean;
+  onClose: () => void;
   onDone: () => void;
 }) {
-  const displayRecipient = isTgRecipient
-    ? recipient
-    : truncateAddress(recipient);
+  const displayRecipient = isTgRecipient ? recipient : truncateAddress(recipient);
   const now = new Date();
-  const dateStr = now.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-  const timeStr = now.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
 
   return (
-    <div className="flex flex-1 flex-col">
-      {/* Header */}
-      <div className="px-4 py-2">
-        <span className="font-sans text-lg font-semibold leading-7 text-white">
-          Send to {displayRecipient}
-        </span>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <style>{`
+        .send-status-close:hover { background: rgba(0, 0, 0, 0.08) !important; }
+        .send-tx-action-btn:hover { background: rgba(249, 54, 60, 0.22) !important; }
+        .send-tx-done-btn:hover { background: #333 !important; }
+      `}</style>
 
-      <div className="flex flex-1 flex-col items-center overflow-y-auto p-2">
+      <SendStatusHeader onClose={onClose} title={`Send to ${displayRecipient}`} />
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px", overflowY: "auto" }}>
         {/* Amount hero */}
-        <div className="flex w-full flex-col px-3 pb-6 pt-8">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-baseline gap-2 whitespace-nowrap font-sans font-semibold">
-              <span className="text-[40px] leading-[48px]" style={{ color: red }}>
-                -{amount}
-              </span>
-              <span className="text-[28px] leading-8 text-gray-500">
-                {token.symbol}
-              </span>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 12px 24px", width: "100%" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "100%" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "8px", fontFamily: font, fontWeight: 600, whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: "40px", lineHeight: "48px", color: red }}>−{amount}</span>
+              <span style={{ fontSize: "28px", lineHeight: "32px", color: "rgba(60, 60, 67, 0.4)", letterSpacing: "0.4px" }}>{token.symbol}</span>
             </div>
-            <span className="font-sans text-base font-normal leading-5 text-gray-400">
-              ~{usdValue}
-            </span>
-            <span className="font-sans text-base font-normal leading-5 text-gray-400">
-              {dateStr}, {timeStr}
-            </span>
+            <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary }}>≈{usdValue}</span>
+            <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary }}>{dateStr}, {timeStr}</span>
           </div>
         </div>
 
         {/* Details card */}
-        <div className="w-full">
-          <div className="flex flex-col rounded-2xl bg-white/[0.06] py-1">
-            <div className="px-3 py-2">
-              <span className="block font-sans text-[13px] font-normal leading-4 text-gray-400">
-                Recipient
-              </span>
-              <span className="mt-0.5 block break-all font-sans text-base font-normal leading-5 text-white">
-                {recipient}
-              </span>
+        <div style={{ width: "100%" }}>
+          <div style={{ background: "rgba(0, 0, 0, 0.04)", borderRadius: "16px", padding: "4px 0", display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "9px 12px" }}>
+              <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, display: "block" }}>Recipient</span>
+              <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#000", display: "block", marginTop: "2px", wordBreak: "break-all" }}>{recipient}</span>
             </div>
-            <div className="px-3 py-2">
-              <span className="block font-sans text-[13px] font-normal leading-4 text-gray-400">
-                Status
-              </span>
-              <span className="mt-0.5 block font-sans text-base font-normal leading-5 text-white">
-                Completed
-              </span>
+            <div style={{ padding: "9px 12px" }}>
+              <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, display: "block" }}>Status</span>
+              <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#000", display: "block", marginTop: "2px" }}>Completed</span>
             </div>
-            <div className="px-3 py-2">
-              <span className="block font-sans text-[13px] font-normal leading-4 text-gray-400">
-                Network Fee
-              </span>
-              <div className="mt-0.5 flex items-center gap-1 font-sans text-base font-normal leading-5">
-                <span className="text-white">0.00005 SOL</span>
-                <span className="text-gray-400">~ $0.00</span>
+            <div style={{ padding: "9px 12px" }}>
+              <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, display: "block" }}>Network Fee</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px" }}>
+                <span style={{ color: "#000" }}>0.00005 SOL</span>
+                <span style={{ color: secondary }}>≈ $0.00</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Action buttons */}
-        <div className="flex w-full items-center pb-4 pt-5">
+        <div style={{ display: "flex", alignItems: "center", paddingTop: "20px", paddingBottom: "16px", width: "100%" }}>
           {!isPrivate && (
-            <div className="flex flex-1 flex-col items-center gap-2">
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
               <button
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-600/20 transition-colors hover:bg-purple-600/30"
-                onClick={() =>
-                  signature &&
-                  window.open(
-                    `https://explorer.solana.com/tx/${signature}`,
-                    "_blank",
-                  )
-                }
-                style={{ opacity: signature ? 1 : 0.5 }}
+                className="send-tx-action-btn"
+                onClick={() => signature && window.open(`https://explorer.solana.com/tx/${signature}`, "_blank")}
+                style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: signature ? "pointer" : "default", opacity: signature ? 1 : 0.5, transition: "background-color 0.15s ease" }}
                 type="button"
               >
-                <Globe className="text-gray-300" size={24} />
+                <Globe size={24} style={{ color: "#3C3C43" }} />
               </button>
-              <span className="text-center font-sans text-[13px] font-normal leading-4 text-gray-400">
-                View in explorer
-              </span>
+              <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, textAlign: "center" }}>View in explorer</span>
             </div>
           )}
-          <div className="flex flex-1 flex-col items-center gap-2">
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
             <button
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-600/20 transition-colors hover:bg-purple-600/30"
+              className="send-tx-action-btn"
               onClick={() => {
                 if (isPrivate) {
-                  void navigator.clipboard.writeText(
-                    `Sent ${amount} ${token.symbol} to ${displayRecipient} (${usdValue})`,
-                  );
+                  void navigator.clipboard.writeText(`Sent ${amount} ${token.symbol} to ${displayRecipient} (${usdValue})`);
                 } else if (signature) {
-                  void navigator.clipboard.writeText(
-                    `https://explorer.solana.com/tx/${signature}`,
-                  );
+                  void navigator.clipboard.writeText(`https://explorer.solana.com/tx/${signature}`);
                 }
               }}
-              style={{ opacity: isPrivate || signature ? 1 : 0.5 }}
+              style={{ width: "48px", height: "48px", borderRadius: "9999px", background: "rgba(249, 54, 60, 0.14)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: isPrivate || signature ? "pointer" : "default", opacity: isPrivate || signature ? 1 : 0.5, transition: "background-color 0.15s ease" }}
               type="button"
             >
-              <Share className="text-gray-300" size={24} />
+              <Share size={24} style={{ color: "#3C3C43" }} />
             </button>
-            <span className="text-center font-sans text-[13px] font-normal leading-4 text-gray-400">
-              Share
-            </span>
+            <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary, textAlign: "center" }}>Share</span>
           </div>
         </div>
       </div>
 
       {/* Done button */}
-      <div className="px-5 py-4">
+      <div style={{ padding: "16px 20px" }}>
         <button
-          className="w-full cursor-pointer rounded-full bg-purple-600 px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors hover:bg-purple-700"
+          className="send-tx-done-btn"
           onClick={onDone}
+          style={{ width: "100%", padding: "12px 16px", borderRadius: "9999px", background: "#000", border: "none", cursor: "pointer", fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#fff", textAlign: "center", transition: "background 0.15s ease" }}
           type="button"
         >
           Done
@@ -335,16 +334,19 @@ function SendTransactionDetail({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main SendContent
-// ---------------------------------------------------------------------------
-
 export function SendContent({
+  onClose,
   onDone,
   onNavigate,
   token,
   addLocalActivity,
-}: SendContentProps) {
+}: {
+  onClose: () => void;
+  onDone: () => void;
+  onNavigate: (view: SubView) => void;
+  token: SwapToken;
+  addLocalActivity?: (row: ActivityRow, detail: TransactionDetail) => void;
+}) {
   const { signer, connection, network } = useWalletContext();
 
   // Map extension network to SolanaEnv expected by hooks
@@ -352,7 +354,6 @@ export function SendContent({
 
   const { executeSend } = useSend(signer, connection);
   const { executePrivateSend } = usePrivateSend(signer, connection, solanaEnv);
-
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
@@ -367,12 +368,9 @@ export function SendContent({
   const numericAmount = Number.parseFloat(amount) || 0;
   const hasAmount = numericAmount > 0;
   const insufficientFunds = numericAmount > token.balance;
-  const amountTextColor = insufficientFunds && hasAmount ? "text-red-400" : "text-white";
+  const amountColor = insufficientFunds && hasAmount ? red : "#000";
 
-  const usdValue = useMemo(
-    () => (numericAmount * token.price).toFixed(2),
-    [numericAmount, token.price],
-  );
+  const usdValue = useMemo(() => (numericAmount * token.price).toFixed(2), [numericAmount, token.price]);
 
   const recipientTrimmed = recipient.trim();
   const hasRecipient = recipientTrimmed.length > 0;
@@ -394,8 +392,7 @@ export function SendContent({
           : isTgNonSol
             ? "Only SOL for Telegram"
             : "Send";
-  const buttonDisabled =
-    !hasAmount || insufficientFunds || !isValidRecipient || isTgNonSol;
+  const buttonDisabled = !hasAmount || insufficientFunds || !isValidRecipient || isTgNonSol;
 
   const handlePercentage = useCallback(
     (pct: number) => {
@@ -407,14 +404,7 @@ export function SendContent({
 
   const handleConfirm = useCallback(async () => {
     const currentAmount = hasAmount ? String(numericAmount) : "0";
-    const currentUsd = `$${
-      hasAmount
-        ? (numericAmount * token.price).toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })
-        : "0"
-    }`;
+    const currentUsd = `$${hasAmount ? (numericAmount * token.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0"}`;
     setResultAmount(currentAmount);
     setResultUsd(currentUsd);
     setResultRecipient(recipientTrimmed);
@@ -424,9 +414,7 @@ export function SendContent({
     setPhase("processing");
 
     const destinationType = isTg ? "telegram" : "wallet";
-    const cleanRecipient = isTg
-      ? recipientTrimmed.replace(/^@/, "")
-      : recipientTrimmed;
+    const cleanRecipient = isTg ? recipientTrimmed.replace(/^@/, "") : recipientTrimmed;
 
     let result: { success: boolean; signature?: string; error?: string };
 
@@ -461,16 +449,9 @@ export function SendContent({
           type: "sent",
           counterparty: cleanRecipient,
           amount: `-${currentAmount} ${token.symbol}`,
-          timestamp: now.toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-          }),
-          date: now.toLocaleDateString("en-US", {
-            month: "long",
-            day: "numeric",
-          }),
-          icon: "",
+          timestamp: now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }),
+          date: now.toLocaleDateString("en-US", { month: "long", day: "numeric" }),
+          icon: "/hero-new/Shield_40.svg",
           isPrivate: true,
           rawTimestamp: now.getTime(),
         };
@@ -488,25 +469,12 @@ export function SendContent({
       setErrorMessage(result.error);
       setPhase("error");
     }
-  }, [
-    hasAmount,
-    numericAmount,
-    token.price,
-    token.symbol,
-    token.mint,
-    recipientTrimmed,
-    isTg,
-    isPrivate,
-    executeSend,
-    executePrivateSend,
-    addLocalActivity,
-  ]);
+  }, [hasAmount, numericAmount, token.price, token.symbol, token.mint, recipientTrimmed, isTg, isPrivate, executeSend, executePrivateSend, addLocalActivity]);
 
   // Cross-fade between phases
   const [phaseOpacity, setPhaseOpacity] = useState(1);
   const [displayPhase, setDisplayPhase] = useState<SendPhase>(phase);
   const prevPhase = useRef(phase);
-
   useEffect(() => {
     if (phase !== prevPhase.current) {
       setPhaseOpacity(0);
@@ -521,7 +489,7 @@ export function SendContent({
 
   const renderPhaseContent = (p: SendPhase) => {
     if (p === "processing") {
-      return <SendProcessing token={token} />;
+      return <SendProcessing onClose={onClose} token={token} />;
     }
     if (p === "success" || p === "error") {
       return (
@@ -529,6 +497,7 @@ export function SendContent({
           amount={resultAmount}
           errorMessage={errorMessage}
           isTgRecipient={resultIsTg}
+          onClose={onClose}
           onDetails={() => setPhase("details")}
           onDone={onDone}
           recipient={resultRecipient}
@@ -543,6 +512,7 @@ export function SendContent({
           amount={resultAmount}
           isPrivate={isPrivate}
           isTgRecipient={resultIsTg}
+          onClose={onClose}
           onDone={onDone}
           recipient={resultRecipient}
           signature={resultSignature}
@@ -552,120 +522,121 @@ export function SendContent({
       );
     }
 
-    // ----- Form phase -----
+    // Form phase
     return (
-      <div className="flex flex-1 flex-col">
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <style>{`
+          .send-close:hover { background: rgba(0, 0, 0, 0.08) !important; }
+          .pct-btn:hover { opacity: 0.7; }
+          .confirm-btn:not(:disabled):hover { background: #333 !important; }
+          .private-card:hover { background: rgba(0, 0, 0, 0.06) !important; }
+          .clear-btn:hover { opacity: 0.7; }
+        `}</style>
+
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px" }}>
+          <div style={{ flex: 1, paddingLeft: "12px", paddingTop: "4px", paddingBottom: "4px" }}>
+            <span style={{ fontFamily: font, fontSize: "18px", fontWeight: 600, lineHeight: "28px", color: "#000" }}>Send</span>
+          </div>
+          <button
+            className="send-close"
+            onClick={onClose}
+            style={{ width: "36px", height: "36px", display: "flex", justifyContent: "center", alignItems: "center", background: "rgba(0, 0, 0, 0.04)", border: "none", borderRadius: "9999px", cursor: "pointer", transition: "all 0.2s ease", color: "#3C3C43" }}
+            type="button"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
         {/* Body */}
-        <div className="flex flex-1 flex-col gap-4 overflow-auto p-2 pb-4">
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px", overflow: "auto", padding: "8px 8px 16px" }}>
           {/* Amount card */}
-          <div className="flex flex-col">
-            <div className="rounded-2xl bg-white/[0.06] px-3 py-2.5">
-              <div className="flex items-center justify-between whitespace-nowrap font-sans font-normal leading-5">
-                <span className="text-base text-gray-400">Amount</span>
-                <div className="flex items-center gap-4 text-sm">
-                  <button
-                    className="border-none bg-transparent p-0 font-sans text-sm font-normal text-purple-400 hover:opacity-70"
-                    onClick={() => handlePercentage(25)}
-                    type="button"
-                  >
-                    25%
-                  </button>
-                  <button
-                    className="border-none bg-transparent p-0 font-sans text-sm font-normal text-purple-400 hover:opacity-70"
-                    onClick={() => handlePercentage(50)}
-                    type="button"
-                  >
-                    50%
-                  </button>
-                  <button
-                    className="border-none bg-transparent p-0 font-sans text-sm font-normal text-purple-400 hover:opacity-70"
-                    onClick={() => handlePercentage(100)}
-                    type="button"
-                  >
-                    Max
-                  </button>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ background: "#fff", borderRadius: "16px", padding: "10px 12px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: font, fontWeight: 400, lineHeight: "20px", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: "16px", color: secondary }}>Amount</span>
+                <div style={{ display: "flex", gap: "16px", alignItems: "center", fontSize: "14px", color: red }}>
+                  <button className="pct-btn" onClick={() => handlePercentage(25)} style={{ background: "none", border: "none", cursor: "pointer", color: red, fontFamily: font, fontSize: "14px", fontWeight: 400, padding: 0 }} type="button">25%</button>
+                  <button className="pct-btn" onClick={() => handlePercentage(50)} style={{ background: "none", border: "none", cursor: "pointer", color: red, fontFamily: font, fontSize: "14px", fontWeight: 400, padding: 0 }} type="button">50%</button>
+                  <button className="pct-btn" onClick={() => handlePercentage(100)} style={{ background: "none", border: "none", cursor: "pointer", color: red, fontFamily: font, fontSize: "14px", fontWeight: 400, padding: 0 }} type="button">Max</button>
                 </div>
               </div>
-
-              <div className="flex h-12 items-center gap-1">
+              <div style={{ display: "flex", gap: "4px", height: "48px", alignItems: "center" }}>
                 <input
-                  className={`min-w-0 flex-1 border-none bg-transparent p-0 font-sans text-[32px] font-semibold leading-9 outline-none ${amountTextColor} placeholder:text-gray-600`}
                   inputMode="decimal"
                   onChange={(e) => {
                     const v = e.target.value;
                     if (v === "" || /^\d*\.?\d*$/.test(v)) setAmount(v);
                   }}
                   placeholder="0"
+                  style={{ flex: 1, fontFamily: font, fontSize: "32px", fontWeight: 600, lineHeight: "36px", color: amountColor, background: "none", border: "none", outline: "none", padding: 0, minWidth: 0 }}
                   type="text"
                   value={amount}
                 />
                 <button
-                  className="flex shrink-0 cursor-pointer items-center rounded-full border-none bg-white/[0.08] px-1"
                   onClick={() => onNavigate({ type: "sendTokenSelect" })}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    background: "#F5F5F5",
+                    borderRadius: "54px",
+                    padding: "0 4px",
+                    border: "none",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                  }}
                   type="button"
                 >
-                  <div className="flex items-center p-1 pr-1.5">
-                    <div className="h-7 w-7 overflow-hidden rounded-full">
-                      <img
-                        alt={token.symbol}
-                        className="h-full w-full object-cover"
-                        src={token.icon}
-                      />
+                  <div style={{ display: "flex", alignItems: "center", paddingRight: "6px", padding: "4px 6px 4px 4px" }}>
+                    <div style={{ width: "28px", height: "28px", borderRadius: "9999px", overflow: "hidden" }}>
+                      <img alt={token.symbol} height={28} src={token.icon} style={{ width: "100%", height: "100%", objectFit: "cover" }} width={28} />
                     </div>
                   </div>
-                  <span className="whitespace-nowrap py-2 font-sans text-base font-medium leading-5 text-white">
+                  <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 500, lineHeight: "20px", color: "#000", letterSpacing: "-0.176px", whiteSpace: "nowrap", padding: "8px 0" }}>
                     {token.symbol}
                   </span>
-                  <div className="flex h-9 items-center justify-center py-2">
-                    <ChevronRight className="text-gray-400" size={16} />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "36px", padding: "8px 0" }}>
+                    <ChevronRight size={16} style={{ color: "#3C3C43" }} />
                   </div>
                 </button>
               </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/[0.08]">
-                    <ArrowDownUp
-                      className="text-gray-400 opacity-40"
-                      size={12}
-                    />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                  <div style={{ width: "20px", height: "20px", borderRadius: "9999px", background: "#F5F5F5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <ArrowDownUp size={12} style={{ color: secondary, opacity: 0.4 }} />
                   </div>
-                  <span className="font-sans text-sm font-normal leading-5 text-gray-400">
-                    {hasAmount
-                      ? `~$${Number(usdValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                      : `1 ${token.symbol} ~ $${token.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`}
+                  <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: secondary }}>
+                    {hasAmount ? `≈$${Number(usdValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `1 ${token.symbol} ≈ $${token.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`}
                   </span>
                 </div>
-                <span className="font-sans text-sm font-normal leading-5 text-gray-400">
-                  Balance: {token.balance.toLocaleString()}
+                <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: secondary }}>
+                  Balance: {token.balance.toLocaleString()}{" "}
                 </span>
               </div>
             </div>
 
             {/* Recipient section */}
-            <div className="px-3 pb-2 pt-3">
-              <span className="font-sans text-base font-normal leading-5 text-gray-400">
-                Recipient
-              </span>
+            <div style={{ padding: "12px 12px 8px" }}>
+              <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: secondary }}>Recipient</span>
             </div>
-            <div className="flex items-start overflow-hidden rounded-2xl bg-white/[0.06] px-3">
+            <div style={{ background: "#fff", borderRadius: "16px", display: "flex", alignItems: "flex-start", padding: "0 12px", overflow: "hidden" }}>
               {hasRecipient && (
-                <div className="flex shrink-0 items-center pr-3 pt-[15px] text-gray-300">
+                <div style={{ display: "flex", alignItems: "center", paddingRight: "12px", flexShrink: 0, color: "#3C3C43", paddingTop: "15px" }}>
                   {startsWithAt ? <Send size={20} /> : <Wallet size={20} />}
                 </div>
               )}
               <textarea
-                className="min-w-0 flex-1 resize-none overflow-hidden border-none bg-transparent py-[15px] font-sans text-base font-normal leading-5 text-white outline-none placeholder:text-gray-500"
                 onChange={(e) => setRecipient(e.target.value.replace(/\n/g, ""))}
                 placeholder="Address or Telegram username"
                 rows={1}
-                style={{ wordBreak: "break-all", fieldSizing: "content" } as React.CSSProperties}
+                style={{ flex: 1, fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#000", background: "none", border: "none", outline: "none", padding: "15px 0", minWidth: 0, resize: "none", overflow: "hidden", wordBreak: "break-all", fieldSizing: "content" } as React.CSSProperties}
                 value={recipient}
               />
               {hasRecipient && (
                 <button
-                  className="flex shrink-0 cursor-pointer items-center justify-center border-none bg-transparent py-[15px] pl-3 text-gray-300 hover:opacity-70"
+                  className="clear-btn"
                   onClick={() => setRecipient("")}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "15px 0 15px 12px", background: "none", border: "none", cursor: "pointer", color: "#3C3C43", flexShrink: 0 }}
                   type="button"
                 >
                   <X size={20} />
@@ -673,62 +644,86 @@ export function SendContent({
               )}
             </div>
             {showInvalidHint && (
-              <div className="px-3 pt-1">
-                <span className="font-sans text-sm font-normal leading-5 text-red-400">
-                  Invalid address
-                </span>
+              <div style={{ padding: "4px 12px 0" }}>
+                <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: red }}>Invalid address</span>
               </div>
             )}
           </div>
 
-          {/* Private Send toggle */}
-          <button
-            className="flex cursor-pointer items-center rounded-2xl border-none px-3 transition-colors hover:bg-white/[0.06]"
+          {/* Private Send card */}
+          <div
+            className="private-card"
             onClick={() => setIsPrivate(!isPrivate)}
             style={{
-              background: isPrivate ? "rgba(255,255,255,0.06)" : "transparent",
+              display: "flex",
+              alignItems: "center",
+              padding: "0 12px",
+              borderRadius: "16px",
+              cursor: "pointer",
+              background: isPrivate ? "rgba(0, 0, 0, 0.04)" : "transparent",
+              transition: "background 0.15s ease",
             }}
-            type="button"
           >
-            <div className="flex shrink-0 items-center py-1 pr-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-600/20">
-                <span className="text-lg text-purple-400">&#9881;</span>
-              </div>
+            <div style={{ display: "flex", alignItems: "center", paddingRight: "12px", paddingTop: "4px", paddingBottom: "4px", flexShrink: 0 }}>
+              <img alt="Private" src="/hero-new/Shield_40.svg" style={{ width: "40px", height: "40px" }} />
             </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-2.5">
-              <span className="text-left font-sans text-base font-normal leading-5 text-white">
-                Private Send
-              </span>
-              <span className="text-left font-sans text-[13px] font-normal leading-4 text-gray-400">
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px", padding: "10px 0", minWidth: 0 }}>
+              <span style={{ fontFamily: font, fontSize: "16px", fontWeight: 400, lineHeight: "20px", color: "#000" }}>Private Send</span>
+              <span style={{ fontFamily: font, fontSize: "13px", fontWeight: 400, lineHeight: "16px", color: secondary }}>
                 Prevents the recipient from seeing which wallet sent the funds
               </span>
             </div>
-            <div className="shrink-0 pl-3">
+            <div style={{ paddingLeft: "12px", flexShrink: 0 }}>
               <div
-                className="relative h-[31px] w-[51px] rounded-full transition-colors"
                 style={{
-                  background: isPrivate ? "rgb(147, 51, 234)" : "rgba(255,255,255,0.08)",
+                  width: "51px",
+                  height: "31px",
+                  borderRadius: "100px",
+                  background: isPrivate ? red : "rgba(0, 0, 0, 0.04)",
+                  position: "relative",
+                  transition: "background 0.2s ease",
                 }}
               >
                 <div
-                  className="absolute top-1/2 h-[27px] w-[27px] -translate-y-1/2 rounded-full bg-white shadow-md transition-[left]"
-                  style={{ left: isPrivate ? "22px" : "2px" }}
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    left: isPrivate ? "22px" : "2px",
+                    width: "27px",
+                    height: "27px",
+                    borderRadius: "100px",
+                    background: "#fff",
+                    boxShadow: "0px 0px 0px 0px rgba(0,0,0,0.04), 0px 3px 8px 0px rgba(0,0,0,0.15), 0px 3px 1px 0px rgba(0,0,0,0.06)",
+                    transition: "left 0.2s ease",
+                  }}
                 />
               </div>
             </div>
-          </button>
+          </div>
         </div>
 
         {/* Bottom button */}
-        <div className="px-5 py-4">
+        <div style={{ padding: "16px 20px" }}>
           <button
-            className={`w-full rounded-full px-4 py-3 font-sans text-base font-normal leading-5 text-white transition-colors ${
-              buttonDisabled
-                ? "cursor-default bg-gray-600"
-                : "cursor-pointer bg-purple-600 hover:bg-purple-700"
-            }`}
+            className="confirm-btn"
             disabled={buttonDisabled}
             onClick={handleConfirm}
+            style={{
+              width: "100%",
+              padding: "12px 16px",
+              borderRadius: "9999px",
+              background: buttonDisabled ? "#CCCDCD" : "#000",
+              border: "none",
+              cursor: buttonDisabled ? "default" : "pointer",
+              fontFamily: font,
+              fontSize: "16px",
+              fontWeight: 400,
+              lineHeight: "20px",
+              color: "#fff",
+              textAlign: "center",
+              transition: "background 0.15s ease",
+            }}
             type="button"
           >
             {buttonLabel}
@@ -740,8 +735,11 @@ export function SendContent({
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col"
       style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
         opacity: phaseOpacity,
         transition: "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
       }}

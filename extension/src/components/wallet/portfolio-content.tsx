@@ -8,62 +8,59 @@ import type {
   TransactionDetail,
 } from "@loyal-labs/wallet-core/types";
 
-import { ActivityRowItem } from "./activity-row-item";
-import { TokenRowItem } from "./token-row-item";
+import { ActivityRowItem } from "~/src/components/wallet/activity-row-item";
+import { TokenRowItem } from "~/src/components/wallet/token-row-item";
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
+const skeletonBar = (width: string, height: string) => ({
+  width,
+  height,
+  borderRadius: "6px",
+  background: "rgba(0, 0, 0, 0.06)",
+  animation: "skeleton-pulse 1.5s ease-in-out infinite",
+});
 
-export interface PortfolioContentProps {
-  tokenRows: TokenRow[];
-  allTokenRows?: TokenRow[];
-  activityRows: ActivityRow[];
-  transactionDetails: Record<string, TransactionDetail>;
-  balanceWhole: string;
-  balanceFraction: string;
-  balanceSolLabel: string;
-  walletLabel: string;
-  walletAddress: string | null;
-  isLoading: boolean;
-  isBalanceHidden: boolean;
-  onBalanceHiddenChange: (hidden: boolean) => void;
-  onNavigate: (view: SubView) => void;
-}
-
-// ---------------------------------------------------------------------------
-// Skeleton helpers
-// ---------------------------------------------------------------------------
-
-function SkeletonBar({ width, height }: { width: string; height: string }) {
-  return (
-    <div
-      className="animate-pulse rounded-md bg-gray-700"
-      style={{ width, height }}
-    />
-  );
-}
-
-function SkeletonCircle({ size }: { size: string }) {
-  return (
-    <div
-      className="shrink-0 animate-pulse rounded-full bg-gray-700"
-      style={{ width: size, height: size }}
-    />
-  );
-}
+const skeletonCircle = (size: string) => ({
+  width: size,
+  height: size,
+  borderRadius: "9999px",
+  background: "rgba(0, 0, 0, 0.06)",
+  flexShrink: 0 as const,
+  animation: "skeleton-pulse 1.5s ease-in-out infinite",
+});
 
 function SkeletonTokenRow() {
   return (
-    <div className="flex w-full items-center gap-3 px-3 py-2.5">
-      <SkeletonCircle size="40px" />
-      <div className="flex flex-1 flex-col gap-1.5">
-        <SkeletonBar width="80px" height="14px" />
-        <SkeletonBar width="50px" height="12px" />
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        padding: "10px 12px",
+        width: "100%",
+      }}
+    >
+      <div style={skeletonCircle("40px")} />
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column" as const,
+          gap: "6px",
+        }}
+      >
+        <div style={skeletonBar("80px", "14px")} />
+        <div style={skeletonBar("50px", "12px")} />
       </div>
-      <div className="flex flex-col items-end gap-1.5">
-        <SkeletonBar width="60px" height="14px" />
-        <SkeletonBar width="40px" height="12px" />
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column" as const,
+          alignItems: "flex-end" as const,
+          gap: "6px",
+        }}
+      >
+        <div style={skeletonBar("60px", "14px")} />
+        <div style={skeletonBar("40px", "12px")} />
       </div>
     </div>
   );
@@ -71,20 +68,31 @@ function SkeletonTokenRow() {
 
 function SkeletonActivityRow() {
   return (
-    <div className="flex w-full items-center gap-3 px-3 py-2.5">
-      <SkeletonCircle size="36px" />
-      <div className="flex flex-1 flex-col gap-1.5">
-        <SkeletonBar width="100px" height="14px" />
-        <SkeletonBar width="60px" height="12px" />
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        padding: "10px 12px",
+        width: "100%",
+      }}
+    >
+      <div style={skeletonCircle("36px")} />
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column" as const,
+          gap: "6px",
+        }}
+      >
+        <div style={skeletonBar("100px", "14px")} />
+        <div style={skeletonBar("60px", "12px")} />
       </div>
-      <SkeletonBar width="50px" height="14px" />
+      <div style={skeletonBar("50px", "14px")} />
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// PortfolioContent
-// ---------------------------------------------------------------------------
 
 export function PortfolioContent({
   activityRows,
@@ -94,14 +102,28 @@ export function PortfolioContent({
   isBalanceHidden,
   isLoading,
   onBalanceHiddenChange,
+  onDisconnect,
   onNavigate,
   tokenRows,
   transactionDetails,
   walletAddress,
   walletLabel,
-}: PortfolioContentProps) {
+}: {
+  activityRows: ActivityRow[];
+  balanceFraction: string;
+  balanceSolLabel: string;
+  balanceWhole: string;
+  isBalanceHidden: boolean;
+  isLoading: boolean;
+  onBalanceHiddenChange: (hidden: boolean) => void;
+  onDisconnect?: () => void;
+  onNavigate: (view: SubView) => void;
+  tokenRows: TokenRow[];
+  transactionDetails: Record<string, TransactionDetail>;
+  walletAddress: string | null;
+  walletLabel: string;
+}) {
   const [copied, setCopied] = useState(false);
-
   const handleCopyAddress = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -111,31 +133,60 @@ export function PortfolioContent({
         setTimeout(() => setCopied(false), 1500);
       });
     },
-    [walletAddress],
+    [walletAddress]
   );
-
-  // -------------------------------------------------------------------------
-  // Loading skeleton
-  // -------------------------------------------------------------------------
-
   if (isLoading) {
     return (
       <>
+        <style>{`
+          @keyframes skeleton-pulse {
+            0%,
+            100% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.4;
+            }
+          }
+        `}</style>
+
         {/* Balance skeleton */}
-        <div className="flex w-full items-start gap-4 px-5 pb-3 pt-5">
-          <SkeletonCircle size="64px" />
-          <div className="flex flex-1 flex-col gap-2">
-            <SkeletonBar width="100px" height="16px" />
-            <SkeletonBar width="140px" height="28px" />
-            <SkeletonBar width="70px" height="14px" />
+        <div
+          style={{
+            display: "flex",
+            gap: "16px",
+            alignItems: "flex-start",
+            padding: "20px 20px 12px",
+            width: "100%",
+          }}
+        >
+          <div style={skeletonCircle("64px")} />
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}
+          >
+            <div style={skeletonBar("100px", "16px")} />
+            <div style={skeletonBar("140px", "28px")} />
+            <div style={skeletonBar("70px", "14px")} />
           </div>
         </div>
 
         {/* Tokens skeleton */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="flex w-full flex-col p-2">
-            <div className="px-3 pb-2 pt-3">
-              <SkeletonBar width="60px" height="16px" />
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              padding: "8px",
+              width: "100%",
+            }}
+          >
+            <div style={{ padding: "12px 12px 8px" }}>
+              <div style={skeletonBar("60px", "16px")} />
             </div>
             <SkeletonTokenRow />
             <SkeletonTokenRow />
@@ -143,9 +194,16 @@ export function PortfolioContent({
           </div>
 
           {/* Activity skeleton */}
-          <div className="flex w-full flex-col p-2">
-            <div className="px-3 pb-2 pt-3">
-              <SkeletonBar width="70px" height="16px" />
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              padding: "8px",
+              width: "100%",
+            }}
+          >
+            <div style={{ padding: "12px 12px 8px" }}>
+              <div style={skeletonBar("70px", "16px")} />
             </div>
             <SkeletonActivityRow />
             <SkeletonActivityRow />
@@ -155,28 +213,114 @@ export function PortfolioContent({
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Main content
-  // -------------------------------------------------------------------------
-
   return (
     <>
-      {/* Balance section */}
-      <div className="flex w-full items-start gap-4 rounded-2xl px-5 pb-3 pt-5">
-        {/* Wallet avatar — purple circle placeholder */}
-        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-white/10 bg-purple-600" />
+      <style>{`
+        .show-all-btn:hover {
+          background: rgba(249, 54, 60, 0.22) !important;
+        }
+      `}</style>
 
-        <div className="flex flex-1 flex-col gap-2">
-          {/* Wallet label + copy address */}
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1 font-sans text-sm leading-5 text-gray-400">
+      {/* SVG pixelation filters */}
+      <svg
+        aria-hidden="true"
+        height="0"
+        style={{
+          position: "absolute",
+          width: 0,
+          height: 0,
+          overflow: "hidden",
+        }}
+        width="0"
+      >
+        <defs>
+          <filter id="rs-pixelate-lg" x="0" y="0" width="100%" height="100%">
+            <feFlood x="4" y="4" height="2" width="2" />
+            <feComposite width="10" height="10" />
+            <feTile result="a" />
+            <feComposite in="SourceGraphic" in2="a" operator="in" />
+            <feMorphology operator="dilate" radius="5" />
+          </filter>
+          <filter id="rs-pixelate-sm" x="0" y="0" width="100%" height="100%">
+            <feFlood x="3" y="3" height="2" width="2" />
+            <feComposite width="8" height="8" />
+            <feTile result="a" />
+            <feComposite in="SourceGraphic" in2="a" operator="in" />
+            <feMorphology operator="dilate" radius="4" />
+          </filter>
+        </defs>
+      </svg>
+
+      {/* Balance section */}
+      <div
+        style={{
+          display: "flex",
+          gap: "16px",
+          alignItems: "flex-start",
+          padding: "20px 20px 12px",
+          borderRadius: "20px",
+          width: "100%",
+        }}
+      >
+        <div
+          style={{
+            width: "64px",
+            height: "64px",
+            borderRadius: "9999px",
+            border: "0.533px solid rgba(0, 0, 0, 0.08)",
+            overflow: "hidden",
+            flexShrink: 0,
+          }}
+        >
+          <img
+            alt="Wallet"
+            height={64}
+            src="/hero-new/Wallet-Cover.png"
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            width={64}
+          />
+        </div>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "14px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "rgba(60, 60, 67, 0.6)",
+                display: "flex",
+                alignItems: "center",
+                gap: "3px",
+              }}
+            >
               {walletLabel}
               {walletAddress && (
                 <button
-                  className="inline-flex shrink-0 cursor-pointer items-center border-none bg-transparent p-px transition-colors"
                   onClick={handleCopyAddress}
                   style={{
-                    color: copied ? "#34C759" : "rgb(107, 114, 128)",
+                    background: "none",
+                    border: "none",
+                    padding: "1px",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    color: copied ? "#34C759" : "rgba(60, 60, 67, 0.35)",
+                    transition: "color 0.15s ease",
+                    flexShrink: 0,
                   }}
                   type="button"
                 >
@@ -184,24 +328,63 @@ export function PortfolioContent({
                 </button>
               )}
             </span>
-          </div>
-
-          {/* Balance amount */}
-          <div className="flex items-center gap-3">
-            <div className="overflow-hidden rounded-lg">
-              <span
-                className="block font-sans text-[28px] font-semibold leading-8"
+            {onDisconnect && (
+              <button
+                onClick={onDisconnect}
                 style={{
-                  color: isBalanceHidden ? "#6b7280" : "#fff",
-                  filter: isBalanceHidden ? "blur(6px)" : "none",
+                  background: "rgba(60, 60, 67, 0.06)",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "2px 8px",
+                  fontFamily: "var(--font-geist-sans), sans-serif",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  lineHeight: "18px",
+                  color: "rgba(60, 60, 67, 0.45)",
+                  cursor: "pointer",
+                  transition: "background 0.15s ease, color 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(60, 60, 67, 0.1)";
+                  e.currentTarget.style.color = "rgba(60, 60, 67, 0.6)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(60, 60, 67, 0.06)";
+                  e.currentTarget.style.color = "rgba(60, 60, 67, 0.45)";
+                }}
+                type="button"
+              >
+                Disconnect
+              </button>
+            )}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+            }}
+          >
+            <div style={{ borderRadius: "8px", overflow: "hidden" }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-geist-sans), sans-serif",
+                  fontSize: "28px",
+                  fontWeight: 600,
+                  lineHeight: "32px",
+                  color: isBalanceHidden ? "#BBBBC0" : "#000",
+                  filter: isBalanceHidden ? "url(#rs-pixelate-lg)" : "none",
                   transition: "filter 0.15s ease, color 0.15s ease",
                   userSelect: isBalanceHidden ? "none" : "auto",
+                  display: "block",
                 }}
               >
                 {balanceWhole}
                 <span
                   style={{
-                    color: isBalanceHidden ? "#6b7280" : "rgb(156, 163, 175)",
+                    color: isBalanceHidden
+                      ? "#BBBBC0"
+                      : "rgba(60, 60, 67, 0.6)",
                     transition: "color 0.15s ease",
                   }}
                 >
@@ -209,37 +392,46 @@ export function PortfolioContent({
                 </span>
               </span>
             </div>
-
             <button
-              className="flex shrink-0 cursor-pointer items-center border-none bg-transparent p-0"
               onClick={() => onBalanceHiddenChange(!isBalanceHidden)}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                flexShrink: 0,
+              }}
               type="button"
             >
               {isBalanceHidden ? (
                 <EyeOff
-                  className="text-gray-500"
                   size={22}
                   strokeWidth={1.5}
+                  style={{ color: "rgba(60, 60, 67, 0.5)" }}
                 />
               ) : (
                 <Eye
-                  className="text-gray-500"
                   size={22}
                   strokeWidth={1.5}
+                  style={{ color: "rgba(60, 60, 67, 0.5)" }}
                 />
               )}
             </button>
           </div>
-
-          {/* SOL sub-label */}
-          <div className="overflow-hidden rounded-md">
+          <div style={{ borderRadius: "6px", overflow: "hidden" }}>
             <span
-              className="block font-sans text-sm leading-5"
               style={{
-                color: isBalanceHidden ? "#6b7280" : "rgb(156, 163, 175)",
-                filter: isBalanceHidden ? "blur(6px)" : "none",
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "14px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: isBalanceHidden ? "#C8C8CC" : "rgba(60, 60, 67, 0.6)",
+                filter: isBalanceHidden ? "url(#rs-pixelate-sm)" : "none",
                 transition: "filter 0.15s ease, color 0.15s ease",
                 userSelect: isBalanceHidden ? "none" : "auto",
+                display: "block",
               }}
             >
               {balanceSolLabel}
@@ -249,11 +441,34 @@ export function PortfolioContent({
       </div>
 
       {/* Scrollable content area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          overflowX: "hidden",
+        }}
+      >
         {/* Tokens section */}
-        <div className="flex w-full flex-col items-center p-2">
-          <div className="w-full px-3 pb-2 pt-3">
-            <span className="font-sans text-base font-medium leading-5 tracking-tight text-white">
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            padding: "8px",
+            width: "100%",
+          }}
+        >
+          <div style={{ width: "100%", padding: "12px 12px 8px" }}>
+            <span
+              style={{
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "16px",
+                fontWeight: 500,
+                lineHeight: "20px",
+                color: "#000",
+                letterSpacing: "-0.176px",
+              }}
+            >
               Tokens
             </span>
           </div>
@@ -266,10 +481,33 @@ export function PortfolioContent({
             />
           ))}
 
-          <div className="flex w-full flex-col items-center justify-center pt-2">
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              paddingTop: "8px",
+              width: "100%",
+            }}
+          >
             <button
-              className="cursor-pointer rounded-full border-none bg-purple-600/20 px-4 py-2 font-sans text-[15px] leading-5 text-white transition-colors hover:bg-purple-600/30"
+              className="show-all-btn"
               onClick={() => onNavigate("allTokens")}
+              style={{
+                background: "rgba(249, 54, 60, 0.14)",
+                border: "none",
+                borderRadius: "9999px",
+                padding: "8px 16px",
+                cursor: "pointer",
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "15px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "#000",
+                textAlign: "center",
+                transition: "background-color 0.15s ease",
+              }}
               type="button"
             >
               Show All
@@ -278,9 +516,26 @@ export function PortfolioContent({
         </div>
 
         {/* Activity section */}
-        <div className="flex w-full flex-col items-center p-2">
-          <div className="w-full px-3 pb-2 pt-3">
-            <span className="font-sans text-base font-medium leading-5 tracking-tight text-white">
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            padding: "8px",
+            width: "100%",
+          }}
+        >
+          <div style={{ width: "100%", padding: "12px 12px 8px" }}>
+            <span
+              style={{
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "16px",
+                fontWeight: 500,
+                lineHeight: "20px",
+                color: "#000",
+                letterSpacing: "-0.176px",
+              }}
+            >
               Activity
             </span>
           </div>
@@ -301,15 +556,46 @@ export function PortfolioContent({
           ))}
 
           {!isLoading && activityRows.length === 0 && (
-            <div className="px-5 py-3 text-center font-sans text-sm text-gray-400">
+            <div
+              style={{
+                padding: "12px 20px",
+                textAlign: "center",
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "14px",
+                color: "rgba(60, 60, 67, 0.6)",
+              }}
+            >
               No activity yet
             </div>
           )}
 
-          <div className="flex w-full flex-col items-center justify-center pt-2">
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              paddingTop: "8px",
+              width: "100%",
+            }}
+          >
             <button
-              className="cursor-pointer rounded-full border-none bg-purple-600/20 px-4 py-2 font-sans text-[15px] leading-5 text-white transition-colors hover:bg-purple-600/30"
+              className="show-all-btn"
               onClick={() => onNavigate("allActivity")}
+              style={{
+                background: "rgba(249, 54, 60, 0.14)",
+                border: "none",
+                borderRadius: "9999px",
+                padding: "8px 16px",
+                cursor: "pointer",
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "15px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "#000",
+                textAlign: "center",
+                transition: "background-color 0.15s ease",
+              }}
               type="button"
             >
               Show All
@@ -317,6 +603,21 @@ export function PortfolioContent({
           </div>
         </div>
       </div>
+
+      <p
+        style={{
+          fontFamily: "var(--font-geist-sans), sans-serif",
+          fontSize: "11px",
+          fontWeight: 400,
+          lineHeight: "16px",
+          color: "rgba(60, 60, 67, 0.3)",
+          textAlign: "center",
+          padding: "8px 0 12px",
+          flexShrink: 0,
+        }}
+      >
+        Token logos by Logo.dev
+      </p>
     </>
   );
 }

@@ -20,63 +20,134 @@ export function ActivityRowItem({
 
   return (
     <div
-      className="flex w-full items-center overflow-hidden rounded-2xl px-3 transition-colors"
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? "rgba(255, 255, 255, 0.06)" : "transparent",
+        display: "flex",
+        alignItems: "center",
+        padding: "0 12px",
+        borderRadius: "16px",
+        width: "100%",
+        overflow: "hidden",
+        background: hovered ? "rgba(0, 0, 0, 0.04)" : "transparent",
+        transition: "background-color 0.15s ease",
         cursor: "pointer",
       }}
     >
-      <div className="shrink-0 pr-3 py-1.5">
-        <div className="h-12 w-12 overflow-hidden rounded-full">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          paddingRight: "12px",
+          paddingTop: "6px",
+          paddingBottom: "6px",
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            width: "48px",
+            height: "48px",
+            borderRadius: "9999px",
+            overflow: "hidden",
+          }}
+        >
           <img
             alt={activity.type}
-            className="h-full w-full object-cover"
             height={48}
             src={activity.icon}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
             width={48}
           />
         </div>
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-2.5">
-        <span className="font-sans text-base font-medium leading-5 tracking-tight text-white">
-          {activity.type === "received"
-            ? "Received"
-            : activity.type === "shielded"
-              ? "Shielded"
-              : activity.type === "unshielded"
-                ? "Unshielded"
-                : "Sent"}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: "2px",
+          padding: "10px 0",
+          minWidth: 0,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "16px",
+            fontWeight: 500,
+            lineHeight: "20px",
+            color: "#000",
+            letterSpacing: "-0.176px",
+          }}
+        >
+          {activity.type === "received" ? "Received"
+            : activity.type === "shielded" ? "Shielded"
+            : activity.type === "unshielded" ? "Unshielded"
+            : "Sent"}
         </span>
-        <span className="font-sans text-[13px] leading-4 text-gray-400">
-          {activity.type === "shielded"
-            ? "to secure balance"
-            : activity.type === "unshielded"
-              ? "to main balance"
-              : activity.type === "received"
-                ? `from ${truncateAddress(activity.counterparty)}`
-                : `to ${truncateAddress(activity.counterparty)}`}
+        <span
+          style={{
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "13px",
+            fontWeight: 400,
+            lineHeight: "16px",
+            color: "rgba(60, 60, 67, 0.6)",
+          }}
+        >
+          {activity.type === "shielded" ? "to secure balance"
+            : activity.type === "unshielded" ? "to main balance"
+            : activity.type === "received" ? `from ${truncateAddress(activity.counterparty)}`
+            : `to ${truncateAddress(activity.counterparty)}`}
         </span>
       </div>
-      <div className="flex shrink-0 flex-col items-end justify-center gap-0.5 overflow-hidden rounded-md py-2.5 pl-3">
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "2px",
+          alignItems: "flex-end",
+          justifyContent: "center",
+          padding: "10px 0",
+          paddingLeft: "12px",
+          flexShrink: 0,
+          borderRadius: "6px",
+          overflow: "hidden",
+        }}
+      >
         <span
-          className="whitespace-nowrap text-right font-sans text-base leading-5"
           style={{
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "16px",
+            fontWeight: 400,
+            lineHeight: "20px",
             color: isBalanceHidden
-              ? "#6b7280"
+              ? "#BBBBC0"
               : activity.type === "received"
                 ? "#34C759"
-                : "#fff",
-            filter: isBalanceHidden ? "blur(6px)" : "none",
+                : activity.type === "shielded" || activity.type === "unshielded"
+                  ? "#000"
+                  : "#000",
+            textAlign: "right",
+            filter: isBalanceHidden ? "url(#rs-pixelate-sm)" : "none",
             transition: "filter 0.15s ease, color 0.15s ease",
             userSelect: isBalanceHidden ? "none" : "auto",
+            whiteSpace: "nowrap",
           }}
         >
           {activity.amount}
         </span>
-        <span className="whitespace-nowrap font-sans text-[13px] leading-4 text-gray-400">
+        <span
+          style={{
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "13px",
+            fontWeight: 400,
+            lineHeight: "16px",
+            color: "rgba(60, 60, 67, 0.6)",
+            whiteSpace: "nowrap",
+          }}
+        >
           {activity.timestamp}
         </span>
       </div>

@@ -1,5 +1,4 @@
-import { ArrowLeft, Search } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, Search, X } from "lucide-react";
 
 export function SearchInput({
   value,
@@ -11,13 +10,37 @@ export function SearchInput({
   placeholder?: string;
 }) {
   return (
-    <div className="px-5 py-2">
-      <div className="flex h-11 items-center gap-2 rounded-full bg-white/[0.08] px-4">
-        <Search className="shrink-0 text-gray-400" size={24} />
+    <div style={{ padding: "8px 20px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          background: "rgba(0, 0, 0, 0.04)",
+          borderRadius: "47px",
+          padding: "0 16px",
+          gap: "8px",
+          height: "44px",
+        }}
+      >
+        <Search
+          size={24}
+          style={{ color: "rgba(60, 60, 67, 0.6)", flexShrink: 0 }}
+        />
         <input
-          className="flex-1 border-none bg-transparent font-sans text-base leading-5 text-white outline-none placeholder:text-gray-500"
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
+          style={{
+            flex: 1,
+            background: "none",
+            border: "none",
+            outline: "none",
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "16px",
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: "#000",
+            padding: 0,
+          }}
           type="text"
           value={value}
         />
@@ -29,33 +52,82 @@ export function SearchInput({
 export function SubViewHeader({
   title,
   onBack,
+  onClose,
 }: {
   title: string;
   onBack: () => void;
+  onClose: () => void;
 }) {
-  const [backHovered, setBackHovered] = useState(false);
-
   return (
-    <div className="flex items-center justify-between p-2">
-      <button
-        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-none transition-colors"
-        onClick={onBack}
-        onMouseEnter={() => setBackHovered(true)}
-        onMouseLeave={() => setBackHovered(false)}
+    <>
+      <style>{`
+        .subview-back:hover {
+          background: rgba(0, 0, 0, 0.08) !important;
+        }
+        .subview-close:hover {
+          background: rgba(0, 0, 0, 0.08) !important;
+        }
+      `}</style>
+      <div
         style={{
-          background: backHovered
-            ? "rgba(255, 255, 255, 0.12)"
-            : "rgba(255, 255, 255, 0.08)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "8px",
         }}
-        type="button"
       >
-        <ArrowLeft className="text-gray-300" size={24} />
-      </button>
-      <span className="font-sans text-lg font-semibold leading-7 text-white">
-        {title}
-      </span>
-      {/* Invisible spacer to keep title centered */}
-      <div className="h-9 w-9" />
-    </div>
+        <button
+          className="subview-back"
+          onClick={onBack}
+          style={{
+            width: "36px",
+            height: "36px",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            background: "rgba(0, 0, 0, 0.04)",
+            border: "none",
+            borderRadius: "9999px",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            color: "#3C3C43",
+          }}
+          type="button"
+        >
+          <ArrowLeft size={24} />
+        </button>
+        <span
+          style={{
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "18px",
+            fontWeight: 600,
+            lineHeight: "28px",
+            color: "#000",
+          }}
+        >
+          {title}
+        </span>
+        <button
+          className="subview-close"
+          onClick={onClose}
+          style={{
+            width: "36px",
+            height: "36px",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            background: "rgba(0, 0, 0, 0.04)",
+            border: "none",
+            borderRadius: "9999px",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            color: "#3C3C43",
+          }}
+          type="button"
+        >
+          <X size={24} />
+        </button>
+      </div>
+    </>
   );
 }

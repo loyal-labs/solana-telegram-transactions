@@ -147,49 +147,111 @@ function CreateWalletScreen() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6 gap-6">
-      <Wallet className="w-12 h-12 text-purple-400" />
-      <h1 className="text-xl font-bold text-white">Loyal Wallet</h1>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100%",
+        padding: "0 24px",
+        gap: "24px",
+      }}
+    >
+      <Wallet size={48} style={{ color: "#F9363C" }} />
+      <span
+        style={{
+          fontFamily: "var(--font-geist-sans), sans-serif",
+          fontSize: "20px",
+          fontWeight: 600,
+          lineHeight: "28px",
+          color: "#000",
+        }}
+      >
+        Loyal Wallet
+      </span>
 
-      <div className="flex gap-2 w-full">
+      <div style={{ display: "flex", gap: "8px", width: "100%" }}>
         <button
           type="button"
           onClick={() => { setMode("create"); setError(null); }}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-            mode === "create"
-              ? "bg-purple-600 text-white"
-              : "bg-gray-800 text-gray-400 hover:text-white"
-          }`}
+          style={{
+            flex: 1,
+            padding: "8px 0",
+            borderRadius: "10px",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "14px",
+            fontWeight: 500,
+            lineHeight: "20px",
+            background: mode === "create" ? "#000" : "rgba(0, 0, 0, 0.04)",
+            color: mode === "create" ? "#fff" : "#000",
+            transition: "background 0.15s ease, color 0.15s ease",
+          }}
         >
           Create
         </button>
         <button
           type="button"
           onClick={() => { setMode("import"); setError(null); }}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-            mode === "import"
-              ? "bg-purple-600 text-white"
-              : "bg-gray-800 text-gray-400 hover:text-white"
-          }`}
+          style={{
+            flex: 1,
+            padding: "8px 0",
+            borderRadius: "10px",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "14px",
+            fontWeight: 500,
+            lineHeight: "20px",
+            background: mode === "import" ? "#000" : "rgba(0, 0, 0, 0.04)",
+            color: mode === "import" ? "#fff" : "#000",
+            transition: "background 0.15s ease, color 0.15s ease",
+          }}
         >
           Import
         </button>
       </div>
 
-      <div className="flex flex-col gap-3 w-full">
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%" }}>
         <input
           type="password"
           placeholder="Password (min 8 characters)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-500"
+          style={{
+            width: "100%",
+            background: "rgba(0, 0, 0, 0.04)",
+            border: "none",
+            borderRadius: "10px",
+            padding: "12px 16px",
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "14px",
+            lineHeight: "20px",
+            color: "#000",
+            outline: "none",
+            boxSizing: "border-box",
+          }}
         />
         <input
           type="password"
           placeholder="Confirm password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-500"
+          style={{
+            width: "100%",
+            background: "rgba(0, 0, 0, 0.04)",
+            border: "none",
+            borderRadius: "10px",
+            padding: "12px 16px",
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "14px",
+            lineHeight: "20px",
+            color: "#000",
+            outline: "none",
+            boxSizing: "border-box",
+          }}
         />
 
         {mode === "import" && (
@@ -198,19 +260,56 @@ function CreateWalletScreen() {
             value={secretKeyInput}
             onChange={(e) => setSecretKeyInput(e.target.value)}
             rows={3}
-            className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+            style={{
+              width: "100%",
+              background: "rgba(0, 0, 0, 0.04)",
+              border: "none",
+              borderRadius: "10px",
+              padding: "12px 16px",
+              fontFamily: "var(--font-geist-sans), sans-serif",
+              fontSize: "14px",
+              lineHeight: "20px",
+              color: "#000",
+              outline: "none",
+              resize: "none",
+              boxSizing: "border-box",
+            }}
           />
         )}
 
         {error && (
-          <p className="text-red-400 text-xs text-center">{error}</p>
+          <p
+            style={{
+              fontFamily: "var(--font-geist-sans), sans-serif",
+              fontSize: "13px",
+              lineHeight: "16px",
+              color: "#FF3B30",
+              textAlign: "center",
+            }}
+          >
+            {error}
+          </p>
         )}
 
         <button
           type="button"
           disabled={loading}
           onClick={mode === "create" ? handleCreate : handleImport}
-          className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium py-3 rounded-lg text-sm transition-colors"
+          style={{
+            width: "100%",
+            padding: "12px 16px",
+            borderRadius: "9999px",
+            border: "none",
+            cursor: loading ? "default" : "pointer",
+            background: loading ? "#CCCDCD" : "#000",
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "16px",
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: "#fff",
+            textAlign: "center",
+            transition: "background 0.15s ease",
+          }}
         >
           {loading
             ? "Working..."
@@ -250,14 +349,43 @@ function UnlockScreen() {
     : null;
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6 gap-6">
-      <Wallet className="w-12 h-12 text-purple-400" />
-      <h1 className="text-xl font-bold text-white">Welcome Back</h1>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100%",
+        padding: "0 24px",
+        gap: "24px",
+      }}
+    >
+      <Wallet size={48} style={{ color: "#F9363C" }} />
+      <span
+        style={{
+          fontFamily: "var(--font-geist-sans), sans-serif",
+          fontSize: "20px",
+          fontWeight: 600,
+          lineHeight: "28px",
+          color: "#000",
+        }}
+      >
+        Welcome Back
+      </span>
       {truncatedKey && (
-        <p className="text-gray-400 text-sm font-mono">{truncatedKey}</p>
+        <span
+          style={{
+            fontFamily: "monospace",
+            fontSize: "14px",
+            lineHeight: "20px",
+            color: "rgba(60, 60, 67, 0.6)",
+          }}
+        >
+          {truncatedKey}
+        </span>
       )}
 
-      <div className="flex flex-col gap-3 w-full">
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%" }}>
         <input
           type="password"
           placeholder="Enter password"
@@ -266,18 +394,54 @@ function UnlockScreen() {
           onKeyDown={(e) => {
             if (e.key === "Enter") handleUnlock();
           }}
-          className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 text-sm placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-500"
+          style={{
+            width: "100%",
+            background: "rgba(0, 0, 0, 0.04)",
+            border: "none",
+            borderRadius: "10px",
+            padding: "12px 16px",
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "14px",
+            lineHeight: "20px",
+            color: "#000",
+            outline: "none",
+            boxSizing: "border-box",
+          }}
         />
 
         {error && (
-          <p className="text-red-400 text-xs text-center">{error}</p>
+          <p
+            style={{
+              fontFamily: "var(--font-geist-sans), sans-serif",
+              fontSize: "13px",
+              lineHeight: "16px",
+              color: "#FF3B30",
+              textAlign: "center",
+            }}
+          >
+            {error}
+          </p>
         )}
 
         <button
           type="button"
           disabled={loading}
           onClick={handleUnlock}
-          className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium py-3 rounded-lg text-sm transition-colors"
+          style={{
+            width: "100%",
+            padding: "12px 16px",
+            borderRadius: "9999px",
+            border: "none",
+            cursor: loading ? "default" : "pointer",
+            background: loading ? "#CCCDCD" : "#000",
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "16px",
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: "#fff",
+            textAlign: "center",
+            transition: "background 0.15s ease",
+          }}
         >
           {loading ? "Unlocking..." : "Unlock"}
         </button>
@@ -324,6 +488,12 @@ function WalletInterface() {
   }, []);
 
   const handleDone = useCallback(() => {
+    setSubView(null);
+  }, []);
+
+  // In the extension, "close" goes back to portfolio (no sidebar to dismiss)
+  const handleClose = useCallback(() => {
+    setActiveTab("portfolio");
     setSubView(null);
   }, []);
 
@@ -379,12 +549,18 @@ function WalletInterface() {
         return (
           <SendContent
             token={sendToken}
+            onClose={handleClose}
             onNavigate={handleNavigate}
             onDone={handleDone}
           />
         );
       case "receive":
-        return <ReceiveContent />;
+        return (
+          <ReceiveContent
+            walletAddress={walletAddress}
+            onClose={handleClose}
+          />
+        );
       case "swap":
         return (
           <SwapContent
@@ -392,6 +568,7 @@ function WalletInterface() {
             toToken={toToken}
             onFromTokenChange={setFromToken}
             onToTokenChange={setToToken}
+            onClose={handleClose}
             onNavigate={handleNavigate}
             onDone={handleDone}
             swapMode={swapMode}
@@ -403,6 +580,7 @@ function WalletInterface() {
           <ShieldContent
             token={shieldToken}
             onTokenChange={setShieldToken}
+            onClose={handleClose}
             onNavigate={handleNavigate}
             onDone={handleDone}
             securedBalance={0}
@@ -424,6 +602,7 @@ function WalletInterface() {
             tokens={allTokenRows}
             isBalanceHidden={balanceHidden}
             onBack={goBack}
+            onClose={handleClose}
           />
         );
       }
@@ -434,6 +613,7 @@ function WalletInterface() {
             details={transactionDetails}
             isBalanceHidden={balanceHidden}
             onBack={goBack}
+            onClose={handleClose}
             onNavigate={handleNavigate}
           />
         );
@@ -455,6 +635,7 @@ function WalletInterface() {
             setSubView(null);
           }}
           onBack={goBack}
+          onClose={handleClose}
           tokens={swapTokens}
         />
       );
@@ -470,6 +651,7 @@ function WalletInterface() {
             setSubView(null);
           }}
           onBack={goBack}
+          onClose={handleClose}
           tokens={swapTokens}
         />
       );
@@ -485,6 +667,7 @@ function WalletInterface() {
             setSubView(null);
           }}
           onBack={goBack}
+          onClose={handleClose}
           tokens={swapTokens}
         />
       );
@@ -506,41 +689,69 @@ function WalletInterface() {
       <TransactionDetailView
         detail={subView.detail}
         onBack={goBack}
+        onClose={handleClose}
       />
     );
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Navigation layers container */}
-      <div className="relative flex-1 overflow-hidden">
+      <div style={{ position: "relative", flex: 1, overflow: "hidden" }}>
         {/* Layer 0 — main tab content */}
         <div
-          className="absolute inset-0 flex flex-col"
-          style={layerStyle(0, activeLayer)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            background: "#F5F5F5",
+            ...layerStyle(0, activeLayer),
+          }}
         >
           {renderTabContent()}
         </div>
 
         {/* Layer 1 — sub-views */}
         <div
-          className="absolute inset-0 flex flex-col bg-gray-900"
-          style={layerStyle(1, activeLayer)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            background: "#F5F5F5",
+            ...layerStyle(1, activeLayer),
+          }}
         >
           {renderSubView()}
         </div>
 
         {/* Layer 2 — transaction detail */}
         <div
-          className="absolute inset-0 flex flex-col bg-gray-900"
-          style={layerStyle(2, activeLayer)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            background: "#F5F5F5",
+            ...layerStyle(2, activeLayer),
+          }}
         >
           {renderTransactionDetail()}
         </div>
       </div>
 
       {/* Bottom tab bar */}
-      <nav className="flex items-center justify-around border-t border-gray-800 bg-gray-900 py-2">
+      <nav
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-around",
+          borderTop: "1px solid rgba(0, 0, 0, 0.06)",
+          background: "#F5F5F5",
+          padding: "8px 0",
+        }}
+      >
         {TABS.map(({ id, label, Icon }) => {
           const isActive = activeTab === id;
           return (
@@ -548,12 +759,30 @@ function WalletInterface() {
               key={id}
               type="button"
               onClick={() => handleTabChange(id)}
-              className={`flex flex-col items-center gap-0.5 px-2 py-1 transition-colors ${
-                isActive ? "text-purple-400" : "text-gray-500 hover:text-gray-300"
-              }`}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "2px",
+                padding: "4px 8px",
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                transition: "color 0.15s ease",
+                color: isActive ? "#F9363C" : "rgba(60, 60, 67, 0.4)",
+              }}
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium">{label}</span>
+              <Icon size={20} />
+              <span
+                style={{
+                  fontFamily: "var(--font-geist-sans), sans-serif",
+                  fontSize: "10px",
+                  fontWeight: 500,
+                  lineHeight: "12px",
+                }}
+              >
+                {label}
+              </span>
             </button>
           );
         })}
@@ -571,8 +800,17 @@ function WalletAppInner() {
 
   if (state === "loading") {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-6 h-6 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+        <div
+          style={{
+            width: "24px",
+            height: "24px",
+            border: "2px solid rgba(0, 0, 0, 0.1)",
+            borderTopColor: "#3C3C43",
+            borderRadius: "9999px",
+            animation: "sidebar-spin 0.8s linear infinite",
+          }}
+        />
       </div>
     );
   }
@@ -585,7 +823,20 @@ function WalletAppInner() {
 export default function WalletApp() {
   return (
     <WalletProvider>
-      <div className="w-full h-full bg-gray-900 text-white">
+      <style>{`
+        @keyframes sidebar-spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          background: "#F5F5F5",
+          color: "#000",
+          fontFamily: "var(--font-geist-sans), sans-serif",
+        }}
+      >
         <WalletAppInner />
       </div>
     </WalletProvider>

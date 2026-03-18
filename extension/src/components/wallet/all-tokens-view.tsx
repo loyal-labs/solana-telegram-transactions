@@ -1,18 +1,19 @@
 import { useState } from "react";
 
-import type { TokenRow } from "@loyal-labs/wallet-core/types";
-
 import { SearchInput, SubViewHeader } from "~/src/components/wallet/shared";
 import { TokenRowItem } from "~/src/components/wallet/token-row-item";
+import type { TokenRow } from "@loyal-labs/wallet-core/types";
 
 export function AllTokensView({
   tokens,
   isBalanceHidden,
   onBack,
+  onClose,
 }: {
   tokens: TokenRow[];
   isBalanceHidden: boolean;
   onBack: () => void;
+  onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
   const filtered = tokens.filter((t) =>
@@ -20,10 +21,17 @@ export function AllTokensView({
   );
 
   return (
-    <div className="flex h-full flex-col">
-      <SubViewHeader onBack={onBack} title="Tokens" />
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <SubViewHeader onBack={onBack} onClose={onClose} title="Tokens" />
       <SearchInput onChange={setSearch} value={search} />
-      <div className="flex-1 overflow-x-hidden overflow-y-auto px-2">
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          overflowX: "hidden",
+          padding: "0 8px",
+        }}
+      >
         {filtered.map((token, i) => (
           <TokenRowItem
             isBalanceHidden={isBalanceHidden}
@@ -32,7 +40,15 @@ export function AllTokensView({
           />
         ))}
         {filtered.length === 0 && (
-          <div className="py-8 text-center font-sans text-sm text-gray-400">
+          <div
+            style={{
+              padding: "32px 20px",
+              textAlign: "center",
+              fontFamily: "var(--font-geist-sans), sans-serif",
+              fontSize: "14px",
+              color: "rgba(60, 60, 67, 0.6)",
+            }}
+          >
             No tokens found
           </div>
         )}

@@ -13,46 +13,115 @@ export function TokenRowItem({
 
   return (
     <div
-      className="flex w-full items-center overflow-hidden rounded-2xl px-3 transition-colors"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? "rgba(255, 255, 255, 0.06)" : "transparent",
+        display: "flex",
+        alignItems: "center",
+        padding: "0 12px",
+        borderRadius: "16px",
+        width: "100%",
+        overflow: "hidden",
+        background: hovered ? "rgba(0, 0, 0, 0.04)" : "transparent",
+        transition: "background-color 0.15s ease",
         cursor: "pointer",
       }}
     >
-      <div className="shrink-0 pr-3 py-1.5">
-        <div className="relative h-12 w-12">
-          <div className="h-12 w-12 overflow-hidden rounded-full">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          paddingRight: "12px",
+          paddingTop: "6px",
+          paddingBottom: "6px",
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ position: "relative", width: "48px", height: "48px" }}>
+          <div
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "9999px",
+              overflow: "hidden",
+            }}
+          >
             <img
               alt={token.symbol}
-              className="h-full w-full object-cover"
               height={48}
               src={token.icon}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
               width={48}
             />
           </div>
           {token.isSecured && (
-            <div className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-xs">
-              🛡️
-            </div>
+            <img
+              alt="Secured"
+              height={24}
+              src="/hero-new/Shield.png"
+              style={{ position: "absolute", bottom: -2, right: -2 }}
+              width={24}
+            />
           )}
         </div>
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-2.5">
-        <span className="font-sans text-base font-medium leading-5 tracking-tight text-white">
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: "2px",
+          padding: "10px 0",
+          minWidth: 0,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "16px",
+            fontWeight: 500,
+            lineHeight: "20px",
+            color: "#000",
+            letterSpacing: "-0.176px",
+          }}
+        >
           {token.symbol}
         </span>
-        <span className="font-sans text-[13px] leading-4 text-gray-400">
+        <span
+          style={{
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "13px",
+            fontWeight: 400,
+            lineHeight: "16px",
+            color: "rgba(60, 60, 67, 0.6)",
+          }}
+        >
           {token.price}
         </span>
       </div>
-      <div className="flex shrink-0 flex-col items-end justify-center gap-0.5 overflow-hidden rounded-md py-2.5 pl-3">
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "2px",
+          alignItems: "flex-end",
+          justifyContent: "center",
+          padding: "10px 0",
+          paddingLeft: "12px",
+          flexShrink: 0,
+          borderRadius: "6px",
+          overflow: "hidden",
+        }}
+      >
         <span
-          className="text-right font-sans text-base leading-5"
           style={{
-            color: isBalanceHidden ? "#6b7280" : "#fff",
-            filter: isBalanceHidden ? "blur(6px)" : "none",
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "16px",
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: isBalanceHidden ? "#BBBBC0" : "#000",
+            textAlign: "right",
+            filter: isBalanceHidden ? "url(#rs-pixelate-sm)" : "none",
             transition: "filter 0.15s ease, color 0.15s ease",
             userSelect: isBalanceHidden ? "none" : "auto",
           }}
@@ -60,10 +129,13 @@ export function TokenRowItem({
           {token.amount}
         </span>
         <span
-          className="font-sans text-[13px] leading-4"
           style={{
-            color: isBalanceHidden ? "#6b7280" : "rgb(156, 163, 175)",
-            filter: isBalanceHidden ? "blur(6px)" : "none",
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "13px",
+            fontWeight: 400,
+            lineHeight: "16px",
+            color: isBalanceHidden ? "#C8C8CC" : "rgba(60, 60, 67, 0.6)",
+            filter: isBalanceHidden ? "url(#rs-pixelate-sm)" : "none",
             transition: "filter 0.15s ease, color 0.15s ease",
             userSelect: isBalanceHidden ? "none" : "auto",
           }}
