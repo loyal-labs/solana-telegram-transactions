@@ -5,6 +5,7 @@
   "workspaces": [
     "admin",
     "app",
+    "extension",
     "frontend",
     "passkey",
     "packages/*",
@@ -15,6 +16,9 @@
     "admin:dev": "bun run --cwd admin dev",
     "admin:build": "bun run --cwd admin build",
     "admin:lint": "bun run --cwd admin lint",
+    "extension:dev": "bun run --cwd extension dev",
+    "extension:build": "bun run --cwd extension build",
+    "extension:zip": "bun run --cwd extension zip",
     "frontend:dev": "bun run --cwd frontend dev",
     "frontend:build": "bun run --cwd frontend build",
     "frontend:lint": "bun run --cwd frontend lint",
