@@ -13,3 +13,12 @@ jobs:
       - run: bun install
       - run: cd packages/wallet-core && bun run typecheck && bun run build
       - run: cd extension && bun run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-chrome-mv3
+          path: extension/.output/chrome-mv3/
+      - run: cd extension && bun run build:firefox
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-firefox-mv2
+          path: extension/.output/firefox-mv2/
