@@ -602,6 +602,16 @@ function WalletInterface() {
     balance: p.totalBalance,
   }));
 
+  // Sync token state when real positions load
+  useEffect(() => {
+    if (swapTokens.length > 0 && swapTokens[0].mint) {
+      setFromToken(swapTokens[0]);
+      setSendToken(swapTokens[0]);
+      setShieldToken(swapTokens[0]);
+      setToToken(swapTokens.find((t) => t.mint === LOYL_TOKEN.mint) ?? LOYL_TOKEN);
+    }
+  }, [positions.length]);
+
   // Tab content with real components (uses displayTab for cross-fade)
   const renderTabContent = () => {
     switch (displayTab) {
