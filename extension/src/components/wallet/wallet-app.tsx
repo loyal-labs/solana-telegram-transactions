@@ -22,6 +22,9 @@ import { AllActivityView } from "./all-activity-view";
 import { TokenSelectView } from "./token-select-view";
 import { TransactionDetailView } from "./transaction-detail-view";
 import { Settings } from "./settings";
+import { useWalletData } from "@loyal-labs/wallet-core/hooks";
+import { getTokenIconUrl } from "@loyal-labs/wallet-core/lib";
+import { useExtensionWalletDataClient } from "~/src/lib/wallet-data-client";
 
 // ---------------------------------------------------------------------------
 // Default token constants
@@ -508,7 +511,16 @@ function UnlockScreen() {
 // ---------------------------------------------------------------------------
 
 function WalletInterface() {
-  const { balanceHidden, toggleBalanceHidden, publicKey } = useWalletContext();
+  const { balanceHidden, toggleBalanceHidden, publicKey, signer, network } = useWalletContext();
+  const solanaEnv = network as import("@loyal-labs/solana-rpc").SolanaEnv;
+  const walletPubkey = signer?.publicKey ?? null;
+  const walletDataClient = useExtensionWalletDataClient(solanaEnv, walletPubkey);
+  const walletData = useWalletData({
+    publicKey: walletPubkey,
+    connected: !!signer,
+    client: walletDataClient,
+    solanaEnv,
+  });
 
   // Navigation state
   const [activeTab, setActiveTab] = useState<TabId>("portfolio");
@@ -565,31 +577,29 @@ function WalletInterface() {
     setSubView(null);
   }, []);
 
-  // TODO: Wire real wallet data via useWalletData + useSolanaWalletDataClient
-  // once the SolanaWalletDataClient dependency chain is available in the extension.
-  // For now, provide empty/loading placeholder data so navigation and component
-  // rendering work end-to-end.
-  const walletAddress = publicKey;
-  const isLoading = false;
-  const balanceWhole = "$0";
-  const balanceFraction = ".00";
-  const balanceSolLabel = "0 SOL";
-  const walletLabel = walletAddress
-    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`
-    : "No account";
-  const tokenRows: import("@loyal-labs/wallet-core/types").TokenRow[] = [];
-  const allTokenRows: import("@loyal-labs/wallet-core/types").TokenRow[] = [];
-  const activityRows: import("@loyal-labs/wallet-core/types").ActivityRow[] = [];
-  const allActivityRows: import("@loyal-labs/wallet-core/types").ActivityRow[] = [];
-  const transactionDetails: Record<string, import("@loyal-labs/wallet-core/types").TransactionDetail> = {};
+  const {
+    walletAddress,
+    isLoading,
+    balanceWhole,
+    balanceFraction,
+    balanceSolLabel,
+    walletLabel,
+    tokenRows,
+    allTokenRows,
+    activityRows,
+    allActivityRows,
+    transactionDetails,
+    positions,
+    addLocalActivity,
+  } = walletData;
 
   // Convert allTokenRows to SwapToken[] for token-select views
-  const swapTokens: SwapToken[] = allTokenRows.map((row) => ({
-    mint: row.id,
-    symbol: row.symbol,
-    icon: row.icon,
-    price: 0,
-    balance: 0,
+  const swapTokens: SwapToken[] = positions.map((p) => ({
+    mint: p.asset.mint,
+    symbol: p.asset.symbol,
+    icon: p.asset.imageUrl || getTokenIconUrl(p.asset.symbol),
+    price: p.priceUsd ?? 0,
+    balance: p.totalBalance,
   }));
 
   // Tab content with real components (uses displayTab for cross-fade)
@@ -620,6 +630,7 @@ function WalletInterface() {
             onClose={handleClose}
             onNavigate={handleNavigate}
             onDone={handleDone}
+            addLocalActivity={addLocalActivity}
           />
         );
       case "receive":

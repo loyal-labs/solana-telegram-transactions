@@ -8,6 +8,14 @@ export default defineConfig({
       "../packages/wallet-core/src",
       import.meta.url,
     ).pathname,
+    "@loyal-labs/solana-rpc": new URL(
+      "../packages/solana-rpc/src",
+      import.meta.url,
+    ).pathname,
+    "@loyal-labs/solana-wallet": new URL(
+      "../packages/solana-wallet/src",
+      import.meta.url,
+    ).pathname,
   },
 
   manifest: ({ mode }) => ({
