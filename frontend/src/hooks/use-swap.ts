@@ -1,3 +1,4 @@
+import { TOKEN_MINTS } from "@loyal-labs/wallet-core/constants";
 import {
   useConnection,
   useWallet,
@@ -42,15 +43,6 @@ export type SwapResult = {
 // Use Jupiter Swap v1 API with paid tier endpoint
 const JUPITER_QUOTE_API_URL = "https://api.jup.ag/swap/v1/quote";
 const JUPITER_SWAP_API_URL = "https://api.jup.ag/swap/v1/swap";
-
-// Token mint address mapping for Solana mainnet
-const TOKEN_MINTS: Record<string, string> = {
-  SOL: "So11111111111111111111111111111111111111112",
-  USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-  BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-  LOYAL: "LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta",
-};
 
 /**
  * Convert token symbol to mint address

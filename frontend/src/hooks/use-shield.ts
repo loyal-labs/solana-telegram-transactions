@@ -7,6 +7,7 @@ import {
   MAGIC_PROGRAM_ID,
 } from "@loyal-labs/private-transactions";
 import { getPerEndpoints, getSolanaEndpoints } from "@loyal-labs/solana-rpc";
+import { TOKEN_DECIMALS, TOKEN_MINTS } from "@loyal-labs/wallet-core/constants";
 import {
   getAssociatedTokenAddressSync,
   NATIVE_MINT,
@@ -26,22 +27,6 @@ export type ShieldResult = {
   signature?: string;
   success: boolean;
   error?: string;
-};
-
-const TOKEN_MINTS: Record<string, string> = {
-  SOL: "So11111111111111111111111111111111111111112",
-  USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-  BONK: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-  LOYAL: "LYLikzBQtpa9ZgVrJsqYGQpR3cC1WMJrBHaXGrQmeta",
-};
-
-const TOKEN_DECIMALS: Record<string, number> = {
-  SOL: 9,
-  USDC: 6,
-  USDT: 6,
-  BONK: 5,
-  LOYAL: 6,
 };
 
 async function waitForAccount(
