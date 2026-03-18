@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { Long } from "@mtcute/core";
+
 import {
   runSummaryPublishOnce,
   runSummaryPublishOnceCli,
@@ -218,7 +220,7 @@ describe("summary-publish-once", () => {
       {
         createClient: async (config) => createFakeBundle(state, config),
         createDb: () => createFakeDb(state),
-        createRandomId: () => 999n,
+        createRandomId: () => Long.fromInt(999),
         env: {
           TELEGRAM_SUMMARY_INLINE_BOT_USERNAME: "@custom_inline_bot",
           TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM: "-1001",

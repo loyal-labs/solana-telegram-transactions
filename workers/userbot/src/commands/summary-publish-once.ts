@@ -124,8 +124,9 @@ function resolveDeps(overrides: Partial<SummaryPublishOnceDeps>): SummaryPublish
   };
 }
 
-function createRandomMessageId(): bigint {
-  return randomBytes(8).readBigUInt64BE(0) & RANDOM_ID_MASK;
+function createRandomMessageId(): Long {
+  const randomId = randomBytes(8).readBigUInt64BE(0) & RANDOM_ID_MASK;
+  return Long.fromString(randomId.toString(), false);
 }
 
 function createRetryLogger(params: {
