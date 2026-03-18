@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState, useCallback } from "react";
+import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import {
   ConnectionProvider,
   WalletProvider,
@@ -13,6 +13,11 @@ import {
   SolflareWalletAdapter,
   CoinbaseWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
+import { Transaction, VersionedTransaction } from "@solana/web3.js";
+import type {
+  SignTransactionRequest,
+  SignTransactionResponse,
+} from "~/src/lib/external-wallet-signer";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 // ---------------------------------------------------------------------------
@@ -26,9 +31,80 @@ const SOLANA_RPC_ENDPOINT = "https://api.mainnet-beta.solana.com";
 // ---------------------------------------------------------------------------
 
 function ConnectInner() {
-  const { publicKey, connected, disconnect } = useWallet();
+  const { publicKey, connected, disconnect, signTransaction } = useWallet();
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [signingCount, setSigningCount] = useState(0);
+
+  // Keep a ref to signTransaction so the message listener always has the latest
+  const signTxRef = useRef(signTransaction);
+  useEffect(() => {
+    signTxRef.current = signTransaction;
+  }, [signTransaction]);
+
+  // Listen for sign requests from background
+  useEffect(() => {
+    const listener = (
+      message: SignTransactionRequest,
+      _sender: browser.runtime.MessageSender,
+      sendResponse: (response: SignTransactionResponse) => void,
+    ) => {
+      if (message.type !== "SIGN_TRANSACTION") return;
+
+      const signFn = signTxRef.current;
+      if (!signFn) {
+        sendResponse({
+          type: "SIGN_TRANSACTION_RESPONSE",
+          id: message.id,
+          error: "Wallet not connected or does not support signing",
+        });
+        return;
+      }
+
+      setSigningCount((c) => c + 1);
+
+      const bytes = new Uint8Array(message.serializedTx);
+      const tx = message.isVersioned
+        ? VersionedTransaction.deserialize(bytes)
+        : Transaction.from(bytes);
+
+      signFn(tx)
+        .then((signed) => {
+          const serialized = message.isVersioned
+            ? Array.from((signed as VersionedTransaction).serialize())
+            : Array.from(
+                (signed as Transaction).serialize({
+                  requireAllSignatures: false,
+                }),
+              );
+
+          sendResponse({
+            type: "SIGN_TRANSACTION_RESPONSE",
+            id: message.id,
+            serializedTx: serialized,
+          });
+        })
+        .catch((err: unknown) => {
+          sendResponse({
+            type: "SIGN_TRANSACTION_RESPONSE",
+            id: message.id,
+            error:
+              err instanceof Error ? err.message : "Signing failed",
+          });
+        })
+        .finally(() => {
+          setSigningCount((c) => c - 1);
+        });
+
+      // Return true to indicate async sendResponse
+      return true;
+    };
+
+    browser.runtime.onMessage.addListener(listener);
+    return () => {
+      browser.runtime.onMessage.removeListener(listener);
+    };
+  }, []);
 
   const sendPublicKey = useCallback(async (key: string) => {
     try {
@@ -37,10 +113,6 @@ function ConnectInner() {
         publicKey: key,
       });
       setSent(true);
-      // Auto-close the tab after a short delay
-      setTimeout(() => {
-        window.close();
-      }, 2000);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Failed to send key to extension",
@@ -60,9 +132,16 @@ function ConnectInner() {
         <div style={styles.successIcon}>&#10003;</div>
         <h2 style={styles.heading}>Wallet Connected</h2>
         <p style={styles.mono}>{publicKey?.toBase58()}</p>
-        <p style={styles.subtext}>
-          Public key sent to extension. This tab will close automatically.
-        </p>
+        {signingCount > 0 ? (
+          <p style={{ ...styles.subtext, color: "#007AFF", fontWeight: 500 }}>
+            Signing transaction{signingCount > 1 ? "s" : ""}...
+          </p>
+        ) : (
+          <p style={styles.subtext}>
+            Wallet linked to extension. Keep this tab open to approve
+            transactions.
+          </p>
+        )}
       </div>
     );
   }
