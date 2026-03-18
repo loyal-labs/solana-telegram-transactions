@@ -351,6 +351,28 @@
         "typescript": "^5",
       },
     },
+    "packages/wallet-core": {
+      "name": "@loyal-labs/wallet-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@loyal-labs/private-transactions": "workspace:*",
+        "@loyal-labs/solana-rpc": "workspace:*",
+        "@loyal-labs/solana-wallet": "workspace:*",
+        "@loyal-labs/transactions": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5",
+      },
+      "peerDependencies": {
+        "@solana/spl-token": "^0.4.13",
+        "@solana/wallet-standard-features": "*",
+        "@solana/wallet-standard-util": "*",
+        "@solana/web3.js": "^1.98.0",
+        "@wallet-standard/base": "*",
+        "react": "^18.0.0 || ^19.0.0",
+      },
+    },
     "passkey": {
       "name": "passkey",
       "version": "0.1.0",
@@ -1061,6 +1083,8 @@
     "@loyal-labs/transactions": ["@loyal-labs/transactions@workspace:sdk/transactions"],
 
     "@loyal-labs/userbot-worker": ["@loyal-labs/userbot-worker@workspace:workers/userbot"],
+
+    "@loyal-labs/wallet-core": ["@loyal-labs/wallet-core@workspace:packages/wallet-core"],
 
     "@magicblock-labs/ephemeral-rollups-sdk": ["@magicblock-labs/ephemeral-rollups-sdk@0.8.0", "", { "dependencies": { "@phala/dcap-qvl-web": "^0.2.7", "@solana/spl-token": "^0.4.9", "@solana/web3.js": "^1.98.0", "bs58": "^6.0.0", "rpc-websockets": "^9.0.4", "typescript": "^5.3.0" } }, "sha512-Eelgua6ub0+8sB+YgwceW5PNLTNCkJVE66QeEUwkxjVl3ulUu8iCbPQk0E4huHLGlSeoG9UxDypAIhdlmimuyQ=="],
 
