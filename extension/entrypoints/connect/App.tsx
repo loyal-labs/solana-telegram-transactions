@@ -8,11 +8,9 @@ import {
   WalletModalProvider,
   WalletMultiButton,
 } from "@solana/wallet-adapter-react-ui";
-import {
-  PhantomWalletAdapter,
-  SolflareWalletAdapter,
-  CoinbaseWalletAdapter,
-} from "@solana/wallet-adapter-wallets";
+// No explicit adapters needed — Wallet Standard auto-detects installed wallets
+// (Phantom, Backpack, Solflare, etc.). Explicit adapters cause fallback to
+// the wallet's homepage when the extension isn't installed.
 import { Transaction, VersionedTransaction } from "@solana/web3.js";
 import type {
   SignTransactionRequest,
@@ -188,14 +186,9 @@ function ConnectInner() {
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const wallets = useMemo(
-    () => [
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
-      new CoinbaseWalletAdapter(),
-    ],
-    [],
-  );
+  // Empty array — Wallet Standard auto-detects installed browser wallets.
+  // Only wallets actually present in the browser will appear.
+  const wallets = useMemo(() => [], []);
 
   return (
     <div style={styles.page}>
