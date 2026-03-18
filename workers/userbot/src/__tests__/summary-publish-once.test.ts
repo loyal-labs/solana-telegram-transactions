@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { Long } from "@mtcute/core";
+
 import {
   runSummaryPublishOnce,
   runSummaryPublishOnceCli,
@@ -218,7 +220,7 @@ describe("summary-publish-once", () => {
       {
         createClient: async (config) => createFakeBundle(state, config),
         createDb: () => createFakeDb(state),
-        createRandomId: () => 999n,
+        createRandomId: () => Long.fromInt(999),
         env: {
           TELEGRAM_SUMMARY_INLINE_BOT_USERNAME: "@custom_inline_bot",
           TELEGRAM_SUMMARY_PEER_OVERRIDE_FROM: "-1001",
@@ -252,11 +254,11 @@ describe("summary-publish-once", () => {
       (request) => request._ === "messages.sendInlineBotResult"
     );
     expect(sendCall?.id).toBe("latest-summary");
-    expect(sendCall?.queryId).toBe(77n);
-    expect(sendCall?.randomId).toBe(999n);
+    expect(String(sendCall?.queryId)).toBe("77");
+    expect(String(sendCall?.randomId)).toBe("999");
   });
 
-  test("skips delivery when inline returns no results", async () => {
+  test("records inline_query failure when inline returns no results", async () => {
     const state = createFakeState({
       communities: [
         {
@@ -287,11 +289,12 @@ describe("summary-publish-once", () => {
       sleep: async () => undefined,
     });
 
-    expect(result.errors).toHaveLength(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]?.scope).toBe("inline_query");
     expect(result.stats.deliveryAttempted).toBe(1);
     expect(result.stats.deliverySucceeded).toBe(0);
-    expect(result.stats.deliveryFailed).toBe(0);
-    expect(result.stats.skippedNoInlineResults).toBe(1);
+    expect(result.stats.deliveryFailed).toBe(1);
+    expect(result.stats.skippedNoInlineResults).toBe(0);
     expect(
       state.callRequests.some((request) => request._ === "messages.sendInlineBotResult")
     ).toBe(false);

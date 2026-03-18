@@ -15,6 +15,7 @@
     "@loyal-labs/db-adapter-neon": "workspace:*",
     "@loyal-labs/db-core": "workspace:*",
     "@mtcute/bun": "^0.28.1",
+    "@mtcute/core": "^0.28.1",
     "@neondatabase/serverless": "^1.0.2",
     "drizzle-orm": "^0.45.1"
   },
