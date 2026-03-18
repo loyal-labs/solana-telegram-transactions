@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import { communities } from "@loyal-labs/db-core/schema";
+import { Long } from "@mtcute/core";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { createUserbotClient, type UserbotClientBundle } from "../lib/client";
@@ -69,7 +70,7 @@ type ActiveSummaryCommunity = {
 type SummaryPublishOnceDeps = {
   createClient: (config: UserbotConfig) => Promise<UserbotClientBundle>;
   createDb: (databaseUrl: string) => UserbotDb;
-  createRandomId: () => bigint;
+  createRandomId: () => Long;
   env: EnvRecord;
   hasFile: (path: string) => Promise<boolean>;
   loadConfig: (env: EnvRecord) => UserbotConfig;
@@ -184,8 +185,8 @@ async function fetchInlineSummaryResult(params: {
   botInputUser: Awaited<ReturnType<UserbotClientBundle["client"]["resolveUser"]>>;
 }): Promise<{
   destinationPeer: Awaited<ReturnType<UserbotClientBundle["client"]["resolvePeer"]>>;
-  queryId: bigint;
-  resultId: string | null;
+  queryId: Long;
+  resultId: string;
 }> {
   let destinationPeer;
   try {
@@ -225,21 +226,20 @@ async function fetchInlineSummaryResult(params: {
   });
 
   const firstResult = inlineResults.results[0];
-  const queryId = toBigIntValue(inlineResults.queryId, "inline query id");
 
   return {
     destinationPeer,
-    queryId,
-    resultId: firstResult && typeof firstResult.id === "string" ? firstResult.id : null,
+    queryId: inlineResults.queryId,
+    resultId: firstResult.id,
   };
 }
 
 async function sendInlineSummaryResult(params: {
   bundle: UserbotClientBundle;
   destinationPeer: Awaited<ReturnType<UserbotClientBundle["client"]["resolvePeer"]>>;
-  queryId: bigint;
+  queryId: Long;
   resultId: string;
-  randomId: bigint;
+  randomId: Long;
 }): Promise<void> {
   await params.bundle.client.call({
     _: "messages.sendInlineBotResult",
@@ -248,29 +248,6 @@ async function sendInlineSummaryResult(params: {
     queryId: params.queryId,
     randomId: params.randomId,
   });
-}
-
-function toBigIntValue(value: unknown, label: string): bigint {
-  if (typeof value === "bigint") {
-    return value;
-  }
-
-  if (typeof value === "number" && Number.isInteger(value)) {
-    return BigInt(value);
-  }
-
-  if (typeof value === "string" && value.trim().length > 0) {
-    return BigInt(value.trim());
-  }
-
-  if (value && typeof value === "object" && "toString" in value) {
-    const text = String((value as { toString: () => string }).toString()).trim();
-    if (text.length > 0) {
-      return BigInt(text);
-    }
-  }
-
-  throw new Error(`Invalid ${label}`);
 }
 
 export async function runSummaryPublishOnce(
@@ -378,8 +355,8 @@ export async function runSummaryPublishOnce(
 
       let inlineResult: {
         destinationPeer: Awaited<ReturnType<UserbotClientBundle["client"]["resolvePeer"]>>;
-        queryId: bigint;
-        resultId: string | null;
+        queryId: Long;
+        resultId: string;
       };
 
       try {
@@ -417,11 +394,6 @@ export async function runSummaryPublishOnce(
         continue;
       }
 
-      if (inlineResult.resultId === null) {
-        stats.skippedNoInlineResults += 1;
-        continue;
-      }
-
       try {
         await deps.runWithRetry({
           baseDelayMs: RETRY_BASE_DELAY_MS,
@@ -438,8 +410,8 @@ export async function runSummaryPublishOnce(
               bundle,
               destinationPeer: inlineResult.destinationPeer,
               queryId: inlineResult.queryId,
-              randomId: deps.createRandomId(),
               resultId: inlineResult.resultId,
+              randomId: deps.createRandomId(),
             });
           },
         });
