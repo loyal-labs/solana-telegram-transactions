@@ -422,23 +422,22 @@ export function useWalletData(params: {
 
 	const addLocalActivity = useCallback(
 		(row: ActivityRow, detail: TransactionDetail) => {
-			setLocalRows((prev) => {
-				const next = [row, ...prev];
-				if (walletAddress) {
-					const nextDetails = {
-						...localDetails,
-						[row.id]: detail,
-					};
-					localActivityStore.set(walletAddress, {
-						rows: next,
-						details: nextDetails,
-					});
-				}
-				return next;
+			setLocalDetails((prevDetails) => {
+				const nextDetails = { ...prevDetails, [row.id]: detail };
+				setLocalRows((prevRows) => {
+					const next = [row, ...prevRows];
+					if (walletAddress) {
+						localActivityStore.set(walletAddress, {
+							rows: next,
+							details: nextDetails,
+						});
+					}
+					return next;
+				});
+				return nextDetails;
 			});
-			setLocalDetails((prev) => ({ ...prev, [row.id]: detail }));
 		},
-		[walletAddress, localDetails],
+		[walletAddress],
 	);
 
 	useEffect(() => {

@@ -19,10 +19,18 @@ const pendingSignRequests = new Map<
 export default defineBackground(() => {
   browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
-  // Clean up tracked tab when it closes
+  // Clean up tracked tab and reject pending sign requests when it closes
   browser.tabs.onRemoved.addListener((tabId) => {
     if (tabId === connectTabId) {
       connectTabId = null;
+      for (const [id, resolve] of pendingSignRequests) {
+        resolve({
+          type: "SIGN_TRANSACTION_RESPONSE",
+          id,
+          error: "Wallet tab was closed before signing completed.",
+        } satisfies SignTransactionResponse);
+        pendingSignRequests.delete(id);
+      }
     }
   });
 
