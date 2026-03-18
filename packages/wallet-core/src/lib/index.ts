@@ -1,3 +1,5 @@
+export * from "./jupiter/client";
+export * from "./jupiter/types";
 export { getTokenIconUrl } from "./token-icon";
 export * from "./solana/wsol-adapter";
 export * from "./solana/sign-in";
