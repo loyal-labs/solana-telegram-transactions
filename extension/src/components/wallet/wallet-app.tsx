@@ -318,6 +318,56 @@ function CreateWalletScreen() {
               : "Import Wallet"}
         </button>
       </div>
+
+      {/* Divider */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          width: "100%",
+        }}
+      >
+        <div style={{ flex: 1, height: "1px", background: "rgba(0, 0, 0, 0.1)" }} />
+        <span
+          style={{
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "13px",
+            lineHeight: "16px",
+            color: "rgba(60, 60, 67, 0.4)",
+          }}
+        >
+          or
+        </span>
+        <div style={{ flex: 1, height: "1px", background: "rgba(0, 0, 0, 0.1)" }} />
+      </div>
+
+      {/* Connect External Wallet */}
+      <button
+        type="button"
+        onClick={() => {
+          browser.tabs.create({
+            url: browser.runtime.getURL("/connect.html"),
+          });
+        }}
+        style={{
+          width: "100%",
+          padding: "12px 16px",
+          borderRadius: "9999px",
+          border: "1px solid rgba(0, 0, 0, 0.12)",
+          cursor: "pointer",
+          background: "transparent",
+          fontFamily: "var(--font-geist-sans), sans-serif",
+          fontSize: "16px",
+          fontWeight: 400,
+          lineHeight: "20px",
+          color: "#000",
+          textAlign: "center",
+          transition: "background 0.15s ease",
+        }}
+      >
+        Connect External Wallet
+      </button>
     </div>
   );
 }
