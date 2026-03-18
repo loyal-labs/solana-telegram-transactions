@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowLeftRight,
@@ -55,13 +55,14 @@ function layerStyle(
   layer: number,
   activeLayer: number,
 ): React.CSSProperties {
+  const transition = "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)";
   if (layer > activeLayer) {
     // Off-screen to the right
     return {
-      transform: "translateX(100%)",
+      transform: "translateX(105%)",
       opacity: 0,
       pointerEvents: "none",
-      transition: "transform 300ms ease, opacity 200ms ease",
+      transition,
     };
   }
   if (layer === activeLayer) {
@@ -69,15 +70,15 @@ function layerStyle(
     return {
       transform: "translateX(0)",
       opacity: 1,
-      transition: "transform 300ms ease, opacity 200ms ease",
+      transition,
     };
   }
-  // Behind the active layer — shift slightly left
+  // Behind the active layer — shift slightly left (matches frontend's -6px)
   return {
-    transform: "translateX(-8%)",
-    opacity: 0.3,
+    transform: "translateX(-6px)",
+    opacity: 1,
     pointerEvents: "none",
-    transition: "transform 300ms ease, opacity 200ms ease",
+    transition,
   };
 }
 
@@ -518,6 +519,20 @@ function WalletInterface() {
 
   const activeLayer = getActiveLayer(subView);
 
+  // Cross-fade when switching tabs: fade out → swap content → fade in
+  const [crossFadeOpacity, setCrossFadeOpacity] = useState(1);
+  const [displayTab, setDisplayTab] = useState(activeTab);
+  useEffect(() => {
+    if (activeTab !== displayTab) {
+      setCrossFadeOpacity(0); // fade out
+      const t = setTimeout(() => {
+        setDisplayTab(activeTab); // swap content while near-invisible
+        setCrossFadeOpacity(1); // fade in
+      }, 200);
+      return () => clearTimeout(t);
+    }
+  }, [activeTab, displayTab]);
+
   const handleTabChange = useCallback((tab: TabId) => {
     setActiveTab(tab);
     setSubView(null);
@@ -574,9 +589,9 @@ function WalletInterface() {
     balance: 0,
   }));
 
-  // Tab content with real components
+  // Tab content with real components (uses displayTab for cross-fade)
   const renderTabContent = () => {
-    switch (activeTab) {
+    switch (displayTab) {
       case "portfolio":
         return (
           <PortfolioContent
@@ -748,18 +763,32 @@ function WalletInterface() {
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Navigation layers container */}
       <div style={{ position: "relative", flex: 1, overflow: "hidden" }}>
-        {/* Layer 0 — main tab content */}
+        {/* Layer 0 — main tab content with cross-fade */}
         <div
           style={{
             position: "absolute",
             inset: 0,
             display: "flex",
             flexDirection: "column",
-            background: "#F5F5F5",
+            background: activeLayer >= 1 ? "#EBEBEB" : "#F5F5F5",
+            borderRadius: "20px",
+            overflow: "hidden",
+            transition: "background 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
             ...layerStyle(0, activeLayer),
           }}
         >
-          {renderTabContent()}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+              opacity: crossFadeOpacity,
+              transition: "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
+          >
+            {renderTabContent()}
+          </div>
         </div>
 
         {/* Layer 1 — sub-views */}
@@ -769,7 +798,10 @@ function WalletInterface() {
             inset: 0,
             display: "flex",
             flexDirection: "column",
-            background: "#F5F5F5",
+            background: activeLayer >= 2 ? "#EBEBEB" : "#F5F5F5",
+            borderRadius: "20px",
+            overflow: "hidden",
+            transition: "background 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
             ...layerStyle(1, activeLayer),
           }}
         >
