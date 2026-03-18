@@ -10,6 +10,29 @@ import type { SubView, SwapMode, SwapToken } from "@loyal-labs/wallet-core/types
 import { LOYL_TOKEN } from "@loyal-labs/wallet-core/types";
 import { useWalletContext, WalletProvider } from "./wallet-provider";
 
+import { PortfolioContent } from "./portfolio-content";
+import { SendContent } from "./send-content";
+import { ReceiveContent } from "./receive-content";
+import { SwapContent } from "./swap-content";
+import { ShieldContent, SwapShieldTabs } from "./shield-content";
+
+import { AllTokensView } from "./all-tokens-view";
+import { AllActivityView } from "./all-activity-view";
+import { TokenSelectView } from "./token-select-view";
+import { TransactionDetailView } from "./transaction-detail-view";
+
+// ---------------------------------------------------------------------------
+// Default token constants
+// ---------------------------------------------------------------------------
+
+const SOL_TOKEN: SwapToken = {
+  mint: "So11111111111111111111111111111111111111112",
+  symbol: "SOL",
+  icon: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
+  price: 0,
+  balance: 0,
+};
+
 // ---------------------------------------------------------------------------
 // Tab definitions
 // ---------------------------------------------------------------------------
@@ -268,12 +291,16 @@ function UnlockScreen() {
 // ---------------------------------------------------------------------------
 
 function WalletInterface() {
+  const { balanceHidden, toggleBalanceHidden, publicKey } = useWalletContext();
+
   // Navigation state
   const [activeTab, setActiveTab] = useState<TabId>("portfolio");
   const [subView, setSubView] = useState<SubView>(null);
-  const [swapMode, _setSwapMode] = useState<SwapMode>("swap");
-  const [_fromToken, _setFromToken] = useState<SwapToken | null>(null);
-  const [_toToken, _setToToken] = useState<SwapToken>(LOYL_TOKEN);
+  const [swapMode, setSwapMode] = useState<SwapMode>("swap");
+  const [fromToken, setFromToken] = useState<SwapToken>(SOL_TOKEN);
+  const [toToken, setToToken] = useState<SwapToken>(LOYL_TOKEN);
+  const [sendToken, setSendToken] = useState<SwapToken>(SOL_TOKEN);
+  const [shieldToken, setShieldToken] = useState<SwapToken>(SOL_TOKEN);
 
   const activeLayer = getActiveLayer(subView);
 
@@ -292,38 +319,96 @@ function WalletInterface() {
     });
   }, []);
 
-  // Tab content (placeholder divs for Tasks 20-25)
+  const handleNavigate = useCallback((view: SubView) => {
+    setSubView(view);
+  }, []);
+
+  const handleDone = useCallback(() => {
+    setSubView(null);
+  }, []);
+
+  // TODO: Wire real wallet data via useWalletData + useSolanaWalletDataClient
+  // once the SolanaWalletDataClient dependency chain is available in the extension.
+  // For now, provide empty/loading placeholder data so navigation and component
+  // rendering work end-to-end.
+  const walletAddress = publicKey;
+  const isLoading = false;
+  const balanceWhole = "$0";
+  const balanceFraction = ".00";
+  const balanceSolLabel = "0 SOL";
+  const walletLabel = walletAddress
+    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`
+    : "No account";
+  const tokenRows: import("@loyal-labs/wallet-core/types").TokenRow[] = [];
+  const allTokenRows: import("@loyal-labs/wallet-core/types").TokenRow[] = [];
+  const activityRows: import("@loyal-labs/wallet-core/types").ActivityRow[] = [];
+  const allActivityRows: import("@loyal-labs/wallet-core/types").ActivityRow[] = [];
+  const transactionDetails: Record<string, import("@loyal-labs/wallet-core/types").TransactionDetail> = {};
+
+  // Convert allTokenRows to SwapToken[] for token-select views
+  const swapTokens: SwapToken[] = allTokenRows.map((row) => ({
+    mint: row.id,
+    symbol: row.symbol,
+    icon: row.icon,
+    price: 0,
+    balance: 0,
+  }));
+
+  // Tab content with real components
   const renderTabContent = () => {
     switch (activeTab) {
       case "portfolio":
         return (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <p className="text-sm">Portfolio Content</p>
-          </div>
+          <PortfolioContent
+            activityRows={activityRows}
+            balanceFraction={balanceFraction}
+            balanceSolLabel={balanceSolLabel}
+            balanceWhole={balanceWhole}
+            isBalanceHidden={balanceHidden}
+            isLoading={isLoading}
+            onBalanceHiddenChange={() => void toggleBalanceHidden()}
+            onNavigate={handleNavigate}
+            tokenRows={tokenRows}
+            allTokenRows={allTokenRows}
+            transactionDetails={transactionDetails}
+            walletAddress={walletAddress}
+            walletLabel={walletLabel}
+          />
         );
       case "send":
         return (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <p className="text-sm">Send Content</p>
-          </div>
+          <SendContent
+            token={sendToken}
+            onNavigate={handleNavigate}
+            onDone={handleDone}
+          />
         );
       case "receive":
-        return (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <p className="text-sm">Receive Content</p>
-          </div>
-        );
+        return <ReceiveContent />;
       case "swap":
         return (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <p className="text-sm">Swap Content (mode: {swapMode})</p>
-          </div>
+          <SwapContent
+            fromToken={fromToken}
+            toToken={toToken}
+            onFromTokenChange={setFromToken}
+            onToTokenChange={setToToken}
+            onNavigate={handleNavigate}
+            onDone={handleDone}
+            swapMode={swapMode}
+            onSwapModeChange={setSwapMode}
+          />
         );
       case "shield":
         return (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <p className="text-sm">Shield Content</p>
-          </div>
+          <ShieldContent
+            token={shieldToken}
+            onTokenChange={setShieldToken}
+            onNavigate={handleNavigate}
+            onDone={handleDone}
+            securedBalance={0}
+            swapMode={swapMode}
+            onSwapModeChange={setSwapMode}
+          />
         );
     }
   };
@@ -331,75 +416,80 @@ function WalletInterface() {
   // Sub-view content (layer 1)
   const renderSubView = () => {
     if (subView === null) return null;
+
     if (typeof subView === "string") {
-      return (
-        <div className="flex-1 flex flex-col">
-          <button
-            type="button"
-            onClick={goBack}
-            className="text-purple-400 text-sm px-4 py-2 self-start"
-          >
-            &larr; Back
-          </button>
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <p className="text-sm">
-              {subView === "allTokens" && "All Tokens View"}
-              {subView === "allActivity" && "All Activity View"}
-            </p>
-          </div>
-        </div>
-      );
+      if (subView === "allTokens") {
+        return (
+          <AllTokensView
+            tokens={allTokenRows}
+            isBalanceHidden={balanceHidden}
+            onBack={goBack}
+          />
+        );
+      }
+      if (subView === "allActivity") {
+        return (
+          <AllActivityView
+            activities={allActivityRows}
+            details={transactionDetails}
+            isBalanceHidden={balanceHidden}
+            onBack={goBack}
+            onNavigate={handleNavigate}
+          />
+        );
+      }
+      return null;
     }
+
     if (subView.type === "tokenSelect") {
       return (
-        <div className="flex-1 flex flex-col">
-          <button
-            type="button"
-            onClick={goBack}
-            className="text-purple-400 text-sm px-4 py-2 self-start"
-          >
-            &larr; Back
-          </button>
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <p className="text-sm">
-              Token Select ({subView.field})
-            </p>
-          </div>
-        </div>
+        <TokenSelectView
+          title={subView.field === "from" ? "Pay with" : "Receive"}
+          currentToken={subView.field === "from" ? fromToken : toToken}
+          onSelect={(token) => {
+            if (subView.field === "from") {
+              setFromToken(token);
+            } else {
+              setToToken(token);
+            }
+            setSubView(null);
+          }}
+          onBack={goBack}
+          tokens={swapTokens}
+        />
       );
     }
+
     if (subView.type === "sendTokenSelect") {
       return (
-        <div className="flex-1 flex flex-col">
-          <button
-            type="button"
-            onClick={goBack}
-            className="text-purple-400 text-sm px-4 py-2 self-start"
-          >
-            &larr; Back
-          </button>
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <p className="text-sm">Send Token Select</p>
-          </div>
-        </div>
+        <TokenSelectView
+          title="Send token"
+          currentToken={sendToken}
+          onSelect={(token) => {
+            setSendToken(token);
+            setSubView(null);
+          }}
+          onBack={goBack}
+          tokens={swapTokens}
+        />
       );
     }
+
     if (subView.type === "shieldTokenSelect") {
       return (
-        <div className="flex-1 flex flex-col">
-          <button
-            type="button"
-            onClick={goBack}
-            className="text-purple-400 text-sm px-4 py-2 self-start"
-          >
-            &larr; Back
-          </button>
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            <p className="text-sm">Shield Token Select</p>
-          </div>
-        </div>
+        <TokenSelectView
+          title="Shield token"
+          currentToken={shieldToken}
+          onSelect={(token) => {
+            setShieldToken(token);
+            setSubView(null);
+          }}
+          onBack={goBack}
+          tokens={swapTokens}
+        />
       );
     }
+
     return null;
   };
 
@@ -413,18 +503,10 @@ function WalletInterface() {
       return null;
     }
     return (
-      <div className="flex-1 flex flex-col">
-        <button
-          type="button"
-          onClick={goBack}
-          className="text-purple-400 text-sm px-4 py-2 self-start"
-        >
-          &larr; Back
-        </button>
-        <div className="flex-1 flex items-center justify-center text-gray-400">
-          <p className="text-sm">Transaction Detail</p>
-        </div>
-      </div>
+      <TransactionDetailView
+        detail={subView.detail}
+        onBack={goBack}
+      />
     );
   };
 
