@@ -65,6 +65,8 @@ interface WalletContextValue {
   lock: () => void;
   setNetwork: (network: Network) => Promise<void>;
   toggleBalanceHidden: () => Promise<void>;
+  /** Returns the secret key as a byte array. Only available when unlocked. */
+  getSecretKey: () => Uint8Array | null;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
@@ -210,6 +212,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const getSecretKey = useCallback((): Uint8Array | null => {
+    if (!activeKeypair) return null;
+    return activeKeypair.secretKey;
+  }, [activeKeypair]);
+
   const value = useMemo<WalletContextValue>(
     () => ({
       state,
@@ -224,6 +231,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       lock,
       setNetwork,
       toggleBalanceHidden,
+      getSecretKey,
     }),
     [
       state,
@@ -238,6 +246,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       lock,
       setNetwork,
       toggleBalanceHidden,
+      getSecretKey,
     ],
   );
 
