@@ -1,68 +1,102 @@
 "use client";
-import Lottie from "lottie-react";
-import { memo, useEffect, useRef, useState } from "react";
+import type { AnimationItem } from "lottie-web";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 
 import { type BentoItem, bentoItems } from "@/data/bento";
 import { BentoGrid, BentoGridItem } from "./ui/bento-grid";
 
-function BentoAnimation({ item, delay }: { item: BentoItem; delay: number }) {
-  const [animationData, setAnimationData] = useState<unknown>(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [shouldPlay, setShouldPlay] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+async function loadLottieLight() {
+  const mod = await import("lottie-web/build/player/lottie_light");
+  return mod.default ?? mod;
+}
 
-  useEffect(() => {
-    fetch(item.animationPath)
-      .then((res) => res.json())
-      .then(setAnimationData)
-      .catch(console.error);
+function BentoAnimation({ item, delay }: { item: BentoItem; delay: number }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const animRef = useRef<AnimationItem | null>(null);
+  const startedRef = useRef(false);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  const initAnimation = useCallback(async () => {
+    const el = containerRef.current;
+    if (!el || startedRef.current) return;
+    startedRef.current = true;
+
+    const lottie = await loadLottieLight();
+    const anim = lottie.loadAnimation({
+      container: el,
+      renderer: "svg",
+      loop: true,
+      autoplay: true,
+      path: item.animationPath,
+    });
+    animRef.current = anim;
+    el.style.opacity = "1";
+    el.style.animation = "bentoFadeIn 0.6s ease-out";
+    setHasStarted(true);
   }, [item.animationPath]);
 
+  // Start animation after delay when first visible
   useEffect(() => {
-    const el = ref.current;
+    const el = containerRef.current;
     if (!el) return;
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
+        if (entry.isIntersecting && !startedRef.current) {
           observer.disconnect();
+          timer = setTimeout(initAnimation, delay);
         }
       },
       { threshold: 0.3 }
     );
 
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (timer) clearTimeout(timer);
+    };
+  }, [delay, initAnimation]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      animRef.current?.destroy();
+    };
   }, []);
 
+  // Pause/play based on viewport visibility
   useEffect(() => {
-    if (!isVisible) return;
-    const timer = setTimeout(() => setShouldPlay(true), delay);
-    return () => clearTimeout(timer);
-  }, [isVisible, delay]);
+    const el = containerRef.current;
+    if (!el || !hasStarted) return;
 
-  const aspectRatio = item.colSpan === 2 ? "795 / 389" : "1 / 1";
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const anim = animRef.current;
+        if (!anim) return;
+        if (entry.isIntersecting) {
+          anim.play();
+        } else {
+          anim.pause();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasStarted]);
+
+  const aspectRatio =
+    item.aspectRatio ?? (item.colSpan === 2 ? "795 / 389" : "1 / 1");
 
   return (
     <div
-      ref={ref}
+      ref={containerRef}
       className="shrink-0 w-full overflow-hidden"
-      style={{ aspectRatio, background: "#F5F5F5" }}
-    >
-      {animationData !== null && shouldPlay && (
-        <Lottie
-          animationData={animationData}
-          loop
-          style={{
-            width: "100%",
-            height: "100%",
-            opacity: 1,
-            animation: "bentoFadeIn 0.6s ease-out",
-          }}
-        />
-      )}
-    </div>
+      style={{ aspectRatio, background: "#F5F5F5", opacity: 0 }}
+    />
   );
 }
 

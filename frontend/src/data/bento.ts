@@ -3,6 +3,7 @@ export type BentoItem = {
   description: string;
   animationPath: string;
   colSpan: 1 | 2;
+  aspectRatio?: string;
 };
 
 export const bentoItems: BentoItem[] = [
@@ -26,6 +27,7 @@ export const bentoItems: BentoItem[] = [
       "Now you can privately send Solana and SPL tokens with minimal fees. Don't doxx your wallet address either — just use their Telegram username instead.",
     animationPath: "/bento/03-Private-transactions.json",
     colSpan: 1,
+    aspectRatio: "1 / 0.95",
   },
   {
     title: "Community agents",
