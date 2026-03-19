@@ -215,12 +215,6 @@ export function PortfolioContent({
 
   return (
     <>
-      <style>{`
-        .show-all-btn:hover {
-          background: rgba(249, 54, 60, 0.22) !important;
-        }
-      `}</style>
-
       {/* SVG pixelation filters */}
       <svg
         aria-hidden="true"
@@ -458,7 +452,15 @@ export function PortfolioContent({
             width: "100%",
           }}
         >
-          <div style={{ width: "100%", padding: "12px 12px 8px" }}>
+          <div
+            style={{
+              width: "100%",
+              padding: "12px 12px 8px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
             <span
               style={{
                 fontFamily: "var(--font-geist-sans), sans-serif",
@@ -471,6 +473,29 @@ export function PortfolioContent({
             >
               Tokens
             </span>
+            <button
+              onClick={() => onNavigate("allTokens")}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = "0.7";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = "1";
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "#F9363C",
+              }}
+              type="button"
+            >
+              See All
+            </button>
           </div>
 
           {tokenRows.map((token) => (
@@ -480,39 +505,6 @@ export function PortfolioContent({
               token={token}
             />
           ))}
-
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              paddingTop: "8px",
-              width: "100%",
-            }}
-          >
-            <button
-              className="show-all-btn"
-              onClick={() => onNavigate("allTokens")}
-              style={{
-                background: "rgba(249, 54, 60, 0.14)",
-                border: "none",
-                borderRadius: "9999px",
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontFamily: "var(--font-geist-sans), sans-serif",
-                fontSize: "15px",
-                fontWeight: 400,
-                lineHeight: "20px",
-                color: "#000",
-                textAlign: "center",
-                transition: "background-color 0.15s ease",
-              }}
-              type="button"
-            >
-              Show All
-            </button>
-          </div>
         </div>
 
         {/* Activity section */}
@@ -525,7 +517,15 @@ export function PortfolioContent({
             width: "100%",
           }}
         >
-          <div style={{ width: "100%", padding: "12px 12px 8px" }}>
+          <div
+            style={{
+              width: "100%",
+              padding: "12px 12px 8px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
             <span
               style={{
                 fontFamily: "var(--font-geist-sans), sans-serif",
@@ -538,6 +538,29 @@ export function PortfolioContent({
             >
               Activity
             </span>
+            <button
+              onClick={() => onNavigate("allActivity")}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = "0.7";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = "1";
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "#F9363C",
+              }}
+              type="button"
+            >
+              See All
+            </button>
           </div>
 
           {activityRows.map((activity) => (
@@ -568,39 +591,6 @@ export function PortfolioContent({
               No activity yet
             </div>
           )}
-
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              paddingTop: "8px",
-              width: "100%",
-            }}
-          >
-            <button
-              className="show-all-btn"
-              onClick={() => onNavigate("allActivity")}
-              style={{
-                background: "rgba(249, 54, 60, 0.14)",
-                border: "none",
-                borderRadius: "9999px",
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontFamily: "var(--font-geist-sans), sans-serif",
-                fontSize: "15px",
-                fontWeight: 400,
-                lineHeight: "20px",
-                color: "#000",
-                textAlign: "center",
-                transition: "background-color 0.15s ease",
-              }}
-              type="button"
-            >
-              Show All
-            </button>
-          </div>
         </div>
       </div>
 
