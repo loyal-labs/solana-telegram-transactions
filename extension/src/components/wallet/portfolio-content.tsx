@@ -475,6 +475,12 @@ export function PortfolioContent({
             </span>
             <button
               onClick={() => onNavigate("allTokens")}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = "0.7";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = "1";
+              }}
               style={{
                 background: "none",
                 border: "none",
@@ -534,6 +540,12 @@ export function PortfolioContent({
             </span>
             <button
               onClick={() => onNavigate("allActivity")}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = "0.7";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = "1";
+              }}
               style={{
                 background: "none",
                 border: "none",
