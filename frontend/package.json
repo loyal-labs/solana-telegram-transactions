@@ -62,6 +62,7 @@
     "highlight.js": "^11.11.1",
     "jose": "^6.0.13",
     "katex": "^0.16.22",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.553.0",
     "magic-router-sdk": "^1.0.10",
     "motion": "^12.23.24",

@@ -1,43 +1,72 @@
 "use client";
-import { AnimatePresence } from "motion/react";
+import Lottie from "lottie-react";
 import { memo, useEffect, useRef, useState } from "react";
-import { bentoTabs } from "@/data/bento";
+
+import { type BentoItem, bentoItems } from "@/data/bento";
 import { BentoGrid, BentoGridItem } from "./ui/bento-grid";
 
-function BentoGridSectionComponent() {
-  const [activeTab, setActiveTab] = useState(0);
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const [isReady, setIsReady] = useState(false);
+function BentoAnimation({ item, delay }: { item: BentoItem; delay: number }) {
+  const [animationData, setAnimationData] = useState<unknown>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [shouldPlay, setShouldPlay] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setIsReady(true);
+    fetch(item.animationPath)
+      .then((res) => res.json())
+      .then(setAnimationData)
+      .catch(console.error);
+  }, [item.animationPath]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
-  const getIndicatorStyle = () => {
-    const tab = tabRefs.current[activeTab];
-    if (!tab) {
-      return { left: 0, width: 0, opacity: 0 };
-    }
+  useEffect(() => {
+    if (!isVisible) return;
+    const timer = setTimeout(() => setShouldPlay(true), delay);
+    return () => clearTimeout(timer);
+  }, [isVisible, delay]);
 
-    return {
-      left: tab.offsetLeft,
-      width: tab.offsetWidth,
-      opacity: 1,
-    };
-  };
+  const aspectRatio = item.colSpan === 2 ? "795 / 389" : "1 / 1";
 
-  const tabs = bentoTabs.map((tab) => ({
-    label: tab.label,
-    content: tab.items.map((item) => ({
-      title: item.title,
-      description: item.description,
-      className:
-        item.visualKey === "cardFour" || item.visualKey === "cardFive"
-          ? "md:col-span-2"
-          : "md:col-span-1",
-    })),
-  }));
+  return (
+    <div
+      ref={ref}
+      className="shrink-0 w-full overflow-hidden"
+      style={{ aspectRatio, background: "#F5F5F5" }}
+    >
+      {animationData && shouldPlay && (
+        <Lottie
+          animationData={animationData}
+          loop
+          style={{
+            width: "100%",
+            height: "100%",
+            opacity: 1,
+            animation: "bentoFadeIn 0.6s ease-out",
+          }}
+        />
+      )}
+    </div>
+  );
+}
 
+function BentoGridSectionComponent() {
   return (
     <section
       id="about-section"
@@ -48,6 +77,12 @@ function BentoGridSectionComponent() {
         background: "#FFFFFF",
       }}
     >
+      <style>{`
+        @keyframes bentoFadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
       <div
         style={{
           maxWidth: "1200px",
@@ -55,124 +90,58 @@ function BentoGridSectionComponent() {
           position: "relative",
         }}
       >
-        <h2
-          style={{
-            fontFamily: "var(--font-geist-sans), sans-serif",
-            fontSize: "48px",
-            fontWeight: 600,
-            color: "#000",
-            textAlign: "center",
-            marginBottom: "20px",
-            letterSpacing: "-0.96px",
-            lineHeight: "48px",
-          }}
-        >
-          About Loyal
-        </h2>
-        <p
-          style={{
-            fontFamily: "var(--font-geist-sans), sans-serif",
-            fontSize: "24px",
-            fontWeight: 400,
-            color: "rgba(60, 60, 67, 0.6)",
-            textAlign: "center",
-            maxWidth: "500px",
-            margin: "0 auto",
-            lineHeight: "28px",
-          }}
-        >
-          Private AI conversations with cutting-edge technology
-        </p>
-
-        {/* Segmented Control */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            marginTop: "28px",
-            marginBottom: "48px",
-          }}
-        >
+        <div style={{ paddingBottom: "48px" }}>
           <div
             style={{
-              position: "relative",
-              display: "inline-flex",
-              gap: "0.125rem",
-              background: "#F5F5F5",
-              borderRadius: "60px",
-              padding: "4px",
-              maxWidth: "800px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "20px",
+              textAlign: "center",
             }}
           >
-            {/* Active tab indicator */}
-            {isReady && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "4px",
-                  bottom: "4px",
-                  left: getIndicatorStyle().left,
-                  width: getIndicatorStyle().width,
-                  background: "#F9363C",
-                  borderRadius: "9999px",
-                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                  pointerEvents: "none",
-                  zIndex: 0,
-                  opacity: getIndicatorStyle().opacity,
-                }}
-              />
-            )}
-
-            {tabs.map((tab, index) => (
-              <button
-                key={tab.label}
-                onClick={() => setActiveTab(index)}
-                ref={(el) => {
-                  tabRefs.current[index] = el;
-                }}
-                style={{
-                  position: "relative",
-                  padding: "8px 16px",
-                  fontFamily: "var(--font-geist-sans), sans-serif",
-                  fontSize: "16px",
-                  fontWeight: 400,
-                  lineHeight: "20px",
-                  fontFeatureSettings: "'liga' off, 'clig' off",
-                  color:
-                    activeTab === index
-                      ? "#FFFFFF"
-                      : "rgba(60, 60, 67, 0.6)",
-                  background: "transparent",
-                  border: "none",
-                  borderRadius: "9999px",
-                  cursor: "pointer",
-                  transition: "color 0.2s ease",
-                  zIndex: 1,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
+            <h2
+              style={{
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "48px",
+                fontWeight: 600,
+                color: "#000",
+                letterSpacing: "-0.96px",
+                lineHeight: "48px",
+                margin: 0,
+              }}
+            >
+              About Loyal
+            </h2>
+            <p
+              style={{
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "20px",
+                fontWeight: 400,
+                color: "rgba(60, 60, 67, 0.6)",
+                lineHeight: "24px",
+                margin: 0,
+              }}
+            >
+              The future of agentic finance
+            </p>
           </div>
         </div>
 
-        <AnimatePresence mode="wait">
-          <BentoGrid
-            className="mx-auto max-w-5xl"
-            key={activeTab}
-          >
-            {tabs[activeTab].content.map((item, i) => (
-              <BentoGridItem
-                animationDelay={i * 0.03}
-                className={item.className}
-                description={item.description}
-                key={`${activeTab}-${i}`}
-                title={item.title}
-              />
-            ))}
-          </BentoGrid>
-        </AnimatePresence>
+        <BentoGrid>
+          {bentoItems.map((item, i) => (
+            <BentoGridItem
+              animationDelay={i * 0.03}
+              className={
+                item.colSpan === 2 ? "md:col-[2/span_2]" : "md:col-span-1"
+              }
+              description={item.description}
+              header={<BentoAnimation delay={i * 200} item={item} />}
+              key={item.title}
+              title={item.title}
+            />
+          ))}
+        </BentoGrid>
       </div>
     </section>
   );
