@@ -50,7 +50,7 @@ function BentoAnimation({ item, delay }: { item: BentoItem; delay: number }) {
       className="shrink-0 w-full overflow-hidden"
       style={{ aspectRatio, background: "#F5F5F5" }}
     >
-      {animationData && shouldPlay && (
+      {animationData !== null && shouldPlay && (
         <Lottie
           animationData={animationData}
           loop
