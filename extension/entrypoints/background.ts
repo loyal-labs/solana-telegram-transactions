@@ -37,7 +37,14 @@ async function checkAutoLock() {
   }
 }
 
+const hasSidePanel = typeof browser.sidePanel !== "undefined";
+
 async function applyViewMode(mode: "sidebar" | "popup") {
+  if (!hasSidePanel) {
+    // Firefox: always use popup mode (no sidePanel API)
+    await browser.action.setPopup({ popup: "/popup.html" });
+    return;
+  }
   if (mode === "sidebar") {
     // Popup takes priority over openPanelOnActionClick — must clear it first
     await browser.action.setPopup({ popup: "" });
@@ -49,45 +56,47 @@ async function applyViewMode(mode: "sidebar" | "popup") {
 }
 
 export default defineBackground(() => {
-  // Apply saved view mode on startup
-  viewMode.getValue().then((mode) => applyViewMode(mode));
+  if (hasSidePanel) {
+    // Chrome: apply saved view mode on startup
+    viewMode.getValue().then((mode) => applyViewMode(mode));
 
-  // Track popup window so we can close it when sidebar opens
-  let popupWindowId: number | null = null;
+    // Track popup window so we can close it when sidebar opens
+    let popupWindowId: number | null = null;
 
-  // React to view mode changes from settings — switch on the fly
-  viewMode.watch(async (mode) => {
-    await applyViewMode(mode);
-    if (mode === "popup") {
-      const win = await browser.windows.create({
-        url: browser.runtime.getURL("/popup.html"),
-        type: "popup",
-        width: 400,
-        height: 600,
-      });
-      popupWindowId = win.id ?? null;
-    } else {
-      // Can't open sidebar programmatically — badge hints the user to click
-      await browser.action.setBadgeText({ text: "↗" });
-      await browser.action.setBadgeBackgroundColor({ color: "#F9363C" });
-    }
-  });
-
-  // When sidebar opens: clear badge and close leftover popup window
-  browser.runtime.onConnect.addListener((port) => {
-    if (port.name === "sidepanel") {
-      void browser.action.setBadgeText({ text: "" });
-      if (popupWindowId !== null) {
-        void browser.windows.remove(popupWindowId).catch(() => {});
-        popupWindowId = null;
+    // React to view mode changes from settings — switch on the fly
+    viewMode.watch(async (mode) => {
+      await applyViewMode(mode);
+      if (mode === "popup") {
+        const win = await browser.windows.create({
+          url: browser.runtime.getURL("/popup.html"),
+          type: "popup",
+          width: 400,
+          height: 600,
+        });
+        popupWindowId = win.id ?? null;
+      } else {
+        // Can't open sidebar programmatically — badge hints the user to click
+        await browser.action.setBadgeText({ text: "↗" });
+        await browser.action.setBadgeBackgroundColor({ color: "#F9363C" });
       }
-    }
-  });
+    });
 
-  // Clear tracked ID if popup is closed manually
-  browser.windows.onRemoved.addListener((windowId) => {
-    if (windowId === popupWindowId) popupWindowId = null;
-  });
+    // When sidebar opens: clear badge and close leftover popup window
+    browser.runtime.onConnect.addListener((port) => {
+      if (port.name === "sidepanel") {
+        void browser.action.setBadgeText({ text: "" });
+        if (popupWindowId !== null) {
+          void browser.windows.remove(popupWindowId).catch(() => {});
+          popupWindowId = null;
+        }
+      }
+    });
+
+    // Clear tracked ID if popup is closed manually
+    browser.windows.onRemoved.addListener((windowId) => {
+      if (windowId === popupWindowId) popupWindowId = null;
+    });
+  }
 
   // --- Auto-lock: periodic alarm check ---
   browser.alarms.create(LOCK_ALARM, { periodInMinutes: 1 });

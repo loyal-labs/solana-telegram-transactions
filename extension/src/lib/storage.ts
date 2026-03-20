@@ -1,12 +1,16 @@
 import { storage } from "#imports";
 
+// Firefox MV2 lacks browser.storage.session — fall back to local storage.
+// import.meta.env.FIREFOX is a compile-time constant set by WXT.
+const SESSION_AREA = import.meta.env.FIREFOX ? "local" : "session";
+
 export const networkSelection = storage.defineItem<"mainnet" | "devnet">(
   "local:network",
   { fallback: "mainnet" },
 );
 
 export const isWalletUnlocked = storage.defineItem<boolean>(
-  "session:walletUnlocked",
+  `${SESSION_AREA}:walletUnlocked`,
   { fallback: false },
 );
 
@@ -39,12 +43,12 @@ export const viewMode = storage.defineItem<"sidebar" | "popup">(
 
 /** Temporary session key for seamless view mode switching. Cleared after use. */
 export const sessionKeypair = storage.defineItem<string | null>(
-  "session:switchKeypair",
+  `${SESSION_AREA}:switchKeypair`,
   { fallback: null },
 );
 
 /** Epoch ms of last user interaction while unlocked. */
 export const lastActivityAt = storage.defineItem<number>(
-  "session:lastActivityAt",
+  `${SESSION_AREA}:lastActivityAt`,
   { fallback: 0 },
 );

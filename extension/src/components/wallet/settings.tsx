@@ -168,6 +168,9 @@ function SegmentedControl<T extends string | number>({
           onClick={() => onChange(opt.value)}
           style={{
             flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             padding: "8px 0",
             borderRadius: "8px",
             border: "none",
@@ -391,6 +394,9 @@ export function Settings({ onBack }: { onBack: () => void }) {
                   onClick={() => setShowPrivateKey(false)}
                   style={{
                     flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     padding: "8px 0",
                     borderRadius: "8px",
                     border: "none",
@@ -465,6 +471,9 @@ export function Settings({ onBack }: { onBack: () => void }) {
                   }}
                   style={{
                     flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     padding: "8px 0",
                     border: "none",
                     borderRadius: "10px",
@@ -485,6 +494,9 @@ export function Settings({ onBack }: { onBack: () => void }) {
                   onClick={() => setResetAction(null)}
                   style={{
                     flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     padding: "8px 0",
                     border: "none",
                     borderRadius: "10px",
@@ -507,46 +519,50 @@ export function Settings({ onBack }: { onBack: () => void }) {
 
         {/* ── Extension ── */}
         <Section label="Extension">
-          <div style={{ padding: "0 16px" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "10px 0",
-                borderBottom: "0.5px solid rgba(0, 0, 0, 0.08)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                {currentViewMode === "sidebar"
-                  ? <PanelRight size={18} style={{ color: "rgba(0,0,0,0.6)" }} />
-                  : <Square size={18} style={{ color: "rgba(0,0,0,0.6)" }} />
-                }
-                <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: "#000" }}>
-                  View Mode
-                </span>
+          {!import.meta.env.FIREFOX && (
+            <>
+              <div style={{ padding: "0 16px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 0",
+                    borderBottom: "0.5px solid rgba(0, 0, 0, 0.08)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    {currentViewMode === "sidebar"
+                      ? <PanelRight size={18} style={{ color: "rgba(0,0,0,0.6)" }} />
+                      : <Square size={18} style={{ color: "rgba(0,0,0,0.6)" }} />
+                    }
+                    <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: "#000" }}>
+                      View Mode
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <SegmentedControl
-            options={[
-              { value: "sidebar" as const, label: "Sidebar" },
-              { value: "popup" as const, label: "Popup" },
-            ]}
-            value={currentViewMode}
-            onChange={(mode) => {
-              if (mode === currentViewMode) return;
-              setCurrentViewMode(mode);
-              void viewModeStorage.setValue(mode);
-              if (mode === "popup") {
-                // Background opens popup; close this view
-                setTimeout(() => globalThis.close(), 200);
-              } else {
-                // Can't open sidebar programmatically — show instruction
-                setSwitchMessage("Click the extension icon to open sidebar");
-              }
-            }}
-          />
+              <SegmentedControl
+                options={[
+                  { value: "sidebar" as const, label: "Sidebar" },
+                  { value: "popup" as const, label: "Popup" },
+                ]}
+                value={currentViewMode}
+                onChange={(mode) => {
+                  if (mode === currentViewMode) return;
+                  setCurrentViewMode(mode);
+                  void viewModeStorage.setValue(mode);
+                  if (mode === "popup") {
+                    // Background opens popup; close this view
+                    setTimeout(() => globalThis.close(), 200);
+                  } else {
+                    // Can't open sidebar programmatically — show instruction
+                    setSwitchMessage("Click the extension icon to open sidebar");
+                  }
+                }}
+              />
+            </>
+          )}
           <SettingsRow
             icon={<Lock size={18} />}
             title="Lock Now"

@@ -246,6 +246,9 @@ function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create"
           onClick={() => { setMode("create"); setError(null); }}
           style={{
             flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             padding: "8px 0",
             borderRadius: "12px",
             border: "none",
@@ -266,6 +269,9 @@ function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create"
           onClick={() => { setMode("import"); setError(null); }}
           style={{
             flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             padding: "8px 0",
             borderRadius: "12px",
             border: "none",
@@ -376,6 +382,9 @@ function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create"
             onClick={mode === "create" ? handleCreate : handleImport}
             style={{
               width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               padding: "12px 16px",
               marginTop: "16px",
               borderRadius: "9999px",
@@ -505,6 +514,9 @@ function UnlockScreen() {
         onClick={handleUnlock}
         style={{
           width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           padding: "12px 16px",
           marginTop: "16px",
           borderRadius: "9999px",
@@ -530,6 +542,9 @@ function UnlockScreen() {
           onClick={() => setResetAction("create")}
           style={{
             flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             padding: "10px 0",
             borderRadius: "10px",
             border: "none",
@@ -550,6 +565,9 @@ function UnlockScreen() {
           onClick={() => setResetAction("import")}
           style={{
             flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             padding: "10px 0",
             borderRadius: "10px",
             border: "none",
@@ -611,6 +629,9 @@ function UnlockScreen() {
               }}
               style={{
                 flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 padding: "8px 0",
                 border: "none",
                 borderRadius: "10px",
@@ -631,6 +652,9 @@ function UnlockScreen() {
               onClick={() => setResetAction(null)}
               style={{
                 flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 padding: "8px 0",
                 border: "none",
                 borderRadius: "10px",
@@ -1083,6 +1107,16 @@ export default function WalletApp() {
       <style>{`
         @keyframes sidebar-spin {
           to { transform: rotate(360deg); }
+        }
+        /* Firefox: strip native button appearance and hidden inner padding/border */
+        button, input, textarea {
+          -moz-appearance: none;
+          appearance: none;
+        }
+        button::-moz-focus-inner,
+        input::-moz-focus-inner {
+          border: 0;
+          padding: 0;
         }
       `}</style>
       <div
