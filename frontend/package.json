@@ -66,6 +66,7 @@
     "lottie-web": "^5.13.0",
     "lucide-react": "^0.553.0",
     "magic-router-sdk": "^1.0.10",
+    "mixpanel": "^0.20.0",
     "motion": "^12.23.24",
     "next": "15.4.10",
     "qrcode.react": "^4.2.0",

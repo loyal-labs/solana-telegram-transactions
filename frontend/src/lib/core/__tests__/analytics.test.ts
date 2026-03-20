@@ -69,7 +69,11 @@ describe("frontend analytics adapter", () => {
 
   beforeEach(() => {
     (globalThis as { window?: unknown }).window = {
-      location: { origin: "https://askloyal.com" },
+      location: {
+        origin: "https://askloyal.com",
+        pathname: "/wallet",
+      },
+      open: mock(),
     };
     createClientCalls.length = 0;
     identifyCalls.length = 0;
@@ -116,7 +120,7 @@ describe("frontend analytics adapter", () => {
     ]);
   });
 
-  test("identifies authenticated users with grid distinct ids and profile fields", () => {
+  test("identifies authenticated users with wallet distinct ids and profile fields", () => {
     analytics.identifyAuthenticatedUser(publicEnv, {
       authMethod: "wallet",
       subjectAddress: "subject-address",
@@ -128,11 +132,11 @@ describe("frontend analytics adapter", () => {
       smartAccountAddress: "smart-account-address",
     });
 
-    expect(identifyCalls).toEqual(["grid:grid-user-1"]);
+    expect(identifyCalls).toEqual(["wallet:wallet-address"]);
     expect(setUserProfileCalls).toEqual([
       {
-        grid_user_id: "grid-user-1",
         auth_method: "wallet",
+        grid_user_id: "grid-user-1",
         provider: "privy",
         email: "user@example.com",
         $email: "user@example.com",
@@ -143,11 +147,12 @@ describe("frontend analytics adapter", () => {
     ]);
   });
 
-  test("does not identify users without a grid user id", () => {
+  test("does not identify users without a wallet address", () => {
     analytics.identifyAuthenticatedUser(publicEnv, {
       authMethod: "wallet",
       subjectAddress: "subject-address",
       displayAddress: "display-address",
+      gridUserId: "grid-user-1",
     });
 
     expect(identifyCalls).toHaveLength(0);
@@ -160,16 +165,18 @@ describe("frontend analytics adapter", () => {
       subjectAddress: "subject-address",
       displayAddress: "display-address",
       gridUserId: "grid-user-1",
+      walletAddress: "wallet-address",
     });
     analytics.identifyAuthenticatedUser(publicEnv, {
       authMethod: "wallet",
       subjectAddress: "subject-address",
       displayAddress: "display-address",
       gridUserId: "grid-user-1",
+      walletAddress: "wallet-address",
       email: "user@example.com",
     });
 
-    expect(identifyCalls).toEqual(["grid:grid-user-1"]);
+    expect(identifyCalls).toEqual(["wallet:wallet-address"]);
     expect(setUserProfileCalls).toHaveLength(2);
     expect(setUserProfileCalls[1]).toMatchObject({
       email: "user@example.com",
@@ -177,25 +184,122 @@ describe("frontend analytics adapter", () => {
     });
   });
 
-  test("resets the identified user on logout", () => {
-    analytics.identifyAuthenticatedUser(publicEnv, {
+  test("tracks logout before reset", () => {
+    analytics.trackAuthLogout(publicEnv, {
       authMethod: "wallet",
       subjectAddress: "subject-address",
       displayAddress: "display-address",
       gridUserId: "grid-user-1",
+      walletAddress: "wallet-address",
     });
-
     analytics.resetAuthenticatedUser();
 
+    expect(trackCalls).toEqual([
+      {
+        event: analytics.FRONTEND_ANALYTICS_EVENTS.authLogout,
+        properties: {
+          path: "/wallet",
+          auth_method: "wallet",
+          grid_user_id: "grid-user-1",
+          wallet_address: "wallet-address",
+        },
+      },
+    ]);
     expect(resetCalls).toHaveLength(1);
+  });
 
-    analytics.identifyAuthenticatedUser(publicEnv, {
-      authMethod: "wallet",
-      subjectAddress: "subject-address",
-      displayAddress: "display-address",
-      gridUserId: "grid-user-1",
+  test("tracks new chat thread creation with path context", () => {
+    analytics.trackChatThreadCreated(publicEnv, {
+      chat_id: "chat-123",
+      source: "main_chat_input",
+      initial_message_length: 18,
     });
 
-    expect(identifyCalls).toEqual(["grid:grid-user-1", "grid:grid-user-1"]);
+    expect(trackCalls).toEqual([
+      {
+        event: analytics.FRONTEND_ANALYTICS_EVENTS.chatThreadCreated,
+        properties: {
+          path: "/wallet",
+          chat_id: "chat-123",
+          source: "main_chat_input",
+          initial_message_length: 18,
+        },
+      },
+    ]);
+  });
+
+  test("classifies docs links separately", () => {
+    expect(
+      analytics.getTrackedFrontendLink({
+        currentOrigin: "https://askloyal.com",
+        href: "https://docs.askloyal.com/getting-started",
+        linkText: "Docs",
+        path: "/",
+        source: "hero_nav",
+      })
+    ).toEqual({
+      event: analytics.FRONTEND_ANALYTICS_EVENTS.siteDocsOpened,
+      properties: {
+        url: "https://docs.askloyal.com/getting-started",
+        hostname: "docs.askloyal.com",
+        link_text: "Docs",
+        source: "hero_nav",
+        path: "/",
+      },
+    });
+  });
+
+  test("classifies other external links as generic site links", () => {
+    expect(
+      analytics.getTrackedFrontendLink({
+        currentOrigin: "https://askloyal.com",
+        href: "https://discord.askloyal.com",
+        linkText: "Discord",
+        path: "/",
+        source: "footer_link",
+      })
+    ).toEqual({
+      event: analytics.FRONTEND_ANALYTICS_EVENTS.siteLinkOpened,
+      properties: {
+        url: "https://discord.askloyal.com/",
+        hostname: "discord.askloyal.com",
+        link_text: "Discord",
+        source: "footer_link",
+        path: "/",
+      },
+    });
+  });
+
+  test("ignores internal non-document links", () => {
+    expect(
+      analytics.getTrackedFrontendLink({
+        currentOrigin: "https://askloyal.com",
+        href: "/about",
+        linkText: "About",
+        path: "/",
+        source: "hero_nav",
+      })
+    ).toBeNull();
+  });
+
+  test("tracks same-origin document downloads as site links", () => {
+    expect(
+      analytics.getTrackedFrontendLink({
+        currentOrigin: "https://askloyal.com",
+        href: "/Loyal_Public_Transparency_Report_Q4_2025.pdf",
+        linkText: "Q4 2025 Report",
+        path: "/",
+        source: "footer_link",
+      })
+    ).toEqual({
+      event: analytics.FRONTEND_ANALYTICS_EVENTS.siteLinkOpened,
+      properties: {
+        url: "https://askloyal.com/Loyal_Public_Transparency_Report_Q4_2025.pdf",
+        hostname: "askloyal.com",
+        link_text: "Q4 2025 Report",
+        source: "footer_link",
+        path: "/",
+      },
+    });
   });
 });

@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { shouldTrackFrontendPageView } from "../AnalyticsBootstrap";
+import {
+  shouldTrackAuthSignInSuccess,
+  shouldTrackFrontendPageView,
+} from "../AnalyticsBootstrap";
 import { getFrontendPageViewEventName } from "@/lib/core/analytics";
 
 describe("frontend analytics bootstrap helpers", () => {
@@ -34,5 +37,38 @@ describe("frontend analytics bootstrap helpers", () => {
         lastTrackedPath: "/wallet",
       })
     ).toBe(true);
+  });
+
+  test("tracks auth success only for anonymous to authenticated transitions", () => {
+    expect(
+      shouldTrackAuthSignInSuccess({
+        previousUser: null,
+        nextUser: {
+          authMethod: "wallet",
+          subjectAddress: "subject-address",
+          displayAddress: "display-address",
+          walletAddress: "wallet-address",
+        },
+      })
+    ).toBe(true);
+  });
+
+  test("does not retrack auth success once a user already exists", () => {
+    expect(
+      shouldTrackAuthSignInSuccess({
+        previousUser: {
+          authMethod: "wallet",
+          subjectAddress: "subject-address",
+          displayAddress: "display-address",
+          walletAddress: "wallet-address",
+        },
+        nextUser: {
+          authMethod: "wallet",
+          subjectAddress: "subject-address",
+          displayAddress: "display-address",
+          walletAddress: "wallet-address",
+        },
+      })
+    ).toBe(false);
   });
 });
