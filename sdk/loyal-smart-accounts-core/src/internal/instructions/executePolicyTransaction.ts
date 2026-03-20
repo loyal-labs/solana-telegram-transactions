@@ -10,12 +10,14 @@ import {
 import { getProposalPda, getTransactionPda } from "../pda";
 
 export function executePolicyTransaction({
+  feePayer,
   policy,
   transactionIndex,
   signer,
   anchorRemainingAccounts,
   programId = PROGRAM_ID,
 }: {
+  feePayer: PublicKey;
   policy: PublicKey;
   transactionIndex: bigint;
   signer: PublicKey;

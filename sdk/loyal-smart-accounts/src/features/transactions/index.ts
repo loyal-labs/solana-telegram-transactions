@@ -21,4 +21,6 @@ export const transactions = createFeatureModule({
   },
 });
 
-export const createTransactionsClient = transactions.client;
+export type TransactionsFeature = typeof transactions;
+export const createTransactionsClient: TransactionsFeature["client"] =
+  transactions.client;

@@ -13,4 +13,6 @@ export const programConfig = createFeatureModule({
   },
 });
 
-export const createProgramConfigClient = programConfig.client;
+export type ProgramConfigFeature = typeof programConfig;
+export const createProgramConfigClient: ProgramConfigFeature["client"] =
+  programConfig.client;

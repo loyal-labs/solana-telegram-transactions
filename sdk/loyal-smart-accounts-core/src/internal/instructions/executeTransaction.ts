@@ -10,17 +10,20 @@ import {
   Transaction,
   TransactionPayloadDetails,
 } from "../generated";
+import { InvalidPayloadError } from "../../errors.js";
 import { getProposalPda, getSmartAccountPda, getTransactionPda } from "../pda";
 import { accountsForTransactionExecute } from "../utils";
 
 export async function executeTransaction({
   connection,
+  feePayer,
   settingsPda,
   transactionIndex,
   signer,
   programId = PROGRAM_ID,
 }: {
   connection: Connection;
+  feePayer: PublicKey;
   settingsPda: PublicKey;
   transactionIndex: bigint;
   signer: PublicKey;
@@ -43,12 +46,14 @@ export async function executeTransaction({
     connection,
     transactionPda
   );
-  const transactionPayload = transactionAccount.payload
-  let transactionDetails: TransactionPayloadDetails
+  const transactionPayload = transactionAccount.payload;
+  let transactionDetails: TransactionPayloadDetails;
   if (transactionPayload.__kind === "TransactionPayload") {
-    transactionDetails = transactionPayload.fields[0]
+    transactionDetails = transactionPayload.fields[0];
   } else {
-    throw new Error("Invalid transaction payload")
+    throw new InvalidPayloadError(
+      `Operation "executeTransaction" expected a Transaction payload for ${settingsPda.toBase58()}:${transactionIndex.toString()}.`
+    );
   }
 
   const [smartAccountPda] = getSmartAccountPda({

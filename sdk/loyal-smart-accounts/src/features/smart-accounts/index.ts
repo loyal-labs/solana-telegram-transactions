@@ -18,4 +18,6 @@ export const smartAccounts = createFeatureModule({
   },
 });
 
-export const createSmartAccountsClient = smartAccounts.client;
+export type SmartAccountsFeature = typeof smartAccounts;
+export const createSmartAccountsClient: SmartAccountsFeature["client"] =
+  smartAccounts.client;

@@ -6,6 +6,7 @@ import {
 import { getProposalPda, getTransactionPda } from "../pda";
 
 export function executeSettingsTransaction({
+  feePayer,
   settingsPda,
   transactionIndex,
   signer,
@@ -14,6 +15,7 @@ export function executeSettingsTransaction({
   policies,
   programId = PROGRAM_ID,
 }: {
+  feePayer: PublicKey;
   settingsPda: PublicKey;
   transactionIndex: bigint;
   signer: PublicKey;

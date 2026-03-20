@@ -11,6 +11,8 @@ import {
 } from "../codecs/primitives.js";
 
 type ProgramIdParam = { programId?: PublicKey };
+type PdaRegistryKey = keyof typeof PDA_REGISTRY;
+type PdaSeedArgs = Record<string, unknown>;
 
 const STATIC_SEED_CACHE = new Map<string, Uint8Array>();
 
@@ -28,23 +30,64 @@ function derivePda(seeds: Uint8Array[], programId: PublicKey): [PublicKey, numbe
   return PublicKey.findProgramAddressSync(seeds, programId);
 }
 
+function toSeedBytes(token: string, args: PdaSeedArgs): Uint8Array {
+  if (!token.includes(":")) {
+    return getStaticSeed(token);
+  }
+
+  const [field, encoding] = token.split(":") as [string, string];
+  const value = args[field];
+  invariant(value != null, `Missing PDA seed value for "${field}"`);
+
+  switch (encoding) {
+    case "pubkey":
+      invariant(value instanceof PublicKey, `PDA seed "${field}" must be a PublicKey`);
+      return value.toBytes();
+    case "u8":
+      invariant(typeof value === "number", `PDA seed "${field}" must be a number`);
+      return toU8Bytes(value);
+    case "u32":
+      invariant(typeof value === "number", `PDA seed "${field}" must be a number`);
+      return toU32Bytes(value);
+    case "u64":
+      invariant(
+        typeof value === "bigint" || typeof value === "number",
+        `PDA seed "${field}" must be a bigint or number`
+      );
+      return toU64Bytes(typeof value === "bigint" ? value : BigInt(value));
+    case "u128":
+      invariant(
+        typeof value === "bigint" || typeof value === "number",
+        `PDA seed "${field}" must be a bigint or number`
+      );
+      return toU128Bytes(typeof value === "bigint" ? value : BigInt(value));
+    default:
+      invariant(false, `Unsupported PDA seed encoding "${encoding}"`);
+  }
+}
+
+function derivePdaFromRegistry(
+  key: PdaRegistryKey,
+  args: PdaSeedArgs,
+  programId: PublicKey
+): [PublicKey, number] {
+  return derivePda(
+    PDA_REGISTRY[key].seeds.map((seed) => toSeedBytes(seed, args)),
+    programId
+  );
+}
+
 export function getProgramConfigPda({
   programId = PROGRAM_ID,
 }: ProgramIdParam): [PublicKey, number] {
-  return derivePda(
-    PDA_REGISTRY.programConfig.seeds.map((seed) => getStaticSeed(seed)),
-    programId
-  );
+  return derivePdaFromRegistry("programConfig", {}, programId);
 }
 
 export function getSettingsPda({
   accountIndex,
   programId = PROGRAM_ID,
 }: ProgramIdParam & { accountIndex: bigint }): [PublicKey, number] {
-  return derivePda(
-    [getStaticSeed("smart_account"), getStaticSeed("settings"), toU128Bytes(accountIndex)],
-    programId
-  );
+  return derivePdaFromRegistry("settings", { accountIndex }, programId);
 }
 
 export function getSmartAccountPda({
@@ -56,13 +99,9 @@ export function getSmartAccountPda({
   accountIndex: number;
 }): [PublicKey, number] {
   invariant(accountIndex >= 0 && accountIndex < 256, "Invalid vault index");
-  return derivePda(
-    [
-      getStaticSeed("smart_account"),
-      settingsPda.toBytes(),
-      getStaticSeed("smart_account"),
-      toU8Bytes(accountIndex),
-    ],
+  return derivePdaFromRegistry(
+    "smartAccount",
+    { settingsPda, accountIndex },
     programId
   );
 }
@@ -75,13 +114,9 @@ export function getEphemeralSignerPda({
   transactionPda: PublicKey;
   ephemeralSignerIndex: number;
 }): [PublicKey, number] {
-  return derivePda(
-    [
-      getStaticSeed("smart_account"),
-      transactionPda.toBytes(),
-      getStaticSeed("ephemeral_signer"),
-      toU8Bytes(ephemeralSignerIndex),
-    ],
+  return derivePdaFromRegistry(
+    "ephemeralSigner",
+    { transactionPda, ephemeralSignerIndex },
     programId
   );
 }
@@ -94,13 +129,9 @@ export function getTransactionPda({
   settingsPda: PublicKey;
   transactionIndex: bigint;
 }): [PublicKey, number] {
-  return derivePda(
-    [
-      getStaticSeed("smart_account"),
-      settingsPda.toBytes(),
-      getStaticSeed("transaction"),
-      toU64Bytes(transactionIndex),
-    ],
+  return derivePdaFromRegistry(
+    "transaction",
+    { settingsPda, transactionIndex },
     programId
   );
 }
@@ -113,14 +144,9 @@ export function getProposalPda({
   settingsPda: PublicKey;
   transactionIndex: bigint;
 }): [PublicKey, number] {
-  return derivePda(
-    [
-      getStaticSeed("smart_account"),
-      settingsPda.toBytes(),
-      getStaticSeed("transaction"),
-      toU64Bytes(transactionIndex),
-      getStaticSeed("proposal"),
-    ],
+  return derivePdaFromRegistry(
+    "proposal",
+    { settingsPda, transactionIndex },
     programId
   );
 }
@@ -135,15 +161,9 @@ export function getBatchTransactionPda({
   batchIndex: bigint;
   transactionIndex: number;
 }): [PublicKey, number] {
-  return derivePda(
-    [
-      getStaticSeed("smart_account"),
-      settingsPda.toBytes(),
-      getStaticSeed("transaction"),
-      toU64Bytes(batchIndex),
-      getStaticSeed("batch_transaction"),
-      toU32Bytes(transactionIndex),
-    ],
+  return derivePdaFromRegistry(
+    "batchTransaction",
+    { settingsPda, batchIndex, transactionIndex },
     programId
   );
 }
@@ -156,15 +176,7 @@ export function getSpendingLimitPda({
   settingsPda: PublicKey;
   seed: PublicKey;
 }): [PublicKey, number] {
-  return derivePda(
-    [
-      getStaticSeed("smart_account"),
-      settingsPda.toBytes(),
-      getStaticSeed("spending_limit"),
-      seed.toBytes(),
-    ],
-    programId
-  );
+  return derivePdaFromRegistry("spendingLimit", { settingsPda, seed }, programId);
 }
 
 export function getTransactionBufferPda({
@@ -177,14 +189,9 @@ export function getTransactionBufferPda({
   creator: PublicKey;
   bufferIndex: number;
 }): [PublicKey, number] {
-  return derivePda(
-    [
-      getStaticSeed("smart_account"),
-      consensusPda.toBytes(),
-      getStaticSeed("transaction_buffer"),
-      creator.toBytes(),
-      toU8Bytes(bufferIndex),
-    ],
+  return derivePdaFromRegistry(
+    "transactionBuffer",
+    { consensusPda, creator, bufferIndex },
     programId
   );
 }
@@ -197,15 +204,7 @@ export function getPolicyPda({
   settingsPda: PublicKey;
   policySeed: number;
 }): [PublicKey, number] {
-  return derivePda(
-    [
-      getStaticSeed("smart_account"),
-      getStaticSeed("policy"),
-      settingsPda.toBytes(),
-      toU64Bytes(BigInt(policySeed)),
-    ],
-    programId
-  );
+  return derivePdaFromRegistry("policy", { settingsPda, policySeed }, programId);
 }
 
 export { PDA_REGISTRY };

@@ -13,4 +13,5 @@ export const policies = createFeatureModule({
   },
 });
 
-export const createPoliciesClient = policies.client;
+export type PoliciesFeature = typeof policies;
+export const createPoliciesClient: PoliciesFeature["client"] = policies.client;

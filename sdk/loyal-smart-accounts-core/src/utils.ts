@@ -12,6 +12,7 @@ import {
 import { Buffer } from "buffer";
 import invariant from "invariant";
 import { SmartAccountTransactionMessage } from "./generated";
+import { MissingLookupTableAccountError } from "./errors";
 import { getEphemeralSignerPda } from "./pda";
 import { transactionMessageBeet } from "./types";
 import { compileToSynchronousMessageAndAccounts } from "./utils/compileToSynchronousMessage";
@@ -274,17 +275,17 @@ export async function accountsForTransactionExecute({
     }
   );
 
-  const addressLookupTableKeys = message.addressTableLookups.map(
-    ({ accountKey }) => accountKey
-  );
+  const addressLookupTableKeySet = new Map<string, PublicKey>();
+  for (const { accountKey } of message.addressTableLookups) {
+    addressLookupTableKeySet.set(accountKey.toBase58(), accountKey);
+  }
+  const addressLookupTableKeys = [...addressLookupTableKeySet.values()];
   const addressLookupTableAccounts = new Map(
     await Promise.all(
       addressLookupTableKeys.map(async (key) => {
         const { value } = await connection.getAddressLookupTable(key);
         if (!value) {
-          throw new Error(
-            `Address lookup table account ${key.toBase58()} not found`
-          );
+          throw new MissingLookupTableAccountError(key.toBase58());
         }
         return [key.toBase58(), value] as const;
       })
@@ -319,7 +320,7 @@ export async function accountsForTransactionExecute({
     );
     invariant(
       lookupTableAccount,
-      `Address lookup table account ${lookup.accountKey.toBase58()} not found`
+      new MissingLookupTableAccountError(lookup.accountKey.toBase58()).message
     );
 
     for (const accountIndex of lookup.writableIndexes) {
@@ -327,7 +328,10 @@ export async function accountsForTransactionExecute({
         lookupTableAccount.state.addresses[accountIndex];
       invariant(
         pubkey,
-        `Address lookup table account ${lookup.accountKey.toBase58()} does not contain address at index ${accountIndex}`
+        new MissingLookupTableAccountError(
+          lookup.accountKey.toBase58(),
+          `does not contain address at index ${accountIndex}.`
+        ).message
       );
       accountMetas.push({
         pubkey,
@@ -341,7 +345,10 @@ export async function accountsForTransactionExecute({
         lookupTableAccount.state.addresses[accountIndex];
       invariant(
         pubkey,
-        `Address lookup table account ${lookup.accountKey.toBase58()} does not contain address at index ${accountIndex}`
+        new MissingLookupTableAccountError(
+          lookup.accountKey.toBase58(),
+          `does not contain address at index ${accountIndex}.`
+        ).message
       );
       accountMetas.push({
         pubkey,

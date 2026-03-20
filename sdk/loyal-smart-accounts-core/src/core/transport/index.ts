@@ -1,7 +1,4 @@
-import {
-  TransactionMessage,
-  VersionedTransaction,
-} from "@solana/web3.js";
+import { TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import type {
   AddressLookupTableAccount,
   Commitment,
@@ -20,6 +17,7 @@ export type PreparedLoyalSmartAccountsOperation<
   operation: Name;
   payer: PublicKey;
   programId: PublicKey;
+  requiresConfirmation: boolean;
   instructions: readonly TransactionInstruction[];
   lookupTableAccounts: readonly AddressLookupTableAccount[];
 }>;
@@ -67,6 +65,7 @@ export type LoyalSmartAccountsTransport = {
 };
 
 export type LoyalSmartAccountsSendOptions = SendOptions;
+export type LoyalSmartAccountsConfirmBehavior = true | false | "if-required";
 
 export function createTransport(
   config: LoyalSmartAccountsClientConfig
@@ -90,6 +89,51 @@ export function freezePreparedOperation<Name extends string>(
   });
 }
 
+function dedupeSigners(signers: readonly Signer[]): Signer[] {
+  const unique = new Map<string, Signer>();
+  for (const signer of signers) {
+    unique.set(signer.publicKey.toBase58(), signer);
+  }
+  return [...unique.values()];
+}
+
+async function confirmPreparedOperation(args: {
+  transport: LoyalSmartAccountsTransport;
+  prepared: PreparedLoyalSmartAccountsOperation<string>;
+  signature: string;
+  blockhash: string;
+  lastValidBlockHeight: number;
+}): Promise<void> {
+  const context: LoyalSmartAccountsConfirmationContext = {
+    prepared: args.prepared,
+    blockhash: args.blockhash,
+    lastValidBlockHeight: args.lastValidBlockHeight,
+    commitment: args.transport.defaultCommitment,
+  };
+
+  if (args.transport.confirm) {
+    await args.transport.confirm(args.signature, context);
+    return;
+  }
+
+  const confirmation = await args.transport.connection.confirmTransaction(
+    {
+      signature: args.signature,
+      blockhash: args.blockhash,
+      lastValidBlockHeight: args.lastValidBlockHeight,
+    },
+    args.transport.defaultCommitment
+  );
+
+  if (confirmation.value.err) {
+    throw new Error(
+      `Transaction ${args.signature} failed to confirm: ${JSON.stringify(
+        confirmation.value.err
+      )}`
+    );
+  }
+}
+
 export function compilePreparedOperation(args: {
   prepared: PreparedLoyalSmartAccountsOperation<string>;
   blockhash: string;
@@ -108,8 +152,10 @@ export async function sendPreparedOperation(args: {
   prepared: PreparedLoyalSmartAccountsOperation<string>;
   signers: Signer[];
   sendOptions?: LoyalSmartAccountsSendOptions;
+  confirm?: LoyalSmartAccountsConfirmBehavior;
 }): Promise<string> {
-  const { transport, prepared, signers, sendOptions } = args;
+  const { transport, prepared, sendOptions } = args;
+  const signers = dedupeSigners(args.signers);
   const latestBlockhash = await transport.connection.getLatestBlockhash(
     transport.defaultCommitment
   );
@@ -135,12 +181,17 @@ export async function sendPreparedOperation(args: {
           return transport.connection.sendTransaction(transaction, sendOptions);
         })();
 
-    if (transport.confirm) {
-      await transport.confirm(signature, {
+    const shouldConfirm =
+      args.confirm === true ||
+      (args.confirm !== false && prepared.requiresConfirmation);
+
+    if (shouldConfirm) {
+      await confirmPreparedOperation({
+        transport,
         prepared,
+        signature,
         blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-        commitment: transport.defaultCommitment,
       });
     }
 

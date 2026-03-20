@@ -20,6 +20,7 @@ import { accountsForTransactionExecute } from "../utils";
 
 export async function executeBatchTransaction({
   connection,
+  feePayer,
   settingsPda,
   signer,
   batchIndex,
@@ -27,6 +28,7 @@ export async function executeBatchTransaction({
   programId = PROGRAM_ID,
 }: {
   connection: Connection;
+  feePayer: PublicKey;
   settingsPda: PublicKey;
   signer: PublicKey;
   batchIndex: bigint;
@@ -70,6 +72,7 @@ export async function executeBatchTransaction({
       ephemeralSignerBumps: [...batchTransactionAccount.ephemeralSignerBumps],
       smartAccountPda,
       transactionPda: batchPda,
+      programId,
     });
 
   return {

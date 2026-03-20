@@ -5,6 +5,7 @@ import {
   PUBLIC_FEATURE_EXPORTS,
   getOperationsForFeature,
 } from "../../loyal-smart-accounts-core/src/spec";
+import { findRuntimeBindingIssues } from "../src/operation-registry";
 
 describe("operation registry", () => {
   it("covers the full intended public surface", () => {
@@ -46,5 +47,12 @@ describe("operation registry", () => {
     expect(FEATURE_INSTRUCTION_COVERAGE.execution).toContain("executeTransaction");
     expect(sdk.execution.instructions).not.toHaveProperty("executeTransaction");
     expect(sdk.execution.prepare).toHaveProperty("executeTransaction");
+  });
+
+  it("binds every core operation exactly once", () => {
+    expect(findRuntimeBindingIssues()).toEqual({
+      missingBuilders: [],
+      extraBuilders: [],
+    });
   });
 });

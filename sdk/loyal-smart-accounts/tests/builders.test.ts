@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import BN from "bn.js";
 import { Connection, Keypair, TransactionMessage } from "@solana/web3.js";
 import * as sdk from "../index";
+import { MissingOperationConnectionError } from "@loyal-labs/loyal-smart-accounts-core";
 
 describe("slice builders", () => {
   it("builds a smart account creation instruction through the slice API", () => {
@@ -117,5 +118,16 @@ describe("slice builders", () => {
 
     expect(prepared.instructions).toHaveLength(1);
     expect(fetchedAddresses.length).toBeGreaterThan(0);
+  });
+
+  it("throws a clear sdk error when online prepare is missing a connection", async () => {
+    await expect(
+      sdk.execution.prepare.executeTransaction({
+        feePayer: Keypair.generate().publicKey,
+        settingsPda: Keypair.generate().publicKey,
+        transactionIndex: 1n,
+        signer: Keypair.generate().publicKey,
+      } as never)
+    ).rejects.toBeInstanceOf(MissingOperationConnectionError);
   });
 });

@@ -5,6 +5,7 @@ import {
 } from "../generated";
 
 export function executeTransactionSync({
+  feePayer,
   settingsPda,
   accountIndex,
   numSigners,
@@ -12,6 +13,7 @@ export function executeTransactionSync({
   instruction_accounts,
   programId = PROGRAM_ID,
 }: {
+  feePayer: PublicKey;
   settingsPda: PublicKey;
   accountIndex: number;
   numSigners: number;

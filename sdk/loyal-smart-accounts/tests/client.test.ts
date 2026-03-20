@@ -83,4 +83,82 @@ describe("client transport", () => {
 
     expect(signature).toBe("signature-explicit");
   });
+
+  it("confirms required prepared operations by default and deduplicates signers", async () => {
+    const signer = Keypair.generate();
+    let observedSignerCount = 0;
+    let confirmCount = 0;
+
+    const client = sdk.createLoyalSmartAccountsClient({
+      connection: {
+        getLatestBlockhash: async () => ({
+          blockhash: Keypair.generate().publicKey.toBase58(),
+          lastValidBlockHeight: 999,
+        }),
+        confirmTransaction: async () => {
+          confirmCount += 1;
+          return { value: { err: null } };
+        },
+      } as unknown as Connection,
+      sendPrepared: async (_prepared, signers) => {
+        observedSignerCount = signers.length;
+        return "confirmed";
+      },
+    });
+
+    const signature = await client.send(
+      Object.freeze({
+        operation: "fixture",
+        payer: signer.publicKey,
+        programId: signer.publicKey,
+        requiresConfirmation: true,
+        instructions: Object.freeze([]),
+        lookupTableAccounts: Object.freeze([]),
+      }),
+      {
+        signers: [signer, signer],
+      }
+    );
+
+    expect(signature).toBe("confirmed");
+    expect(observedSignerCount).toBe(1);
+    expect(confirmCount).toBe(1);
+  });
+
+  it("lets callers skip confirmation explicitly", async () => {
+    const signer = Keypair.generate();
+    let confirmCount = 0;
+
+    const client = sdk.createLoyalSmartAccountsClient({
+      connection: {
+        getLatestBlockhash: async () => ({
+          blockhash: Keypair.generate().publicKey.toBase58(),
+          lastValidBlockHeight: 111,
+        }),
+        sendTransaction: async () => "skip-confirm",
+        confirmTransaction: async () => {
+          confirmCount += 1;
+          return { value: { err: null } };
+        },
+      } as unknown as Connection,
+    });
+
+    const signature = await client.send(
+      Object.freeze({
+        operation: "fixture",
+        payer: signer.publicKey,
+        programId: signer.publicKey,
+        requiresConfirmation: true,
+        instructions: Object.freeze([]),
+        lookupTableAccounts: Object.freeze([]),
+      }),
+      {
+        signers: [signer],
+        confirm: false,
+      }
+    );
+
+    expect(signature).toBe("skip-confirm");
+    expect(confirmCount).toBe(0);
+  });
 });

@@ -15,7 +15,9 @@ export type LoyalSmartAccountsOperationMetadata = {
   phase: LoyalSmartAccountsOperationPhase;
   payerRole: string;
   signerRoles: readonly string[];
-  defaultsRentPayerToActor?: boolean;
+  signerFallbacks?: Readonly<Record<string, string>>;
+  exposeInstruction?: boolean;
+  requiresConnection?: boolean;
   requiresLookupTables?: boolean;
   requiresConfirmation?: boolean;
 };
@@ -135,7 +137,9 @@ export const OPERATION_REGISTRY = {
     phase: "offline",
     payerRole: "feePayer",
     signerRoles: ["feePayer", "creator", "rentPayer"],
-    defaultsRentPayerToActor: true,
+    signerFallbacks: {
+      rentPayer: "creator",
+    },
   },
   activateProposal: {
     feature: "proposals",
@@ -184,7 +188,9 @@ export const OPERATION_REGISTRY = {
     phase: "offline",
     payerRole: "feePayer",
     signerRoles: ["feePayer", "creator", "rentPayer"],
-    defaultsRentPayerToActor: true,
+    signerFallbacks: {
+      rentPayer: "creator",
+    },
   },
   closeTransactionBuffer: {
     feature: "transactions",
@@ -209,7 +215,9 @@ export const OPERATION_REGISTRY = {
     phase: "offline",
     payerRole: "feePayer",
     signerRoles: ["feePayer", "creator", "rentPayer"],
-    defaultsRentPayerToActor: true,
+    signerFallbacks: {
+      rentPayer: "creator",
+    },
   },
   closeTransaction: {
     feature: "transactions",
@@ -234,16 +242,21 @@ export const OPERATION_REGISTRY = {
     phase: "offline",
     payerRole: "feePayer",
     signerRoles: ["feePayer", "creator", "rentPayer"],
-    defaultsRentPayerToActor: true,
+    signerFallbacks: {
+      rentPayer: "creator",
+    },
   },
   addTransactionToBatch: {
     feature: "batches",
     instruction: "addTransactionToBatch",
     exportName: "addTransaction",
-    phase: "online",
+    phase: "offline",
     payerRole: "feePayer",
     signerRoles: ["feePayer", "signer", "rentPayer"],
-    defaultsRentPayerToActor: true,
+    signerFallbacks: {
+      rentPayer: "signer",
+    },
+    exposeInstruction: false,
     requiresLookupTables: true,
   },
   closeBatchTransaction: {
@@ -318,6 +331,7 @@ export const OPERATION_REGISTRY = {
     phase: "online",
     payerRole: "feePayer",
     signerRoles: ["feePayer"],
+    requiresConnection: true,
     requiresLookupTables: true,
     requiresConfirmation: true,
   },
@@ -328,6 +342,7 @@ export const OPERATION_REGISTRY = {
     phase: "online",
     payerRole: "feePayer",
     signerRoles: ["feePayer", "signer"],
+    requiresConnection: true,
     requiresLookupTables: true,
     requiresConfirmation: true,
   },

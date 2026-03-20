@@ -15,4 +15,5 @@ export const batches = createFeatureModule({
   },
 });
 
-export const createBatchesClient = batches.client;
+export type BatchesFeature = typeof batches;
+export const createBatchesClient: BatchesFeature["client"] = batches.client;

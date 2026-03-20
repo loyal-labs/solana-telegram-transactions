@@ -13,4 +13,5 @@ export const proposals = createFeatureModule({
   },
 });
 
-export const createProposalsClient = proposals.client;
+export type ProposalsFeature = typeof proposals;
+export const createProposalsClient: ProposalsFeature["client"] = proposals.client;

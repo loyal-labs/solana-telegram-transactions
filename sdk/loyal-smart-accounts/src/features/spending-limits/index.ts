@@ -13,4 +13,6 @@ export const spendingLimits = createFeatureModule({
   },
 });
 
-export const createSpendingLimitsClient = spendingLimits.client;
+export type SpendingLimitsFeature = typeof spendingLimits;
+export const createSpendingLimitsClient: SpendingLimitsFeature["client"] =
+  spendingLimits.client;

@@ -6,6 +6,7 @@ import {
 } from "../generated";
 
 export function executePolicyPayloadSync({
+  feePayer,
   policy,
   accountIndex,
   numSigners,
@@ -13,6 +14,7 @@ export function executePolicyPayloadSync({
   instruction_accounts,
   programId = PROGRAM_ID,
 }: {
+  feePayer: PublicKey;
   policy: PublicKey;
   accountIndex: number;
   numSigners: number;

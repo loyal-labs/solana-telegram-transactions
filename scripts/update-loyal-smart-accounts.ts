@@ -2,8 +2,10 @@ import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -29,11 +31,13 @@ type SyncOptions = {
   ref?: string;
   upstreamDir?: string;
   allowProgramIdChange?: boolean;
+  check?: boolean;
 };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = resolve(__dirname, "..");
 const PACKAGE_DIR = resolve(ROOT_DIR, "sdk/loyal-smart-accounts-core");
+const PUBLIC_PACKAGE_DIR = resolve(ROOT_DIR, "sdk/loyal-smart-accounts");
 const RAW_IDL_PATH = join(
   PACKAGE_DIR,
   "upstream/raw/squads_smart_account_program.json"
@@ -144,6 +148,16 @@ function assertFeatureCoverage(): void {
   );
 }
 
+function assertRuntimeBindingCoverage(): void {
+  execFileSync(
+    "bun",
+    ["run", "--cwd", PUBLIC_PACKAGE_DIR, "validate:surface"],
+    {
+      stdio: "inherit",
+    }
+  );
+}
+
 function parseArgs(argv: string[]): SyncOptions {
   const options: SyncOptions = {
     repoUrl: DEFAULT_REPO_URL,
@@ -170,6 +184,10 @@ function parseArgs(argv: string[]): SyncOptions {
     }
     if (current === "--allow-program-id-change") {
       options.allowProgramIdChange = true;
+      continue;
+    }
+    if (current === "--check") {
+      options.check = true;
     }
   }
 
@@ -203,8 +221,91 @@ function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, "utf8")) as T;
 }
 
-function writeJson(path: string, value: unknown): void {
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+function normalizeText(value: string): string {
+  return value.endsWith("\n") ? value : `${value}\n`;
+}
+
+function assertOrWriteFile(args: {
+  path: string;
+  content: string;
+  check?: boolean;
+}): void {
+  const normalizedContent = normalizeText(args.content);
+  const existingContent = existsSync(args.path)
+    ? readFileSync(args.path, "utf8")
+    : null;
+
+  if (args.check) {
+    if (existingContent !== normalizedContent) {
+      throw new Error(`Drift detected for ${args.path}`);
+    }
+    return;
+  }
+
+  writeFileSync(args.path, normalizedContent, "utf8");
+}
+
+function collectFiles(root: string): string[] {
+  if (!existsSync(root)) {
+    return [];
+  }
+
+  return readdirSync(root, { recursive: true })
+    .filter((entry) => {
+      const fullPath = join(root, entry);
+      return statSync(fullPath).isFile();
+    })
+    .map((entry) => entry.toString())
+    .sort();
+}
+
+function assertOrReplaceDirectory(args: {
+  targetDir: string;
+  sourceDir: string;
+  check?: boolean;
+}): void {
+  const targetFiles = collectFiles(args.targetDir);
+  const sourceFiles = collectFiles(args.sourceDir);
+
+  if (args.check) {
+    if (targetFiles.length !== sourceFiles.length) {
+      throw new Error(`Generated output drift detected in ${args.targetDir}`);
+    }
+
+    for (let index = 0; index < sourceFiles.length; index += 1) {
+      if (targetFiles[index] !== sourceFiles[index]) {
+        throw new Error(`Generated output drift detected in ${args.targetDir}`);
+      }
+
+      const targetContent = readFileSync(
+        join(args.targetDir, targetFiles[index]),
+        "utf8"
+      );
+      const sourceContent = readFileSync(
+        join(args.sourceDir, sourceFiles[index]),
+        "utf8"
+      );
+
+      if (targetContent !== sourceContent) {
+        throw new Error(`Generated output drift detected in ${args.targetDir}`);
+      }
+    }
+
+    return;
+  }
+
+  rmSync(args.targetDir, { recursive: true, force: true });
+  mkdirSync(dirname(args.targetDir), { recursive: true });
+
+  for (const relativePath of sourceFiles) {
+    const destinationPath = join(args.targetDir, relativePath);
+    mkdirSync(dirname(destinationPath), { recursive: true });
+    writeFileSync(
+      destinationPath,
+      readFileSync(join(args.sourceDir, relativePath), "utf8"),
+      "utf8"
+    );
+  }
 }
 
 export async function syncFromUpstream(options: SyncOptions): Promise<{
@@ -235,7 +336,7 @@ export async function syncFromUpstream(options: SyncOptions): Promise<{
   }
 
   const currentManifest = existsSync(MANIFEST_PATH)
-    ? readJson<{ programId: string }>(MANIFEST_PATH)
+    ? readJson<{ programId: string; fetchedAt?: string }>(MANIFEST_PATH)
     : null;
   if (
     currentManifest &&
@@ -250,20 +351,19 @@ export async function syncFromUpstream(options: SyncOptions): Promise<{
   mkdirSync(join(PACKAGE_DIR, "upstream/raw"), { recursive: true });
   mkdirSync(join(PACKAGE_DIR, "upstream/normalized"), { recursive: true });
 
-  writeJson(RAW_IDL_PATH, rawIdl);
-  writeJson(NORMALIZED_IDL_PATH, normalizedIdl);
-
   const commitSha = execFileSync("git", ["-C", upstreamDir, "rev-parse", "HEAD"], {
     encoding: "utf8",
   }).trim();
   const upstreamPackage = readJson<{ name: string; version: string }>(
     upstreamPackageJsonPath
   );
-
-  writeJson(MANIFEST_PATH, {
+  const manifest = {
     repoUrl: options.repoUrl,
     commitSha,
-    fetchedAt: new Date().toISOString().slice(0, 10),
+    fetchedAt:
+      options.check && currentManifest?.fetchedAt
+        ? currentManifest.fetchedAt
+        : new Date().toISOString().slice(0, 10),
     sourceIdlPath: UPSTREAM_IDL_PATH,
     sourceProgramLibPath: UPSTREAM_PROGRAM_LIB_PATH,
     sourceSolitaConfigPath: UPSTREAM_SOLITA_CONFIG_PATH,
@@ -273,16 +373,41 @@ export async function syncFromUpstream(options: SyncOptions): Promise<{
     programId,
     upstreamPackageName: upstreamPackage.name,
     upstreamPackageVersion: upstreamPackage.version,
+  };
+
+  assertOrWriteFile({
+    path: RAW_IDL_PATH,
+    content: JSON.stringify(rawIdl, null, 2),
+    check: options.check,
+  });
+  assertOrWriteFile({
+    path: NORMALIZED_IDL_PATH,
+    content: JSON.stringify(normalizedIdl, null, 2),
+    check: options.check,
+  });
+  assertOrWriteFile({
+    path: MANIFEST_PATH,
+    content: JSON.stringify(manifest, null, 2),
+    check: options.check,
   });
 
-  rmSync(GENERATED_DIR, { recursive: true, force: true });
-  mkdirSync(dirname(GENERATED_DIR), { recursive: true });
+  const tempGeneratedDir = join(
+    tmpdir(),
+    `loyal-smart-accounts-generated-${Date.now().toString(36)}`
+  );
   const generator = new Solita(normalizedIdl as any, {
     formatCode: true,
   });
-  await generator.renderAndWriteTo(GENERATED_DIR);
+  await generator.renderAndWriteTo(tempGeneratedDir);
+
+  assertOrReplaceDirectory({
+    targetDir: GENERATED_DIR,
+    sourceDir: tempGeneratedDir,
+    check: options.check,
+  });
 
   assertFeatureCoverage();
+  assertRuntimeBindingCoverage();
 
   return {
     commitSha,
@@ -294,7 +419,7 @@ async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   const result = await syncFromUpstream(options);
   console.log(
-    `Updated loyal-smart-accounts from ${options.repoUrl} at ${result.commitSha} (${result.programId})`
+    `${options.check ? "Validated" : "Updated"} loyal-smart-accounts from ${options.repoUrl} at ${result.commitSha} (${result.programId})`
   );
 }
 

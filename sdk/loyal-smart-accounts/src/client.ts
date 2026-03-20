@@ -2,6 +2,7 @@ import type { Signer } from "@solana/web3.js";
 import {
   createTransport,
   sendPreparedOperation,
+  type LoyalSmartAccountsConfirmBehavior,
   type LoyalSmartAccountsClientConfig,
   type LoyalSmartAccountsSendOptions,
   type PreparedLoyalSmartAccountsOperation,
@@ -34,14 +35,46 @@ import {
 } from "./features/execution/index.js";
 
 export type {
+  LoyalSmartAccountsConfirmBehavior,
   LoyalSmartAccountsClientConfig,
   LoyalSmartAccountsSendOptions,
   PreparedLoyalSmartAccountsOperation,
 } from "@loyal-labs/loyal-smart-accounts-core";
 
+export type LoyalSmartAccountsClient = {
+  connection: LoyalSmartAccountsClientConfig["connection"];
+  programId: Exclude<LoyalSmartAccountsClientConfig["programId"], undefined>;
+  send: (
+    prepared: PreparedLoyalSmartAccountsOperation<string>,
+    args: {
+      signers: Signer[];
+      sendOptions?: LoyalSmartAccountsSendOptions;
+      confirm?: LoyalSmartAccountsConfirmBehavior;
+    }
+  ) => Promise<string>;
+  programConfig: ReturnType<typeof createProgramConfigClient>;
+  smartAccounts: ReturnType<typeof createSmartAccountsClient>;
+  proposals: ReturnType<typeof createProposalsClient>;
+  transactions: ReturnType<typeof createTransactionsClient>;
+  batches: ReturnType<typeof createBatchesClient>;
+  policies: ReturnType<typeof createPoliciesClient>;
+  spendingLimits: ReturnType<typeof createSpendingLimitsClient>;
+  execution: ReturnType<typeof createExecutionClient>;
+  features: {
+    programConfig: typeof programConfig;
+    smartAccounts: typeof smartAccounts;
+    proposals: typeof proposals;
+    transactions: typeof transactions;
+    batches: typeof batches;
+    policies: typeof policies;
+    spendingLimits: typeof spendingLimits;
+    execution: typeof execution;
+  };
+};
+
 export function createLoyalSmartAccountsClient(
   config: LoyalSmartAccountsClientConfig
-) {
+): LoyalSmartAccountsClient {
   const transport = createTransport(config);
 
   return {
@@ -52,6 +85,7 @@ export function createLoyalSmartAccountsClient(
       args: {
         signers: Signer[];
         sendOptions?: LoyalSmartAccountsSendOptions;
+        confirm?: LoyalSmartAccountsConfirmBehavior;
       }
     ) {
       return sendPreparedOperation({
@@ -59,6 +93,7 @@ export function createLoyalSmartAccountsClient(
         prepared,
         signers: [...args.signers],
         sendOptions: args.sendOptions,
+        confirm: args.confirm,
       });
     },
     programConfig: createProgramConfigClient(transport),
@@ -81,7 +116,3 @@ export function createLoyalSmartAccountsClient(
     },
   };
 }
-
-export type LoyalSmartAccountsClient = ReturnType<
-  typeof createLoyalSmartAccountsClient
->;

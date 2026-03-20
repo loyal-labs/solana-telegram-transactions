@@ -27,4 +27,5 @@ export const execution = createFeatureModule({
   },
 });
 
-export const createExecutionClient = execution.client;
+export type ExecutionFeature = typeof execution;
+export const createExecutionClient: ExecutionFeature["client"] = execution.client;

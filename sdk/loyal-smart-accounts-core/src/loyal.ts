@@ -1,6 +1,3 @@
-import {
-  createLoyalSmartAccountsClient,
-} from "@loyal-labs/loyal-smart-accounts";
 import { Connection, type Commitment } from "@solana/web3.js";
 import { getSolanaEndpoints, type SolanaEnv } from "@loyal-labs/solana-rpc";
 import type { LoyalSmartAccountsClientConfig } from "./transport.js";
@@ -11,17 +8,22 @@ type CreateConnection = (
   commitment: Commitment
 ) => Connection;
 
-export type CreateLoyalSmartAccountsClientFromEnvConfig = Omit<
-  LoyalSmartAccountsClientConfig,
-  "connection" | "defaultCommitment"
-> & {
+export type LoyalSmartAccountsConnectionCache = Map<string, Connection>;
+
+export type LoyalSmartAccountsConnectionConfig = {
   env: SolanaEnv;
   commitment?: Commitment;
   connection?: Connection;
   createConnection?: CreateConnection;
+  cache?: LoyalSmartAccountsConnectionCache;
 };
 
-const connectionCache = new Map<string, Connection>();
+export type ResolveLoyalSmartAccountsClientConfigFromEnvInput = Omit<
+  LoyalSmartAccountsClientConfig,
+  "connection" | "defaultCommitment"
+> &
+  LoyalSmartAccountsConnectionConfig;
+
 const DEFAULT_COMMITMENT: Commitment = "confirmed";
 
 function getCacheKey(
@@ -32,42 +34,68 @@ function getCacheKey(
   return `${rpcEndpoint}::${websocketEndpoint}::${commitment}`;
 }
 
-function getOrCreateConnection(
-  env: SolanaEnv,
-  commitment: Commitment,
-  createConnection?: CreateConnection
+export function createLoyalSmartAccountsConnectionCache(): LoyalSmartAccountsConnectionCache {
+  return new Map<string, Connection>();
+}
+
+export function resetLoyalSmartAccountsConnectionCache(
+  cache: LoyalSmartAccountsConnectionCache
+): void {
+  cache.clear();
+}
+
+export function getLoyalSmartAccountsConnection(
+  config: LoyalSmartAccountsConnectionConfig
 ): Connection {
-  const { rpcEndpoint, websocketEndpoint } = getSolanaEndpoints(env);
+  if (config.connection) {
+    return config.connection;
+  }
+
+  const commitment = config.commitment ?? DEFAULT_COMMITMENT;
+  const { rpcEndpoint, websocketEndpoint } = getSolanaEndpoints(config.env);
+
+  if (!config.cache) {
+    return config.createConnection
+      ? config.createConnection(rpcEndpoint, websocketEndpoint, commitment)
+      : new Connection(rpcEndpoint, {
+          commitment,
+          wsEndpoint: websocketEndpoint,
+        });
+  }
+
   const cacheKey = getCacheKey(rpcEndpoint, websocketEndpoint, commitment);
-  const cached = connectionCache.get(cacheKey);
+  const cached = config.cache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
-  const connection = createConnection
-    ? createConnection(rpcEndpoint, websocketEndpoint, commitment)
+  const connection = config.createConnection
+    ? config.createConnection(rpcEndpoint, websocketEndpoint, commitment)
     : new Connection(rpcEndpoint, {
         commitment,
         wsEndpoint: websocketEndpoint,
       });
 
-  connectionCache.set(cacheKey, connection);
+  config.cache.set(cacheKey, connection);
   return connection;
 }
 
-export function createLoyalSmartAccountsClientFromEnv(
-  config: CreateLoyalSmartAccountsClientFromEnvConfig
-): ReturnType<typeof createLoyalSmartAccountsClient> {
+export function resolveLoyalSmartAccountsClientConfigFromEnv(
+  config: ResolveLoyalSmartAccountsClientConfigFromEnvInput
+): LoyalSmartAccountsClientConfig {
   const commitment = config.commitment ?? DEFAULT_COMMITMENT;
-  const connection =
-    config.connection ??
-    getOrCreateConnection(config.env, commitment, config.createConnection);
 
-  return createLoyalSmartAccountsClient({
-    connection,
+  return {
+    connection: getLoyalSmartAccountsConnection({
+      env: config.env,
+      commitment,
+      connection: config.connection,
+      createConnection: config.createConnection,
+      cache: config.cache,
+    }),
     programId: config.programId,
     defaultCommitment: commitment,
     sendPrepared: config.sendPrepared,
     confirm: config.confirm,
-  });
+  };
 }
