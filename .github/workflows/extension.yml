@@ -2,6 +2,7 @@ name: Extension CI
 on:
   push:
     paths: ["extension/**", "packages/wallet-core/**"]
+    tags-ignore: ["ext-v*"]
   pull_request:
     paths: ["extension/**", "packages/wallet-core/**"]
 jobs:
