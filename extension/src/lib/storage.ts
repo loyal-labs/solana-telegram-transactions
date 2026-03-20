@@ -31,6 +31,18 @@ export const autoLockTimeout = storage.defineItem<number>(
   { fallback: 15 },
 );
 
+/** Extension view mode: sidebar or popup */
+export const viewMode = storage.defineItem<"sidebar" | "popup">(
+  "local:viewMode",
+  { fallback: "sidebar" },
+);
+
+/** Temporary session key for seamless view mode switching. Cleared after use. */
+export const sessionKeypair = storage.defineItem<string | null>(
+  "session:switchKeypair",
+  { fallback: null },
+);
+
 /** Epoch ms of last user interaction while unlocked. */
 export const lastActivityAt = storage.defineItem<number>(
   "session:lastActivityAt",

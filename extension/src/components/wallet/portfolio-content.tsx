@@ -196,7 +196,7 @@ export function PortfolioContent({
         </div>
 
         {/* Tokens skeleton */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden" }}>
           <div
             style={{
               display: "flex",
@@ -493,6 +493,22 @@ export function PortfolioContent({
             key={label}
             type="button"
             onClick={action}
+            onMouseEnter={(e) => {
+              const circle = e.currentTarget.querySelector("[data-action-circle]") as HTMLElement;
+              if (circle) circle.style.background = "rgba(249, 54, 60, 0.22)";
+            }}
+            onMouseLeave={(e) => {
+              const circle = e.currentTarget.querySelector("[data-action-circle]") as HTMLElement;
+              if (circle) circle.style.background = "rgba(249, 54, 60, 0.14)";
+            }}
+            onMouseDown={(e) => {
+              const circle = e.currentTarget.querySelector("[data-action-circle]") as HTMLElement;
+              if (circle) circle.style.transform = "scale(0.93)";
+            }}
+            onMouseUp={(e) => {
+              const circle = e.currentTarget.querySelector("[data-action-circle]") as HTMLElement;
+              if (circle) circle.style.transform = "scale(1)";
+            }}
             style={{
               flex: 1,
               display: "flex",
@@ -509,6 +525,7 @@ export function PortfolioContent({
             }}
           >
             <div
+              data-action-circle
               style={{
                 width: "48px",
                 height: "48px",
@@ -517,7 +534,7 @@ export function PortfolioContent({
                 alignItems: "center",
                 justifyContent: "center",
                 background: "rgba(249, 54, 60, 0.14)",
-                transition: "transform 0.15s ease",
+                transition: "background 0.15s ease, transform 0.15s ease",
               }}
             >
               <Icon size={24} strokeWidth={1.5} style={{ color: "#000" }} />
@@ -540,6 +557,7 @@ export function PortfolioContent({
       <div
         style={{
           flex: 1,
+          minHeight: 0,
           overflowY: "auto",
           overflowX: "hidden",
         }}

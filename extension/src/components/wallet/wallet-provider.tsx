@@ -6,7 +6,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Connection } from "@solana/web3.js";
+import { Connection, Keypair } from "@solana/web3.js";
 import type { WalletSigner } from "@loyal-labs/wallet-core/types";
 import { createKeypairSigner } from "~/src/lib/keypair-signer";
 import {
@@ -22,6 +22,7 @@ import {
   isWalletUnlocked as isWalletUnlockedStorage,
   lastActivityAt as lastActivityAtStorage,
   networkSelection,
+  sessionKeypair as sessionKeypairStorage,
 } from "~/src/lib/storage";
 
 // ---------------------------------------------------------------------------
@@ -66,7 +67,9 @@ interface WalletContextValue {
   unlock: (password: string) => Promise<void>;
   lock: () => void;
   /** Wipe stored keypair and return to the create wallet screen */
-  resetWallet: () => Promise<void>;
+  resetWallet: (initialMode?: "create" | "import") => Promise<void>;
+  /** The mode the create screen should open in after a reset */
+  resetMode: "create" | "import";
   setNetwork: (network: Network) => Promise<void>;
   toggleBalanceHidden: () => Promise<void>;
   /** Returns the secret key as a byte array. Only available when unlocked. */
@@ -113,11 +116,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     async function init() {
-      const [hasKeypair, storedPk, net, hidden] = await Promise.all([
+      const [hasKeypair, storedPk, net, hidden, switchKey] = await Promise.all([
         hasStoredKeypair(),
         getStoredPublicKey(),
         networkSelection.getValue(),
         isBalanceHiddenStorage.getValue(),
+        sessionKeypairStorage.getValue(),
       ]);
 
       if (cancelled) return;
@@ -125,6 +129,18 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setPublicKey(storedPk);
       setNetworkState(net);
       setBalanceHidden(hidden);
+
+      // Auto-unlock from session keypair (persists across open/close within browser session)
+      if (switchKey) {
+        try {
+          const keypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(switchKey)));
+          buildSigner(keypair);
+          return;
+        } catch {
+          // Fall through to normal locked state
+        }
+      }
+
       setState(hasKeypair ? "locked" : "noWallet");
     }
 
@@ -195,6 +211,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setState("unlocked");
       void isWalletUnlockedStorage.setValue(true);
       void lastActivityAtStorage.setValue(Date.now());
+      // Persist keypair in session storage so reopening doesn't require re-auth
+      void sessionKeypairStorage.setValue(JSON.stringify(Array.from(keypair.secretKey)));
     },
     [connection],
   );
@@ -231,14 +249,19 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setActiveKeypair(null);
     setState("locked");
     void isWalletUnlockedStorage.setValue(false);
+    void sessionKeypairStorage.setValue(null);
   }, []);
 
-  const resetWallet = useCallback(async () => {
+  const [resetMode, setResetMode] = useState<"create" | "import">("create");
+
+  const resetWallet = useCallback(async (initialMode: "create" | "import" = "create") => {
     setSigner(null);
     setActiveKeypair(null);
     setPublicKey(null);
+    setResetMode(initialMode);
     await clearStoredKeypair();
     await isWalletUnlockedStorage.setValue(false);
+    await sessionKeypairStorage.setValue(null);
     setState("noWallet");
   }, []);
 
@@ -273,6 +296,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       unlock,
       lock,
       resetWallet,
+      resetMode,
       setNetwork,
       toggleBalanceHidden,
       getSecretKey,
@@ -289,6 +313,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       unlock,
       lock,
       resetWallet,
+      resetMode,
       setNetwork,
       toggleBalanceHidden,
       getSecretKey,

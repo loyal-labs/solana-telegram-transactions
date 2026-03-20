@@ -1,8 +1,8 @@
-import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Eye, Globe, KeyRound, Lock, Plus, Timer } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Eye, Globe, KeyRound, Lock, PanelRight, Plus, Square, Timer } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { useWalletContext } from "~/src/components/wallet/wallet-provider";
-import { autoLockTimeout } from "~/src/lib/storage";
+import { autoLockTimeout, viewMode as viewModeStorage } from "~/src/lib/storage";
 
 const font = "var(--font-geist-sans), sans-serif";
 const secondary = "rgba(60, 60, 67, 0.6)";
@@ -154,11 +154,11 @@ function SegmentedControl<T extends string | number>({
     <div
       style={{
         display: "flex",
-        gap: "0",
-        background: "rgba(0, 0, 0, 0.06)",
-        borderRadius: "8px",
-        padding: "2px",
-        margin: "4px 16px 8px",
+        gap: "4px",
+        background: "rgba(0, 0, 0, 0.04)",
+        borderRadius: "12px",
+        padding: "4px",
+        margin: "4px 12px 8px",
       }}
     >
       {options.map((opt) => (
@@ -168,18 +168,18 @@ function SegmentedControl<T extends string | number>({
           onClick={() => onChange(opt.value)}
           style={{
             flex: 1,
-            padding: "6px 0",
-            borderRadius: "6px",
+            padding: "8px 0",
+            borderRadius: "8px",
             border: "none",
             cursor: "pointer",
             fontFamily: font,
-            fontSize: "12px",
+            fontSize: "13px",
             fontWeight: 500,
-            lineHeight: "16px",
+            lineHeight: "20px",
             background: value === opt.value ? "#fff" : "transparent",
             color: value === opt.value ? "#000" : secondary,
             boxShadow: value === opt.value ? "0 1px 3px rgba(0, 0, 0, 0.08)" : "none",
-            transition: "all 0.15s ease",
+            transition: "background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease",
             minWidth: 0,
           }}
         >
@@ -201,9 +201,12 @@ export function Settings({ onBack }: { onBack: () => void }) {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [resetAction, setResetAction] = useState<"create" | "import" | null>(null);
   const [lockTimeout, setLockTimeout] = useState(15);
+  const [currentViewMode, setCurrentViewMode] = useState<"sidebar" | "popup">("sidebar");
+  const [switchMessage, setSwitchMessage] = useState<string | null>(null);
 
   useEffect(() => {
     void autoLockTimeout.getValue().then(setLockTimeout);
+    void viewModeStorage.getValue().then(setCurrentViewMode);
   }, []);
 
   const handleCopyPrivateKey = useCallback(() => {
@@ -220,7 +223,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
     : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, background: "#F5F5F5" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, background: "#F5F5F5", position: "relative", overflow: "hidden" }}>
       {/* Header */}
       <div
         style={{
@@ -267,6 +270,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
       <div
         style={{
           flex: 1,
+          minHeight: 0,
           overflowY: "auto",
           padding: "4px 12px 20px",
           display: "flex",
@@ -455,8 +459,9 @@ export function Settings({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   onClick={() => {
-                    void resetWallet();
+                    const action = resetAction;
                     setResetAction(null);
+                    void resetWallet(action === "import" ? "import" : "create");
                   }}
                   style={{
                     flex: 1,
@@ -502,6 +507,46 @@ export function Settings({ onBack }: { onBack: () => void }) {
 
         {/* ── Extension ── */}
         <Section label="Extension">
+          <div style={{ padding: "0 16px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 0",
+                borderBottom: "0.5px solid rgba(0, 0, 0, 0.08)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {currentViewMode === "sidebar"
+                  ? <PanelRight size={18} style={{ color: "rgba(0,0,0,0.6)" }} />
+                  : <Square size={18} style={{ color: "rgba(0,0,0,0.6)" }} />
+                }
+                <span style={{ fontFamily: font, fontSize: "14px", fontWeight: 400, lineHeight: "20px", color: "#000" }}>
+                  View Mode
+                </span>
+              </div>
+            </div>
+          </div>
+          <SegmentedControl
+            options={[
+              { value: "sidebar" as const, label: "Sidebar" },
+              { value: "popup" as const, label: "Popup" },
+            ]}
+            value={currentViewMode}
+            onChange={(mode) => {
+              if (mode === currentViewMode) return;
+              setCurrentViewMode(mode);
+              void viewModeStorage.setValue(mode);
+              if (mode === "popup") {
+                // Background opens popup; close this view
+                setTimeout(() => globalThis.close(), 200);
+              } else {
+                // Can't open sidebar programmatically — show instruction
+                setSwitchMessage("Click the extension icon to open sidebar");
+              }
+            }}
+          />
           <SettingsRow
             icon={<Lock size={18} />}
             title="Lock Now"
@@ -563,6 +608,40 @@ export function Settings({ onBack }: { onBack: () => void }) {
           </span>
         </div>
       </div>
+
+      {/* Fullscreen overlay for sidebar switch prompt */}
+      {switchMessage && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(245, 245, 245, 0.75)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "0 24px",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: font,
+              fontSize: "15px",
+              fontWeight: 600,
+              lineHeight: "22px",
+              color: "#000",
+              textAlign: "center",
+            }}
+          >
+            Click the <img src="/icon/128.png" alt="" style={{ width: "18px", height: "18px", verticalAlign: "-3px", display: "inline", margin: "0 2px" }} /> extension icon to open sidebar
+          </span>
+        </div>
+      )}
     </div>
   );
 }

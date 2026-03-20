@@ -168,12 +168,12 @@ function Logotype() {
 // Create / Import wallet screen
 // ---------------------------------------------------------------------------
 
-function CreateWalletScreen() {
+function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create" | "import" }) {
   const { createWallet, importWallet } = useWalletContext();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [secretKeyInput, setSecretKeyInput] = useState("");
-  const [mode, setMode] = useState<"create" | "import">("create");
+  const [mode, setMode] = useState<"create" | "import">(initialMode);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -208,7 +208,10 @@ function CreateWalletScreen() {
     }
     try {
       const hex = secretKeyInput.trim().replace(/^0x/, "");
-      const bytes = new Uint8Array(hex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)));
+      if (!hex) throw new Error("Private key cannot be empty");
+      const pairs = hex.match(/.{1,2}/g);
+      if (!pairs) throw new Error("Invalid hex format");
+      const bytes = new Uint8Array(pairs.map((b) => parseInt(b, 16)));
       setError(null);
       setLoading(true);
       await importWallet(bytes, password);
@@ -327,21 +330,22 @@ function CreateWalletScreen() {
             placeholder="Private key (hex)"
             value={secretKeyInput}
             onChange={(e) => setSecretKeyInput(e.target.value)}
-            rows={3}
+            rows={4}
             style={{
               width: "100%",
               background: "#fff",
               border: "none",
               borderRadius: "16px",
-              padding: "15px 16px",
-              fontFamily: "var(--font-geist-sans), sans-serif",
-              fontSize: "16px",
+              padding: "12px 16px",
+              fontFamily: "monospace",
+              fontSize: "13px",
               fontWeight: 400,
-              lineHeight: "20px",
+              lineHeight: "18px",
               color: "#000",
               outline: "none",
               resize: "none",
               boxSizing: "border-box",
+              wordBreak: "break-all",
             }}
           />
         )}
@@ -408,7 +412,7 @@ function UnlockScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetAction, setResetAction] = useState<"create" | "import" | null>(null);
 
   const handleUnlock = async () => {
     setError(null);
@@ -523,7 +527,7 @@ function UnlockScreen() {
       <div style={{ display: "flex", gap: "8px", width: "100%", marginTop: "24px" }}>
         <button
           type="button"
-          onClick={() => setShowResetConfirm(true)}
+          onClick={() => setResetAction("create")}
           style={{
             flex: 1,
             padding: "10px 0",
@@ -543,7 +547,7 @@ function UnlockScreen() {
         </button>
         <button
           type="button"
-          onClick={() => setShowResetConfirm(true)}
+          onClick={() => setResetAction("import")}
           style={{
             flex: 1,
             padding: "10px 0",
@@ -567,11 +571,11 @@ function UnlockScreen() {
       <div
         style={{
           width: "100%",
-          maxHeight: showResetConfirm ? "200px" : "0",
-          opacity: showResetConfirm ? 1 : 0,
+          maxHeight: resetAction ? "200px" : "0",
+          opacity: resetAction ? 1 : 0,
           overflow: "hidden",
           transition: "max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), margin 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          marginTop: showResetConfirm ? "12px" : "0",
+          marginTop: resetAction ? "12px" : "0",
         }}
       >
         <div
@@ -600,7 +604,11 @@ function UnlockScreen() {
           <div style={{ display: "flex", gap: "8px" }}>
             <button
               type="button"
-              onClick={() => void resetWallet()}
+              onClick={() => {
+                const action = resetAction;
+                setResetAction(null);
+                void resetWallet(action === "import" ? "import" : "create");
+              }}
               style={{
                 flex: 1,
                 padding: "8px 0",
@@ -620,7 +628,7 @@ function UnlockScreen() {
             </button>
             <button
               type="button"
-              onClick={() => setShowResetConfirm(false)}
+              onClick={() => setResetAction(null)}
               style={{
                 flex: 1,
                 padding: "8px 0",
@@ -780,7 +788,6 @@ function WalletInterface() {
             onShield={() => { setSwapMode("shield"); handleTabChange("shield"); }}
             onSettings={() => setShowSettings(true)}
             tokenRows={tokenRows}
-            allTokenRows={allTokenRows}
             transactionDetails={transactionDetails}
             walletAddress={walletAddress}
             walletLabel={walletLabel}
@@ -949,7 +956,7 @@ function WalletInterface() {
             flexDirection: "column",
             background: activeLayer >= 1 ? "#EBEBEB" : "#F5F5F5",
             borderRadius: "20px",
-            overflow: "hidden",
+            overflow: "clip",
             transition: "background 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
             ...layerStyle(0, activeLayer),
           }}
@@ -977,7 +984,7 @@ function WalletInterface() {
             flexDirection: "column",
             background: activeLayer >= 2 ? "#EBEBEB" : "#F5F5F5",
             borderRadius: "20px",
-            overflow: "hidden",
+            overflow: "clip",
             transition: "background 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
             ...layerStyle(1, activeLayer),
           }}
@@ -1008,7 +1015,7 @@ function WalletInterface() {
             flexDirection: "column",
             background: "#F5F5F5",
             borderRadius: "20px",
-            overflow: "hidden",
+            overflow: "clip",
             transform: showSettings ? "translateX(0)" : "translateX(105%)",
             opacity: showSettings ? 1 : 0,
             transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -1028,7 +1035,7 @@ function WalletInterface() {
 // ---------------------------------------------------------------------------
 
 function WalletAppInner() {
-  const { state } = useWalletContext();
+  const { state, resetMode } = useWalletContext();
   const prevStateRef = useRef(state);
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -1057,7 +1064,7 @@ function WalletAppInner() {
   }
 
   const screen = state === "noWallet"
-    ? <CreateWalletScreen />
+    ? <CreateWalletScreen initialMode={resetMode} />
     : state === "locked"
       ? <UnlockScreen />
       : <WalletInterface />;
