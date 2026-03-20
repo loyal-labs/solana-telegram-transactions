@@ -13,13 +13,15 @@ jobs:
       - run: bun install
       - run: bun run build:solana-packages
       - run: cd packages/wallet-core && bun run typecheck && bun run build
+      - id: version
+        run: echo "v=$(jq -r .version extension/package.json)" >> "$GITHUB_OUTPUT"
       - run: cd extension && bun run build
       - uses: actions/upload-artifact@v4
         with:
-          name: extension-chrome-mv3
+          name: loyal-ext-universal-v${{ steps.version.outputs.v }}
           path: extension/.output/chrome-mv3/
       - run: cd extension && bun run build:firefox
       - uses: actions/upload-artifact@v4
         with:
-          name: extension-firefox-mv2
+          name: loyal-ext-firefox-v${{ steps.version.outputs.v }}
           path: extension/.output/firefox-mv2/
