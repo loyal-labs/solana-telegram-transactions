@@ -2,12 +2,13 @@ name: Extension CI
 on:
   push:
     paths: ["extension/**", "packages/wallet-core/**"]
-    tags-ignore: ["ext-v*"]
   pull_request:
     paths: ["extension/**", "packages/wallet-core/**"]
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -26,3 +27,18 @@ jobs:
         with:
           name: loyal-ext-firefox-v${{ steps.version.outputs.v }}
           path: extension/.output/firefox-mv2/
+      - name: Create release
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cd extension/.output
+          zip -r loyal-ext-universal-v${{ steps.version.outputs.v }}.zip chrome-mv3/
+          zip -r loyal-ext-firefox-v${{ steps.version.outputs.v }}.zip firefox-mv2/
+      - uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: ext-v${{ steps.version.outputs.v }}
+          name: Extension v${{ steps.version.outputs.v }}
+          make_latest: false
+          files: |
+            extension/.output/loyal-ext-universal-v${{ steps.version.outputs.v }}.zip
+            extension/.output/loyal-ext-firefox-v${{ steps.version.outputs.v }}.zip
