@@ -1,4 +1,14 @@
-import { Check, Copy, Eye, EyeOff } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowLeftRight,
+  ArrowUpRight,
+  Check,
+  Copy,
+  Eye,
+  EyeOff,
+  Settings,
+  Shield,
+} from "lucide-react";
 import { useCallback, useState } from "react";
 
 import type {
@@ -104,6 +114,11 @@ export function PortfolioContent({
   onBalanceHiddenChange,
   onDisconnect,
   onNavigate,
+  onSend,
+  onReceive,
+  onSwap,
+  onShield,
+  onSettings,
   tokenRows,
   transactionDetails,
   walletAddress,
@@ -118,6 +133,11 @@ export function PortfolioContent({
   onBalanceHiddenChange: (hidden: boolean) => void;
   onDisconnect?: () => void;
   onNavigate: (view: SubView) => void;
+  onSend: () => void;
+  onReceive: () => void;
+  onSwap: () => void;
+  onShield: () => void;
+  onSettings: () => void;
   tokenRows: TokenRow[];
   transactionDetails: Record<string, TransactionDetail>;
   walletAddress: string | null;
@@ -249,10 +269,9 @@ export function PortfolioContent({
       <div
         style={{
           display: "flex",
-          gap: "16px",
+          gap: "12px",
           alignItems: "flex-start",
-          padding: "20px 20px 12px",
-          borderRadius: "20px",
+          padding: "12px 12px 12px 20px",
           width: "100%",
         }}
       >
@@ -432,6 +451,89 @@ export function PortfolioContent({
             </span>
           </div>
         </div>
+        <button
+          onClick={onSettings}
+          style={{
+            width: "36px",
+            height: "36px",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            background: "rgba(0, 0, 0, 0.04)",
+            border: "none",
+            borderRadius: "9999px",
+            cursor: "pointer",
+            transition: "background 0.2s ease",
+            color: "#3C3C43",
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0, 0, 0, 0.08)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0, 0, 0, 0.04)"; }}
+          type="button"
+        >
+          <Settings size={20} />
+        </button>
+      </div>
+
+      {/* Action buttons — matching app design */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          padding: "4px 16px 12px",
+        }}
+      >
+        {([
+          { label: "Send", Icon: ArrowUpRight, action: onSend },
+          { label: "Receive", Icon: ArrowDownLeft, action: onReceive },
+          { label: "Swap", Icon: ArrowLeftRight, action: onSwap },
+          { label: "Shield", Icon: Shield, action: onShield },
+        ] as const).map(({ label, Icon, action }) => (
+          <button
+            key={label}
+            type="button"
+            onClick={action}
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              minWidth: 0,
+              overflow: "hidden",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            <div
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "9999px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(249, 54, 60, 0.14)",
+                transition: "transform 0.15s ease",
+              }}
+            >
+              <Icon size={24} strokeWidth={1.5} style={{ color: "#000" }} />
+            </div>
+            <span
+              style={{
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "13px",
+                lineHeight: "16px",
+                color: "rgba(60, 60, 67, 0.6)",
+              }}
+            >
+              {label}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Scrollable content area */}
@@ -594,6 +696,50 @@ export function PortfolioContent({
         </div>
       </div>
 
+      {/* Download CTA */}
+      <div style={{ padding: "8px 16px 4px", flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={() => globalThis.open("https://askloyal.com", "_blank")}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: "10px 16px",
+            background: "#fff",
+            border: "none",
+            borderRadius: "16px",
+            cursor: "pointer",
+            transition: "background 0.15s ease",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(249, 54, 60, 0.06)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; }}
+        >
+          <svg width="28" height="22" viewBox="0 0 980 784" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+            <path d="M147 686L0 343H441V0L637 343L686 0L980 784L147 686Z" fill="#F9363C"/>
+            <path d="M542.333 423.938C623.407 428.187 686.146 488.592 682.464 558.857L388.867 543.47C392.549 473.205 461.258 419.689 542.333 423.938Z" fill="white"/>
+            <path d="M542.532 435.643C586.259 437.935 619.849 475.241 617.557 518.967C616.87 532.087 613.028 544.293 606.809 554.892L466.142 547.52C461.065 536.329 458.522 523.788 459.209 510.669C461.501 466.942 498.805 433.352 542.532 435.643Z" fill="black"/>
+            <path d="M562.108 543.399C562.108 523.779 546.203 507.874 526.583 507.874C546.203 507.874 562.108 491.969 562.108 472.349C562.108 491.969 578.014 507.874 597.633 507.874C578.014 507.874 562.108 523.779 562.108 543.399Z" fill="white"/>
+            <circle cx="588.44" cy="477.861" r="9.1875" fill="white"/>
+          </svg>
+          <span
+            style={{
+              fontFamily: "var(--font-geist-sans), sans-serif",
+              fontSize: "14px",
+              fontWeight: 500,
+              lineHeight: "20px",
+              color: "#000",
+            }}
+          >
+            Download for all platforms
+          </span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(60,60,67,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: "auto", flexShrink: 0 }}>
+            <path d="M9 18l6-6-6-6"/>
+          </svg>
+        </button>
+      </div>
+
       <p
         style={{
           fontFamily: "var(--font-geist-sans), sans-serif",
@@ -602,7 +748,7 @@ export function PortfolioContent({
           lineHeight: "16px",
           color: "rgba(60, 60, 67, 0.3)",
           textAlign: "center",
-          padding: "8px 0 12px",
+          padding: "4px 0 12px",
           flexShrink: 0,
         }}
       >

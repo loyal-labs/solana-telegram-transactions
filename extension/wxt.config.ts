@@ -21,7 +21,7 @@ export default defineConfig({
   manifest: ({ mode }) => ({
     name: mode === "development" ? "Loyal (Dev)" : "Loyal",
     description: "Solana wallet for Telegram communities",
-    permissions: ["storage", "sidePanel"],
+    permissions: ["storage", "sidePanel", "idle", "alarms"],
     host_permissions: [
       "https://api.mainnet-beta.solana.com/*",
       "https://*.helius-rpc.com/*",

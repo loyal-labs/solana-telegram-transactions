@@ -4,7 +4,10 @@ import type {
 } from "~/src/lib/external-wallet-signer";
 import {
   activeWalletSource,
+  autoLockTimeout,
   connectedExternalWallet,
+  isWalletUnlocked,
+  lastActivityAt,
 } from "~/src/lib/storage";
 
 // Track the connect tab so we can route signing requests to it
@@ -16,8 +19,47 @@ const pendingSignRequests = new Map<
   (response: SignTransactionResponse) => void
 >();
 
+const LOCK_ALARM = "auto-lock-check";
+
+async function checkAutoLock() {
+  const [unlocked, timeout, lastActive] = await Promise.all([
+    isWalletUnlocked.getValue(),
+    autoLockTimeout.getValue(),
+    lastActivityAt.getValue(),
+  ]);
+  if (!unlocked || timeout === 0 || lastActive === 0) return;
+  const elapsed = Date.now() - lastActive;
+  if (elapsed >= timeout * 60_000) {
+    await isWalletUnlocked.setValue(false);
+  }
+}
+
 export default defineBackground(() => {
   browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+
+  // --- Auto-lock: periodic alarm check ---
+  browser.alarms.create(LOCK_ALARM, { periodInMinutes: 1 });
+  browser.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === LOCK_ALARM) void checkAutoLock();
+  });
+
+  // --- Auto-lock: system idle / screen lock ---
+  browser.idle.setDetectionInterval(60);
+  browser.idle.onStateChanged.addListener((state) => {
+    if (state === "locked") {
+      void isWalletUnlocked.setValue(false);
+    } else if (state === "idle") {
+      void checkAutoLock();
+    }
+  });
+
+  // --- Auto-lock: activity heartbeat from UI ---
+  browser.runtime.onMessage.addListener((message) => {
+    if (message.type === "ACTIVITY_HEARTBEAT") {
+      void lastActivityAt.setValue(Date.now());
+      return;
+    }
+  });
 
   // Clean up tracked tab and reject pending sign requests when it closes
   browser.tabs.onRemoved.addListener((tabId) => {

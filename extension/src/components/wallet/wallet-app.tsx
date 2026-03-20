@@ -207,7 +207,8 @@ function CreateWalletScreen() {
       return;
     }
     try {
-      const bytes = new Uint8Array(JSON.parse(secretKeyInput));
+      const hex = secretKeyInput.trim().replace(/^0x/, "");
+      const bytes = new Uint8Array(hex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)));
       setError(null);
       setLoading(true);
       await importWallet(bytes, password);
@@ -323,7 +324,7 @@ function CreateWalletScreen() {
 
         {mode === "import" && (
           <textarea
-            placeholder="Secret key (JSON byte array)"
+            placeholder="Private key (hex)"
             value={secretKeyInput}
             onChange={(e) => setSecretKeyInput(e.target.value)}
             rows={3}
@@ -681,7 +682,7 @@ function WalletInterface() {
       const t = setTimeout(() => {
         setDisplayTab(activeTab); // swap content while near-invisible
         setCrossFadeOpacity(1); // fade in
-      }, 200);
+      }, 100);
       return () => clearTimeout(t);
     }
   }, [activeTab, displayTab]);
@@ -691,11 +692,19 @@ function WalletInterface() {
     setSubView(null);
   }, []);
 
+  const handleSwapModeChange = useCallback((mode: SwapMode) => {
+    setSwapMode(mode);
+    setActiveTab(mode === "shield" ? "shield" : "swap");
+    setSubView(null);
+  }, []);
+
   const goBack = useCallback(() => {
     setSubView((current) => {
       if (current === null) return null;
       if (typeof current === "object" && current.type === "transaction") {
-        return current.from === "allActivity" ? "allActivity" : "allTokens";
+        if (current.from === "allActivity") return "allActivity";
+        if (current.from === "allTokens") return "allTokens";
+        return null;
       }
       return null;
     });
@@ -706,6 +715,7 @@ function WalletInterface() {
   }, []);
 
   const handleDone = useCallback(() => {
+    setActiveTab("portfolio");
     setSubView(null);
   }, []);
 
@@ -764,6 +774,11 @@ function WalletInterface() {
             isLoading={isLoading}
             onBalanceHiddenChange={() => void toggleBalanceHidden()}
             onNavigate={handleNavigate}
+            onSend={() => handleTabChange("send")}
+            onReceive={() => handleTabChange("receive")}
+            onSwap={() => { setSwapMode("swap"); handleTabChange("swap"); }}
+            onShield={() => { setSwapMode("shield"); handleTabChange("shield"); }}
+            onSettings={() => setShowSettings(true)}
             tokenRows={tokenRows}
             allTokenRows={allTokenRows}
             transactionDetails={transactionDetails}
@@ -799,7 +814,7 @@ function WalletInterface() {
             onNavigate={handleNavigate}
             onDone={handleDone}
             swapMode={swapMode}
-            onSwapModeChange={setSwapMode}
+            onSwapModeChange={handleSwapModeChange}
           />
         );
       case "shield":
@@ -812,7 +827,7 @@ function WalletInterface() {
             onDone={handleDone}
             securedBalance={0}
             swapMode={swapMode}
-            onSwapModeChange={setSwapMode}
+            onSwapModeChange={handleSwapModeChange}
           />
         );
     }
@@ -946,7 +961,7 @@ function WalletInterface() {
               flex: 1,
               minHeight: 0,
               opacity: crossFadeOpacity,
-              transition: "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+              transition: "opacity 0.12s cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           >
             {renderTabContent()}
@@ -1004,80 +1019,6 @@ function WalletInterface() {
         </div>
       </div>
 
-      {/* Bottom tab bar */}
-      <nav
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-around",
-          borderTop: "1px solid rgba(0, 0, 0, 0.06)",
-          background: "#F5F5F5",
-          padding: "8px 0",
-        }}
-      >
-        {TABS.map(({ id, label, Icon }) => {
-          const isActive = activeTab === id && !showSettings;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => { handleTabChange(id); setShowSettings(false); }}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "2px",
-                padding: "4px 8px",
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                transition: "color 0.15s ease",
-                color: isActive ? "#F9363C" : "rgba(60, 60, 67, 0.4)",
-              }}
-            >
-              <Icon size={20} />
-              <span
-                style={{
-                  fontFamily: "var(--font-geist-sans), sans-serif",
-                  fontSize: "10px",
-                  fontWeight: 500,
-                  lineHeight: "12px",
-                }}
-              >
-                {label}
-              </span>
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          onClick={() => setShowSettings(true)}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "2px",
-            padding: "4px 8px",
-            border: "none",
-            background: "transparent",
-            cursor: "pointer",
-            transition: "color 0.15s ease",
-            color: showSettings ? "#F9363C" : "rgba(60, 60, 67, 0.4)",
-          }}
-        >
-          <SettingsIcon size={20} />
-          <span
-            style={{
-              fontFamily: "var(--font-geist-sans), sans-serif",
-              fontSize: "10px",
-              fontWeight: 500,
-              lineHeight: "12px",
-            }}
-          >
-            Settings
-          </span>
-        </button>
-      </nav>
     </div>
   );
 }

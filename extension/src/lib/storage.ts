@@ -24,3 +24,15 @@ export const isBalanceHidden = storage.defineItem<boolean>(
   "local:balanceHidden",
   { fallback: false },
 );
+
+/** Auto-lock timeout in minutes. 0 = never. */
+export const autoLockTimeout = storage.defineItem<number>(
+  "local:autoLockTimeout",
+  { fallback: 15 },
+);
+
+/** Epoch ms of last user interaction while unlocked. */
+export const lastActivityAt = storage.defineItem<number>(
+  "session:lastActivityAt",
+  { fallback: 0 },
+);

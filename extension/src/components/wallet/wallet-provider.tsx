@@ -20,6 +20,7 @@ import {
 import {
   isBalanceHidden as isBalanceHiddenStorage,
   isWalletUnlocked as isWalletUnlockedStorage,
+  lastActivityAt as lastActivityAtStorage,
   networkSelection,
 } from "~/src/lib/storage";
 
@@ -144,12 +145,41 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const unwatchBalance = isBalanceHiddenStorage.watch((value) => {
       setBalanceHidden(value);
     });
+    // Background worker may set this to false on idle/timeout
+    const unwatchUnlocked = isWalletUnlockedStorage.watch((value) => {
+      if (!value && state === "unlocked") {
+        setSigner(null);
+        setActiveKeypair(null);
+        setState("locked");
+      }
+    });
 
     return () => {
       unwatchNetwork();
       unwatchBalance();
+      unwatchUnlocked();
     };
-  }, []);
+  }, [state]);
+
+  // -----------------------------------------------------------------------
+  // Activity heartbeat — throttled, updates last-activity for auto-lock
+  // -----------------------------------------------------------------------
+
+  useEffect(() => {
+    if (state !== "unlocked") return;
+    let lastSent = Date.now();
+    const onActivity = () => {
+      const now = Date.now();
+      if (now - lastSent < 30_000) return; // throttle to once per 30s
+      lastSent = now;
+      void lastActivityAtStorage.setValue(now);
+    };
+    const events = ["click", "keydown", "scroll", "mousemove"] as const;
+    for (const e of events) document.addEventListener(e, onActivity, { passive: true });
+    return () => {
+      for (const e of events) document.removeEventListener(e, onActivity);
+    };
+  }, [state]);
 
   // -----------------------------------------------------------------------
   // Actions
@@ -164,6 +194,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setPublicKey(keypair.publicKey.toBase58());
       setState("unlocked");
       void isWalletUnlockedStorage.setValue(true);
+      void lastActivityAtStorage.setValue(Date.now());
     },
     [connection],
   );
