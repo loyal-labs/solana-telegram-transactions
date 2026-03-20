@@ -38,6 +38,11 @@ export async function getStoredPublicKey(): Promise<string | null> {
   return walletPublicKey.getValue();
 }
 
+export async function clearStoredKeypair(): Promise<void> {
+  await encryptedKeypair.setValue(null);
+  await walletPublicKey.setValue(null);
+}
+
 async function storeKeypair(keypair: Keypair, password: string): Promise<void> {
   const serialized = JSON.stringify(Array.from(keypair.secretKey));
   const encrypted = await encrypt(serialized, password);

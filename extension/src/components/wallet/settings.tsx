@@ -7,10 +7,11 @@ const font = "var(--font-geist-sans), sans-serif";
 const secondary = "rgba(60, 60, 67, 0.6)";
 
 export function Settings({ onBack }: { onBack: () => void }) {
-  const { network, setNetwork, publicKey, lock, getSecretKey } = useWalletContext();
+  const { network, setNetwork, publicKey, lock, resetWallet, getSecretKey } = useWalletContext();
   const [lockHovered, setLockHovered] = useState(false);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [resetAction, setResetAction] = useState<"create" | "import" | null>(null);
 
   const handleCopyPrivateKey = useCallback(() => {
     const sk = getSecretKey();
@@ -324,6 +325,146 @@ export function Settings({ onBack }: { onBack: () => void }) {
           <Lock size={16} />
           Lock Wallet
         </button>
+
+        {/* Replace wallet */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <span
+            style={{
+              fontFamily: font,
+              fontSize: "13px",
+              fontWeight: 500,
+              lineHeight: "16px",
+              color: secondary,
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+            }}
+          >
+            Replace Wallet
+          </span>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              type="button"
+              onClick={() => setResetAction("create")}
+              style={{
+                flex: 1,
+                padding: "10px 0",
+                borderRadius: "10px",
+                border: "none",
+                cursor: "pointer",
+                background: "rgba(255, 59, 48, 0.08)",
+                fontFamily: font,
+                fontSize: "14px",
+                fontWeight: 500,
+                lineHeight: "20px",
+                color: "#FF3B30",
+                transition: "background 0.15s ease",
+              }}
+            >
+              Create New
+            </button>
+            <button
+              type="button"
+              onClick={() => setResetAction("import")}
+              style={{
+                flex: 1,
+                padding: "10px 0",
+                borderRadius: "10px",
+                border: "none",
+                cursor: "pointer",
+                background: "rgba(255, 59, 48, 0.08)",
+                fontFamily: font,
+                fontSize: "14px",
+                fontWeight: 500,
+                lineHeight: "20px",
+                color: "#FF3B30",
+                transition: "background 0.15s ease",
+              }}
+            >
+              Import
+            </button>
+          </div>
+
+          {/* Confirmation card */}
+          <div
+            style={{
+              maxHeight: resetAction ? "200px" : "0",
+              opacity: resetAction ? 1 : 0,
+              overflow: "hidden",
+              transition: "max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
+          >
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                border: "1px solid rgba(255, 59, 48, 0.2)",
+                padding: "16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+                marginTop: "4px",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: font,
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  lineHeight: "18px",
+                  color: "#FF3B30",
+                  textAlign: "center",
+                }}
+              >
+                Your current wallet will be erased. Without an exported key you will lose access forever.
+              </span>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void resetWallet();
+                    setResetAction(null);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "8px 0",
+                    border: "none",
+                    borderRadius: "10px",
+                    cursor: "pointer",
+                    background: "rgba(255, 59, 48, 0.12)",
+                    fontFamily: font,
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    lineHeight: "16px",
+                    color: "#FF3B30",
+                    transition: "background 0.15s ease",
+                  }}
+                >
+                  I'm 100% sure
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setResetAction(null)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 0",
+                    border: "none",
+                    borderRadius: "10px",
+                    cursor: "pointer",
+                    background: "rgba(0, 0, 0, 0.04)",
+                    fontFamily: font,
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    lineHeight: "16px",
+                    color: "#000",
+                    transition: "background 0.15s ease",
+                  }}
+                >
+                  Nevermind
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Version */}
         <div style={{ textAlign: "center", paddingTop: "8px" }}>

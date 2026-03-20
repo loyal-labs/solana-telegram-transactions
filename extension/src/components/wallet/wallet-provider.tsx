@@ -10,6 +10,7 @@ import { Connection } from "@solana/web3.js";
 import type { WalletSigner } from "@loyal-labs/wallet-core/types";
 import { createKeypairSigner } from "~/src/lib/keypair-signer";
 import {
+  clearStoredKeypair,
   generateKeypair,
   getStoredPublicKey,
   hasStoredKeypair,
@@ -63,6 +64,8 @@ interface WalletContextValue {
   importWallet: (secretKey: Uint8Array, password: string) => Promise<void>;
   unlock: (password: string) => Promise<void>;
   lock: () => void;
+  /** Wipe stored keypair and return to the create wallet screen */
+  resetWallet: () => Promise<void>;
   setNetwork: (network: Network) => Promise<void>;
   toggleBalanceHidden: () => Promise<void>;
   /** Returns the secret key as a byte array. Only available when unlocked. */
@@ -199,6 +202,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     void isWalletUnlockedStorage.setValue(false);
   }, []);
 
+  const resetWallet = useCallback(async () => {
+    setSigner(null);
+    setActiveKeypair(null);
+    setPublicKey(null);
+    await clearStoredKeypair();
+    await isWalletUnlockedStorage.setValue(false);
+    setState("noWallet");
+  }, []);
+
   const setNetwork = useCallback(async (net: Network) => {
     await networkSelection.setValue(net);
     setNetworkState(net);
@@ -229,6 +241,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       importWallet,
       unlock,
       lock,
+      resetWallet,
       setNetwork,
       toggleBalanceHidden,
       getSecretKey,
@@ -244,6 +257,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       importWallet,
       unlock,
       lock,
+      resetWallet,
       setNetwork,
       toggleBalanceHidden,
       getSecretKey,
