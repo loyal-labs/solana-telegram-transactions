@@ -4,6 +4,8 @@ import {
   ArrowDownLeft,
   ArrowLeftRight,
   ArrowUpRight,
+  Eye,
+  EyeOff,
   Settings as SettingsIcon,
   Shield,
   Wallet,
@@ -173,6 +175,7 @@ function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create"
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [secretKeyInput, setSecretKeyInput] = useState("");
+  const [showImportKey, setShowImportKey] = useState(false);
   const [mode, setMode] = useState<"create" | "import">(initialMode);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -332,28 +335,49 @@ function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create"
         />
 
         {mode === "import" && (
-          <textarea
-            placeholder="Private key (hex)"
-            value={secretKeyInput}
-            onChange={(e) => setSecretKeyInput(e.target.value)}
-            rows={4}
-            style={{
-              width: "100%",
-              background: "#fff",
-              border: "none",
-              borderRadius: "16px",
-              padding: "12px 16px",
-              fontFamily: "monospace",
-              fontSize: "13px",
-              fontWeight: 400,
-              lineHeight: "18px",
-              color: "#000",
-              outline: "none",
-              resize: "none",
-              boxSizing: "border-box",
-              wordBreak: "break-all",
-            }}
-          />
+          <div style={{ position: "relative", width: "100%" }}>
+            <textarea
+              placeholder="Private key (hex)"
+              value={secretKeyInput}
+              onChange={(e) => setSecretKeyInput(e.target.value)}
+              rows={4}
+              style={{
+                width: "100%",
+                background: "#fff",
+                border: "none",
+                borderRadius: "16px",
+                padding: "12px 40px 12px 16px",
+                fontFamily: showImportKey ? "monospace" : "'text-security-disc', monospace",
+                fontSize: "13px",
+                fontWeight: 400,
+                lineHeight: "18px",
+                color: "#000",
+                outline: "none",
+                resize: "none",
+                boxSizing: "border-box",
+                wordBreak: "break-all",
+                ...(showImportKey ? {} : { WebkitTextSecurity: "disc" as never }),
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowImportKey(!showImportKey)}
+              style={{
+                position: "absolute",
+                right: "12px",
+                top: "12px",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "2px",
+                display: "flex",
+                alignItems: "center",
+                color: "rgba(60, 60, 67, 0.6)",
+              }}
+            >
+              {showImportKey ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
         )}
       </div>
 
