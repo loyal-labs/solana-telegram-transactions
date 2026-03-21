@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Eye, Globe, KeyRound, Lock, PanelRight, Plus, Square, Timer } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Eye, EyeOff, Globe, KeyRound, Lock, PanelRight, Plus, Square, Timer } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { useWalletContext } from "~/src/components/wallet/wallet-provider";
@@ -200,6 +200,7 @@ function SegmentedControl<T extends string | number>({
 export function Settings({ onBack }: { onBack: () => void }) {
   const { network, setNetwork, publicKey, lock, resetWallet, getSecretKey } = useWalletContext();
   const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [revealKey, setRevealKey] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [resetAction, setResetAction] = useState<"create" | "import" | null>(null);
@@ -317,7 +318,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
           <SettingsRow
             icon={<Eye size={18} />}
             title="Private Key"
-            onClick={() => setShowPrivateKey(!showPrivateKey)}
+            onClick={() => { setShowPrivateKey(!showPrivateKey); setRevealKey(false); }}
           >
             {showPrivateKey
               ? <ChevronUp size={14} style={{ color: chevronColor }} />
@@ -349,9 +350,10 @@ export function Settings({ onBack }: { onBack: () => void }) {
               </span>
               <div
                 style={{
+                  position: "relative",
                   background: "rgba(0, 0, 0, 0.04)",
                   borderRadius: "8px",
-                  padding: "10px 12px",
+                  padding: "10px 36px 10px 12px",
                   fontFamily: "monospace",
                   fontSize: "11px",
                   lineHeight: "16px",
@@ -361,7 +363,28 @@ export function Settings({ onBack }: { onBack: () => void }) {
                   overflowY: "auto",
                 }}
               >
-                {Array.from(getSecretKey() ?? []).map((b) => b.toString(16).padStart(2, "0")).join("")}
+                {revealKey
+                  ? Array.from(getSecretKey() ?? []).map((b) => b.toString(16).padStart(2, "0")).join("")
+                  : "••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••"}
+                <button
+                  type="button"
+                  onClick={() => setRevealKey(!revealKey)}
+                  style={{
+                    position: "absolute",
+                    right: "8px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "2px",
+                    display: "flex",
+                    alignItems: "center",
+                    color: "rgba(60, 60, 67, 0.6)",
+                  }}
+                >
+                  {revealKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button

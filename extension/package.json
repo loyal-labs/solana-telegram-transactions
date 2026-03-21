@@ -26,6 +26,7 @@
     "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "text-security": "^3.2.1",
     "tweetnacl": "1.0.3"
   },
   "devDependencies": {
