@@ -62,9 +62,9 @@ interface WalletContextValue {
   publicKey: string | null;
 
   // Actions
-  createWallet: (password: string) => Promise<void>;
-  importWallet: (secretKey: Uint8Array, password: string) => Promise<void>;
-  unlock: (password: string) => Promise<void>;
+  createWallet: (pin: string) => Promise<void>;
+  importWallet: (secretKey: Uint8Array, pin: string) => Promise<void>;
+  unlock: (pin: string) => Promise<void>;
   lock: () => void;
   /** Wipe stored keypair and return to the create wallet screen */
   resetWallet: (initialMode?: "create" | "import") => Promise<void>;
@@ -218,26 +218,26 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   );
 
   const createWallet = useCallback(
-    async (password: string) => {
-      const keypair = await generateKeypair(password);
+    async (pin: string) => {
+      const keypair = await generateKeypair(pin);
       buildSigner(keypair);
     },
     [buildSigner],
   );
 
   const importWallet = useCallback(
-    async (secretKey: Uint8Array, password: string) => {
-      const keypair = await importKeypair(secretKey, password);
+    async (secretKey: Uint8Array, pin: string) => {
+      const keypair = await importKeypair(secretKey, pin);
       buildSigner(keypair);
     },
     [buildSigner],
   );
 
   const unlock = useCallback(
-    async (password: string) => {
-      const keypair = await loadKeypair(password);
+    async (pin: string) => {
+      const keypair = await loadKeypair(pin);
       if (!keypair) {
-        throw new Error("Invalid password or no stored keypair");
+        throw new Error("Invalid PIN or no stored keypair");
       }
       buildSigner(keypair);
     },

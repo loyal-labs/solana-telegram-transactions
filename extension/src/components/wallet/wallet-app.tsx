@@ -15,6 +15,7 @@ import confettiAnimationData from "~/assets/confetti.json";
 import type { SubView, SwapMode, SwapToken } from "@loyal-labs/wallet-core/types";
 import { LOYL_TOKEN } from "@loyal-labs/wallet-core/types";
 import { useWalletContext, WalletProvider } from "./wallet-provider";
+import { PinInput } from "./shared";
 
 import { PortfolioContent } from "./portfolio-content";
 import { SendContent } from "./send-content";
@@ -172,43 +173,52 @@ function Logotype() {
 
 function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create" | "import" }) {
   const { createWallet, importWallet } = useWalletContext();
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [step, setStep] = useState<"enter" | "confirm">("enter");
   const [secretKeyInput, setSecretKeyInput] = useState("");
   const [showImportKey, setShowImportKey] = useState(false);
   const [mode, setMode] = useState<"create" | "import">(initialMode);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleCreate = async () => {
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-    setError(null);
-    setLoading(true);
-    try {
-      await createWallet(password);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create wallet");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleCreateWithPin = useCallback(
+    async (finalPin: string) => {
+      setLoading(true);
+      try {
+        await createWallet(finalPin);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to create wallet");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [createWallet],
+  );
+
+  const handlePinComplete = useCallback(
+    (enteredPin: string) => {
+      if (step === "enter") {
+        setPin(enteredPin);
+        setStep("confirm");
+        setConfirmPin("");
+        setError(null);
+      } else {
+        if (enteredPin !== pin) {
+          setError("PINs don't match");
+          setConfirmPin("");
+          return;
+        }
+        setConfirmPin(enteredPin);
+        setError(null);
+        if (mode === "import") return;
+        void handleCreateWithPin(enteredPin);
+      }
+    },
+    [step, pin, mode, handleCreateWithPin],
+  );
 
   const handleImport = async () => {
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
     try {
       const hex = secretKeyInput.trim().replace(/^0x/, "");
       if (!hex) throw new Error("Private key cannot be empty");
@@ -217,13 +227,23 @@ function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create"
       const bytes = new Uint8Array(pairs.map((b) => parseInt(b, 16)));
       setError(null);
       setLoading(true);
-      await importWallet(bytes, password);
+      await importWallet(bytes, pin);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Invalid secret key or import failed");
     } finally {
       setLoading(false);
     }
   };
+
+  const handleBack = useCallback(() => {
+    setStep("enter");
+    setConfirmPin("");
+    setPin("");
+    setError(null);
+  }, []);
+
+  const pinLabel = step === "enter" ? "Create a PIN" : "Confirm your PIN";
+  const showImportField = mode === "import" && step === "confirm" && confirmPin.length === 4 && confirmPin === pin;
 
   return (
     <div
@@ -242,11 +262,11 @@ function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create"
         <Logotype />
       </div>
 
-      {/* Tab toggle — matches frontend quick-action 12px radius, 6px gap */}
-      <div style={{ display: "flex", gap: "6px", width: "100%", marginBottom: "16px" }}>
+      {/* Tab toggle */}
+      <div style={{ display: "flex", gap: "6px", width: "100%", marginBottom: "24px" }}>
         <button
           type="button"
-          onClick={() => { setMode("create"); setError(null); }}
+          onClick={() => { setMode("create"); setError(null); setStep("enter"); setPin(""); setConfirmPin(""); }}
           style={{
             flex: 1,
             display: "flex",
@@ -269,7 +289,7 @@ function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create"
         </button>
         <button
           type="button"
-          onClick={() => { setMode("import"); setError(null); }}
+          onClick={() => { setMode("import"); setError(null); setStep("enter"); setPin(""); setConfirmPin(""); }}
           style={{
             flex: 1,
             display: "flex",
@@ -292,49 +312,49 @@ function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create"
         </button>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%" }}>
-        <input
-          type="password"
-          placeholder="Password (min 8 characters)"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{
-            width: "100%",
-            background: "#fff",
-            border: "none",
-            borderRadius: "16px",
-            padding: "15px 16px",
-            fontFamily: "var(--font-geist-sans), sans-serif",
-            fontSize: "16px",
-            fontWeight: 400,
-            lineHeight: "20px",
-            color: "#000",
-            outline: "none",
-            boxSizing: "border-box",
-          }}
-        />
-        <input
-          type="password"
-          placeholder="Confirm password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          style={{
-            width: "100%",
-            background: "#fff",
-            border: "none",
-            borderRadius: "16px",
-            padding: "15px 16px",
-            fontFamily: "var(--font-geist-sans), sans-serif",
-            fontSize: "16px",
-            fontWeight: 400,
-            lineHeight: "20px",
-            color: "#000",
-            outline: "none",
-            boxSizing: "border-box",
-          }}
-        />
+      {/* PIN input — don't pass disabled during create loading to prevent layout shift */}
+      <PinInput
+        value={step === "enter" ? pin : confirmPin}
+        onChange={step === "enter" ? setPin : setConfirmPin}
+        onComplete={handlePinComplete}
+        error={!!error}
+        label={pinLabel}
+      />
 
-        {mode === "import" && (
+      {/* Back button — always rendered to reserve space and prevent layout shift */}
+      <button
+        type="button"
+        onClick={handleBack}
+        style={{
+          marginTop: "12px",
+          background: "none",
+          border: "none",
+          cursor: step === "confirm" ? "pointer" : "default",
+          fontFamily: "var(--font-geist-sans), sans-serif",
+          fontSize: "13px",
+          fontWeight: 500,
+          lineHeight: "16px",
+          color: "rgba(60, 60, 67, 0.6)",
+          padding: "4px 8px",
+          opacity: step === "confirm" && !showImportField ? 1 : 0,
+          pointerEvents: step === "confirm" && !showImportField ? "auto" : "none",
+          transition: "opacity 0.15s ease",
+        }}
+      >
+        Re-enter PIN
+      </button>
+
+      {/* Import key field + button — animated reveal after PIN is confirmed */}
+      <div
+        style={{
+          width: "100%",
+          overflow: "hidden",
+          maxHeight: showImportField ? "300px" : "0px",
+          opacity: showImportField ? 1 : 0,
+          transition: "max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
+        }}
+      >
+        <div style={{ width: "100%", marginTop: "16px" }}>
           <div style={{ position: "relative", width: "100%" }}>
             <textarea
               placeholder="Private key (hex)"
@@ -378,7 +398,40 @@ function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create"
               {showImportKey ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-        )}
+        </div>
+
+        {/* Import button */}
+        {(() => {
+          const isDisabled = loading || !secretKeyInput.trim();
+          return (
+            <button
+              type="button"
+              disabled={isDisabled}
+              onClick={handleImport}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "12px 16px",
+                marginTop: "16px",
+                borderRadius: "9999px",
+                border: "none",
+                cursor: isDisabled ? "default" : "pointer",
+                background: isDisabled ? "#CCCDCD" : "#000",
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20px",
+                color: "#fff",
+                textAlign: "center",
+                transition: "background 0.15s ease",
+              }}
+            >
+              {loading ? "Working..." : "Import Wallet"}
+            </button>
+          );
+        })()}
       </div>
 
       {error && (
@@ -396,42 +449,6 @@ function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create"
         </p>
       )}
 
-      {(() => {
-        const isFormValid = password.length >= 8 && password === confirmPassword && (mode === "create" || secretKeyInput.trim().length > 0);
-        const isDisabled = loading || !isFormValid;
-        return (
-          <button
-            type="button"
-            disabled={isDisabled}
-            onClick={mode === "create" ? handleCreate : handleImport}
-            style={{
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "12px 16px",
-              marginTop: "16px",
-              borderRadius: "9999px",
-              border: "none",
-              cursor: isDisabled ? "default" : "pointer",
-              background: isDisabled ? "#CCCDCD" : "#000",
-              fontFamily: "var(--font-geist-sans), sans-serif",
-              fontSize: "16px",
-              fontWeight: 400,
-              lineHeight: "20px",
-              color: "#fff",
-              textAlign: "center",
-              transition: "background 0.15s ease",
-            }}
-          >
-            {loading
-              ? "Working..."
-              : mode === "create"
-                ? "Create Wallet"
-                : "Import Wallet"}
-          </button>
-        );
-      })()}
     </div>
   );
 }
@@ -442,22 +459,26 @@ function CreateWalletScreen({ initialMode = "create" }: { initialMode?: "create"
 
 function UnlockScreen() {
   const { unlock, publicKey, resetWallet } = useWalletContext();
-  const [password, setPassword] = useState("");
+  const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resetAction, setResetAction] = useState<"create" | "import" | null>(null);
 
-  const handleUnlock = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      await unlock(password);
-    } catch {
-      setError("Invalid password");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleUnlock = useCallback(
+    async (enteredPin: string) => {
+      setError(null);
+      setLoading(true);
+      try {
+        await unlock(enteredPin);
+      } catch {
+        setError("Wrong PIN");
+        setPin("");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [unlock],
+  );
 
   const truncatedKey = publicKey
     ? `${publicKey.slice(0, 4)}...${publicKey.slice(-4)}`
@@ -493,28 +514,14 @@ function UnlockScreen() {
         )}
       </div>
 
-      <input
-        type="password"
-        placeholder="Enter password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") handleUnlock();
-        }}
-        style={{
-          width: "100%",
-          background: "#fff",
-          border: "none",
-          borderRadius: "16px",
-          padding: "15px 16px",
-          fontFamily: "var(--font-geist-sans), sans-serif",
-          fontSize: "16px",
-          fontWeight: 400,
-          lineHeight: "20px",
-          color: "#000",
-          outline: "none",
-          boxSizing: "border-box",
-        }}
+      {/* PIN input */}
+      <PinInput
+        value={pin}
+        onChange={setPin}
+        onComplete={handleUnlock}
+        error={!!error}
+        disabled={loading}
+        label="Enter your PIN"
       />
 
       {error && (
@@ -525,39 +532,27 @@ function UnlockScreen() {
             lineHeight: "16px",
             color: "#FF3B30",
             textAlign: "center",
-            marginTop: "8px",
+            marginTop: "12px",
           }}
         >
           {error}
         </p>
       )}
 
-      <button
-        type="button"
-        disabled={loading}
-        onClick={handleUnlock}
-        style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "12px 16px",
-          marginTop: "16px",
-          borderRadius: "9999px",
-          border: "none",
-          cursor: loading ? "default" : "pointer",
-          background: loading ? "#CCCDCD" : "#000",
-          fontFamily: "var(--font-geist-sans), sans-serif",
-          fontSize: "16px",
-          fontWeight: 400,
-          lineHeight: "20px",
-          color: "#fff",
-          textAlign: "center",
-          transition: "background 0.15s ease",
-        }}
-      >
-        {loading ? "Unlocking..." : "Unlock"}
-      </button>
+      {loading && (
+        <p
+          style={{
+            fontFamily: "var(--font-geist-sans), sans-serif",
+            fontSize: "14px",
+            lineHeight: "20px",
+            color: "rgba(60, 60, 67, 0.6)",
+            textAlign: "center",
+            marginTop: "12px",
+          }}
+        >
+          Unlocking...
+        </p>
+      )}
 
       {/* Reset wallet options */}
       <div style={{ display: "flex", gap: "8px", width: "100%", marginTop: "24px" }}>
@@ -1086,15 +1081,29 @@ function WalletAppInner() {
   const { state, resetMode } = useWalletContext();
   const prevStateRef = useRef(state);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
+  const [displayState, setDisplayState] = useState(state);
 
   useEffect(() => {
-    if (prevStateRef.current === "noWallet" && state === "unlocked") {
-      setShowConfetti(true);
-    }
+    const prev = prevStateRef.current;
     prevStateRef.current = state;
+
+    // Cross-fade when unlocking (locked→unlocked or noWallet→unlocked)
+    if (state === "unlocked" && (prev === "locked" || prev === "noWallet")) {
+      setTransitioning(true);
+      // Fade out the old screen, then swap content + fade in + confetti
+      const t = setTimeout(() => {
+        setDisplayState(state);
+        setTransitioning(false);
+        setShowConfetti(true);
+      }, 250);
+      return () => clearTimeout(t);
+    }
+
+    setDisplayState(state);
   }, [state]);
 
-  if (state === "loading") {
+  if (displayState === "loading") {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
         <div
@@ -1111,15 +1120,23 @@ function WalletAppInner() {
     );
   }
 
-  const screen = state === "noWallet"
+  const screen = displayState === "noWallet"
     ? <CreateWalletScreen initialMode={resetMode} />
-    : state === "locked"
+    : displayState === "locked"
       ? <UnlockScreen />
       : <WalletInterface />;
 
   return (
     <>
-      {screen}
+      <div
+        style={{
+          height: "100%",
+          opacity: transitioning ? 0 : 1,
+          transition: "opacity 0.25s ease",
+        }}
+      >
+        {screen}
+      </div>
       {showConfetti && <ConfettiOverlay onComplete={() => setShowConfetti(false)} />}
     </>
   );
